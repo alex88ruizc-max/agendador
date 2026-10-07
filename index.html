@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Reserva tu cupo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Archivo+Narrow:wght@500;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="theme.js"></script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-paper text-ink font-sans antialiased">
+
+  <!-- Encabezado -->
+  <header class="pole-top bg-ink text-white">
+    <div class="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-4">
+      <div class="min-w-0">
+        <h1 id="bizName" class="font-narrow text-2xl font-bold leading-tight">Reserva tu cupo</h1>
+        <p id="bizAddress" class="truncate text-sm text-white/70"></p>
+      </div>
+      <nav id="nav" class="flex shrink-0 flex-wrap items-center justify-end gap-2"></nav>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-5xl px-4 pb-40 pt-6">
+    <section id="unavailable" class="mx-auto mt-10 hidden max-w-md rounded-2xl bg-white p-6 text-center">
+      <h2 id="unTitle" class="font-narrow text-2xl font-bold"></h2><p id="unText" class="mt-2 text-ink/70"></p>
+    </section>
+    <div id="mainContent">
+    <p id="closedBanner" class="mb-6 hidden rounded-xl border border-pole-red/40 bg-white p-4 text-sm font-semibold text-pole-red">
+      Las reservas en línea de esta barbería no están disponibles por ahora. Comunícate directamente con el local.
+    </p>
+
+    <!-- Estado de los barberos -->
+    <section aria-label="Barberos" class="mb-8">
+      <div id="staffStatus" class="flex flex-wrap gap-2"></div>
+    </section>
+
+    <!-- Paso 1: servicio -->
+    <section class="mb-10" aria-labelledby="h-serv">
+      <h2 id="h-serv" class="step-title"><span class="step-num">1</span>¿Qué te vas a hacer?</h2>
+      <p class="mb-3 text-sm text-ink/70">Elige un servicio principal.</p>
+      <div id="mainServices" class="grid gap-2 sm:grid-cols-2"></div>
+      <div id="extrasWrap" class="mt-6 hidden">
+        <p class="mb-3 text-sm text-ink/70">¿Le agregas algo? Cada agregado suma a su precio y tiempo.</p>
+        <div id="extraServices" class="grid gap-2 sm:grid-cols-2"></div>
+      </div>
+    </section>
+
+    <!-- Paso 2: barbero -->
+    <section class="mb-10" aria-labelledby="h-staff">
+      <h2 id="h-staff" class="step-title"><span class="step-num">2</span>¿Con quién?</h2>
+      <div id="staffPick" class="flex flex-wrap gap-2"></div>
+    </section>
+
+    <!-- Paso 3: día -->
+    <section class="mb-10" aria-labelledby="h-day">
+      <h2 id="h-day" class="step-title"><span class="step-num">3</span>Elige el día</h2>
+      <div class="rounded-xl border border-line bg-white p-4">
+        <div class="mb-3 flex items-center justify-between">
+          <button id="prevMonth" class="btn-ghost" aria-label="Mes anterior">‹</button>
+          <p id="monthLabel" class="font-narrow text-lg font-bold capitalize"></p>
+          <button id="nextMonth" class="btn-ghost" aria-label="Mes siguiente">›</button>
+        </div>
+        <div class="grid grid-cols-7 gap-1 text-center text-xs font-semibold text-ink/60">
+          <span>L</span><span>M</span><span>M</span><span>J</span><span>V</span><span>S</span><span>D</span>
+        </div>
+        <div id="calendar" class="mt-1 grid grid-cols-7 gap-1"></div>
+        <div class="mt-4 flex flex-wrap gap-4 text-xs text-ink/70">
+          <span class="flex items-center gap-1.5"><i class="dot bg-emerald-500"></i>Hay cupos</span>
+          <span class="flex items-center gap-1.5"><i class="dot bg-amber-500"></i>Quedan pocos</span>
+          <span class="flex items-center gap-1.5"><i class="dot bg-pole-red"></i>Lleno</span>
+          <span class="flex items-center gap-1.5"><i class="dot bg-slate-300"></i>Cerrado</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Paso 4: hora -->
+    <section class="mb-10" aria-labelledby="h-time">
+      <h2 id="h-time" class="step-title"><span class="step-num">4</span>Elige la hora</h2>
+      <p id="slotsHint" class="text-sm text-ink/70">Primero elige un servicio y un día.</p>
+      <div id="slots" class="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-6"></div>
+    </section>
+    </div>
+  </main>
+
+  <!-- Barra inferior de resumen -->
+  <div id="bookBar" class="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-white/95 backdrop-blur" style="padding-bottom: env(safe-area-inset-bottom, 0px)">
+    <div class="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
+      <div id="summary" class="min-w-0 text-sm"></div>
+      <button id="btnBook" class="btn-primary shrink-0" disabled>Apartar cupo</button>
+    </div>
+  </div>
+
+  <!-- Modal: registro / ingreso -->
+  <div id="authModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+    <div class="modal-card">
+      <div class="mb-4 flex items-start justify-between">
+        <h3 id="authTitle" class="font-narrow text-2xl font-bold">Regístrate y aparta tus cupos</h3>
+        <button class="btn-ghost" data-close="authModal" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="mb-4 grid grid-cols-2 rounded-lg bg-paper p-1 text-sm font-semibold">
+        <button id="tabRegister" class="tab tab-on">Crear cuenta</button>
+        <button id="tabLogin" class="tab">Ya tengo cuenta</button>
+      </div>
+      <form id="registerForm" class="space-y-3" novalidate>
+        <div class="grid grid-cols-2 gap-3">
+          <label class="field"><span>Nombre</span><input name="firstName" required autocomplete="given-name"></label>
+          <label class="field"><span>Apellido</span><input name="lastName" required autocomplete="family-name"></label>
+        </div>
+        <label class="field"><span>WhatsApp</span><input name="whatsapp" type="tel" inputmode="tel" placeholder="300 123 4567" required autocomplete="tel"></label>
+        <label class="field"><span>Correo</span><input name="email" type="email" required autocomplete="email"></label>
+        <label class="field"><span>Contraseña (mínimo 6 caracteres)</span><input name="password" type="password" minlength="6" required autocomplete="new-password"></label>
+        <label class="flex items-start gap-2 text-xs text-ink/75">
+          <input name="consent" type="checkbox" class="mt-0.5 h-4 w-4 accent-pole-blue" required>
+          <span id="habeasText">Autorizo el tratamiento de mis datos personales.</span>
+        </label>
+        <button class="btn-primary w-full" type="submit">Crear cuenta y continuar</button>
+      </form>
+      <form id="loginForm" class="hidden space-y-3" novalidate>
+        <label class="field"><span>Correo</span><input name="email" type="email" required autocomplete="email"></label>
+        <label class="field"><span>Contraseña</span><input name="password" type="password" required autocomplete="current-password"></label>
+        <button class="btn-primary w-full" type="submit">Ingresar</button>
+        <button id="btnForgot" type="button" class="w-full text-center text-sm text-pole-blue underline">Olvidé mi contraseña</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: autorización de datos para esta barbería -->
+  <div id="consentModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="consentTitle">
+    <div class="modal-card">
+      <div class="mb-3 flex items-start justify-between">
+        <h3 id="consentTitle" class="font-narrow text-2xl font-bold">Antes de reservar en <span id="consentBiz"></span></h3>
+        <button class="btn-ghost" data-close="consentModal" aria-label="Cerrar">✕</button>
+      </div>
+      <p id="consentText" class="mb-4 text-sm text-ink/80"></p>
+      <button id="btnConsent" class="btn-primary w-full">Acepto y continúo</button>
+    </div>
+  </div>
+
+  <!-- Modal: pago -->
+  <div id="payModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="payTitle">
+    <div class="modal-card">
+      <div class="mb-2 flex items-start justify-between">
+        <h3 id="payTitle" class="font-narrow text-2xl font-bold">Paga el abono y asegura tu cupo</h3>
+        <button class="btn-ghost" data-close="payModal" aria-label="Cerrar">✕</button>
+      </div>
+      <div id="payBody"></div>
+      <form id="proofForm" class="mt-4 space-y-3">
+        <label class="field"><span>Screenshot de la transferencia</span>
+          <input name="proof" type="file" accept="image/*" required class="file:mr-3 file:rounded file:border-0 file:bg-ink file:px-3 file:py-1.5 file:text-white">
+        </label>
+        <img id="proofPreview" class="hidden max-h-48 rounded-lg border border-line" alt="Vista previa del comprobante">
+        <label class="field"><span>Número de la transacción (opcional)</span><input name="reference" maxlength="80"></label>
+        <button class="btn-primary w-full" type="submit">Enviar comprobante</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: comprobante de reserva (ticket) -->
+  <div id="ticketModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Tu reserva">
+    <div class="w-full max-w-sm">
+      <div id="ticket"></div>
+      <div class="mt-3 grid grid-cols-2 gap-2">
+        <button id="tkCopy" class="btn-light">Copiar número</button>
+        <a id="tkWa" class="btn-light text-center" target="_blank" rel="noopener">Enviar a WhatsApp</a>
+      </div>
+      <button class="btn-ghost mt-2 w-full text-white" data-close="ticketModal">Cerrar</button>
+    </div>
+  </div>
+
+  <!-- Modal: mis cupos -->
+  <div id="mineModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="mineTitle">
+    <div class="modal-card max-w-2xl">
+      <div class="mb-4 flex items-start justify-between">
+        <h3 id="mineTitle" class="font-narrow text-2xl font-bold">Mis cupos</h3>
+        <button class="btn-ghost" data-close="mineModal" aria-label="Cerrar">✕</button>
+      </div>
+      <div id="mineList" class="space-y-3"></div>
+    </div>
+  </div>
+
+  <!-- Modal: reagendar -->
+  <div id="reschedModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="reschedTitle">
+    <div class="modal-card">
+      <div class="mb-4 flex items-start justify-between">
+        <h3 id="reschedTitle" class="font-narrow text-2xl font-bold">Cambiar fecha u hora</h3>
+        <button class="btn-ghost" data-close="reschedModal" aria-label="Cerrar">✕</button>
+      </div>
+      <p id="reschedInfo" class="mb-3 text-sm text-ink/75"></p>
+      <label class="field"><span>Nueva fecha</span><input id="reschedDate" type="date"></label>
+      <div id="reschedSlots" class="mt-3 grid grid-cols-3 gap-2"></div>
+      <button id="btnResched" class="btn-primary mt-4 w-full" disabled>Confirmar cambio</button>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

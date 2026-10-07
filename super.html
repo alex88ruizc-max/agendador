@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex">
+  <title>Superusuario · Agendador</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Archivo+Narrow:wght@500;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="theme.js"></script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-paper text-ink font-sans antialiased">
+
+  <header class="pole-top bg-ink text-white">
+    <div class="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-4">
+      <div>
+        <h1 class="font-narrow text-2xl font-bold leading-tight">Tus barberías</h1>
+        <p id="who" class="text-sm text-white/70"></p>
+      </div>
+      <button id="btnLogout" class="btn-ghost hidden text-sm text-white/80">Salir</button>
+    </div>
+  </header>
+
+  <section id="loginView" class="mx-auto mt-12 hidden max-w-sm px-4">
+    <form id="loginForm" class="space-y-3 rounded-2xl bg-white p-6">
+      <h2 class="font-narrow text-2xl font-bold">Ingreso del superusuario</h2>
+      <label class="field"><span>Correo</span><input name="email" type="email" required autocomplete="email"></label>
+      <label class="field"><span>Contraseña</span><input name="password" type="password" required autocomplete="current-password"></label>
+      <button class="btn-primary w-full" type="submit">Ingresar</button>
+      <button id="btnForgot" type="button" class="w-full text-center text-sm text-pole-blue underline">Olvidé mi contraseña</button>
+    </form>
+  </section>
+
+  <section id="deniedView" class="mx-auto mt-12 hidden max-w-md px-4 text-center">
+    <p class="rounded-2xl bg-white p-6">Esta cuenta no es de superusuario. Si eres dueño de una barbería, entra por <a class="underline" href="admin.html">el panel de tu barbería</a>.</p>
+  </section>
+
+  <div id="appView" class="mx-auto hidden max-w-6xl px-4 pb-24 pt-6">
+    <div id="stats" class="mb-6 grid grid-cols-2 gap-3 md:grid-cols-5"></div>
+    <div class="mb-4 flex flex-wrap items-center gap-2">
+      <button id="btnNew" class="btn-primary">+ Nueva barbería</button>
+      <button id="btnOverview" class="btn-light">Ver citas y clientes de cada una</button>
+      <input id="search" placeholder="Buscar barbería" class="ml-auto min-w-0 rounded-lg border border-line px-3 py-2">
+    </div>
+    <div id="list" class="grid gap-3 md:grid-cols-2"></div>
+
+    <section class="mt-10 grid gap-4 md:grid-cols-2">
+      <div class="rounded-xl border border-line bg-white p-4">
+        <h2 class="mb-2 font-narrow text-xl font-bold">Telegram de la plataforma</h2>
+        <p class="mb-3 text-sm text-ink/70">Un solo bot sirve a todas las barberías. Aquí recibes los avisos de vencimientos, suspensiones y barberías nuevas.</p>
+        <div class="mb-3 flex gap-2">
+          <input id="botUser" placeholder="Usuario del bot, sin @" class="min-w-0 flex-1 rounded-lg border border-line px-3 py-2">
+          <button id="btnSaveBot" class="btn-dark">Guardar</button>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <button id="btnTgSuper" class="btn-light">Conectar mi Telegram</button>
+          <span id="tgSuperState" class="text-sm text-ink/70"></span>
+        </div>
+      </div>
+      <div class="rounded-xl border border-line bg-white p-4">
+        <h2 class="mb-2 font-narrow text-xl font-bold">Últimos pagos recibidos</h2>
+        <div id="payments" class="text-sm"></div>
+      </div>
+    </section>
+  </div>
+
+  <div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-card max-w-xl">
+      <div class="mb-4 flex items-start justify-between gap-3">
+        <h3 id="modalTitle" class="font-narrow text-2xl font-bold"></h3>
+        <button class="btn-ghost" data-close="modal" aria-label="Cerrar">✕</button>
+      </div>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <script type="module" src="super.js"></script>
+</body>
+</html>
