@@ -2,7 +2,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js?v=2026-10-10b";
+import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js?v=2026-10-10d";
 
 export const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
@@ -16,7 +16,7 @@ export function businessFromUrl() {
 export const bpath = (...parts) => ["businesses", BID, ...parts].join("/");
 
 // Versión de la página: cámbiala en cada actualización para comprobar que se publicó
-export const APP_VERSION = '2026-10-10b';
+export const APP_VERSION = '2026-10-10d';
 // Versiones que esta página espera del servidor y de las reglas de Firebase
 export const SERVER_VERSION = '2026-10-09z';
 export const RULES_VERSION = '2026-10-09v';
@@ -440,6 +440,24 @@ export function plansOf(plat = {}) {
   if (!plat.plans && plat.trialDays) out.free.days = Number(plat.trialDays);
   return out;
 }
+// Lo que se les dice al suscribirse (una línea por beneficio); el superusuario lo edita en Cobros > Planes
+export const DEFAULT_BENEFITS = {
+  free: ["📅 Tu página para que te agenden en línea", "⚡ Cita rápida y atender ahora", "💳 Cobro de abonos con Nequi o Bre-B"],
+  basic: ["🎨 Tu marca: portada, colores y logo", "🔔 Aviso en Telegram de cada reserva", "🗂️ Tus clientes: historial, preferenciales y bloqueos", "🖼️ Imágenes con tus horarios libres", "👥 Hasta 3 profesionales y reservas hasta 30 días"],
+  gold: ["🎨 Estados PRO: 8 diseños con tu logo", "📲 Publícalos en tu estado de WhatsApp con un toque", "📣 Marketing para llenar tus huecos libres", "🔔 Tú eliges qué avisos de Telegram recibir", "👥 Equipo sin límite y reservas hasta 90 días"]
+};
+// frase antes de la lista: cada plan muestra solo lo que suma sobre el anterior
+export const DEFAULT_BENEFITS_INTRO = { free: "", basic: "Todo lo del plan Gratis, y además:", gold: "Todo lo de Básico, y además:" };
+const OLD_GOLD = "🎨 Estados PRO: 8 diseños con tu logo|📲 Publícalos en tu estado de WhatsApp con un toque|📣 Marketing para llenar tus huecos libres|🔔 Eliges qué avisos de Telegram recibir|📊 Actividad de tu página y recomendaciones|👥 Equipo sin límite · reservas hasta 90 días";
+const OLD_BASIC_END = "👥 Hasta 3 profesionales · reservas hasta 30 días";
+export function planBenefits(plans, k) {
+  const b = plans[k]?.benefits;
+  if (!Array.isArray(b) || !b.length) return DEFAULT_BENEFITS[k] || [];
+  if (k === "gold" && b.join("|") === OLD_GOLD) return DEFAULT_BENEFITS.gold; // lista vieja guardada sin cambios
+  if (k === "basic" && b[b.length - 1] === OLD_BASIC_END && b.length === 5) return DEFAULT_BENEFITS.basic;
+  return b;
+}
+export const planBenefitsIntro = (plans, k) => (typeof plans[k]?.benefitsIntro === "string" ? plans[k].benefitsIntro : DEFAULT_BENEFITS_INTRO[k] || "");
 // tiendas antiguas sin plan: en prueba = Gratis; las que ya pagaban = Gold
 export const planOfBiz = (biz = {}) => (PLAN_KEYS.includes(biz.plan) ? biz.plan : biz.trial ? "free" : "gold");
 export function planPriceOf(plat, plan, months) {

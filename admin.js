@@ -7,9 +7,9 @@ import {
   startUpdateWatcher, applyBrandColors, uiConfirm, uiPrompt, setDialogBrand, viewImage, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, hora12, fechaLarga, fechaCorta, toMillis, cop, esc, normalizePhone,
   waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, DEFAULT_WA_RESCHEDULE, computeSlots, staffHours, mapLinks, headerBgCss, onColor, darken,
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
-  PLAN_KEYS, plansOf, planOfBiz, planPriceOf, DEFAULT_PAY_WARNING, TG_EVENTS,
+  PLAN_KEYS, plansOf, planOfBiz, planPriceOf, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-10-10b";
+} from "./common.js?v=2026-10-10d";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -1764,9 +1764,8 @@ function syncPlanGate() {
     if (A.tab !== "plan") switchTab("plan", { fromPop: true });
     else renderPlan();
   } else if (was) {
-    toast(`🎉 ¡Listo! Tu plan ${PLANS()[myPlan()].name} está activo.`);
     switchTab("home", { fromPop: true });
-    if (!A.settings?.setupDone) setTimeout(() => openWizard(), 600);
+    showPlanWelcome(() => { if (!A.settings?.setupDone) openWizard(); });
   }
 }
 function renderPlan() {
@@ -1806,6 +1805,11 @@ function renderPlan() {
         <span class="block text-[11px] opacity-90">${k === "free" ? `${P.free.days} días` : cop(P[k].priceCOP) + "/mes"}</span>
         ${k === cur && !gate ? `<span class="mt-1 inline-block rounded-full bg-white/25 px-1.5 text-[9.5px] font-bold">Tu plan</span>` : ""}
       </button>`).join("")}</div>
+    <div class="mt-3 rounded-2xl p-3" style="background:${sel === "gold" ? "linear-gradient(160deg,#fff6db,#fff)" : "var(--canvas)"};${sel === "gold" ? "border:1px solid #f5c542" : ""}">
+      <p class="mb-1 text-sm font-extrabold">${PLAN_STYLE[sel][2]} Con ${esc(P[sel].name)}${P[sel].tagline ? `: <span class="font-semibold text-ink/70">${esc(P[sel].tagline)}</span>` : ""}</p>
+      ${planBenefitsIntro(P, sel) ? `<p class="mb-1 text-[12px] font-bold text-ink/60">${esc(planBenefitsIntro(P, sel))}</p>` : ""}
+      <ul class="space-y-1 text-[13px]">${planBenefits(P, sel).map((b) => `<li>${esc(b)}</li>`).join("")}</ul>
+    </div>
     <table class="mt-2 w-full border-collapse">
       ${featRow("Agenda y cita rápida", () => `<b style="color:var(--mint)">✓</b>`)}
       ${featRow("Avisos en Telegram", (k) => !(P[k].features || []).includes("telegram") ? `<span class="text-ink/30">—</span>` : (P[k].tgChoose ? "<b>Eliges</b>" : `<b>${(P[k].tgEvents || []).length === 1 ? "Reservas" : (P[k].tgEvents || []).length}</b>`))}
@@ -1913,7 +1917,14 @@ $("btnQuickSide").onclick = () => openQuick();
 
 function startHome() {
   H.unsubs.forEach((f) => f()); H.unsubs = [];
-  H.unsubs.push(onSnapshot(doc(db, "businesses", bpath().split("/")[1]), (d) => { if (d.exists()) { A.biz = { ...A.biz, ...d.data() }; renderTabs(); syncPlanGate(); if (A.tab === "plan") renderPlan(); } }, () => {}));
+  H.unsubs.push(onSnapshot(doc(db, "businesses", bpath().split("/")[1]), (d) => {
+    if (!d.exists()) return;
+    const before = myPlan(); A.biz = { ...A.biz, ...d.data() };
+    const gate = document.body.classList.contains("plan-gate");
+    if (A.planSeen && before !== myPlan() && myPlan() !== "free" && !gate) showPlanWelcome();
+    A.planSeen = true;
+    renderTabs(); syncPlanGate(); if (A.tab === "plan") renderPlan();
+  }, () => {}));
   if (isOwner()) H.unsubs.push(onSnapshot(doc(db, bpath("private", "billing")), (d) => { A.bill = d.data() || {}; syncPlanGate(); if (A.tab === "plan") renderPlan(); }, () => {}));
   H.unsubs.push(onSnapshot(doc(db, "platform", "public"), (d) => { A.plat = d.data() || {}; renderTabs(); if (A.tab === "home") renderHome(); }, () => {}));
   H.today = bogNow().date;
@@ -3571,4 +3582,13 @@ async function shareToWhatsApp(dataUrl) {
   const a = document.createElement("a"); a.href = dataUrl; a.download = "estado.jpg"; a.click();
   toast("La imagen se descargó: súbela a tu estado desde WhatsApp.");
   setTimeout(() => window.open("https://wa.me/", "_blank"), 600);
+}
+
+// Al activar Básico o Gold: bienvenida con lo que ahora pueden hacer
+function showPlanWelcome(after) {
+  const k = myPlan(), P = PLANS()[k];
+  openM(`${PLAN_STYLE[k][2]} ¡Plan ${P.name} activo!`, `<p class="soft -mt-2 mb-3 text-sm">Gracias por tu pago. Esto es lo que ya puedes usar:</p>
+    <ul class="space-y-2 text-[14px]">${planBenefits(PLANS(), k).map((b) => `<li class="rounded-xl p-2.5" style="background:var(--canvas)">${esc(b)}</li>`).join("")}</ul>
+    <button class="btn-primary mt-4 w-full py-3" data-close-m="1">¡Vamos!</button>`);
+  $("modalBody").querySelector("[data-close-m]").onclick = () => { closeM(); after?.(); };
 }

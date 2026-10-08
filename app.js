@@ -1,5 +1,5 @@
 // Página pública: ver cupos, registrarse, apartar, pagar con screenshot, mis cupos
-import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz } from "./common.js?v=2026-10-10b";
+import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro } from "./common.js?v=2026-10-10d";
 import {
   onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -10,7 +10,7 @@ import {
   startUpdateWatcher, applyBrandColors, warmServer, uiConfirm, setDialogBrand, viewImage, pushOverlay, dropOverlay, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, dow, hora12, fechaLarga, fechaCorta, toMillis, cop, esc,
   normalizePhone, waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, computeSlots, dayCapacityUnits, staffHours, mapLinks, headerBgCss,
   toast, openModal, closeModal, setBusy, copyText, tmin, mstr, UNIT
-} from "./common.js?v=2026-10-10b";
+} from "./common.js?v=2026-10-10d";
 
 const $ = (id) => document.getElementById(id);
 const S = {
@@ -997,7 +997,11 @@ function renderTrialPlans() {
       ${k === rec ? `<span class="absolute -top-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-pole-red px-1.5 text-[8.5px] font-extrabold text-white">RECOMENDADO</span>` : ""}
       ${k === T_PLAN ? `<span class="absolute -right-1.5 -top-2 grid h-5 w-5 place-items-center rounded-full bg-ink text-[11px] font-extrabold text-white">✓</span>` : ""}
       <b class="block text-[14px]">${PSTYLE[k][2]} ${esc(P[k].name)}</b><span class="block text-[11px] opacity-90">${k === "free" ? P.free.days + " días" : cop(P[k].priceCOP) + "/mes"}</span></button>`).join("")}</div>
-    <p class="mt-2 text-center text-xs text-ink/60">${esc(P[T_PLAN].tagline || "")}</p>
+    <div class="mt-3 rounded-2xl p-3" style="background:${T_PLAN === "gold" ? "linear-gradient(160deg,#fff6db,#fff)" : "#F2F5F8"};${T_PLAN === "gold" ? "border:1px solid #f5c542" : ""}">
+      <p class="mb-1 text-sm font-extrabold">${PSTYLE[T_PLAN][2]} Con ${esc(P[T_PLAN].name)}${P[T_PLAN].tagline ? `: <span class="font-semibold text-ink/70">${esc(P[T_PLAN].tagline)}</span>` : ""}</p>
+      ${planBenefitsIntro(P, T_PLAN) ? `<p class="mb-1 text-[12px] font-bold text-ink/60">${esc(planBenefitsIntro(P, T_PLAN))}</p>` : ""}
+      <ul class="space-y-1 text-[13px]">${planBenefits(P, T_PLAN).map((b) => `<li>${esc(b)}</li>`).join("")}</ul>
+    </div>
     <table class="mt-1 w-full border-collapse">
       ${row("Agenda y cita rápida", () => `<b class="text-emerald-600">✓</b>`)}
       ${row("Días para reservar", (k) => `<b>${P[k].daysAhead}</b>`)}

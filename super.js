@@ -3,8 +3,8 @@ import { onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordRe
 import {
   doc, getDoc, setDoc, addDoc, deleteDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp, where
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { PLAN_KEYS, PLAN_FEATURES, plansOf, planOfBiz, DEFAULT_PAY_WARNING, TG_EVENTS, BIZ_TYPES } from "./common.js?v=2026-10-10b";
-import { APP_VERSION, SERVER_VERSION, RULES_VERSION, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, readPublishedVersion, reloadFresh, startUpdateWatcher, warmServer, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-10-10b";
+import { PLAN_KEYS, PLAN_FEATURES, plansOf, planOfBiz, DEFAULT_PAY_WARNING, TG_EVENTS, BIZ_TYPES, planBenefits, planBenefitsIntro } from "./common.js?v=2026-10-10d";
+import { APP_VERSION, SERVER_VERSION, RULES_VERSION, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, readPublishedVersion, reloadFresh, startUpdateWatcher, warmServer, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-10-10d";
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on) => $(id).classList.toggle("hidden", !on);
@@ -620,6 +620,8 @@ function renderPlanEditor() {
       ${k === "free" ? `<label class="field"><span>Días gratis</span><input data-plk="days" type="number" min="1" max="90" value="${p.days}"></label>`
         : `<label class="field"><span>Precio al mes (COP)</span><input data-plk="priceCOP" type="number" min="0" step="1000" value="${p.priceCOP}"></label>`}
       <label class="field sm:col-span-2"><span>Frase corta</span><input data-plk="tagline" value="${esc(p.tagline || "")}" maxlength="50"></label>
+      <label class="field sm:col-span-2"><span>Frase antes de los beneficios <span class="soft font-normal">(ej. “Todo lo de Básico, y además:”)</span></span><input data-plk="benefitsIntro" maxlength="60" value="${esc(planBenefitsIntro(PL.plans, k))}"></label>
+      <label class="field sm:col-span-2"><span>Beneficios que se les dicen al suscribirse <span class="soft font-normal">(uno por línea, puedes usar emojis)</span></span><textarea data-plben="1" rows="5" maxlength="900" placeholder="Máximo 4 o 5 líneas para que se lean">${esc(planBenefits(PL.plans, k).join("\n"))}</textarea></label>
       <label class="field"><span>Días que pueden reservar adelante</span><input data-plk="daysAhead" type="number" min="1" max="365" value="${p.daysAhead}"></label>
       <label class="field"><span>Profesionales (0 = sin límite)</span><input data-plk="maxStaff" type="number" min="0" max="50" value="${p.maxStaff}"></label>
       <div class="sm:col-span-2"><p class="mb-1 text-sm font-semibold">Funciones incluidas</p>
@@ -636,6 +638,7 @@ function readPlanEditor() {
     box.querySelectorAll("[data-plk]").forEach((i) => { const key = i.dataset.plk; p[key] = i.type === "checkbox" ? i.checked : i.type === "number" ? Number(i.value || 0) : i.value.trim(); });
     p.features = [...box.querySelectorAll("[data-plf]:checked")].map((x) => x.dataset.plf);
     p.tgEvents = [...box.querySelectorAll("[data-pltg]:checked")].map((x) => x.dataset.pltg);
+    const ben = box.querySelector("[data-plben]"); if (ben) p.benefits = ben.value.split("\n").map((l) => l.trim()).filter(Boolean).slice(0, 12);
   });
   PL.rec = document.querySelector('input[name="plRec"]:checked')?.value || "gold";
 }
