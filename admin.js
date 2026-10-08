@@ -9,7 +9,7 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-10-10d";
+} from "./common.js?v=2026-10-10e";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -1791,9 +1791,9 @@ function renderPlan() {
     : gate
     ? `<p class="text-[11px] font-extrabold tracking-wider text-ink/50">PASO 3 DE 3</p>
        <h2 class="disp text-[26px] font-extrabold leading-tight">Activa tu plan ${PLAN_STYLE[sel][2]} ${esc(P[sel].name)}</h2>
-       <p class="soft mb-3 text-sm">Tu cuenta ya está creada. Paga y tu plan se activa solo, o empieza con el plan Gratis.</p>`
+       <p class="soft mb-3 text-sm">Tu cuenta ya está creada. Paga y tu plan se activa solo, o empieza con la prueba gratis.</p>`
     : `<div class="sp-card mb-3"><div class="flex items-center justify-between gap-2"><p class="disp text-[20px] font-extrabold">${PLAN_STYLE[cur][2]} Plan ${esc(P[cur].name)}</p><span class="${status[1]} rounded-full px-2.5 py-0.5 text-xs font-bold">${status[0]}</span></div>
-       <p class="mt-1 text-sm">${bl.paidUntil ? `${cur === "free" ? "Gratis hasta el" : "Pagado hasta el"} ${fechaLarga(bl.paidUntil)}${days > 0 ? ` (faltan ${days} día${days === 1 ? "" : "s"})` : days === 0 ? " (vence hoy)" : ` (venció hace ${-days} día${days === -1 ? "" : "s"})`}` : ""}</p>
+       <p class="mt-1 text-sm">${bl.paidUntil ? `${cur === "free" ? "Prueba gratis hasta el" : "Pagado hasta el"} ${fechaLarga(bl.paidUntil)}${days > 0 ? ` (faltan ${days} día${days === 1 ? "" : "s"})` : days === 0 ? " (vence hoy)" : ` (venció hace ${-days} día${days === -1 ? "" : "s"})`}` : ""}</p>
        ${credit ? `<p class="mt-2 rounded-xl px-3 py-2 text-sm font-semibold" style="background:#fff7e0;color:#8a5a00">🎁 Tienes ${cop(credit)} de descuento por referidos.</p>` : ""}</div>
        <div class="sp-h"><h2>${cur === "free" ? "Elige tu plan" : "Renueva o cambia de plan"}</h2></div>`;
   const shown = over ? PLAN_KEYS.filter((k) => k !== "free") : PLAN_KEYS;
@@ -1819,8 +1819,8 @@ function renderPlan() {
     </table>`;
   let action = "";
   if (sel === "free") {
-    action = gate ? `<button id="pFree" class="btn-light mt-4 w-full py-3">Empezar con el plan Gratis (${P.free.days} días)</button>`
-      : cur === "free" ? `<p class="soft mt-4 text-center text-sm">Este es tu plan actual.</p>` : `<p class="soft mt-4 text-center text-sm">El plan Gratis es solo para empezar. Elige Básico o Gold para renovar.</p>`;
+    action = gate ? `<button id="pFree" class="btn-light mt-4 w-full py-3">Empezar con la prueba gratis (${P.free.days} días)</button>`
+      : cur === "free" ? `<p class="soft mt-4 text-center text-sm">Este es tu plan actual.</p>` : `<p class="soft mt-4 text-center text-sm">La prueba gratis es solo para empezar. Elige Básico o Gold para renovar.</p>`;
   } else {
     const price = Number(P[sel].priceCOP || 0);
     const chips = [1, 3, 6, 12].map((m) => {
@@ -1855,13 +1855,13 @@ function renderPlan() {
       ${!orderOk ? `<details class="mt-3"><summary class="cursor-pointer text-sm font-semibold soft">¿Pagaste por otro medio? Sube el comprobante</summary>
         <label class="pay-drop mt-2" for="pOtherFile"><span class="pay-drop-ico"><i class="fa-solid fa-camera"></i></span><span id="pOtherLbl" class="min-w-0 flex-1 text-sm"><b>Adjunta la captura</b></span></label>
         <input id="pOtherFile" type="file" accept="image/*" class="hidden"><input id="pOtherAmt" type="hidden" value="0"><button id="pOtherSend" class="btn-light mt-2 w-full">Enviar comprobante</button></details>` : ""}
-      ${gate && !over ? `<button id="pFree2" class="mt-3 w-full py-1 text-center text-sm text-ink/60 underline">Empezar con el plan Gratis (${P.free.days} días)</button>` : ""}`;
+      ${gate && !over ? `<button id="pFree2" class="mt-3 w-full py-1 text-center text-sm text-ink/60 underline">Empezar con la prueba gratis (${P.free.days} días)</button>` : ""}`;
   }
   el.innerHTML = `${head}${cards}${action}`;
   // ---- acciones
   el.querySelectorAll("[data-psel]").forEach((b) => b.onclick = () => { A.planPick = b.dataset.psel; renderPlan(); });
   el.querySelectorAll("[data-pm]").forEach((b) => b.onclick = () => { A.planMonths = Number(b.dataset.pm); renderPlan(); });
-  const free = async () => { try { await api("chooseFreePlan", {}); toast("Listo: empiezas con el plan Gratis."); } catch (err) { toast(err.message, "error"); } };
+  const free = async () => { try { await api("chooseFreePlan", {}); toast("Listo: empiezas con la prueba gratis."); } catch (err) { toast(err.message, "error"); } };
   if ($("pFree")) $("pFree").onclick = free;
   if ($("pFree2")) $("pFree2").onclick = free;
   if ($("pPay")) $("pPay").onclick = async () => {
@@ -3053,8 +3053,9 @@ function wizInit() {
     days: new Set(WDAYS.map(([d]) => d).filter((d) => (hrs[String(d)] || []).length).length ? WDAYS.map(([d]) => d).filter((d) => (hrs[String(d)] || []).length) : [1, 2, 3, 4, 5, 6]),
     lunch: first.length > 1, open: first[0].open, close: (first[1] || first[0]).close, lunchFrom: first.length > 1 ? first[0].close : "13:00", lunchTo: first.length > 1 ? first[1].open : "14:00",
     slot: Number(s.slotDurationMinutes || 30),
-    svcList: A.services.filter((x) => x.active !== false).sort((a, b) => (a.order ?? 99) - (b.order ?? 99))
-      .map((x) => ({ id: x.id, name: x.name, minutes: Number(x.minutes || 30), price: Number(x.priceCOP || 0), type: x.type || "base" })),
+    svcList: (() => { const l = A.services.filter((x) => x.active !== false).sort((a, b) => (a.order ?? 99) - (b.order ?? 99))
+      .map((x) => ({ id: x.id, name: x.name, minutes: Number(x.minutes || 30), price: Number(x.priceCOP || 0), type: x.type || "base" }));
+      return l.length ? l : [{ id: null, name: "", minutes: 30, price: 0, type: "base" }]; })(),
     deposit: Number(s.depositAmountCOP ?? 5000), pmLabel: pm.label || "Nequi", pmAccount: pm.account || "", pmHolder: pm.holder || "", pmQr: pm.qr || "",
     geo: s.geo || null, geoMode: s.geoMode || ""
   };
@@ -3173,7 +3174,7 @@ const STEPS = [
       <div class="space-y-2">${d.svcList.map((x, i) => `
         <div class="sp-card !p-3">
           <div class="flex items-center gap-2">
-            <input data-sname="${i}" value="${esc(x.name)}" placeholder="Nombre del servicio" maxlength="40" class="min-w-0 flex-1 border-0 p-0 text-[15px] font-bold outline-none">
+            <input data-sname="${i}" value="${esc(x.name)}" placeholder="${esc(svcExample())}" maxlength="40" class="min-w-0 flex-1 border-0 p-0 text-[15px] font-bold outline-none">
             <button type="button" data-sdel="${i}" class="grid h-8 w-8 shrink-0 place-items-center rounded-full text-sm" style="background:#fde8eb;color:#b81d33" aria-label="Quitar ${esc(x.name || "servicio")}"><i class="fa-regular fa-trash-can"></i></button>
           </div>
           <div class="mt-2 flex items-center gap-2">
@@ -3202,7 +3203,9 @@ const STEPS = [
   { id: "deposit", html: () => {
       const d = W.d;
       return `<h3 class="wz-h">Abono para apartar</h3><p class="wz-sub">Con abono la gente no te deja plantado: lo paga por adelantado y el resto en tu local.</p>
-      <div class="flex flex-wrap gap-2">${[[0, "Sin abono"], [5000, "$5.000"], [10000, "$10.000"], [15000, "$15.000"]].map(([v, t]) => `<button type="button" class="q-chip" data-wdep="${v}" aria-pressed="${d.deposit === v}">${t}</button>`).join("")}</div>
+      ${(() => { const preset = [0, 5000, 10000, 15000], other = d.depOther || !preset.includes(d.deposit); return `
+      <div class="flex flex-wrap gap-2">${[[0, "Sin abono"], [5000, "$5.000"], [10000, "$10.000"], [15000, "$15.000"]].map(([v, t]) => `<button type="button" class="q-chip" data-wdep="${v}" aria-pressed="${!other && d.deposit === v}">${t}</button>`).join("")}<button type="button" class="q-chip" data-wdepother="1" aria-pressed="${other}">Otro valor</button></div>
+      ${other ? `<label class="mt-2 flex items-center gap-1 rounded-xl border-2 px-3 py-2" style="border-color:var(--sblue)"><span class="soft font-bold">$</span><input id="wDepOther" inputmode="numeric" class="w-full border-0 p-0 text-[17px] font-extrabold outline-none" placeholder="Escribe el valor, ej. 12.000" value="${d.deposit && !preset.includes(d.deposit) ? Number(d.deposit).toLocaleString("es-CO") : ""}"></label>` : ""}`; })()}
       ${d.deposit ? `<p class="mb-1 mt-4 text-sm font-semibold soft">¿Dónde te pagan?</p>
       <div class="flex flex-wrap gap-2">${["Nequi", "Daviplata", "Bre-B", "Bancolombia"].map((t) => `<button type="button" class="q-chip" data-wpml="${t}" aria-pressed="${d.pmLabel === t}">${t}</button>`).join("")}</div>
       <div class="sp-card mt-2 space-y-2">
@@ -3217,6 +3220,7 @@ const STEPS = [
       const d = W.d;
       if ($("wPmAcc")) { d.pmAccount = $("wPmAcc").value.trim(); d.pmHolder = $("wPmHolder").value.trim(); }
       const data = { depositAmountCOP: d.deposit };
+      if (d.depOther && !d.deposit) throw new Error("Escribe el valor del abono, o elige “Sin abono”.");
       if (d.deposit && !d.pmAccount) throw new Error("Escribe dónde te pagan el abono, o elige “Sin abono”.");
       const pmErr = d.deposit ? pmProblem([{ label: d.pmLabel, account: d.pmAccount }]) : "";
       if (pmErr) throw new Error(pmErr);
@@ -3242,10 +3246,9 @@ const STEPS = [
       if (d.geo) await updateDoc(doc(db, bpath("settings", "general")), { geo: d.geo, geoMode: "gps" });
       else if (d.geoMode === "address") await updateDoc(doc(db, bpath("settings", "general")), { geoMode: "address" });
     } },
-  { id: "telegram", skipTxt: "Lo conecto después (no recibirás avisos)", html: () => {
+  { id: "telegram", skipTxt: "Lo conecto después (no recibirás avisos)", noSkip: () => lockedNow("telegram"), html: () => {
       if (lockedNow("telegram")) return `<p class="text-5xl">📲</p><h3 class="wz-h">Avisos en tu Telegram</h3>
-        <p class="wz-sub">Con el plan ${esc(PLANS()[planFor("telegram")].name)} te llegan al celular las reservas, los abonos con botón para aprobar y los recordatorios.</p>
-        <div class="sp-card text-[14px]">🔒 Tu plan ${esc(planInfo().name)} no incluye avisos por Telegram: las reservas las ves en tu panel. Puedes activarlos cuando quieras en <b>Mi plan</b>.</div>`;
+        <div class="sp-card text-[14px]">🔒 <b>Este plan no incluye avisos de Telegram.</b> Las reservas las ves en tu panel. <a href="#" class="font-bold underline" data-goplan="${planFor("telegram")}">Ver planes</a></div>`;
       const on = !!A.tg?.owner;
       return `<span class="inline-block rounded-full px-2.5 py-1 text-[11px] font-extrabold" style="background:#fff3dc;color:#9a5a00">⭐ PASO MÁS IMPORTANTE</span>
       <h3 class="wz-h mt-2">Recibe tus citas en Telegram</h3>
@@ -3299,7 +3302,7 @@ function drawWizard() {
   const st = STEPS[W.i], el = $("wizard");
   el.innerHTML = `<div class="wz-top"><button type="button" class="wz-x" data-wx="close" aria-label="Cerrar">✕</button><span class="soft text-xs font-bold">Paso ${W.i + 1} de ${STEPS.length}</span><span class="wz-bar"><i style="width:${((W.i + 1) / STEPS.length) * 100}%"></i></span></div>
     <div class="wz-body q-pop">${st.html()}</div>
-    ${st.essential ? "" : `<button type="button" class="wz-skip" data-wx="skip">${st.skipTxt || "Lo hago después"}</button>`}
+    ${st.essential || st.noSkip?.() ? "" : `<button type="button" class="wz-skip" data-wx="skip">${st.skipTxt || "Lo hago después"}</button>`}
     <div class="wz-foot">${W.i ? `<button type="button" class="btn-light !px-5" data-wx="back">Atrás</button>` : ""}<button type="button" class="btn-primary flex-1 py-3.5 text-base" data-wx="next">${st.next || "Siguiente"}</button></div>`;
   el.querySelector(".wz-body").scrollTop = 0;
   if (st.id === "telegram") wizWatchTg();
@@ -3342,7 +3345,8 @@ async function wizClick(e) {
   }
   const sg = t.closest("[data-ssug]");
   if (sg) { wizReadSvcs(); const x = A.services.find((y) => y.id === sg.dataset.ssug); if (x) d.svcList.push({ id: x.id, name: x.name, minutes: Number(x.minutes || 30), price: Number(x.priceCOP || 0), type: x.type || "base" }); return drawWizard(); }
-  const dp = t.closest("[data-wdep]"); if (dp) { if ($("wPmAcc")) { d.pmAccount = $("wPmAcc").value; d.pmHolder = $("wPmHolder").value; } d.deposit = Number(dp.dataset.wdep); return drawWizard(); }
+  const dp = t.closest("[data-wdep]"); if (dp) { if ($("wPmAcc")) { d.pmAccount = $("wPmAcc").value; d.pmHolder = $("wPmHolder").value; } d.depOther = false; d.deposit = Number(dp.dataset.wdep); return drawWizard(); }
+  if (t.closest("[data-wdepother]")) { if ($("wPmAcc")) { d.pmAccount = $("wPmAcc").value; d.pmHolder = $("wPmHolder").value; } d.depOther = true; if ([0, 5000, 10000, 15000].includes(d.deposit)) d.deposit = 0; drawWizard(); $("wDepOther")?.focus(); return; }
   const pl = t.closest("[data-wpml]"); if (pl) { if ($("wPmAcc")) { d.pmAccount = $("wPmAcc").value; d.pmHolder = $("wPmHolder").value; } d.pmLabel = pl.dataset.wpml; return drawWizard(); }
   const ge = t.closest("[data-wgeo]");
   if (ge) {
@@ -3371,6 +3375,12 @@ async function wizClick(e) {
 }
 function wizInput(e) {
   const t = e.target, d = W.d;
+  if (t.id === "wDepOther") {
+    const n = Number(t.value.replace(/\D/g, "") || 0); t.value = n ? n.toLocaleString("es-CO") : "";
+    const had = !!d.deposit; d.deposit = n;
+    if (had !== !!n) { const pos = t.value.length; drawWizard(); const i = $("wDepOther"); if (i) { i.focus(); i.setSelectionRange(pos, pos); } }
+    return;
+  }
   if (t.dataset.sprice !== undefined) { const n = Number(t.value.replace(/\D/g, "") || 0); t.value = n ? n.toLocaleString("es-CO") : ""; t.closest("label").style.borderColor = n ? "var(--hair)" : "#f3c27a"; return; }
   if (t.dataset.wt) { d[t.dataset.wt] = t.value; clearTimeout(W.tT); W.tT = setTimeout(() => { const pos = t.dataset.wt; drawWizard(); document.querySelector(`[data-wt="${pos}"]`)?.focus(); }, 700); }
 }
@@ -3591,4 +3601,10 @@ function showPlanWelcome(after) {
     <ul class="space-y-2 text-[14px]">${planBenefits(PLANS(), k).map((b) => `<li class="rounded-xl p-2.5" style="background:var(--canvas)">${esc(b)}</li>`).join("")}</ul>
     <button class="btn-primary mt-4 w-full py-3" data-close-m="1">¡Vamos!</button>`);
   $("modalBody").querySelector("[data-close-m]").onclick = () => { closeM(); after?.(); };
+}
+
+// ejemplo de servicio según el tipo de negocio (para la tarjeta vacía)
+function svcExample() {
+  const ex = { barberia: "Ej. Corte clásico", peluqueria: "Ej. Corte y cepillado", salon: "Ej. Tinte completo", unas: "Ej. Manicure semipermanente", pestanas: "Ej. Lifting de pestañas", estetica: "Ej. Limpieza facial", spa: "Ej. Masaje relajante", masajes: "Ej. Masaje descontracturante", maquillaje: "Ej. Maquillaje social", tatuajes: "Ej. Tatuaje pequeño", mascotas: "Ej. Baño y corte" };
+  return ex[A.settings?.businessType] || "Ej. Bronceado en cámara";
 }

@@ -3,8 +3,8 @@ import { onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordRe
 import {
   doc, getDoc, setDoc, addDoc, deleteDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp, where
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { PLAN_KEYS, PLAN_FEATURES, plansOf, planOfBiz, DEFAULT_PAY_WARNING, TG_EVENTS, BIZ_TYPES, planBenefits, planBenefitsIntro } from "./common.js?v=2026-10-10d";
-import { APP_VERSION, SERVER_VERSION, RULES_VERSION, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, readPublishedVersion, reloadFresh, startUpdateWatcher, warmServer, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-10-10d";
+import { PLAN_KEYS, PLAN_FEATURES, plansOf, planOfBiz, DEFAULT_PAY_WARNING, TG_EVENTS, BIZ_TYPES, planBenefits, planBenefitsIntro } from "./common.js?v=2026-10-10e";
+import { APP_VERSION, SERVER_VERSION, RULES_VERSION, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, readPublishedVersion, reloadFresh, startUpdateWatcher, warmServer, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-10-10e";
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on) => $(id).classList.toggle("hidden", !on);
@@ -617,7 +617,7 @@ function renderPlanEditor() {
     <summary class="flex cursor-pointer items-center gap-2 rounded-2xl px-3 py-2.5 text-white" style="background:${PSTY[k][0]}"><b class="flex-1">${PSTY[k][1]} ${esc(p.name)}</b><span class="text-sm">${k === "free" ? p.days + " días" : cop(p.priceCOP) + "/mes"}</span></summary>
     <div class="grid gap-2 p-3 sm:grid-cols-2">
       <label class="field"><span>Nombre</span><input data-plk="name" value="${esc(p.name)}" maxlength="20"></label>
-      ${k === "free" ? `<label class="field"><span>Días gratis</span><input data-plk="days" type="number" min="1" max="90" value="${p.days}"></label>`
+      ${k === "free" ? `<label class="field"><span>Días de prueba (máximo 15)</span><input data-plk="days" type="number" min="1" max="15" value="${Math.min(15, p.days)}"></label>`
         : `<label class="field"><span>Precio al mes (COP)</span><input data-plk="priceCOP" type="number" min="0" step="1000" value="${p.priceCOP}"></label>`}
       <label class="field sm:col-span-2"><span>Frase corta</span><input data-plk="tagline" value="${esc(p.tagline || "")}" maxlength="50"></label>
       <label class="field sm:col-span-2"><span>Frase antes de los beneficios <span class="soft font-normal">(ej. “Todo lo de Básico, y además:”)</span></span><input data-plk="benefitsIntro" maxlength="60" value="${esc(planBenefitsIntro(PL.plans, k))}"></label>
@@ -677,9 +677,9 @@ $("plSave").onclick = async () => {
   const btn = $("plSave"); setBusy(btn, true, "Guardando…");
   try {
     await setDoc(doc(db, "platform", "public"), {
-      plans: (readPlanEditor(), PL.plans), recommendedPlan: PL.rec, planDiscounts: PL.disc, payWarning: $("plWarn").value.trim() || DEFAULT_PAY_WARNING,
+      plans: (readPlanEditor(), PL.plans.free.days = Math.min(15, Math.max(1, Number(PL.plans.free.days || 15))), PL.plans), recommendedPlan: PL.rec, planDiscounts: PL.disc, payWarning: $("plWarn").value.trim() || DEFAULT_PAY_WARNING,
       // compatibilidad con versiones anteriores
-      planName: PL.plans.basic.name, planPriceCOP: Number(PL.plans.basic.priceCOP || 0), trialDays: Math.min(90, Math.max(1, Number(PL.plans.free.days || 30))),
+      planName: PL.plans.basic.name, planPriceCOP: Number(PL.plans.basic.priceCOP || 0), trialDays: Math.min(15, Math.max(1, Number(PL.plans.free.days || 15))),
       trialRules: { daysAhead: Math.max(1, Number(PL.plans.free.daysAhead || 5)), locked: [] },
       trialEnabled: $("plTrial").checked, storyLimit: Math.min(30, Math.max(1, Number($("plStories").value || 10))),
       payMethods: PL.methods.filter((m) => m.label && m.account),

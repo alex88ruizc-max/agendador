@@ -1,5 +1,5 @@
 // Página pública: ver cupos, registrarse, apartar, pagar con screenshot, mis cupos
-import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro } from "./common.js?v=2026-10-10d";
+import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro } from "./common.js?v=2026-10-10e";
 import {
   onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -10,7 +10,7 @@ import {
   startUpdateWatcher, applyBrandColors, warmServer, uiConfirm, setDialogBrand, viewImage, pushOverlay, dropOverlay, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, dow, hora12, fechaLarga, fechaCorta, toMillis, cop, esc,
   normalizePhone, waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, computeSlots, dayCapacityUnits, staffHours, mapLinks, headerBgCss,
   toast, openModal, closeModal, setBusy, copyText, tmin, mstr, UNIT
-} from "./common.js?v=2026-10-10d";
+} from "./common.js?v=2026-10-10e";
 
 const $ = (id) => document.getElementById(id);
 const S = {
@@ -643,7 +643,7 @@ $("btnForgot").onclick = async () => {
 
 // ================= Pago con screenshot =================
 function showPay(apt, keepForm = false) {
-  S.payApt = apt; presence("pay");
+  S.payApt = apt; presence("pay"); warmServer(); // el servidor se despierta mientras el cliente paga
   const st = S.settings || {};
   const methods = (st.paymentMethods || []);
   const fullName = `${S.profile?.firstName || ""} ${S.profile?.lastName || ""}`.trim();
@@ -728,12 +728,12 @@ $("proofFile").addEventListener("change", (e) => {
 
 async function compressImage(file) {
   const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = URL.createObjectURL(file); });
-  const max = 1280;
+  const max = 1000; // suficiente para leer el comprobante y 4 veces más liviano que la foto original
   let w = img.naturalWidth, h = img.naturalHeight;
   if (Math.max(w, h) > max) { const r = max / Math.max(w, h); w = Math.round(w * r); h = Math.round(h * r); }
   const c = document.createElement("canvas"); c.width = w; c.height = h;
   const ctx = c.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, w, h); ctx.drawImage(img, 0, 0, w, h);
-  return c.toDataURL("image/jpeg", 0.75);
+  return c.toDataURL("image/jpeg", 0.62);
 }
 
 $("proofForm").addEventListener("submit", async (e) => {
@@ -743,17 +743,20 @@ $("proofForm").addEventListener("submit", async (e) => {
   if (!file) return toast("Selecciona el screenshot de la transferencia.", "error");
   if (!file.type.startsWith("image/")) return toast("El comprobante debe ser una imagen.", "error");
   const btn = f.querySelector("button[type=submit]");
-  setBusy(btn, true, "Enviando comprobante…");
-  try {
-    if (!S.payApt?.code) throw new Error("Espera un segundo, estamos apartando tu cupo.");
-    const image = await (S.proofData || compressImage(file));
-    const r = await api("submitProof", { code: S.payApt.code, image, reference: f.reference.value });
-    clearInterval(S.payTimer);
-    closeModal("payModal");
-    showTicket(r.appointment);
-    watchTicket(r.appointment.code);
-  } catch (err) { toast(err.message || "No se pudo enviar el comprobante.", "error"); }
-  finally { setBusy(btn, false); }
+  if (!S.payApt?.code) return toast("Espera un segundo, estamos apartando tu cupo.", "error");
+  setBusy(btn, true, "Preparando…");
+  let image;
+  try { image = await (S.proofData || compressImage(file)); }
+  catch { setBusy(btn, false); return toast("No se pudo leer la imagen. Intenta con otra captura.", "error"); }
+  // se pasa al ticket de una vez; el comprobante termina de enviarse por detrás
+  const apt = { ...S.payApt, status: "pending_verification" };
+  clearInterval(S.payTimer);
+  closeModal("payModal"); setBusy(btn, false);
+  showTicket(apt); watchTicket(apt.code);
+  toast("✓ ¡Recibido! Estamos enviando tu comprobante…");
+  api("submitProof", { code: apt.code, image, reference: f.reference.value })
+    .then(() => toast("✓ Comprobante enviado. Te avisamos cuando lo aprueben."))
+    .catch((err) => { toast((err.message || "No se pudo enviar el comprobante.") + " Intenta de nuevo.", "error"); closeModal("ticketModal"); showPay(S.payApt, true); });
 });
 
 // ================= Ticket =================
@@ -817,17 +820,21 @@ function canChange(apt) {
   const minH = Number(S.settings?.rescheduleMinHours ?? 2);
   return toMillis(apt.startAt) - Date.now() >= minH * 3600000;
 }
-function apptCard(a) {
+function apptCard(a, i, list) {
   const maxR = Number(S.settings?.maxReschedules ?? 2);
+  const sameDay = (list || []).filter((x) => x.date === a.date && ["confirmed", "pending_verification"].includes(x.status));
+  const latestOfDay = sameDay.length > 1 && sameDay.every((x) => toMillis(x.startAt) <= toMillis(a.startAt));
+  const soon = !canChange(a);
   const acts = [];
   if (a.status === "pending_payment") {
     acts.push(`<button class="btn-dark text-sm" data-act="pay" data-code="${a.code}">Pagar abono</button>`);
     acts.push(`<button class="btn-sm" data-act="cancel" data-code="${a.code}">Cancelar</button>`);
   } else if (["confirmed", "pending_verification"].includes(a.status)) {
     acts.push(`<button class="btn-dark text-sm" data-act="ticket" data-code="${a.code}">Ver ticket</button>`);
-    if (canChange(a) && (a.rescheduleCount || 0) < maxR) acts.push(`<button class="btn-sm" data-act="resched" data-code="${a.code}">Cambiar hora</button>`);
-    if (canChange(a)) acts.push(`<button class="btn-sm" data-act="cancel" data-code="${a.code}">Cancelar</button>`);
-    if (!canChange(a) && S.settings?.whatsapp) acts.push(`<a class="btn-sm" target="_blank" rel="noopener" href="${waLink(S.settings.whatsapp, "Hola, necesito ayuda con mi reserva " + a.code)}">Escribir por WhatsApp</a>`);
+    // Cambiar hora y Cancelar salen siempre; si faltan menos de 2 horas, al tocarlos se explica y se ofrece WhatsApp
+    if ((a.rescheduleCount || 0) < maxR) acts.push(`<button class="btn-sm" data-act="resched" data-code="${a.code}">Cambiar hora</button>`);
+    acts.push(`<button class="btn-sm" data-act="cancel" data-code="${a.code}">Cancelar</button>`);
+    if ((soon || latestOfDay) && S.settings?.whatsapp) acts.push(`<a class="btn-sm" target="_blank" rel="noopener" href="${waLink(S.settings.whatsapp, "Hola, necesito ayuda con mi reserva " + a.code)}"><i class="fa-brands fa-whatsapp"></i> Escribir por WhatsApp</a>`);
   } else acts.push(`<button class="btn-sm" data-act="ticket" data-code="${a.code}">Ver detalle</button>`);
   return `<article class="rounded-xl border border-line p-3">
     <div class="flex flex-wrap items-center justify-between gap-2">
@@ -835,6 +842,7 @@ function apptCard(a) {
     </div>
     <p class="mt-1 text-sm capitalize">${fechaLarga(a.date)} · ${hora12(a.startTime)} · ${esc(a.staffName)}</p>
     <p class="text-sm text-ink/70">${(a.items || []).map((i) => esc(i.name)).join(" + ")} · ${cop(a.totalCOP)}</p>
+    ${soon && ["confirmed", "pending_verification"].includes(a.status) ? `<p class="mt-2 rounded-lg px-2.5 py-1.5 text-xs" style="background:#fff7e6;color:#7a4b00">⏰ Tu cita ya se acerca: faltan menos de ${Number(S.settings?.rescheduleMinHours ?? 2)} horas. Para cancelar o cambiar la hora, escríbele al negocio.</p>` : ""}
     <div class="mt-2 flex flex-wrap gap-2">${acts.join("")}</div>
   </article>`;
 }
@@ -921,6 +929,11 @@ $("mineList").addEventListener("click", async (e) => {
   const act = b.dataset.act;
   if (act === "pay") showPay(apt);
   if (act === "ticket") { closeModal("mineModal"); showTicket(apt); watchTicket(apt.code); }
+  if ((act === "resched" || act === "cancel") && !canChange(apt) && apt.status !== "pending_payment") {
+    const h = Number(S.settings?.rescheduleMinHours ?? 2);
+    if (await uiConfirm("Tu cita ya se acerca", `Faltan menos de ${h} horas para tu cita, así que ya no se puede ${act === "cancel" ? "cancelar" : "cambiar"} desde aquí. Escríbele al negocio por WhatsApp y te ayudan.`, { okText: "Escribir por WhatsApp", cancelText: "Cerrar" }) && S.settings?.whatsapp) window.open(waLink(S.settings.whatsapp, `Hola, necesito ${act === "cancel" ? "cancelar" : "cambiar la hora de"} mi reserva ${apt.code}`), "_blank");
+    return;
+  }
   if (act === "resched") openResched(apt);
   if (act === "cancel") {
     if (!(await uiConfirm("¿Cancelar la reserva?", `La reserva ${apt.code} se cancela y el horario queda libre.`, { okText: "Sí, cancelar", cancelText: "No", danger: true }))) return;
@@ -1081,7 +1094,7 @@ $("trialForm").addEventListener("submit", async (e) => {
       <a class="btn-primary block w-full py-3" href="${panel}&guia=1">Empezar: primeros pasos →</a>
       <p class="mb-1 mt-4 text-xs font-semibold text-ink/60">Tu enlace de citas (el que usan tus clientes para reservar)</p>
       <p class="mb-2 truncate rounded-lg bg-paper px-3 py-2 font-mono text-xs">${esc(page)}</p>
-      <div class="grid grid-cols-2 gap-2"><a class="btn-light text-sm" href="${page}" target="_blank" rel="noopener">Ver cómo reservan</a><button class="btn-light text-sm" data-copy="${page}">Copiar enlace</button></div>`;
+      <div class="grid grid-cols-2 gap-2"><a class="btn-light text-sm" href="${page}&desde=panel">Ver cómo reservan</a><button class="btn-light text-sm" data-copy="${page}">Copiar enlace</button></div>`;
   } catch (err) { toast(err.message || "No se pudo crear la agenda.", "error"); }
   finally { setBusy(btn, false); }
 });
@@ -1205,3 +1218,12 @@ if (new URLSearchParams(location.search).get("invita") || new URLSearchParams(lo
   sel.innerHTML = BIZ_TYPES.map(([k, t, , e]) => `<option value="${k}">${e} ${t}</option>`).join("");
   sel.onchange = () => $("trialTypeOther").classList.toggle("hidden", sel.value !== "otro");
 })();
+
+// El dueño mirando su propia página (desde "Ver cómo reservan" o su panel): botón para volver
+if (new URLSearchParams(location.search).get("desde") === "panel" && BIZ_ID) {
+  const back = document.createElement("a");
+  back.href = "admin.html?b=" + encodeURIComponent(BIZ_ID);
+  back.className = "back-panel";
+  back.innerHTML = "← Volver a mi panel";
+  document.body.appendChild(back);
+}

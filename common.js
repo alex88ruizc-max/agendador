@@ -2,7 +2,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js?v=2026-10-10d";
+import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js?v=2026-10-10e";
 
 export const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
@@ -16,9 +16,9 @@ export function businessFromUrl() {
 export const bpath = (...parts) => ["businesses", BID, ...parts].join("/");
 
 // Versión de la página: cámbiala en cada actualización para comprobar que se publicó
-export const APP_VERSION = '2026-10-10d';
+export const APP_VERSION = '2026-10-10e';
 // Versiones que esta página espera del servidor y de las reglas de Firebase
-export const SERVER_VERSION = '2026-10-09z';
+export const SERVER_VERSION = '2026-10-10e';
 export const RULES_VERSION = '2026-10-09v';
 
 export const UNIT = 15;          // unidad interna de bloqueo (minutos)
@@ -430,7 +430,7 @@ export const PLAN_FEATURES = [
   ["activity", "Actividad de la página y recomendaciones"]
 ];
 export const DEFAULT_PLANS = {
-  free: { name: "Gratis", priceCOP: 0, days: 30, daysAhead: 5, maxStaff: 1, features: [], tagline: "Para empezar a recibir citas", tgEvents: [], tgChoose: false },
+  free: { name: "Prueba gratis", priceCOP: 0, days: 15, daysAhead: 5, maxStaff: 1, features: [], tagline: "Para empezar a recibir citas", tgEvents: [], tgChoose: false },
   basic: { name: "Básico", priceCOP: 20000, daysAhead: 30, maxStaff: 3, features: ["telegram", "appearance", "clients", "images"], tagline: "Tu marca y tus clientes", tgEvents: ["newBooking"], tgChoose: false },
   gold: { name: "Gold", priceCOP: 35000, daysAhead: 90, maxStaff: 0, features: ["telegram", "appearance", "clients", "images", "marketing", "activity"], tagline: "Todo para llenar tu agenda", tgEvents: ["newBooking", "proof", "cancel", "reschedule", "reminder", "panelApt", "breaks", "noShow"], tgChoose: true }
 };
@@ -438,6 +438,8 @@ export function plansOf(plat = {}) {
   const out = {};
   PLAN_KEYS.forEach((k) => { out[k] = { ...DEFAULT_PLANS[k], ...((plat.plans || {})[k] || {}) }; });
   if (!plat.plans && plat.trialDays) out.free.days = Number(plat.trialDays);
+  if (!out.free.name || out.free.name === "Gratis") out.free.name = "Prueba gratis";
+  out.free.days = Math.min(15, Math.max(1, Number(out.free.days || 15))); // la prueba nunca pasa de 15 días
   return out;
 }
 // Lo que se les dice al suscribirse (una línea por beneficio); el superusuario lo edita en Cobros > Planes
@@ -474,3 +476,38 @@ export const TG_EVENTS = [
   ["reschedule", "🔁", "Cambios de hora"], ["reminder", "⏰", "Recordatorio antes de cada cita"], ["panelApt", "📝", "Citas agendadas desde el panel"],
   ["breaks", "☕", "Descansos del equipo"], ["noShow", "⚠️", "Clientes que no llegan"]
 ];
+
+// ---------- Correo: completar el dominio y avisar errores comunes (en todos los campos de correo) ----------
+const MAIL_DOMAINS = ["gmail.com", "hotmail.com", "outlook.com", "yahoo.com", "icloud.com", "live.com"];
+const MAIL_TYPOS = { "gmial.com": "gmail.com", "gmal.com": "gmail.com", "gmai.com": "gmail.com", "gamil.com": "gmail.com", "gmail.co": "gmail.com", "gmail.con": "gmail.com", "hotmal.com": "hotmail.com", "hotmial.com": "hotmail.com", "hotmail.co": "hotmail.com", "hotmail.con": "hotmail.com", "outlok.com": "outlook.com", "yaho.com": "yahoo.com", "yahoo.co": "yahoo.com", "icloud.co": "icloud.com" };
+function mailBox(input) {
+  let box = input.parentElement.querySelector(".mail-sug");
+  if (!box) { box = document.createElement("div"); box.className = "mail-sug"; input.insertAdjacentElement("afterend", box); }
+  return box;
+}
+if (typeof document !== "undefined") {
+  document.addEventListener("input", (e) => {
+    const t = e.target; if (!(t instanceof HTMLInputElement) || t.type !== "email") return;
+    t.setAttribute("inputmode", "email"); t.setAttribute("autocapitalize", "off"); t.setAttribute("spellcheck", "false");
+    const v = t.value.trim().toLowerCase(), at = v.indexOf("@"), box = mailBox(t);
+    if (at < 1) { box.innerHTML = ""; return; }
+    const user = v.slice(0, at), dom = v.slice(at + 1);
+    const opts = MAIL_DOMAINS.filter((d) => d.startsWith(dom) && d !== dom).slice(0, 4);
+    box.innerHTML = opts.map((d) => `<button type="button" data-mail="${user}@${d}">@${d}</button>`).join("");
+  });
+  // tocar una sugerencia no le quita el foco al campo (si no, el aviso la reemplazaría antes del toque)
+  document.addEventListener("mousedown", (e) => { if (e.target.closest?.("[data-mail]")) e.preventDefault(); });
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest?.("[data-mail]"); if (!b) return;
+    const input = b.closest(".mail-sug")?.previousElementSibling; if (!input) return;
+    input.value = b.dataset.mail; b.parentElement.innerHTML = ""; input.dispatchEvent(new Event("change", { bubbles: true })); input.focus();
+  });
+  document.addEventListener("focusout", (e) => {
+    const t = e.target; if (!(t instanceof HTMLInputElement) || t.type !== "email") return;
+    const v = t.value.trim().toLowerCase(), at = v.indexOf("@"); if (at < 1) return;
+    const dom = v.slice(at + 1), fix = MAIL_TYPOS[dom], box = mailBox(t);
+    if (fix) box.innerHTML = `<button type="button" class="fix" data-mail="${v.slice(0, at)}@${fix}">¿Quisiste decir <b>${v.slice(0, at)}@${fix}</b>?</button>`;
+    else if (!/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/.test(v)) box.innerHTML = `<span class="bad">Revisa tu correo: parece incompleto.</span>`;
+    else setTimeout(() => { if (document.activeElement !== t) box.innerHTML = ""; }, 200);
+  });
+}
