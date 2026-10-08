@@ -326,3 +326,20 @@ body.branded .sp-quick-side { background:var(--b-primary); color:var(--b-on-prim
 @media (min-width:1024px) { .guide-tip { bottom:24px; } }
 .chair-free { cursor:pointer; background:rgba(215,38,61,.06); border-color:#e7a3ad; }
 .chair-free:hover { background:rgba(215,38,61,.14); }
+
+/* estado del barbero (disponible / descanso) */
+.status-pill { display:inline-flex; align-items:center; gap:7px; flex-shrink:0; border-radius:999px; padding:7px 11px; font-size:12.5px; font-weight:700; background:#e2f5ec; color:#16774b; white-space:nowrap; }
+.status-pill .sdot { width:8px; height:8px; border-radius:50%; background:#1E9E63; box-shadow:0 0 0 3px rgba(30,158,99,.2); }
+.status-pill.busy { background:#fde8eb; color:#b81d33; }
+.status-pill.busy .sdot { background:#D7263D; box-shadow:0 0 0 3px rgba(215,38,61,.2); }
+.team-chip { display:flex; align-items:center; gap:8px; border-radius:16px; padding:9px 12px; background:#fff; font-size:13px; flex-shrink:0; }
+/* actividad */
+.bars { display:flex; align-items:flex-end; gap:6px; height:110px; }
+.bars > div { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:4px; height:100%; }
+.bars .b { width:100%; border-radius:7px 7px 3px 3px; background:#c9d6ef; min-height:3px; }
+.bars .b.on { background:var(--sblue); }
+.bars small { font-size:10px; color:var(--soft); }
+.bars b { font-size:11px; }
+.funnel-row { display:grid; grid-template-columns:7.5rem 1fr 2.6rem; align-items:center; gap:8px; font-size:12.5px; padding:5px 0; }
+.funnel-row .track { height:12px; border-radius:999px; background:#eef1f5; overflow:hidden; }
+.funnel-row .fill { height:100%; border-radius:999px; background:var(--sblue); }

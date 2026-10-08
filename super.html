@@ -9,9 +9,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Archivo+Narrow:wght@500;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="theme.js?v=2026-10-08u"></script>
+  <script src="theme.js?v=2026-10-08w"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="styles.css?v=2026-10-08u">
+  <link rel="stylesheet" href="styles.css?v=2026-10-08w">
   <style>
     /* ===== Panel del superusuario: claro, frío, con un solo elemento protagonista (el carril de cobros) ===== */
     .sp { --canvas:#F2F5F8; --paperw:#FFFFFF; --sink:#14213D; --soft:#5B6782; --hair:#DDE3EA; --sblue:#2B59C3; --sred:#D7263D; --mint:#1E9E63; --sky:#3F8FD6; --amber:#C77700;
@@ -169,6 +169,13 @@
               <p class="soft mt-1 text-xs">El precio aplica a las tiendas nuevas. Para cambiar el de una tienda existente, ábrela en Tiendas.</p>
             </div>
             <div class="sp-card">
+              <h2 class="disp mb-1 text-[18px] font-bold">Qué puede usar una tienda en prueba</h2>
+              <p class="soft mb-3 text-sm">Lo que marques queda bloqueado 🔒 hasta que la tienda pague. Aplica al instante a todas las tiendas en prueba.</p>
+              <label class="field mb-3 max-w-xs"><span>Días hacia adelante que sus clientes pueden reservar</span><input id="trDays" type="number" min="1" max="60"></label>
+              <p class="mb-2 text-sm font-semibold">Bloquear durante la prueba</p>
+              <div id="trLocks" class="grid gap-2 sm:grid-cols-2"></div>
+            </div>
+            <div class="sp-card">
               <h2 class="disp mb-1 text-[18px] font-bold">Pago automático por Bre-B</h2>
               <p class="soft mb-3 text-sm">Cada pago lleva un valor único (por ejemplo $50.037) y el sistema lee en tu Gmail los avisos de Nequi para activar el plan solo.</p>
               <label class="mb-3 flex items-center gap-2 text-sm"><input id="bbOn" type="checkbox" class="h-4 w-4"> Ofrecer el pago automático en “Mi plan”</label>
@@ -236,6 +243,6 @@
     </div>
   </div>
 
-  <script type="module" src="super.js?v=2026-10-08u"></script>
+  <script type="module" src="super.js?v=2026-10-08w"></script>
 </body>
 </html>

@@ -3,7 +3,7 @@ import { onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordRe
 import {
   doc, getDoc, setDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp, where
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { APP_VERSION, readPublishedVersion, reloadFresh, startUpdateWatcher, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-10-08u";
+import { APP_VERSION, readPublishedVersion, reloadFresh, startUpdateWatcher, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-10-08w";
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on) => $(id).classList.toggle("hidden", !on);
@@ -518,11 +518,21 @@ startUpdateWatcher();
 
 // ================= Cobro: plan, prueba gratis y medios de pago del superusuario =================
 let PL = { methods: [] };
+const TRIAL_FEATURES = [
+  ["clients", "Clientes", "Lista de clientes, notas, preferenciales y bloqueos."],
+  ["marketing", "Marketing", "Llenar huecos, estados, aviso destacado y mensajes por Telegram."],
+  ["appearance", "Apariencia", "Logo, colores y textos de su página."],
+  ["images", "Imágenes", "Imágenes con horarios y QR para compartir."],
+  ["team", "Varios profesionales", "Agregar personas al equipo y darles acceso al panel."]
+];
 async function loadPlanCfg() {
   const pp = (await getDoc(doc(db, "platform", "public")).catch(() => null))?.data() || {};
   $("plName").value = pp.planName || ""; $("plPrice").value = pp.planPriceCOP ?? ""; $("plDays").value = pp.trialDays ?? 30;
   $("plTrial").checked = pp.trialEnabled !== false;
   PL.methods = (pp.payMethods || []).map((m) => ({ ...m }));
+  const tr = { daysAhead: 5, locked: ["clients", "marketing", "appearance", "images", "team"], ...(pp.trialRules || {}) };
+  $("trDays").value = tr.daysAhead;
+  $("trLocks").innerHTML = TRIAL_FEATURES.map(([k, t, d]) => `<label class="flex items-start gap-2 rounded-xl p-2.5 text-sm" style="background:var(--canvas)"><input type="checkbox" class="mt-0.5 h-4 w-4" data-trl="${k}" ${tr.locked.includes(k) ? "checked" : ""}><span><b>${t}</b><br><span class="soft text-xs">${d}</span></span></label>`).join("");
   $("bbOn").checked = !!pp.brebEnabled; $("bbKey").value = pp.brebKey || ""; $("bbHolder").value = pp.brebHolder || ""; $("bbSender").value = pp.brebSender || "nequi";
   PL.brebQr = pp.brebQr || ""; $("bbQrImg").src = PL.brebQr; $("bbQrImg").classList.toggle("hidden", !PL.brebQr);
   renderPlMethods();
@@ -576,7 +586,8 @@ $("plSave").onclick = async () => {
       trialDays: Math.min(90, Math.max(1, Number($("plDays").value || 30))), trialEnabled: $("plTrial").checked,
       payMethods: PL.methods.filter((m) => m.label && m.account),
       brebEnabled: $("bbOn").checked, brebKey: $("bbKey").value.trim(), brebHolder: $("bbHolder").value.trim(),
-      brebSender: $("bbSender").value.trim() || "nequi", brebQr: PL.brebQr || ""
+      brebSender: $("bbSender").value.trim() || "nequi", brebQr: PL.brebQr || "",
+      trialRules: { daysAhead: Math.min(60, Math.max(1, Number($("trDays").value || 5))), locked: [...document.querySelectorAll("[data-trl]:checked")].map((x) => x.dataset.trl) }
     }, { merge: true });
     toast("Guardado. Los dueños ya lo ven en “Mi plan”.");
   } catch (err) { toast(err.message, "error"); }

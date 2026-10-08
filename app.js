@@ -9,7 +9,7 @@ import {
   startUpdateWatcher, applyBrandColors, warmServer, uiConfirm, setDialogBrand, viewImage, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, dow, hora12, fechaLarga, fechaCorta, toMillis, cop, esc,
   normalizePhone, waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, computeSlots, dayCapacityUnits, staffHours,
   toast, openModal, closeModal, setBusy, copyText, tmin, mstr, UNIT
-} from "./common.js?v=2026-10-08u";
+} from "./common.js?v=2026-10-08w";
 
 const $ = (id) => document.getElementById(id);
 const S = {
@@ -217,7 +217,7 @@ $("staffPick").addEventListener("click", (e) => {
 // ---------- Cálculo de cupos ----------
 const slotLen = () => Number(S.settings?.slotDurationMinutes || 30);
 // En prueba gratis la tienda solo recibe reservas hasta 5 días adelante
-const maxDate = () => addDays(bogNow().date, Math.min(S.biz?.trial ? 5 : 90, Number(S.settings?.bookingWindowDays || 30)));
+const maxDate = () => addDays(bogNow().date, Math.min(S.biz?.trial ? Number((PLAT && PLAT.trialRules?.daysAhead) || 5) : 90, Number(S.settings?.bookingWindowDays || 30)));
 const staffPool = () => S.staff.filter((s) => !S.staffId || s.id === S.staffId);
 const hoursOfStaff = (s, date) => staffHours(S.settings, s, date);
 // Cerrado si ningún profesional (del filtro) atiende ese día
@@ -942,16 +942,17 @@ if (/^[a-z0-9][a-z0-9-]{1,29}$/.test(BIZ_ID)) boot(); // arranca cuando todo est
 startUpdateWatcher();
 
 // ================= Probar gratis: crear la tienda de prueba =================
-let PLAT = {};
+var PLAT = {}; // var: se usa desde maxDate antes de llegar a esta línea
 getDoc(doc(db, "platform", "public")).then((d) => {
   PLAT = d.data() || {};
+  if (S.settings) renderAll();
   const on = PLAT.trialEnabled !== false;
   $("trialCta").classList.toggle("hidden", !on);
   $("trialDaysTxt").textContent = `${Number(PLAT.trialDays || 30)} días gratis`;
 }).catch(() => {});
 $("btnTrial").onclick = () => {
   const logged = !!auth.currentUser;
-  $("trialSub").textContent = `Gratis por ${Number(PLAT.trialDays || 30)} días, con reservas hasta 5 días adelante y funciones básicas. Activa tu plan cuando quieras (${PLAT.planPriceCOP ? cop(PLAT.planPriceCOP) + " al mes" : "mensualidad"}) para desbloquear todo.`;
+  $("trialSub").textContent = `Gratis por ${Number(PLAT.trialDays || 30)} días, con reservas hasta ${Number(PLAT.trialRules?.daysAhead || 5)} días adelante y funciones básicas. Activa tu plan cuando quieras (${PLAT.planPriceCOP ? cop(PLAT.planPriceCOP) + " al mes" : "mensualidad"}) para desbloquear todo.`;
   $("trialAccount").classList.toggle("hidden", logged);
   $("trialLogged").classList.toggle("hidden", !logged);
   if (logged) $("trialLogged").textContent = `Se crea con tu cuenta ${auth.currentUser.email}. Con ella entras a tu panel.`;
@@ -999,13 +1000,19 @@ const PSID = (() => {
   const mk = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
   try { let v = sessionStorage.getItem("psid"); if (!v) { v = mk(); sessionStorage.setItem("psid", v); } return v; } catch { return mk(); }
 })();
-let PSTAGE = "visit", PLAST = 0;
+let PSTAGE = "visit", PLAST = 0, PBEST = 0, PSTARTED = false;
+const STAGE_RANK = { visit: 0, register: 1, hours: 2, service: 3, pay: 4, done: 5 };
 function presence(stage) {
   if (S.dead || !BIZ_ID) return;
-  if (stage) { if (stage === PSTAGE && Date.now() - PLAST < 20000) return; PSTAGE = stage; }
+  if (stage) { if (stage === PSTAGE && Date.now() - PLAST < 20000) return; PSTAGE = stage; PBEST = Math.max(PBEST, STAGE_RANK[stage] ?? 0); }
   PLAST = Date.now();
   const name = S.profile ? `${S.profile.firstName || ""} ${(S.profile.lastName || "").slice(0, 1)}${S.profile.lastName ? "." : ""}`.trim().slice(0, 40) : "";
-  setDoc(doc(db, bpath("presence", PSID)), { stage: PSTAGE, name, uid: S.user && S.profile ? S.user.uid : "", at: serverTimestamp() }).catch(() => {});
+  const data = { stage: PSTAGE, name, uid: S.user && S.profile ? S.user.uid : "", at: serverTimestamp(), best: PBEST };
+  if (!PSTARTED) data.first = serverTimestamp(); // cuándo empezó la visita (para Actividad)
+  setDoc(doc(db, bpath("presence", PSID)), data, { merge: true }).then(() => { PSTARTED = true; }).catch(() => {
+    // la visita ya existía (recargó la página): se sigue sin volver a marcar el inicio
+    if (!PSTARTED) { PSTARTED = true; delete data.first; setDoc(doc(db, bpath("presence", PSID)), data, { merge: true }).catch(() => {}); }
+  });
 }
 if (!S.dead) {
   presence("visit");

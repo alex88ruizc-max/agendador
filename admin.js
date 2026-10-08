@@ -7,7 +7,7 @@ import {
   startUpdateWatcher, applyBrandColors, uiConfirm, uiPrompt, setDialogBrand, viewImage, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, hora12, fechaLarga, fechaCorta, toMillis, cop, esc, normalizePhone,
   waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, DEFAULT_WA_RESCHEDULE, computeSlots, staffHours, onColor, darken,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-10-08u";
+} from "./common.js?v=2026-10-08w";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -133,7 +133,7 @@ async function renderPlanBanner() {
   const msgs = [];
   if (A.me.isSuper) msgs.push(`Estás viendo el panel de ${esc(A.biz.name)} como superusuario. <a class="underline" href="super.html">Volver a mis negocios</a>`);
   if (A.biz.status !== "active") msgs.push("⛔ Tu agenda en línea está suspendida: tus clientes no pueden reservar desde la página. Comunícate con soporte para reactivarla.");
-  if (isTrial()) msgs.push(`🎁 Estás en prueba gratis: tus clientes agendan hasta ${TRIAL_DAYS_AHEAD} días adelante y algunas funciones están bloqueadas 🔒. <a href="#" class="underline" data-goplan="1">Activar mi plan</a>`);
+  if (isTrial()) msgs.push(`🎁 Estás en prueba gratis: tus clientes agendan hasta ${trialDays()} días adelante y algunas funciones están bloqueadas 🔒. <a href="#" class="underline" data-goplan="1">Activar mi plan</a>`);
   if (isOwner()) {
     try {
       const b = (await getDoc(doc(db, bpath("private", "billing")))).data();
@@ -158,24 +158,28 @@ function subscribeDay() {
 // ================= Pestañas =================
 // Secciones del menú: [nombre, ícono, color del ícono]
 const TABS = {
-  home: ["Inicio", "fa-house", "#2B59C3"], marketing: ["Marketing", "fa-bullhorn", "#D7263D"],
+  home: ["Inicio", "fa-house", "#2B59C3"], marketing: ["Marketing", "fa-bullhorn", "#D7263D"], activity: ["Actividad", "fa-chart-line", "#0891b2"],
   agenda: ["Agenda", "fa-calendar-days", "#2563eb"], staff: ["Equipo y descansos", "fa-users", "#7c3aed"],
   clients: ["Clientes", "fa-address-book", "#db2777"], services: ["Servicios", "fa-scissors", "#ea580c"],
   appearance: ["Apariencia", "fa-palette", "#c026d3"], images: ["Imágenes", "fa-image", "#0891b2"], plan: ["Mi plan", "fa-crown", "#ca8a04"],
   settings: ["Configuración", "fa-gear", "#475569"]
 };
-const TRIAL_LOCKED = ["clients", "appearance", "images", "marketing"]; // funciones Pro
+// Lo que se bloquea en la prueba gratis lo define el superusuario en su panel (Cobros)
+const TRIAL_DEFAULT = { daysAhead: 5, locked: ["clients", "marketing", "appearance", "images", "team"] };
+const trialRules = () => ({ ...TRIAL_DEFAULT, ...(A.plat?.trialRules || {}) });
+const trialLocked = () => trialRules().locked || [];
+const trialDays = () => Math.max(1, Number(trialRules().daysAhead || 5));
+const lockedNow = (f) => isTrial() && trialLocked().includes(f);
 const isTrial = () => !!A.biz?.trial && !A.me?.isSuper;
-const TRIAL_DAYS_AHEAD = 5;
 function goTab(id) { switchTab(id); }
 function lockCard(id) {
   $("tab-" + id).innerHTML = `<div class="rounded-2xl border border-line bg-white p-6 text-center">
     <p class="text-4xl">🔒</p><p class="mt-2 font-narrow text-2xl font-bold">${TABS[id][0]} es una función Pro</p>
-    <p class="mx-auto mt-1 max-w-sm text-sm text-ink/70">Durante la prueba gratis está bloqueada. Activa tu plan y se desbloquea al instante, junto con agendar más de ${TRIAL_DAYS_AHEAD} días adelante, varios profesionales y avisos por Telegram al equipo.</p>
+    <p class="mx-auto mt-1 max-w-sm text-sm text-ink/70">Durante la prueba gratis está bloqueada. Activa tu plan y se desbloquea al instante, junto con agendar más de ${trialDays()} días adelante, varios profesionales y avisos por Telegram al equipo.</p>
     <button class="btn-primary mt-4" data-goplan="1">👑 Activar mi plan</button></div>`;
 }
 document.addEventListener("click", (e) => { if (e.target.closest("[data-goplan]")) { e.preventDefault(); goTab("plan"); } });
-const ALL_TABS = ["home", "agenda", "staff", "clients", "services", "marketing", "appearance", "images", "plan", "settings"];
+const ALL_TABS = ["home", "activity", "agenda", "staff", "clients", "services", "marketing", "appearance", "images", "plan", "settings"];
 const LOCKED_TABS = ["home", "appearance", "settings", "plan"]; // siempre visibles para poder deshacer cambios
 const PANEL_DEFAULT = { useBrand: true, linkLabel: "Link clientes", shareMsg: "Agenda tu cita en {negocio} aquí: {link}", columns: 3, style: "cards", colorIcons: true, order: ALL_TABS, hidden: [] };
 function panelPrefs() {
@@ -186,11 +190,11 @@ function panelPrefs() {
 }
 function renderTabs() {
   const P = panelPrefs();
-  const allowed = ["home", "agenda", "staff"].concat(isOwner() ? ["clients", "services", "marketing", "appearance", "images", "plan", "settings"] : []);
+  const allowed = ["home", "agenda", "staff"].concat(isOwner() ? ["activity", "clients", "services", "marketing", "appearance", "images", "plan", "settings"] : []);
   const ids = P.order.filter((id) => allowed.includes(id) && (!P.hidden.includes(id) || A.tab === id));
   const t = $("tabs");
   t.className = `grid gap-1.5 lg:grid-cols-1 ${({ 2: "grid-cols-2", 3: "grid-cols-3", 4: "grid-cols-4" })[P.columns] || "grid-cols-3"} ${P.style === "list" ? "tabs-list" : ""} ${P.colorIcons ? "" : "tabs-mono"}`;
-  t.innerHTML = ids.map((id) => `<button class="admin-tab relative" data-tab="${id}" aria-current="${A.tab === id ? "page" : "false"}"><i class="fa-solid ${TABS[id][1]}" style="color:${TABS[id][2]}"></i><span>${TABS[id][0]}</span>${isTrial() && TRIAL_LOCKED.includes(id) ? `<span class="absolute right-1.5 top-1 text-[11px]" aria-label="Bloqueada">🔒</span>` : ""}</button>`).join("");
+  t.innerHTML = ids.map((id) => `<button class="admin-tab relative" data-tab="${id}" aria-current="${A.tab === id ? "page" : "false"}"><i class="fa-solid ${TABS[id][1]}" style="color:${TABS[id][2]}"></i><span>${TABS[id][0]}</span>${lockedNow(id) ? `<span class="absolute right-1.5 top-1 text-[11px]" aria-label="Bloqueada">🔒</span>` : ""}</button>`).join("");
   $("linkCard").classList.remove("hidden");
   $("linkTitle").textContent = P.linkLabel || PANEL_DEFAULT.linkLabel;
 }
@@ -219,7 +223,7 @@ function switchTab(id) {
   if (A.tab !== "home") $("hdrSub").textContent = TABS[A.tab][0];
   window.scrollTo({ top: 0, behavior: "smooth" });
   if (A.tab === "home") renderHome();
-  if (isTrial() && TRIAL_LOCKED.includes(A.tab)) return lockCard(A.tab);
+  if (lockedNow(A.tab)) return lockCard(A.tab);
   if (A.tab === "clients") loadUsers();
   if (A.tab === "settings") renderSettings();
   if (A.tab === "services") renderServices();
@@ -227,6 +231,7 @@ function switchTab(id) {
   if (A.tab === "images") renderImages();
   if (A.tab === "plan") renderPlan();
   if (A.tab === "marketing") renderMarketing();
+  if (A.tab === "activity") renderActivity();
 }
 
 // ================= Modal genérico =================
@@ -487,13 +492,14 @@ const timeOf = (v) => new Date(toMillis(v)).toLocaleTimeString("es-CO", { timeZo
 
 function renderStaffTab() {
   if (!A.me) return;
+  renderMyStatus();
   const el = $("tab-staff");
   const list = isOwner() ? A.staff : A.staff.filter((s) => s.id === A.me.staffId);
   const ownerTg = A.tg?.owner;
   el.innerHTML = `
     ${isOwner() ? `<div class="mb-4 flex flex-wrap items-center justify-between gap-2">
       <p class="text-sm text-ink/70">${ownerTg ? "Tu Telegram de dueño está conectado." : "Conecta tu Telegram de dueño en Configuración para recibir todos los avisos."}</p>
-      ${isTrial() ? `<button class="btn-light" data-goplan="1">🔒 Agregar al equipo (Pro)</button>` : `<button class="btn-primary" data-sact="new">+ Agregar al equipo</button>`}</div>` : ""}
+      ${lockedNow("team") ? `<button class="btn-light" data-goplan="1">🔒 Agregar al equipo (Pro)</button>` : `<button class="btn-primary" data-sact="new">+ Agregar al equipo</button>`}</div>` : ""}
     <section class="mb-4 rounded-xl border border-line bg-white p-4">
       <div class="mb-2 flex items-center gap-2"><i class="fa-regular fa-clock text-pole-blue"></i><h3 class="font-narrow text-xl font-bold">Disponibilidad ${list.length > 1 ? "del equipo" : ""}</h3></div>
       <p class="mb-3 text-xs text-ink/60">${list.length > 1
@@ -993,7 +999,7 @@ function renderSettings() {
           <input id="stSlotCustom" type="number" min="15" step="15" class="mt-2 ${[15, 30, 45, 60, 90, 120].includes(Number(s.slotDurationMinutes || 30)) ? "hidden" : ""}" value="${Number(s.slotDurationMinutes || 30)}" placeholder="Minutos (múltiplo de 15)"></label>
         ${num("stDeposit", "Abono para apartar (COP)", s.depositAmountCOP, 'min="0" step="1000"')}
         ${num("stHold", "Minutos para subir el comprobante", s.holdMinutes ?? 30, 'min="5"')}
-        ${num("stWindow", isTrial() ? `Días hacia adelante (máx. ${TRIAL_DAYS_AHEAD} en prueba gratis)` : "Días hacia adelante que se puede reservar", isTrial() ? Math.min(TRIAL_DAYS_AHEAD, s.bookingWindowDays ?? TRIAL_DAYS_AHEAD) : (s.bookingWindowDays ?? 30), isTrial() ? `min="1" max="${TRIAL_DAYS_AHEAD}"` : 'min="1"')}
+        ${num("stWindow", isTrial() ? `Días hacia adelante (máx. ${trialDays()} en prueba gratis)` : "Días hacia adelante que se puede reservar", isTrial() ? Math.min(trialDays(), s.bookingWindowDays ?? trialDays()) : (s.bookingWindowDays ?? 30), isTrial() ? `min="1" max="${trialDays()}"` : 'min="1"')}
         ${num("stAdvance", "Anticipación mínima (minutos)", s.minAdvanceMinutes ?? 60, 'min="0"')}
         ${num("stTolerance", "Tolerancia de espera (minutos)", s.toleranceMinutes ?? 10, 'min="0"')}
       </div>
@@ -1141,7 +1147,7 @@ async function saveSettings(e) {
   const data = {
     businessName: $("stName").value.trim(), whatsapp: phone, address: $("stAddress").value.trim(), city: $("stCity").value.trim(),
     slotDurationMinutes: slotVal, businessType: $("stType").value, staffLabel: $("stStaffLabel").value.trim(), depositAmountCOP: n("stDeposit"), holdMinutes: Math.max(5, n("stHold")),
-    bookingWindowDays: isTrial() ? Math.min(TRIAL_DAYS_AHEAD, Math.max(1, n("stWindow"))) : Math.max(1, n("stWindow")), minAdvanceMinutes: n("stAdvance"), toleranceMinutes: n("stTolerance"),
+    bookingWindowDays: isTrial() ? Math.min(trialDays(), Math.max(1, n("stWindow"))) : Math.max(1, n("stWindow")), minAdvanceMinutes: n("stAdvance"), toleranceMinutes: n("stTolerance"),
     autoConfirmProof: $("stAuto").checked, businessHours: hours, closedDates: A.closedDraft,
     paymentMethods: A.pmDraft.filter((m) => m.label && m.account).map((m) => ({ label: m.label, account: m.account, holder: m.holder || "", qr: m.qr || "" })), paymentInstructions: $("stPayInstr").value.trim(),
     rescheduleMinHours: n("stReschedH"), maxReschedules: n("stMaxResched"), noShowThreshold: Math.max(1, n("stNoShow")),
@@ -1701,11 +1707,13 @@ $("btnQuickSide").onclick = () => openQuick();
 
 function startHome() {
   H.unsubs.forEach((f) => f()); H.unsubs = [];
+  H.unsubs.push(onSnapshot(doc(db, "platform", "public"), (d) => { A.plat = d.data() || {}; renderTabs(); if (A.tab === "home") renderHome(); }, () => {}));
   H.today = bogNow().date;
   H.unsubs.push(onSnapshot(query(collection(db, bpath("appointments")), where("date", "==", H.today)), (q) => { H.apts = q.docs.map((d) => d.data()); renderHome(); }, onErr));
   H.unsubs.push(onSnapshot(query(collection(db, bpath("slotLocks")), where("date", "==", H.today)), (q) => { H.locks = q.docs.map((d) => d.data()); renderHome(); }, onErr));
   H.unsubs.push(onSnapshot(collection(db, bpath("stories")), (q) => { H.stories = q.docs.map((d) => ({ id: d.id, ...d.data() })).filter((x) => toMillis(x.expiresAt) > Date.now()).sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt)); renderHome(); if (A.tab === "marketing") renderMarketing(); }, () => {}));
   subscribeLive();
+  if (isOwner()) loadActivity();
   A.unsubs.push(() => H.unsubs.forEach((f) => f()));
   clearInterval(H.timer);
   H.timer = setInterval(() => { if (bogNow().date !== H.today) startHome(); else renderHome(); }, 30000);
@@ -1790,7 +1798,7 @@ function renderHome() {
   // --- estados
   const stories = isOwner() ? `<div class="sp-h"><h2>Tus estados</h2><span>los ven tus clientes por 24 h</span></div>
     <div class="flex gap-2 overflow-x-auto pb-1">
-      <button class="story-btn" data-hstory="new"><span class="story-add">${isTrial() ? "🔒" : "+"}</span>Nuevo</button>
+      <button class="story-btn" data-hstory="new"><span class="story-add">${lockedNow("marketing") ? "🔒" : "+"}</span>Nuevo</button>
       ${H.stories.map((x) => `<button class="story-btn" data-hstory="${x.id}"><span class="story-ring"><span style="${storyBg(x)}">${x.img ? "" : esc((x.text || "").slice(0, 18))}</span></span><span class="w-full truncate text-center">${esc((x.text || "Estado").split("\n")[0].slice(0, 12))}</span></button>`).join("")}
     </div>` : "";
 
@@ -1799,19 +1807,29 @@ function renderHome() {
       <p class="disp text-lg font-extrabold">Llena tus huecos de hoy</p>
       <p class="mt-1 text-[13px] opacity-80">${freeLater.slice(0, 6).map((f) => hora12(f.time)).join(", ")}${freeLater.length > 6 ? "…" : ""}</p>
       <div class="mt-3 grid grid-cols-2 gap-2 text-[13px] font-bold">
-        <button class="rounded-xl bg-white py-2.5" style="color:var(--sink)" data-hfill="story">${isTrial() ? "🔒 " : ""}Publicar como estado</button>
+        <button class="rounded-xl bg-white py-2.5" style="color:var(--sink)" data-hfill="story">${lockedNow("marketing") ? "🔒 " : ""}Publicar como estado</button>
         <button class="rounded-xl py-2.5" style="background:rgba(255,255,255,.16)" data-hgo="marketing">Más opciones</button>
       </div></div>` : "";
 
-  el.innerHTML = `${liveHtml}
+  const team = myStaff();
+  const teamHtml = team.length ? `<div class="mt-3 flex gap-2 overflow-x-auto pb-1">${team.map((s2) => {
+      const busy = isBusy(s2);
+      return `<button class="team-chip" data-hstaff="${s2.id}"><span class="sdot" style="width:9px;height:9px;border-radius:50%;background:${busy ? "var(--sred)" : "var(--mint)"}"></span>
+        <span class="text-left"><b>${esc(team.length === 1 && s2.id === A.me.staffId ? "Tú" : s2.name)}</b><br><span class="soft text-xs">${busy ? "En descanso hasta " + timeOf(s2.busyUntil) : "Disponible"}</span></span>
+        <span class="ml-1 rounded-full px-2.5 py-1 text-[11px] font-bold ${busy ? "t-ok" : "t-off"}">${busy ? "Ya volví" : "Descanso"}</span></button>`;
+    }).join("")}</div>` : "";
+  const rec = isOwner() ? buildRecs()[0] : null;
+  const recHtml = rec ? `<div class="todo mt-3" style="border:1.5px solid #f3d27a"><span class="ic" style="background:#fff7e0;color:#a86e00"><i class="fa-solid fa-lightbulb"></i></span>
+      <p class="min-w-0 flex-1 text-[13.5px] leading-snug">${rec.txt}</p>${rec.act ? `<button class="act" style="background:var(--sink);color:#fff" data-hrec="0">${rec.act}</button>` : ""}</div>` : "";
+  el.innerHTML = `${liveHtml}${teamHtml}${recHtml}
     <div class="sp-card mt-3" id="chairCard"><div class="flex items-center justify-between gap-2"><h2 class="disp text-[18px] font-bold">Hoy en la silla</h2>
       ${freeLater.length ? `<button class="rounded-full px-3 py-1.5 text-xs font-bold ${H.showFree ? "" : "t-late"}" style="${H.showFree ? "background:var(--sink);color:#fff" : ""}" data-hfree="1" aria-expanded="${!!H.showFree}">${freeLater.length} hueco${freeLater.length === 1 ? "" : "s"} libre${freeLater.length === 1 ? "" : "s"} ${H.showFree ? "▴" : "▾"}</button>` : `<span class="soft text-xs">Sin huecos libres</span>`}</div>${chair}
       ${H.showFree && freeLater.length ? `<div class="q-pop mt-3 rounded-2xl p-3" style="background:var(--canvas)">
         <p class="mb-2 text-sm font-bold">Toca un hueco para agendar a alguien ahí</p>
         <div class="grid grid-cols-3 gap-2">${freeLater.map((f) => `<button class="q-slot" data-hfreeat="${f.time}">${hora12(f.time)}${myStaff().length > 1 ? `<span class="soft block text-[10px] font-semibold">${f.staffIds.length} libre${f.staffIds.length === 1 ? "" : "s"}</span>` : ""}</button>`).join("")}</div>
-        ${isOwner() ? `<button class="mt-3 w-full rounded-xl py-2.5 text-sm font-bold t-late" data-hfill="story">${isTrial() ? "🔒 " : ""}Publicar estos huecos como estado</button>` : ""}
+        ${isOwner() ? `<button class="mt-3 w-full rounded-xl py-2.5 text-sm font-bold t-late" data-hfill="story">${lockedNow("marketing") ? "🔒 " : ""}Publicar estos huecos como estado</button>` : ""}
       </div>` : ""}
-      <div class="soft mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px]"><span><span style="color:var(--mint)">●</span> confirmada</span><span><span style="color:var(--amber)">●</span> abono por revisar</span><span><span style="color:#8a94a8">●</span> esperando pago</span><span><span style="color:var(--sred)">|</span> ahora</span></div></div>
+      <div class="soft mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px]">${isOwner() ? `<button class="font-bold underline" style="color:var(--sblue)" data-gstep="slot">Turnos de ${Number(A.settings?.slotDurationMinutes || 30)} min, cambiar</button>` : ""}<span><span style="color:var(--mint)">●</span> confirmada</span><span><span style="color:var(--amber)">●</span> abono por revisar</span><span><span style="color:#8a94a8">●</span> esperando pago</span><span><span style="color:var(--sred)">|</span> ahora</span></div></div>
     <div class="sp-h"><h2>Para hoy</h2><span>${todo.length ? todo.length + " pendiente" + (todo.length === 1 ? "" : "s") : ""}</span></div>
     ${todo.join("") || `<div class="todo"><span class="ic t-ok"><i class="fa-solid fa-check"></i></span><p class="flex-1 text-[13.5px]">Todo al día. Usa <b>Cita rápida</b> para agendar a quien llame o llegue.</p></div>`}
     ${stories}${fill}`;
@@ -1831,6 +1849,8 @@ $("tab-home").addEventListener("click", async (e) => {
   const fr = e.target.closest("[data-hfree]");
   if (fr) { H.showFree = fr.dataset.hfree === "open" ? true : !H.showFree; renderHome(); if (H.showFree) $("chairCard")?.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
   const fa = e.target.closest("[data-hfreeat]"); if (fa) return openQuick({ date: H.today, time: fa.dataset.hfreeat });
+  const hs = e.target.closest("[data-hstaff]"); if (hs) return toggleStaffStatus(A.staff.find((x) => x.id === hs.dataset.hstaff));
+  const hr = e.target.closest("[data-hrec]"); if (hr) return buildRecs()[Number(hr.dataset.hrec)]?.fn?.();
   const blk = e.target.closest("[data-hcode]"); if (blk) { setAgendaDate(H.today); return switchTab("agenda"); }
   const st = e.target.closest("[data-hstory]"); if (st) return st.dataset.hstory === "new" ? newStory() : manageStory(st.dataset.hstory);
   const fl = e.target.closest("[data-hfill]"); if (fl) return fillAsStory(H.today);
@@ -1972,7 +1992,7 @@ async function saveQuick() {
 // =====================================================================
 const STORY_BGS = ["#14213D", "#2B59C3", "#D7263D", "#1E9E63", "#7C3AED", "#C77700"];
 function newStory(preset = {}) {
-  if (isTrial()) return lockCard("marketing"), switchTab("marketing");
+  if (lockedNow("marketing")) return switchTab("marketing");
   const S2 = { img: "", bg: preset.bg || STORY_BGS[0], text: preset.text || "" };
   openM("Nuevo estado", `
     <div id="stPrev" class="relative mx-auto mb-3 grid aspect-[9/14] w-full max-w-[220px] place-items-center overflow-hidden rounded-2xl bg-cover bg-center p-4 text-center text-lg font-extrabold leading-tight text-white" style="text-shadow:0 2px 10px rgba(0,0,0,.45)"></div>
@@ -2016,7 +2036,7 @@ function fillAsStory(date) {
 // =====================================================================
 const MK = { day: "today", lost: null, tLocks: [] };
 function renderMarketing() {
-  if (isTrial()) return lockCard("marketing");
+  if (lockedNow("marketing")) return lockCard("marketing");
   const el = $("tab-marketing");
   const tomorrow = addDays(H.today, 1);
   const date = MK.day === "today" ? H.today : tomorrow;
@@ -2130,6 +2150,9 @@ function guideSteps() {
     { id: "hours", ic: "fa-clock", t: "Horario de atención", d: "Los días y horas en que abres. Si cierras a almorzar, usa el segundo turno.",
       ok: hasHours && guideDone().includes("hours"), tab: "settings", focus: "[data-dow]", manual: true,
       tip: "Marca los días que abres y pon apertura y cierre. Al final toca Guardar." },
+    { id: "slot", ic: "fa-stopwatch", t: "Duración de cada turno", d: `Cada cuánto se abre un cupo en tu agenda (ahora: ${Number(s.slotDurationMinutes || 30)} minutos). Elige el tiempo de tu servicio más común.`,
+      ok: guideDone().includes("slot"), tab: "settings", focus: "stSlot", manual: true,
+      tip: "En “Duración de cada cupo” elige 15, 30, 45 o 60 minutos (o Personalizado). Baja y toca Guardar." },
     { id: "services", ic: "fa-scissors", t: "Servicios y precios", d: "Revisa los servicios de ejemplo: cambia precios y duración, y oculta los que no haces.",
       ok: guideDone().includes("services"), tab: "services", manual: true,
       tip: "Toca Editar en cada servicio para poner tu precio y duración." },
@@ -2167,7 +2190,7 @@ function openGuide() {
     <div class="space-y-2">${steps.map((x) => `
       <div class="flex items-start gap-3 rounded-2xl p-3" style="background:${x.ok ? "#f1faf5" : "var(--canvas)"}">
         <span class="grid h-9 w-9 shrink-0 place-items-center rounded-xl ${x.ok ? "t-ok" : "t-trial"}"><i class="fa-solid ${x.ok ? "fa-check" : x.ic}"></i></span>
-        <div class="min-w-0 flex-1"><p class="text-[14px] font-bold">${esc(x.t)}${x.optional ? ` <span class="soft text-xs font-semibold">opcional${isTrial() && x.id === "brand" ? ", Pro" : ""}</span>` : ""}</p>
+        <div class="min-w-0 flex-1"><p class="text-[14px] font-bold">${esc(x.t)}${x.optional ? ` <span class="soft text-xs font-semibold">opcional${lockedNow("appearance") && x.id === "brand" ? ", Pro" : ""}</span>` : ""}</p>
           <p class="soft text-xs leading-snug">${esc(x.d)}</p>
           <div class="mt-2 flex flex-wrap gap-2"><button class="btn-sm" data-gstep="${x.id}">${x.ok ? "Revisar" : "Hacerlo"}</button>
             ${x.manual && !x.ok ? `<button class="btn-sm" data-gmark="${x.id}">Ya lo hice ✓</button>` : ""}</div></div>
@@ -2257,3 +2280,101 @@ function openShareGuide() {
     </div>`);
   markGuide("share");
 }
+
+// =====================================================================
+//  ESTADO DEL BARBERO: disponible o en descanso, a un toque
+// =====================================================================
+const meStaff = () => A.staff.find((x) => x.id === A.me?.staffId);
+function renderMyStatus() {
+  const b = $("myStatus"), me = meStaff();
+  if (!me || me.active === false) { b.classList.add("hidden"); return; }
+  const busy = isBusy(me);
+  b.className = "status-pill" + (busy ? " busy" : "");
+  b.innerHTML = `<span class="sdot"></span><span>${busy ? "Descanso · " + timeOf(me.busyUntil) : "Disponible"}</span>`;
+  b.title = busy ? "Toca cuando vuelvas" : "Toca para tomar un descanso";
+}
+$("myStatus").onclick = () => toggleStaffStatus(meStaff());
+async function toggleStaffStatus(s) {
+  if (!s) return;
+  if (!isOwner() && s.id !== A.me?.staffId) return toast("Solo puedes cambiar tu propio estado.", "error");
+  if (isBusy(s)) {
+    if (!(await uiConfirm(s.id === A.me?.staffId ? "¿Ya volviste?" : `¿${s.name} ya volvió?`, "Se abren de nuevo sus cupos en la página.", { okText: "Sí, disponible" }))) return;
+    try { await api("endBreak", { staffId: s.id }); toast(`${s.id === A.me?.staffId ? "Estás" : s.name + " está"} disponible de nuevo.`); } catch (err) { toast(err.message, "error"); }
+  } else openBreak(s);
+}
+
+// =====================================================================
+//  ACTIVIDAD: quién entra a tu página, cuándo y hasta dónde llega
+// =====================================================================
+const ACT = { visits: [], at: 0, loading: false };
+async function loadActivity(force) {
+  if (ACT.loading || (!force && Date.now() - ACT.at < 5 * 60000)) return;
+  ACT.loading = true;
+  try {
+    const snap = await getDocs(query(collection(db, bpath("presence")), where("first", ">=", Timestamp.fromMillis(Date.now() - 14 * 86400000))));
+    ACT.visits = snap.docs.map((d) => d.data()).filter((v) => v.first).map((v) => ({ t: toMillis(v.first), best: Number(v.best || 0), named: !!v.name }));
+    ACT.at = Date.now();
+  } catch (e) { console.warn(e); }
+  ACT.loading = false;
+  if (A.tab === "home") renderHome();
+  if (A.tab === "activity") renderActivity();
+}
+const bogDay = (ms) => new Date(ms - 5 * 3600000).toISOString().slice(0, 10);
+const bogHour = (ms) => new Date(ms - 5 * 3600000).getUTCHours();
+function actStats() {
+  const today = bogNow().date, v = ACT.visits;
+  const days = Array.from({ length: 7 }, (_, i) => addDays(today, i - 6));
+  const perDay = days.map((d) => v.filter((x) => bogDay(x.t) === d).length);
+  const week = v.filter((x) => bogDay(x.t) >= days[0]);
+  const prevWeek = v.filter((x) => bogDay(x.t) < days[0] && bogDay(x.t) >= addDays(days[0], -7)).length;
+  const hours = Array.from({ length: 24 }, (_, h) => v.filter((x) => bogHour(x.t) === h).length);
+  let peak = 0, peakH = -1;
+  for (let h = 6; h < 23; h++) { const n = hours[h] + hours[h + 1]; if (n > peak) { peak = n; peakH = h; } }
+  const reach = (n) => week.filter((x) => x.best >= n).length;
+  return { days, perDay, today: perDay[6], week: week.length, prevWeek, hours, peakH, peak,
+    funnel: [["Entraron", week.length], ["Vieron horarios", reach(2)], ["Eligieron hora", reach(3)], ["Llegaron al pago", reach(4)], ["Reservaron", reach(5)]] };
+}
+const hh = (h) => hora12(String(h).padStart(2, "0") + ":00").replace(":00", "");
+function buildRecs() {
+  if (!ACT.at || !A.settings) return [];
+  const st = actStats(), out = [];
+  const [, saw, chose, paid, done] = st.funnel.map((f) => f[1]);
+  const live = liveNow().length;
+  const freeLater = freeTimes(H.today, H.locks).filter((f) => { const [h, m] = f.time.split(":").map(Number); return h * 60 + m > bogNow().min; });
+  if (live && freeLater.length) out.push({ w: 0, txt: `Ahora mismo hay <b>${live} persona${live === 1 ? "" : "s"}</b> en tu página y te quedan <b>${freeLater.length} huecos</b>. Publica tus horarios libres como estado.`, act: "Publicar", fn: () => fillAsStory(H.today) });
+  if (st.today >= 5 && !H.stories.length) out.push({ w: 1, txt: `Hoy ya entraron <b>${st.today} personas</b> y no tienes estados activos. Sube uno: una foto de un corte o tu promo.`, act: "Subir estado", fn: () => newStory() });
+  if (paid - done >= 2) out.push({ w: 1, txt: `<b>${paid - done} personas</b> llegaron a pagar el abono esta semana y no terminaron. Revisa que tu QR y tu llave se vean claros.`, act: "Revisar pagos", fn: () => goStep("pay") });
+  if (saw >= 5 && done / Math.max(1, saw) < 0.25) out.push({ w: 2, txt: `<b>${saw} personas</b> vieron tus horarios y solo <b>${done}</b> reservaron. Prueba un aviso destacado con una promo.`, act: "Crear aviso", fn: () => switchTab("marketing") });
+  if (st.peakH >= 0 && st.peak >= 4) out.push({ w: 3, txt: `Tus clientes entran más entre <b>${hh(st.peakH)} y ${hh(st.peakH + 2)}</b>. Publica tus estados y huecos un poco antes, cerca de las ${hh(Math.max(6, st.peakH - 1))}.`, act: "Subir estado", fn: () => newStory() });
+  if (st.week < 10) out.push({ w: 2, txt: `Esta semana entraron <b>${st.week} persona${st.week === 1 ? "" : "s"}</b> a tu página. Comparte tu enlace en tu estado de WhatsApp y en Instagram.`, act: "Compartir", fn: () => openShareGuide() });
+  if (st.prevWeek >= 5 && st.week > st.prevWeek * 1.15) out.push({ w: 4, txt: `🎉 Tus visitas subieron <b>${Math.round((st.week / st.prevWeek - 1) * 100)}%</b> frente a la semana pasada. ¡Sigue así!` });
+  return out.filter((r) => !lockedNow("marketing") || !/estado|aviso/i.test(r.act || "")).sort((a, b) => a.w - b.w);
+}
+function renderActivity() {
+  const el = $("tab-activity");
+  if (!ACT.at) { el.innerHTML = `<div class="sp-card soft text-sm"><span class="spin mr-1"></span> Calculando tu actividad…</div>`; loadActivity(true); return; }
+  const st = actStats(), max = Math.max(1, ...st.perDay), recs = buildRecs();
+  const conv = st.funnel[0][1] ? Math.round((st.funnel[4][1] / st.funnel[0][1]) * 100) : 0;
+  const trend = st.prevWeek ? Math.round((st.week / st.prevWeek - 1) * 100) : null;
+  const hmax = Math.max(1, ...st.hours.slice(6, 23));
+  el.innerHTML = `
+    <div class="grid grid-cols-3 gap-2">
+      <div class="sp-card !p-3"><p class="disp text-2xl font-extrabold">${st.today}</p><p class="soft text-xs">visitas hoy</p></div>
+      <div class="sp-card !p-3"><p class="disp text-2xl font-extrabold">${st.week}</p><p class="soft text-xs">en 7 días${trend !== null ? ` <b style="color:${trend >= 0 ? "var(--mint)" : "var(--sred)"}">${trend >= 0 ? "↑" : "↓"}${Math.abs(trend)}%</b>` : ""}</p></div>
+      <div class="sp-card !p-3"><p class="disp text-2xl font-extrabold">${conv}%</p><p class="soft text-xs">reservaron</p></div>
+    </div>
+    ${recs.length ? `<div class="sp-h"><h2>Te recomendamos</h2><span>según tus visitas</span></div>
+      ${recs.map((r, i) => `<div class="todo"><span class="ic" style="background:#fff7e0;color:#a86e00"><i class="fa-solid fa-lightbulb"></i></span><p class="min-w-0 flex-1 text-[13.5px] leading-snug">${r.txt}</p>${r.act ? `<button class="act" style="background:var(--sink);color:#fff" data-arec="${i}">${r.act}</button>` : ""}</div>`).join("")}` : ""}
+    <div class="sp-h"><h2>Visitas por día</h2><span>últimos 7 días</span></div>
+    <div class="sp-card"><div class="bars" role="img" aria-label="Visitas por día">${st.days.map((d, i) => {
+      const [y, m, dd] = d.split("-").map(Number);
+      const lbl = new Date(Date.UTC(y, m - 1, dd)).toLocaleDateString("es-CO", { timeZone: "UTC", weekday: "short" }).replace(".", "");
+      return `<div><b>${st.perDay[i] || ""}</b><span class="b ${i === 6 ? "on" : ""}" style="height:${(st.perDay[i] / max) * 80}%"></span><small class="capitalize">${i === 6 ? "hoy" : lbl}</small></div>`;
+    }).join("")}</div></div>
+    <div class="sp-h"><h2>A qué hora entran</h2><span>${st.peakH >= 0 && st.peak ? `más entre ${hh(st.peakH)} y ${hh(st.peakH + 2)}` : "últimas 2 semanas"}</span></div>
+    <div class="sp-card"><div class="bars" style="height:80px;gap:3px">${st.hours.slice(6, 23).map((n, i) => `<div><span class="b ${i + 6 === st.peakH || i + 6 === st.peakH + 1 ? "on" : ""}" style="height:${(n / hmax) * 85}%"></span><small>${(i + 6) % 3 === 0 ? hh(i + 6) : ""}</small></div>`).join("")}</div></div>
+    <div class="sp-h"><h2>Hasta dónde llegan</h2><span>esta semana</span></div>
+    <div class="sp-card">${st.funnel.map(([t, n], i) => `<div class="funnel-row"><span>${t}</span><span class="track"><span class="fill block" style="width:${st.funnel[0][1] ? (n / st.funnel[0][1]) * 100 : 0}%;${i === 4 ? "background:var(--mint)" : ""}"></span></span><b class="text-right">${n}</b></div>`).join("")}
+      <p class="soft mt-2 text-xs">Cada visita es una persona que abrió tu enlace. Si muchos llegan a ver horarios pero pocos reservan, revisa precios, abono o tus huecos libres.</p></div>`;
+}
+$("tab-activity").addEventListener("click", (e) => { const b = e.target.closest("[data-arec]"); if (b) buildRecs()[Number(b.dataset.arec)]?.fn?.(); });
