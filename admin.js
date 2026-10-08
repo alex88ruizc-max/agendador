@@ -7,7 +7,7 @@ import {
   startUpdateWatcher, applyBrandColors, uiConfirm, uiPrompt, setDialogBrand, viewImage, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, hora12, fechaLarga, fechaCorta, toMillis, cop, esc, normalizePhone,
   waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, DEFAULT_WA_RESCHEDULE, computeSlots, staffHours, onColor, darken,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-10-08t";
+} from "./common.js?v=2026-10-08u";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -106,7 +106,7 @@ function start() {
     A.settings = s.data() || {};
     setDialogBrand(A.settings.businessName || A.biz?.name, A.settings.appearance?.logo);
     applyPanelBrand(); if (A.me) renderTabs();
-    renderAgenda(); renderStaffTab();
+    renderAgenda(); renderStaffTab(); if (typeof renderHome === "function" && A.tab === "home") renderHome();
   }, onErr));
   A.unsubs.push(onSnapshot(collection(db, bpath("services")), (q) => {
     A.services = q.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
@@ -121,7 +121,7 @@ function start() {
     renderAgenda();
   }, onErr));
   if (isOwner()) {
-    A.unsubs.push(onSnapshot(doc(db, bpath("private", "telegram")), (s) => { A.tg = s.data() || {}; renderStaffTab(); }, onErr));
+    A.unsubs.push(onSnapshot(doc(db, bpath("private", "telegram")), (s) => { A.tg = s.data() || {}; renderStaffTab(); if (A.tab === "home") renderHome(); }, onErr));
   }
   subscribeDay();
   startHome();
@@ -1762,7 +1762,10 @@ function renderHome() {
         const st = toMin(a.startTime), en = st + Number(a.occupiedMinutes || 30);
         const tone = a.status === "pending_verification" ? "t-due" : a.status === "pending_payment" ? "t-off" : "t-ok";
         return `<button class="chair-blk ${tone}" style="left:${pos(st)}%;width:${Math.max(4, pos(en) - pos(st))}%" data-hcode="${a.code}" title="${esc(firstName(a))} ${hora12(a.startTime)}">${esc(firstName(a))}</button>`;
-      }).join("");
+      }).join("") + (H.showFree ? freeLater.filter((f) => f.staffIds.includes(s.id)).map((f) => {
+        const st = toMin(f.time), en = st + Number(A.settings.slotDurationMinutes || 30);
+        return `<button class="chair-free" style="left:${pos(st)}%;width:${Math.max(3, pos(en) - pos(st))}%" data-hfreeat="${f.time}" aria-label="Libre ${hora12(f.time)}" title="Libre ${hora12(f.time)}"></button>`;
+      }).join("") : "");
       const now = nowMin >= open && nowMin <= close ? `<span class="chair-now" style="left:${pos(nowMin)}%"></span>` : "";
       return `<p class="mt-2 text-xs font-bold">${esc(s.name)}</p><div class="chair-lane">${blocks}${now}</div>`;
     }).join("");
@@ -1782,7 +1785,7 @@ function renderHome() {
     ${next.a.customer?.whatsapp ? `<a class="act t-ok" target="_blank" rel="noopener" href="${waLink(next.a.customer.whatsapp, `Hola ${firstName(next.a)}, te esperamos hoy a las ${hora12(next.a.startTime)} en ${A.settings?.businessName || A.biz?.name}. ¡Nos vemos!`)}">WhatsApp</a>` : ""}</div>`);
   if (freeLater.length) todo.push(`<div class="todo"><span class="ic t-late"><i class="fa-solid fa-fire"></i></span>
     <p class="min-w-0 flex-1 text-[13.5px] leading-snug">Quedan <b>${freeLater.length} cupo${freeLater.length === 1 ? "" : "s"}</b> libres hoy.</p>
-    <button class="act t-late" data-hgo="marketing">${isOwner() ? "Promocionar" : "Ver"}</button></div>`);
+    <button class="act t-late" data-hfree="open">Ver huecos</button></div>`);
 
   // --- estados
   const stories = isOwner() ? `<div class="sp-h"><h2>Tus estados</h2><span>los ven tus clientes por 24 h</span></div>
@@ -1801,11 +1804,18 @@ function renderHome() {
       </div></div>` : "";
 
   el.innerHTML = `${liveHtml}
-    <div class="sp-card mt-3"><div class="flex items-baseline justify-between"><h2 class="disp text-[18px] font-bold">Hoy en la silla</h2><span class="soft text-xs">${freeLater.length} hueco${freeLater.length === 1 ? "" : "s"} libre${freeLater.length === 1 ? "" : "s"}</span></div>${chair}
+    <div class="sp-card mt-3" id="chairCard"><div class="flex items-center justify-between gap-2"><h2 class="disp text-[18px] font-bold">Hoy en la silla</h2>
+      ${freeLater.length ? `<button class="rounded-full px-3 py-1.5 text-xs font-bold ${H.showFree ? "" : "t-late"}" style="${H.showFree ? "background:var(--sink);color:#fff" : ""}" data-hfree="1" aria-expanded="${!!H.showFree}">${freeLater.length} hueco${freeLater.length === 1 ? "" : "s"} libre${freeLater.length === 1 ? "" : "s"} ${H.showFree ? "▴" : "▾"}</button>` : `<span class="soft text-xs">Sin huecos libres</span>`}</div>${chair}
+      ${H.showFree && freeLater.length ? `<div class="q-pop mt-3 rounded-2xl p-3" style="background:var(--canvas)">
+        <p class="mb-2 text-sm font-bold">Toca un hueco para agendar a alguien ahí</p>
+        <div class="grid grid-cols-3 gap-2">${freeLater.map((f) => `<button class="q-slot" data-hfreeat="${f.time}">${hora12(f.time)}${myStaff().length > 1 ? `<span class="soft block text-[10px] font-semibold">${f.staffIds.length} libre${f.staffIds.length === 1 ? "" : "s"}</span>` : ""}</button>`).join("")}</div>
+        ${isOwner() ? `<button class="mt-3 w-full rounded-xl py-2.5 text-sm font-bold t-late" data-hfill="story">${isTrial() ? "🔒 " : ""}Publicar estos huecos como estado</button>` : ""}
+      </div>` : ""}
       <div class="soft mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px]"><span><span style="color:var(--mint)">●</span> confirmada</span><span><span style="color:var(--amber)">●</span> abono por revisar</span><span><span style="color:#8a94a8">●</span> esperando pago</span><span><span style="color:var(--sred)">|</span> ahora</span></div></div>
     <div class="sp-h"><h2>Para hoy</h2><span>${todo.length ? todo.length + " pendiente" + (todo.length === 1 ? "" : "s") : ""}</span></div>
     ${todo.join("") || `<div class="todo"><span class="ic t-ok"><i class="fa-solid fa-check"></i></span><p class="flex-1 text-[13.5px]">Todo al día. Usa <b>Cita rápida</b> para agendar a quien llame o llegue.</p></div>`}
     ${stories}${fill}`;
+  if (isOwner()) el.insertAdjacentHTML("afterbegin", guideCard());
 }
 function storyBg(x) { return x.img ? `background-image:url('${x.img}')` : `background:${x.bg || "#14213D"}`; }
 $("tab-home").addEventListener("click", async (e) => {
@@ -1818,6 +1828,9 @@ $("tab-home").addEventListener("click", async (e) => {
     return;
   }
   const go = e.target.closest("[data-hgo]"); if (go) return switchTab(go.dataset.hgo);
+  const fr = e.target.closest("[data-hfree]");
+  if (fr) { H.showFree = fr.dataset.hfree === "open" ? true : !H.showFree; renderHome(); if (H.showFree) $("chairCard")?.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
+  const fa = e.target.closest("[data-hfreeat]"); if (fa) return openQuick({ date: H.today, time: fa.dataset.hfreeat });
   const blk = e.target.closest("[data-hcode]"); if (blk) { setAgendaDate(H.today); return switchTab("agenda"); }
   const st = e.target.closest("[data-hstory]"); if (st) return st.dataset.hstory === "new" ? newStory() : manageStory(st.dataset.hstory);
   const fl = e.target.closest("[data-hfill]"); if (fl) return fillAsStory(H.today);
@@ -1827,10 +1840,10 @@ $("tab-home").addEventListener("click", async (e) => {
 //  CITA RÁPIDA: horas libres primero, luego WhatsApp, servicio y listo
 // =====================================================================
 const Q = {};
-function openQuick() {
+function openQuick(preset = {}) {
   const mains = A.services.filter((s) => s.active !== false && s.type !== "addon");
   if (!mains.length) return toast("Primero crea tus servicios.", "error");
-  Object.assign(Q, { date: bogNow().date, time: null, staffId: null, mainId: mains[0].id, extras: new Set(), known: null, locks: [], phone: "" });
+  Object.assign(Q, { date: preset.date || bogNow().date, time: preset.time || null, staffId: null, mainId: mains[0].id, extras: new Set(), known: null, locks: [], phone: "" });
   openM("Cita rápida", `
     <p class="soft -mt-3 mb-3 text-sm">Para quien llamó o llegó sin cuenta. Toca una hora.</p>
     <div id="qDays" class="mb-3 flex gap-2 overflow-x-auto pb-1"></div>
@@ -1886,6 +1899,7 @@ function renderQSlots() {
   const cur = slots.find((s) => s.time === Q.time);
   if (Q.time && !cur) { Q.time = null; $("qAfter").classList.add("hidden"); }
   if (cur && !cur.staffIds.includes(Q.staffId)) Q.staffId = cur.staffIds[0];
+  if (cur && $("qAfter").classList.contains("hidden")) { $("qAfter").classList.remove("hidden"); $("qAfter").classList.add("q-pop"); }
   $("qSlots").innerHTML = slots.map((s) => `<button class="q-slot" data-qt="${s.time}" aria-pressed="${s.time === Q.time}">${hora12(s.time)}</button>`).join("")
     || `<div class="col-span-3 rounded-xl bg-paper p-3 text-sm">No quedan horas para este servicio ${isToday ? "hoy" : "ese día"}. <button class="font-bold underline" data-qnext="${addDays(Q.date, 1)}">Ver el día siguiente</button></div>`;
   renderQStaff(); updQSave();
@@ -2100,4 +2114,146 @@ async function loadLost() {
         <a class="act t-ok rounded-full px-3 py-2 text-xs font-bold" target="_blank" rel="noopener" href="${waLink(c.phone, txt)}">Invitar</a></div>`;
     }).join("") : `<p class="soft text-sm">Todos tus clientes han vuelto en el último mes. 👏</p>`;
   } catch (err) { box.innerHTML = `<p class="soft text-sm">No se pudo calcular: ${esc(err.message)}</p>`; }
+}
+
+// =====================================================================
+//  GUÍA DE CONFIGURACIÓN: paso a paso para dejar la tienda lista
+// =====================================================================
+const guideDone = () => A.settings?.guideDone || [];
+function guideSteps() {
+  const s = A.settings || {};
+  const hasHours = Object.values(s.businessHours || {}).some((d) => (d || []).length);
+  return [
+    { id: "biz", ic: "fa-store", t: "Datos de tu negocio", d: "Nombre, WhatsApp, dirección y ciudad. Así te encuentran y te escriben tus clientes.",
+      ok: !!(s.businessName && s.whatsapp && s.address), tab: "settings", focus: "stName",
+      tip: "Escribe el nombre, el WhatsApp y la dirección. Al final de la página toca Guardar." },
+    { id: "hours", ic: "fa-clock", t: "Horario de atención", d: "Los días y horas en que abres. Si cierras a almorzar, usa el segundo turno.",
+      ok: hasHours && guideDone().includes("hours"), tab: "settings", focus: "[data-dow]", manual: true,
+      tip: "Marca los días que abres y pon apertura y cierre. Al final toca Guardar." },
+    { id: "services", ic: "fa-scissors", t: "Servicios y precios", d: "Revisa los servicios de ejemplo: cambia precios y duración, y oculta los que no haces.",
+      ok: guideDone().includes("services"), tab: "services", manual: true,
+      tip: "Toca Editar en cada servicio para poner tu precio y duración." },
+    { id: "pay", ic: "fa-qrcode", t: "Cómo te pagan el abono", d: "Tu Nequi, Daviplata o llave Bre-B con su QR, y cuánto cobras para apartar el cupo.",
+      ok: (s.paymentMethods || []).length > 0, tab: "settings", focus: "pmList",
+      tip: "Toca “Agregar medio de pago”, escribe tu número o llave y sube el QR. Revisa el valor del abono arriba y toca Guardar." },
+    { id: "telegram", ic: "fa-paper-plane", t: "Avisos en tu Telegram", d: "Te llegan las reservas, los comprobantes con botón para aprobar y los recordatorios.",
+      ok: !!A.tg?.owner, guide: "telegram" },
+    { id: "team", ic: "fa-users", t: "Tu equipo y sus horarios", d: "Agrega a cada barbero, su horario propio y sus días libres. Si trabajas solo, revisa el tuyo.",
+      ok: guideDone().includes("team"), tab: "staff", manual: true,
+      tip: "En Disponibilidad toca Editar horario. Para agregar personas usa “Agregar al equipo”." },
+    { id: "brand", ic: "fa-palette", t: "Tu logo y colores", d: "Que tu página se vea como tu negocio.", optional: true,
+      ok: !!s.appearance?.logo, tab: "appearance", tip: "Sube tu logo, elige un tema o tus colores y toca Guardar apariencia." },
+    { id: "share", ic: "fa-share-nodes", t: "Comparte tu enlace", d: "Ponlo en tu estado de WhatsApp, en Instagram y en tu perfil de Google.",
+      ok: guideDone().includes("share"), guide: "share" }
+  ];
+}
+function guideProgress() { const st = guideSteps().filter((x) => !x.optional); return { done: st.filter((x) => x.ok).length, total: st.length, next: guideSteps().find((x) => !x.ok && !x.optional) }; }
+function guideCard() {
+  if (!A.settings) return "";
+  const g = guideProgress();
+  if (!g.next) return "";
+  const pct = Math.round((g.done / g.total) * 100);
+  return `<div class="sp-card mb-3" style="border:2px solid var(--sblue)">
+    <div class="flex items-center justify-between gap-2"><p class="disp text-[18px] font-extrabold">Deja tu agenda lista</p><span class="soft text-xs">${g.done} de ${g.total}</span></div>
+    <div class="mt-2 h-2 overflow-hidden rounded-full" style="background:var(--hair)"><div class="h-full rounded-full" style="width:${pct}%;background:var(--sblue)"></div></div>
+    <div class="mt-3 flex items-center gap-3"><span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl t-trial"><i class="fa-solid ${g.next.ic}"></i></span>
+      <div class="min-w-0 flex-1"><p class="text-[14px] font-bold">Sigue: ${esc(g.next.t)}</p><p class="soft text-xs leading-snug">${esc(g.next.d)}</p></div></div>
+    <div class="mt-3 grid grid-cols-2 gap-2"><button class="btn-primary text-sm" data-gstep="${g.next.id}">Hacerlo ahora</button><button class="btn-light text-sm" data-gopen="1">Ver todos los pasos</button></div></div>`;
+}
+function openGuide() {
+  const steps = guideSteps(), g = guideProgress();
+  openM("Guía de configuración", `
+    <p class="soft -mt-2 mb-4 text-sm">${g.next ? `Llevas ${g.done} de ${g.total} pasos. Cada uno te lleva al lugar exacto y te dice qué hacer.` : "¡Tu agenda está lista! Puedes volver a cualquier paso cuando quieras."}</p>
+    <div class="space-y-2">${steps.map((x) => `
+      <div class="flex items-start gap-3 rounded-2xl p-3" style="background:${x.ok ? "#f1faf5" : "var(--canvas)"}">
+        <span class="grid h-9 w-9 shrink-0 place-items-center rounded-xl ${x.ok ? "t-ok" : "t-trial"}"><i class="fa-solid ${x.ok ? "fa-check" : x.ic}"></i></span>
+        <div class="min-w-0 flex-1"><p class="text-[14px] font-bold">${esc(x.t)}${x.optional ? ` <span class="soft text-xs font-semibold">opcional${isTrial() && x.id === "brand" ? ", Pro" : ""}</span>` : ""}</p>
+          <p class="soft text-xs leading-snug">${esc(x.d)}</p>
+          <div class="mt-2 flex flex-wrap gap-2"><button class="btn-sm" data-gstep="${x.id}">${x.ok ? "Revisar" : "Hacerlo"}</button>
+            ${x.manual && !x.ok ? `<button class="btn-sm" data-gmark="${x.id}">Ya lo hice ✓</button>` : ""}</div></div>
+      </div>`).join("")}</div>`);
+}
+async function markGuide(id) {
+  if (guideDone().includes(id)) return;
+  try { await updateDoc(doc(db, bpath("settings", "general")), { guideDone: [...guideDone(), id] }); } catch { /* no es grave */ }
+}
+function goStep(id) {
+  const x = guideSteps().find((s2) => s2.id === id); if (!x) return;
+  closeM();
+  if (x.guide === "telegram") return openTelegramGuide();
+  if (x.guide === "share") return openShareGuide();
+  if (x.tab) switchTab(x.tab);
+  // espera a que la sección se dibuje y resalta el lugar exacto
+  setTimeout(() => {
+    const el = x.focus ? (x.focus.startsWith("[") ? document.querySelector(`#tab-${x.tab} ${x.focus}`) : $(x.focus)) : $("tab-" + x.tab);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("guide-glow"); setTimeout(() => el.classList.remove("guide-glow"), 4200);
+      if (el.focus && el.tagName === "INPUT") setTimeout(() => el.focus({ preventScroll: true }), 500);
+    }
+    showGuideTip(x);
+  }, 350);
+}
+function showGuideTip(x) {
+  document.getElementById("guideTip")?.remove();
+  const t = document.createElement("div");
+  t.id = "guideTip"; t.className = "guide-tip q-pop"; t.setAttribute("role", "status");
+  t.innerHTML = `<i class="fa-solid fa-lightbulb mt-0.5" style="color:#f59e0b"></i><p class="min-w-0 flex-1 text-[13px] leading-snug"><b>${esc(x.t)}.</b> ${esc(x.tip || x.d)}</p>
+    ${x.manual ? `<button class="shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-bold" style="color:var(--sink)" data-gmark="${x.id}">Listo ✓</button>` : ""}
+    <button class="shrink-0 px-1 text-lg leading-none opacity-70" data-gclose="1" aria-label="Cerrar">✕</button>`;
+  document.body.appendChild(t);
+}
+document.addEventListener("click", (e) => {
+  const st = e.target.closest("[data-gstep]"); if (st) return goStep(st.dataset.gstep);
+  const op = e.target.closest("[data-gopen]"); if (op) return openGuide();
+  const mk = e.target.closest("[data-gmark]");
+  if (mk) { markGuide(mk.dataset.gmark); document.getElementById("guideTip")?.remove(); if ($("modal").classList.contains("hidden") === false) setTimeout(openGuide, 300); toast("¡Paso completado!"); return; }
+  if (e.target.closest("[data-gclose]")) document.getElementById("guideTip")?.remove();
+  if (e.target.closest("[data-link]")) markGuide("share");
+});
+// Telegram paso a paso, con el estado en vivo
+function openTelegramGuide() {
+  const on = !!A.tg?.owner;
+  openM("Avisos en tu Telegram", `
+    <p class="soft -mt-2 mb-4 text-sm">Te llegan las reservas nuevas, los comprobantes de pago con botones para aprobar o rechazar, los recordatorios y los avisos de tu plan.</p>
+    <ol class="space-y-3">
+      <li class="flex gap-3"><span class="grid h-7 w-7 shrink-0 place-items-center rounded-full t-trial text-sm font-bold">1</span><div class="flex-1 text-sm"><b>Instala Telegram</b> en tu celular si aún no lo tienes.
+        <div class="mt-1.5 flex flex-wrap gap-2"><a class="btn-sm" target="_blank" rel="noopener" href="https://play.google.com/store/apps/details?id=org.telegram.messenger">Android</a><a class="btn-sm" target="_blank" rel="noopener" href="https://apps.apple.com/app/telegram-messenger/id686449807">iPhone</a></div></div></li>
+      <li class="flex gap-3"><span class="grid h-7 w-7 shrink-0 place-items-center rounded-full t-trial text-sm font-bold">2</span><div class="flex-1 text-sm"><b>Toca “Conectar”</b>. Se abre Telegram con el bot de la plataforma.
+        <button id="tgGo" class="btn-primary mt-1.5 w-full">Conectar mi Telegram</button></div></li>
+      <li class="flex gap-3"><span class="grid h-7 w-7 shrink-0 place-items-center rounded-full t-trial text-sm font-bold">3</span><div class="flex-1 text-sm">En Telegram toca <b>Iniciar</b> (o <i>Start</i>) abajo. Te llega un mensaje de bienvenida.</div></li>
+      <li class="flex gap-3"><span class="grid h-7 w-7 shrink-0 place-items-center rounded-full ${on ? "t-ok" : "t-off"} text-sm font-bold">${on ? "✓" : "4"}</span><div class="flex-1 text-sm"><b>Listo.</b> <span id="tgState">${on ? "Tu Telegram está conectado. 🎉" : `<span class="spin mr-1"></span>Esperando la conexión… esta pantalla se actualiza sola.`}</span></div></li>
+    </ol>
+    <p class="soft mt-4 rounded-xl p-3 text-xs" style="background:var(--canvas)">💡 Cada barbero puede recibir sus propias citas: en <b>Equipo</b>, toca “Conectar Telegram” en su tarjeta y envíale el enlace.</p>`);
+  $("tgGo").onclick = async () => {
+    const btn = $("tgGo"); setBusy(btn, true, "Creando enlace…");
+    let bot = "";
+    try { bot = ((await getDoc(doc(db, "platform", "public"))).data()?.telegramBot || "").replace(/^@/, "").trim(); } catch { /* sin bot */ }
+    if (!bot) { setBusy(btn, false); return toast("El bot de la plataforma aún no está listo. Avísale a soporte.", "error"); }
+    const code = Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4);
+    try { await setDoc(doc(db, "telegramLinks", code), { businessId: bpath().split("/")[1], target: "owner", createdAt: serverTimestamp() }); }
+    catch (err) { setBusy(btn, false); return toast(err.message, "error"); }
+    window.open(`https://t.me/${bot}?start=${code}`, "_blank");
+    setBusy(btn, false); btn.textContent = "Abrir Telegram otra vez";
+  };
+  A.tgGuideOpen = true;
+}
+// cuando llega la conexión, la guía lo muestra al instante
+const _tgWatch = setInterval(() => {
+  if (!A.tgGuideOpen || !$("tgState")) { A.tgGuideOpen = !!$("tgState"); return; }
+  if (A.tg?.owner && !$("tgState").dataset.ok) { $("tgState").dataset.ok = "1"; $("tgState").innerHTML = "Tu Telegram está conectado. 🎉"; toast("¡Telegram conectado! Ya te llegarán los avisos."); renderHome(); }
+}, 1500);
+function openShareGuide() {
+  const url = $("linkUrl").textContent, name = A.settings?.businessName || A.biz?.name || "";
+  const msg = (panelPrefs().shareMsg || PANEL_DEFAULT.shareMsg).replace(/\{negocio\}/g, name).replace(/\{link\}/g, url);
+  openM("Comparte tu enlace", `
+    <p class="soft -mt-2 mb-3 text-sm">Entre más lo vean, más reservas te llegan solas. Estos son los mejores lugares:</p>
+    <p class="mb-3 truncate rounded-lg bg-paper px-3 py-2 font-mono text-xs">${esc(url)}</p>
+    <div class="space-y-2 text-sm">
+      <a class="todo !mt-0" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(msg)}" data-link-done="1"><span class="ic t-ok"><i class="fa-brands fa-whatsapp"></i></span><span class="flex-1"><b>Estado de WhatsApp</b><br><span class="soft text-xs">Publícalo con la imagen de tus horarios.</span></span></a>
+      <button class="todo !mt-0 w-full text-left" data-link="copy"><span class="ic t-trial"><i class="fa-brands fa-instagram"></i></span><span class="flex-1"><b>Biografía de Instagram</b><br><span class="soft text-xs">Copia el enlace y pégalo en “Editar perfil”.</span></span></button>
+      <button class="todo !mt-0 w-full text-left" data-link="copy"><span class="ic t-due"><i class="fa-brands fa-google"></i></span><span class="flex-1"><b>Perfil de Google</b><br><span class="soft text-xs">En Google Business pégalo como “Enlace de reservas”.</span></span></button>
+      <button class="todo !mt-0 w-full text-left" data-link="qr"><span class="ic t-off"><i class="fa-solid fa-qrcode"></i></span><span class="flex-1"><b>QR en tu local</b><br><span class="soft text-xs">Imprímelo y ponlo en el espejo o la caja.</span></span></button>
+    </div>`);
+  markGuide("share");
 }
