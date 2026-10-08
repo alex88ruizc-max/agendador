@@ -7,7 +7,7 @@ import {
   startUpdateWatcher, applyBrandColors, uiConfirm, uiPrompt, setDialogBrand, viewImage, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, hora12, fechaLarga, fechaCorta, toMillis, cop, esc, normalizePhone,
   waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, DEFAULT_WA_RESCHEDULE, computeSlots, onColor, darken,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js";
+} from "./common.js?v=2026-10-08j";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -23,7 +23,7 @@ const onErr = (e) => { console.error(e); toast("Error leyendo datos: " + (e.code
 onAuthStateChanged(auth, async (u) => {
   A.unsubs.forEach((f) => f()); A.unsubs = []; A.unsubDay?.();
   show("loginView", !u);
-  if (!u) { $("btnClientLink").classList.add("hidden"); $("btnAccount").classList.add("hidden"); $("hdrTitle").textContent = "Panel de tu negocio"; }
+  if (!u) { $("linkCard").classList.add("hidden"); $("btnAccount").classList.add("hidden"); $("hdrTitle").textContent = "Panel de tu negocio"; }
   if (!u) { show("appView", false); show("deniedView", false); $("who").textContent = ""; return; }
   const [sup, snap] = await Promise.all([
     getDoc(doc(db, "superusers", u.uid)).catch(() => null),
@@ -65,17 +65,16 @@ $("loginForm").addEventListener("submit", async (e) => {
 });
 $("btnLogout").onclick = () => { closeMenus(); signOut(auth); };
 // Menús del encabezado (link de clientes y cuenta)
-function closeMenus() { ["linkMenu", "acctMenu"].forEach((m) => $(m).classList.add("hidden")); ["btnClientLink", "btnAccount"].forEach((b) => $(b).setAttribute("aria-expanded", "false")); }
+function closeMenus() { $("acctMenu").classList.add("hidden"); $("btnAccount").setAttribute("aria-expanded", "false"); }
 function toggleMenu(btn, menu) {
   const open = $(menu).classList.contains("hidden");
   closeMenus();
   if (open) { $(menu).classList.remove("hidden"); $(btn).setAttribute("aria-expanded", "true"); }
 }
-$("btnClientLink").onclick = (e) => { e.stopPropagation(); toggleMenu("btnClientLink", "linkMenu"); };
 $("btnAccount").onclick = (e) => { e.stopPropagation(); toggleMenu("btnAccount", "acctMenu"); };
 document.addEventListener("click", (e) => { if (!e.target.closest(".hdr-menu")) closeMenus(); });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeMenus(); });
-$("linkMenu").addEventListener("click", async (e) => {
+$("linkCard").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-link]"); if (!b) return;
   const url = $("linkUrl").textContent, name = A.settings?.businessName || A.biz?.name || "";
   const msg = (panelPrefs().shareMsg || PANEL_DEFAULT.shareMsg).replace(/\{negocio\}/g, name).replace(/\{link\}/g, url);
@@ -177,8 +176,8 @@ function renderTabs() {
   const t = $("tabs");
   t.className = `grid gap-1.5 lg:grid-cols-1 ${({ 2: "grid-cols-2", 3: "grid-cols-3", 4: "grid-cols-4" })[P.columns] || "grid-cols-3"} ${P.style === "list" ? "tabs-list" : ""} ${P.colorIcons ? "" : "tabs-mono"}`;
   t.innerHTML = ids.map((id) => `<button class="admin-tab" data-tab="${id}" aria-current="${A.tab === id ? "page" : "false"}"><i class="fa-solid ${TABS[id][1]}" style="color:${TABS[id][2]}"></i><span>${TABS[id][0]}</span></button>`).join("");
-  $("btnClientLink").classList.remove("hidden");
-  $("btnClientLink").querySelector("span").textContent = P.linkLabel || PANEL_DEFAULT.linkLabel;
+  $("linkCard").classList.remove("hidden");
+  $("linkTitle").textContent = P.linkLabel || PANEL_DEFAULT.linkLabel;
 }
 // Aplica la marca del negocio (logo y colores) al panel, si el dueño lo eligió
 function applyPanelBrand() {

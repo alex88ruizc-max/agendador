@@ -2,7 +2,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js";
+import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js?v=2026-10-08j";
 
 export const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
@@ -16,7 +16,7 @@ export function businessFromUrl() {
 export const bpath = (...parts) => ["businesses", BID, ...parts].join("/");
 
 // Versión de la página: cámbiala en cada actualización para comprobar que se publicó
-export const APP_VERSION = '2026-10-08i';
+export const APP_VERSION = '2026-10-08j';
 
 export const UNIT = 15;          // unidad interna de bloqueo (minutos)
 const TZ = "America/Bogota";     // Colombia no usa horario de verano
@@ -218,8 +218,11 @@ export async function readPublishedVersion() {
   return m ? m[1] : null;
 }
 // Recarga sin usar la copia guardada (conserva ?b= del negocio)
-export function reloadFresh() {
-  const u = new URL(location.href); u.searchParams.set("v", Date.now()); location.replace(u.href);
+export async function reloadFresh() {
+  // Descarga de nuevo todos los archivos (sin la copia guardada) y luego recarga la página
+  const files = ["index.html", "admin.html", "super.html", "common.js", "app.js", "admin.js", "super.js", "config.js", "theme.js", "styles.css"];
+  await Promise.all(files.map((f) => fetch(new URL(f, location.href).href, { cache: "reload" }).catch(() => null)));
+  location.reload();
 }
 // Al abrir y cada 30 minutos: si hay una versión nueva publicada, muestra el aviso para actualizar
 export function startUpdateWatcher() {
@@ -227,6 +230,7 @@ export function startUpdateWatcher() {
     try {
       const pub = await readPublishedVersion();
       if (!pub || !(pub > APP_VERSION) || document.getElementById("avisoVersionNueva")) return;
+      try { if (sessionStorage.getItem("verCerrada") === pub) return; } catch { /* sin almacenamiento */ }
       const el = document.createElement("div");
       el.id = "avisoVersionNueva";
       el.className = "fixed bottom-24 left-1/2 z-[95] w-[calc(100%-1.5rem)] max-w-md -translate-x-1/2";
@@ -234,8 +238,8 @@ export function startUpdateWatcher() {
         <p class="min-w-0 flex-grow text-xs font-bold leading-snug">Hay una versión nueva de la página con mejoras.</p>
         <button type="button" class="shrink-0 rounded-xl bg-white px-3 py-1.5 text-xs font-bold text-sky-700">Actualizar</button>
         <button type="button" aria-label="Cerrar" class="shrink-0 px-1 text-white/80">✕</button></div>`;
-      el.querySelectorAll("button")[0].onclick = reloadFresh;
-      el.querySelectorAll("button")[1].onclick = () => el.remove();
+      el.querySelectorAll("button")[0].onclick = (e) => { e.target.textContent = "Actualizando…"; reloadFresh(); };
+      el.querySelectorAll("button")[1].onclick = () => { try { sessionStorage.setItem("verCerrada", pub); } catch { /* nada */ } el.remove(); };
       document.body.appendChild(el);
     } catch { /* sin conexión: se revisa después */ }
   };

@@ -225,3 +225,10 @@ body.branded .hdr-pill { color:var(--b-on-header); border-color:currentColor; ba
 body.branded .hdr-avatar { background:var(--b-primary); color:var(--b-on-primary); }
 #tabs.tabs-list .admin-tab { flex-direction:row; justify-content:flex-start; gap:.6rem; padding:.65rem .75rem; font-size:12.5px; text-align:left; }
 #tabs.tabs-mono .admin-tab i { color:currentColor !important; }
+
+/* Tarjeta del link para clientes */
+.link-ico { background:rgba(16,185,129,.12); color:#047857; }
+body.branded .link-ico { background:var(--b-primary-soft); color:var(--b-primary-text); }
+.link-act { display:flex; flex-direction:column; align-items:center; gap:.3rem; padding:.55rem .1rem; border-radius:.7rem; border:1px solid var(--line); background:#fff; }
+.link-act i { font-size:1rem; color:var(--ink); }
+.link-act:hover { border-color:rgba(23,34,46,.35); }
