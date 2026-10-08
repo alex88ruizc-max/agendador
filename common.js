@@ -16,7 +16,7 @@ export function businessFromUrl() {
 export const bpath = (...parts) => ["businesses", BID, ...parts].join("/");
 
 // Versión de la página: cámbiala en cada actualización para comprobar que se publicó
-export const APP_VERSION = '2026-10-08f';
+export const APP_VERSION = '2026-10-08i';
 
 export const UNIT = 15;          // unidad interna de bloqueo (minutos)
 const TZ = "America/Bogota";     // Colombia no usa horario de verano
@@ -197,6 +197,9 @@ export function applyBrandColors(ap) {
   st.setProperty("--b-primary", primary); st.setProperty("--b-on-primary", onColor(primary));
   st.setProperty("--b-primary-text", lum(primary) > 0.35 ? darken(primary, 0.45) : primary);
   st.setProperty("--b-bg", bg);
+  const [r, g, b] = hexRgb(primary);
+  st.setProperty("--b-primary-soft", `rgba(${r},${g},${b},.12)`);
+  st.setProperty("--b-primary-line", `rgba(${r},${g},${b},.45)`);
 }
 // Despierta el servidor (Apps Script) antes de que el cliente aparte, para que responda más rápido
 let warmAt = 0;

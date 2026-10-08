@@ -4,7 +4,7 @@ import {
   doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, query, where, onSnapshot, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
-  startUpdateWatcher, uiConfirm, uiPrompt, setDialogBrand, viewImage, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, hora12, fechaLarga, fechaCorta, toMillis, cop, esc, normalizePhone,
+  startUpdateWatcher, applyBrandColors, uiConfirm, uiPrompt, setDialogBrand, viewImage, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, hora12, fechaLarga, fechaCorta, toMillis, cop, esc, normalizePhone,
   waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, DEFAULT_WA_RESCHEDULE, computeSlots, onColor, darken,
   toast, openModal, closeModal, setBusy, copyText
 } from "./common.js";
@@ -22,8 +22,8 @@ const onErr = (e) => { console.error(e); toast("Error leyendo datos: " + (e.code
 // ================= Sesión =================
 onAuthStateChanged(auth, async (u) => {
   A.unsubs.forEach((f) => f()); A.unsubs = []; A.unsubDay?.();
-  show("loginView", !u); $("btnLogout").classList.toggle("hidden", !u);
-  if (!u) { $("publicLink").classList.add("hidden"); $("hdrTitle").textContent = "Panel de tu negocio"; }
+  show("loginView", !u);
+  if (!u) { $("btnClientLink").classList.add("hidden"); $("btnAccount").classList.add("hidden"); $("hdrTitle").textContent = "Panel de tu negocio"; }
   if (!u) { show("appView", false); show("deniedView", false); $("who").textContent = ""; return; }
   const [sup, snap] = await Promise.all([
     getDoc(doc(db, "superusers", u.uid)).catch(() => null),
@@ -39,7 +39,13 @@ onAuthStateChanged(auth, async (u) => {
   }
   if (!bid) { show("deniedView", true); show("appView", false); $("who").textContent = u.email; return; }
   setBusiness(bid);
-  $("publicLink").href = "index.html?b=" + encodeURIComponent(bid);
+  $("linkOpen").href = "index.html?b=" + encodeURIComponent(bid);
+  $("linkUrl").textContent = new URL("index.html?b=" + encodeURIComponent(bid), location.href).href;
+  $("btnAccount").textContent = (u.email || "?").slice(0, 1).toUpperCase();
+  $("btnAccount").classList.remove("hidden");
+  $("acctMenuEmail").textContent = u.email;
+  $("acctMenuRole").textContent = isSuper ? "Superusuario" : (A.me?.role === "owner" ? "Dueño del negocio" : "Equipo");
+  $("acctSuper").classList.toggle("hidden", !isSuper);
   const bizSnap = await getDoc(doc(db, "businesses", bid)).catch(() => null);
   A.biz = bizSnap?.data() || { name: bid, status: "active" };
   setDialogBrand(A.biz.name);
@@ -57,7 +63,35 @@ $("loginForm").addEventListener("submit", async (e) => {
   catch { toast("Correo o contraseña incorrectos.", "error"); }
   finally { setBusy(btn, false); }
 });
-$("btnLogout").onclick = () => signOut(auth);
+$("btnLogout").onclick = () => { closeMenus(); signOut(auth); };
+// Menús del encabezado (link de clientes y cuenta)
+function closeMenus() { ["linkMenu", "acctMenu"].forEach((m) => $(m).classList.add("hidden")); ["btnClientLink", "btnAccount"].forEach((b) => $(b).setAttribute("aria-expanded", "false")); }
+function toggleMenu(btn, menu) {
+  const open = $(menu).classList.contains("hidden");
+  closeMenus();
+  if (open) { $(menu).classList.remove("hidden"); $(btn).setAttribute("aria-expanded", "true"); }
+}
+$("btnClientLink").onclick = (e) => { e.stopPropagation(); toggleMenu("btnClientLink", "linkMenu"); };
+$("btnAccount").onclick = (e) => { e.stopPropagation(); toggleMenu("btnAccount", "acctMenu"); };
+document.addEventListener("click", (e) => { if (!e.target.closest(".hdr-menu")) closeMenus(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeMenus(); });
+$("linkMenu").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-link]"); if (!b) return;
+  const url = $("linkUrl").textContent, name = A.settings?.businessName || A.biz?.name || "";
+  const msg = (panelPrefs().shareMsg || PANEL_DEFAULT.shareMsg).replace(/\{negocio\}/g, name).replace(/\{link\}/g, url);
+  if (b.dataset.link === "copy") copyText(url);
+  if (b.dataset.link === "wa") window.open("https://wa.me/?text=" + encodeURIComponent(msg), "_blank");
+  if (b.dataset.link === "share") {
+    if (navigator.share) { try { await navigator.share({ title: name, text: msg, url }); } catch { /* canceló */ } } else copyText(url);
+  }
+  if (b.dataset.link === "qr") {
+    await loadScript("https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js").catch(() => {});
+    if (!window.QRious) return toast("No se pudo generar el QR. Revisa tu conexión.", "error");
+    const q = new window.QRious({ value: url, size: 700, level: "M" });
+    viewImage(q.toDataURL(), `${name}: escanéalo para agendar`);
+  }
+  closeMenus();
+});
 $("btnLogoutDenied").onclick = () => signOut(auth);
 $("btnForgotAdmin").onclick = async () => {
   const email = $("loginForm").email.value.trim();
@@ -71,6 +105,7 @@ function start() {
   A.unsubs.push(onSnapshot(doc(db, bpath("settings", "general")), (s) => {
     A.settings = s.data() || {};
     setDialogBrand(A.settings.businessName || A.biz?.name, A.settings.appearance?.logo);
+    applyPanelBrand(); if (A.me) renderTabs();
     renderAgenda(); renderStaffTab();
   }, onErr));
   A.unsubs.push(onSnapshot(collection(db, bpath("services")), (q) => {
@@ -126,10 +161,33 @@ const TABS = {
   appearance: ["Apariencia", "fa-palette", "#c026d3"], images: ["Imágenes", "fa-image", "#0891b2"],
   settings: ["Configuración", "fa-gear", "#475569"]
 };
+const ALL_TABS = ["agenda", "staff", "clients", "services", "appearance", "images", "settings"];
+const LOCKED_TABS = ["appearance", "settings"]; // siempre visibles para poder deshacer cambios
+const PANEL_DEFAULT = { useBrand: true, linkLabel: "Link clientes", shareMsg: "Agenda tu cita en {negocio} aquí: {link}", columns: 3, style: "cards", colorIcons: true, order: ALL_TABS, hidden: [] };
+function panelPrefs() {
+  const p = { ...PANEL_DEFAULT, ...(A.settings?.panel || {}) };
+  p.order = [...(p.order || []).filter((t) => ALL_TABS.includes(t)), ...ALL_TABS.filter((t) => !(p.order || []).includes(t))];
+  p.hidden = (p.hidden || []).filter((t) => !LOCKED_TABS.includes(t));
+  return p;
+}
 function renderTabs() {
-  const ids = ["agenda", "staff"].concat(isOwner() ? ["clients", "services", "appearance", "images", "settings"] : []);
-  $("tabs").innerHTML = ids.map((id) => `<button class="admin-tab" data-tab="${id}" aria-current="${A.tab === id ? "page" : "false"}"><i class="fa-solid ${TABS[id][1]}" style="color:${TABS[id][2]}"></i><span>${TABS[id][0]}</span></button>`).join("");
-  $("publicLink").classList.remove("hidden");
+  const P = panelPrefs();
+  const allowed = ["agenda", "staff"].concat(isOwner() ? ["clients", "services", "appearance", "images", "settings"] : []);
+  const ids = P.order.filter((id) => allowed.includes(id) && (!P.hidden.includes(id) || A.tab === id));
+  const t = $("tabs");
+  t.className = `grid gap-1.5 lg:grid-cols-1 ${({ 2: "grid-cols-2", 3: "grid-cols-3", 4: "grid-cols-4" })[P.columns] || "grid-cols-3"} ${P.style === "list" ? "tabs-list" : ""} ${P.colorIcons ? "" : "tabs-mono"}`;
+  t.innerHTML = ids.map((id) => `<button class="admin-tab" data-tab="${id}" aria-current="${A.tab === id ? "page" : "false"}"><i class="fa-solid ${TABS[id][1]}" style="color:${TABS[id][2]}"></i><span>${TABS[id][0]}</span></button>`).join("");
+  $("btnClientLink").classList.remove("hidden");
+  $("btnClientLink").querySelector("span").textContent = P.linkLabel || PANEL_DEFAULT.linkLabel;
+}
+// Aplica la marca del negocio (logo y colores) al panel, si el dueño lo eligió
+function applyPanelBrand() {
+  const P = panelPrefs(), ap = A.settings?.appearance || {};
+  applyBrandColors(P.useBrand ? ap : {});
+  const logo = $("hdrLogo"), show = P.useBrand && (ap.logo || (ap.colors && ap.colors.header));
+  logo.classList.toggle("hidden", !show); logo.classList.toggle("grid", !!show);
+  const name = A.settings?.businessName || A.biz?.name || "";
+  logo.innerHTML = ap.logo ? `<img src="${ap.logo}" alt="" class="h-full w-full object-cover">` : esc(name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase());
 }
 $("tabs").addEventListener("click", (e) => {
   const b = e.target.closest("[data-tab]"); if (!b) return;
@@ -737,24 +795,76 @@ const TEMPLATES = {
     ["Retiro de acrílico", "addon", 15000, 30, "Manos"], ["Pedicure tradicional", "base", 28000, 60, "Pies"], ["Pedicure spa", "base", 45000, 75, "Pies"],
     ["Decoración / diseño", "addon", 10000, 15, "Extras"], ["Parafina", "addon", 15000, 15, "Extras"], ["Masaje relajante", "base", 90000, 60, "Spa"], ["Limpieza facial", "base", 80000, 60, "Spa"]] }
 };
+const TYPE_STYLE = { base: "bg-sky-100 text-sky-900", addon: "bg-amber-100 text-amber-900", special: "bg-fuchsia-100 text-fuchsia-900" };
 function renderServices() {
   if (!isOwner()) return;
+  const list = A.services.slice().sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
+  const hidden = list.filter((s) => s.active === false).length;
+  const groups = [];
+  list.forEach((s) => { const c = (s.category || "").trim() || "Sin categoría"; let g = groups.find((x) => x.c === c); if (!g) groups.push(g = { c, items: [] }); g.items.push(s); });
+  const card = (s) => `
+    <article class="rounded-xl border border-line bg-white p-3 ${s.active === false ? "opacity-60" : ""}">
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <p class="font-semibold leading-snug">${esc(s.name)}</p>
+          ${s.description ? `<p class="text-xs text-ink/60">${esc(s.description)}</p>` : ""}
+        </div>
+        <p class="shrink-0 font-narrow text-xl font-bold">${s.type === "addon" ? "+" : ""}${cop(s.priceCOP)}</p>
+      </div>
+      <div class="mt-2 flex flex-wrap items-center gap-1.5 text-xs font-semibold">
+        <span class="rounded-full px-2 py-0.5 ${TYPE_STYLE[s.type] || "bg-slate-200"}">${TYPE_LABEL[s.type] || s.type}</span>
+        <span class="rounded-full bg-paper px-2 py-0.5 text-ink/70">⏱ ${s.type === "addon" ? "+" : ""}${Number(s.minutes || 0)} min</span>
+        ${s.active === false ? `<span class="rounded-full bg-slate-200 px-2 py-0.5 text-ink/60">Oculto en la página</span>` : ""}
+      </div>
+      <div class="mt-3 flex flex-wrap gap-1.5">
+        <button class="btn-sm" data-svc="${s.id}"><i class="fa-solid fa-pen"></i> Editar</button>
+        <button class="btn-sm" data-svis="${s.id}">${s.active === false ? '<i class="fa-solid fa-eye"></i> Mostrar' : '<i class="fa-solid fa-eye-slash"></i> Ocultar'}</button>
+        <button class="btn-sm" data-sdup="${s.id}"><i class="fa-regular fa-copy"></i> Duplicar</button>
+        <button class="btn-sm" data-smove="-1" data-sid="${s.id}" aria-label="Subir">↑</button>
+        <button class="btn-sm" data-smove="1" data-sid="${s.id}" aria-label="Bajar">↓</button>
+      </div>
+    </article>`;
   $("tab-services").innerHTML = `
-    <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
-      <p class="max-w-xl text-sm text-ink/70">Principal: el cliente elige uno. Agregado: solo se suma a un principal. Especial: puede ser principal o agregado. La categoría agrupa los servicios en la página (Cabello, Uñas, Barba…).</p>
-      <div class="flex flex-wrap gap-2"><button class="btn-light" data-tpl="1">Cargar plantilla</button><button class="btn-primary" data-svc="">+ Nuevo servicio</button></div>
+    <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+      <p class="text-sm text-ink/70"><b class="text-ink">${list.length}</b> servicio(s)${hidden ? ` · ${hidden} oculto(s)` : ""}</p>
+      <div class="flex flex-wrap gap-2"><button class="btn-light text-sm" data-tpl="1">Cargar plantilla</button><button class="btn-primary text-sm" data-svc="">+ Nuevo servicio</button></div>
     </div>
-    <div class="overflow-x-auto rounded-xl border border-line bg-white"><table class="w-full min-w-[560px] text-sm">
-      <thead class="bg-paper text-left"><tr><th class="p-3">Servicio</th><th class="p-3">Categoría</th><th class="p-3">Tipo</th><th class="p-3">Precio</th><th class="p-3">Minutos</th><th class="p-3"></th></tr></thead>
-      <tbody>${A.services.map((s) => `<tr class="border-t border-line ${s.active === false ? "opacity-50" : ""}">
-        <td class="p-3 font-semibold">${esc(s.name)}${s.active === false ? " (oculto)" : ""}</td><td class="p-3">${esc(s.category || "")}</td><td class="p-3">${TYPE_LABEL[s.type] || s.type}</td>
-        <td class="p-3">${cop(s.priceCOP)}</td><td class="p-3">${s.type === "addon" ? "+" : ""}${s.minutes}</td>
-        <td class="p-3 text-right"><button class="btn-sm" data-svc="${s.id}">Editar</button></td></tr>`).join("")}</tbody></table></div>`;
+    <details class="mb-4 rounded-xl border border-line bg-white p-3 text-sm">
+      <summary class="cursor-pointer font-semibold">¿Qué es principal, agregado y especial?</summary>
+      <p class="mt-2 text-ink/70"><b>Principal:</b> el cliente elige uno (corte, manicure…). <b>Agregado:</b> solo se suma a un principal (barba, cejas…). <b>Especial:</b> puede ser principal o agregado (color, keratina…). La <b>categoría</b> agrupa los servicios en la página del cliente.</p>
+    </details>
+    ${list.length ? groups.map((g) => `
+      <h3 class="mb-2 mt-5 text-xs font-bold uppercase tracking-wider text-ink/60">${esc(g.c)} (${g.items.length})</h3>
+      <div class="grid gap-2 sm:grid-cols-2">${g.items.map(card).join("")}</div>`).join("")
+    : `<div class="rounded-xl border border-dashed border-line bg-white p-6 text-center text-sm text-ink/70">Aún no tienes servicios. Toca <b>Cargar plantilla</b> para empezar con una lista lista, o <b>+ Nuevo servicio</b>.</div>`}`;
 }
-$("tab-services").addEventListener("click", (e) => {
+$("tab-services").addEventListener("click", async (e) => {
   if (e.target.closest("[data-tpl]")) return openTemplates();
-  const b = e.target.closest("[data-svc]"); if (!b) return;
-  openService(A.services.find((s) => s.id === b.dataset.svc));
+  const ed = e.target.closest("[data-svc]");
+  if (ed) return openService(A.services.find((x) => x.id === ed.dataset.svc));
+  const vis = e.target.closest("[data-svis]"), dup = e.target.closest("[data-sdup]"), mv = e.target.closest("[data-smove]");
+  try {
+    if (vis) {
+      const s = A.services.find((x) => x.id === vis.dataset.svis);
+      await setDoc(doc(db, bpath("services", s.id)), { active: s.active === false }, { merge: true });
+      toast(s.active === false ? "Ahora se ve en la página." : "Oculto: ya no aparece en la página.");
+    }
+    if (dup) {
+      const s = A.services.find((x) => x.id === dup.dataset.sdup);
+      const { id, ...data } = s;
+      const maxOrder = Math.max(0, ...A.services.map((x) => Number(x.order || 0)));
+      await setDoc(doc(db, bpath("services", "s" + Date.now().toString(36))), { ...data, name: s.name + " (copia)", order: maxOrder + 1 });
+      toast("Servicio duplicado. Edítalo para cambiar el nombre o el precio.");
+    }
+    if (mv) {
+      const list = A.services.slice().sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
+      const i = list.findIndex((x) => x.id === mv.dataset.sid), j = i + Number(mv.dataset.smove);
+      if (j < 0 || j >= list.length) return;
+      // reordena todo para que el orden quede limpio (1, 2, 3…)
+      [list[i], list[j]] = [list[j], list[i]];
+      await Promise.all(list.map((x, k) => (x.order === k + 1 ? null : setDoc(doc(db, bpath("services", x.id)), { order: k + 1 }, { merge: true }))));
+    }
+  } catch (err) { toast("No se pudo guardar: " + err.message, "error"); }
 });
 function openTemplates() {
   openM("Cargar plantilla de servicios", `
@@ -1040,7 +1150,15 @@ async function imgToDataUrl(file, max, type) {
   c.getContext("2d").drawImage(img, 0, 0, w, h);
   return c.toDataURL(type || "image/png");
 }
+function renderPanelOrder() {
+  $("pnOrder").innerHTML = A.pn.order.map((id, i) => `<div class="flex items-center gap-2 rounded-lg border border-line px-2.5 py-1.5 text-sm">
+    <i class="fa-solid ${TABS[id][1]} w-5 text-center" style="color:${TABS[id][2]}"></i><span class="flex-1">${TABS[id][0]}</span>
+    ${LOCKED_TABS.includes(id) ? `<span class="text-xs text-ink/50">siempre</span>` : `<label class="flex items-center gap-1 text-xs"><input type="checkbox" data-pnshow="${id}" class="h-4 w-4" ${A.pn.hidden.includes(id) ? "" : "checked"}>Ver</label>`}
+    <button type="button" class="btn-sm px-2" data-pnmove="-1" data-pnid="${i}" aria-label="Subir">↑</button>
+    <button type="button" class="btn-sm px-2" data-pnmove="1" data-pnid="${i}" aria-label="Bajar">↓</button></div>`).join("");
+}
 function renderAppearance() {
+  A.pn = JSON.parse(JSON.stringify(panelPrefs()));
   const ap = JSON.parse(JSON.stringify(A.settings.appearance || {}));
   ap.colors = ap.colors || {}; ap.texts = ap.texts || {};
   A.ap = ap;
@@ -1072,6 +1190,21 @@ function renderAppearance() {
         <p class="mb-3 text-xs text-ink/60">Si dejas un campo vacío se usa el texto original (el que ves en gris).</p>
         <div class="space-y-3">${TEXT_FIELDS.map(([k, l, d]) => `<label class="field"><span>${l}</span><input data-aptext="${k}" value="${esc(ap.texts[k] || "")}" placeholder="${esc(d)}"></label>`).join("")}</div>
       </div>
+      <div class="rounded-xl border border-line bg-white p-4">
+        <h3 class="mb-1 font-narrow text-xl font-bold">Tu panel</h3>
+        <p class="mb-3 text-xs text-ink/60">Cómo se ve el panel donde manejas los turnos (tú y tu equipo).</p>
+        <label class="mb-3 flex items-center gap-2 text-sm"><input id="pnBrand" type="checkbox" class="h-4 w-4" ${A.pn.useBrand ? "checked" : ""}> Usar mi logo y mis colores también en el panel</label>
+        <div class="mb-3 grid grid-cols-2 gap-3">
+          <label class="field"><span>Cuadros por fila (celular)</span><select id="pnCols">${[2, 3, 4].map((n) => `<option value="${n}" ${A.pn.columns === n ? "selected" : ""}>${n}</option>`).join("")}</select></label>
+          <label class="field"><span>Estilo del menú</span><select id="pnStyle"><option value="cards" ${A.pn.style === "cards" ? "selected" : ""}>Cuadros (ícono arriba)</option><option value="list" ${A.pn.style === "list" ? "selected" : ""}>Lista (ícono al lado)</option></select></label>
+        </div>
+        <label class="mb-3 flex items-center gap-2 text-sm"><input id="pnIcons" type="checkbox" class="h-4 w-4" ${A.pn.colorIcons ? "checked" : ""}> Íconos de colores</label>
+        <p class="mb-1 text-sm font-semibold">Orden y secciones visibles</p>
+        <div id="pnOrder" class="mb-3 space-y-1"></div>
+        <label class="field mb-3"><span>Texto del botón del link</span><input id="pnLabel" maxlength="24" value="${esc(A.pn.linkLabel)}" placeholder="Link clientes"></label>
+        <label class="field"><span>Mensaje al compartir el link</span><textarea id="pnShare" rows="2" maxlength="300" placeholder="${esc(PANEL_DEFAULT.shareMsg)}">${esc(A.pn.shareMsg)}</textarea>
+          <span class="mt-1 block text-xs font-normal text-ink/60">Usa {negocio} y {link}.</span></label>
+      </div>
       <button id="apSave" class="btn-primary sticky bottom-3 w-full shadow-lg">Guardar apariencia</button>
     </div>
     <div>
@@ -1102,10 +1235,25 @@ function renderAppearance() {
     const btn = $("apSave"); setBusy(btn, true, "Guardando…");
     try {
       const appearance = { logo: ap.logo || "", slogan: ap.slogan || "", colors: ap.colors, texts: ap.texts };
-      await updateDoc(doc(db, bpath("settings", "general")), { appearance, businessName: $("apName").value.trim() || A.settings.businessName || "" });
+      const panel = {
+        useBrand: $("pnBrand").checked, columns: Number($("pnCols").value), style: $("pnStyle").value, colorIcons: $("pnIcons").checked,
+        order: A.pn.order, hidden: A.pn.hidden, linkLabel: $("pnLabel").value.trim() || PANEL_DEFAULT.linkLabel, shareMsg: $("pnShare").value.trim() || PANEL_DEFAULT.shareMsg
+      };
+      await updateDoc(doc(db, bpath("settings", "general")), { appearance, panel, businessName: $("apName").value.trim() || A.settings.businessName || "" });
       toast("Apariencia guardada. Tu página ya se ve así.");
     } catch (err) { toast("No se pudo guardar: " + err.message, "error"); }
     finally { setBusy(btn, false); }
+  };
+  renderPanelOrder();
+  $("pnOrder").onclick = (e) => {
+    const b = e.target.closest("[data-pnmove]"); if (!b) return;
+    const i = Number(b.dataset.pnid), j = i + Number(b.dataset.pnmove);
+    if (j < 0 || j >= A.pn.order.length) return;
+    [A.pn.order[i], A.pn.order[j]] = [A.pn.order[j], A.pn.order[i]]; renderPanelOrder();
+  };
+  $("pnOrder").onchange = (e) => {
+    const c = e.target.closest("[data-pnshow]"); if (!c) return;
+    A.pn.hidden = c.checked ? A.pn.hidden.filter((t) => t !== c.dataset.pnshow) : [...A.pn.hidden, c.dataset.pnshow];
   };
   renderApPreview();
 }

@@ -205,3 +205,23 @@ body.branded .text-pole-blue { color:var(--b-primary-text) !important; }
 body.branded .bg-pole-blue.text-white, body.branded button.bg-pole-blue { color:var(--b-on-primary) !important; }
 .acct-tab { border-radius:.4rem; padding:.45rem; color:rgba(23,34,46,.65); }
 .acct-tab[aria-pressed="true"] { background:#fff; color:var(--ink); box-shadow:0 1px 2px rgba(23,34,46,.12); }
+
+/* Encabezado del panel, estilo limpio tipo Proton */
+.hdr-pill { display:inline-flex; align-items:center; gap:.45rem; padding:.45rem .85rem; border-radius:999px; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; font-weight:600; font-size:.82rem; white-space:nowrap; transition:background .15s, border-color .15s; }
+.hdr-pill:hover, .hdr-pill[aria-expanded="true"] { background:rgba(255,255,255,.18); border-color:rgba(255,255,255,.35); }
+.hdr-avatar { width:2.25rem; height:2.25rem; border-radius:999px; background:#fff; color:var(--ink); font-weight:800; font-size:.85rem; display:grid; place-items:center; box-shadow:0 0 0 2px rgba(255,255,255,.25); }
+.hdr-avatar.hidden, .hdr-pill.hidden { display:none; }
+.hdr-menu { position:absolute; right:0; top:calc(100% + .5rem); z-index:70; width:17rem; max-width:calc(100vw - 2rem); background:#fff; color:var(--ink); border:1px solid var(--line); border-radius:1rem; padding:.85rem; box-shadow:0 18px 50px rgba(15,23,42,.22); }
+.menu-item { display:flex; align-items:center; gap:.7rem; width:100%; padding:.6rem .65rem; border-radius:.6rem; font-size:.9rem; font-weight:600; text-align:left; color:var(--ink); }
+.menu-item i { width:1.1rem; text-align:center; color:rgba(23,34,46,.55); }
+.menu-item:hover { background:var(--paper); }
+.menu-item.text-pole-red, .menu-item.text-pole-red i { color:var(--red); }
+@media (max-width:420px) { .hdr-pill span { display:none; } .hdr-pill { padding:.5rem .6rem; } }
+
+/* Panel del negocio con la marca y el menú personalizado */
+body.branded .admin-tab[aria-current="page"] { background:var(--b-primary-soft); border-color:var(--b-primary-line); color:var(--b-primary-text); }
+body.branded .admin-tab[aria-current="page"] i { color:var(--b-primary-text) !important; }
+body.branded .hdr-pill { color:var(--b-on-header); border-color:currentColor; background:transparent; }
+body.branded .hdr-avatar { background:var(--b-primary); color:var(--b-on-primary); }
+#tabs.tabs-list .admin-tab { flex-direction:row; justify-content:flex-start; gap:.6rem; padding:.65rem .75rem; font-size:12.5px; text-align:left; }
+#tabs.tabs-mono .admin-tab i { color:currentColor !important; }
