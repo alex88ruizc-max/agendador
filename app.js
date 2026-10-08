@@ -7,9 +7,9 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   startUpdateWatcher, applyBrandColors, warmServer, uiConfirm, setDialogBrand, viewImage, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, dow, hora12, fechaLarga, fechaCorta, toMillis, cop, esc,
-  normalizePhone, waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, computeSlots, dayCapacityUnits, staffHours, mapLinks,
+  normalizePhone, waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, computeSlots, dayCapacityUnits, staffHours, mapLinks, headerBgCss,
   toast, openModal, closeModal, setBusy, copyText, tmin, mstr, UNIT
-} from "./common.js?v=2026-10-08y";
+} from "./common.js?v=2026-10-09k";
 
 const $ = (id) => document.getElementById(id);
 const S = {
@@ -24,7 +24,7 @@ const onErr = (e) => { console.error(e); toast("No se pudo cargar la informació
 // ================= Barbería del enlace =================
 const BIZ_ID = businessFromUrl();
 function showUnavailable(title, text) {
-  S.dead = true; $("gate").classList.add("hidden");
+  S.dead = true; $("gate").classList.add("hidden"); $("bizLogoWrap").classList.add("hidden");
   $("unTitle").textContent = title; $("unText").textContent = text;
   $("unavailable").classList.remove("hidden");
   $("mainContent").classList.add("hidden");
@@ -153,19 +153,33 @@ function renderBiz() {
   $("promoBar").classList.toggle("hidden", !promoOn);
   if (promoOn) $("promoBar").textContent = "🔥 " + s.promo.text;
   $("bizName").textContent = s.businessName || "Reserva tu cita";
+  // redes sociales del negocio como íconos de marca
+  const SOC = [["instagram", "fa-instagram", "Instagram"], ["facebook", "fa-facebook-f", "Facebook"], ["tiktok", "fa-tiktok", "TikTok"], ["youtube", "fa-youtube", "YouTube"]];
+  const soc = SOC.filter(([k]) => /^https?:\/\//.test(s.social?.[k] || ""));
+  $("bizSocial").innerHTML = soc.map(([k, ic, t]) => `<a href="${esc(s.social[k])}" target="_blank" rel="noopener" aria-label="${t} de ${esc(s.businessName || "")}"><i class="fa-brands ${ic}"></i></a>`).join("");
+  $("bizSocial").classList.toggle("hidden", !soc.length); $("bizSocial").classList.toggle("flex", !!soc.length);
   const ml = mapLinks(s);
-  $("bizAddress").innerHTML = esc([s.address, s.city].filter(Boolean).join(", "))
-    + (ml ? ` <a class="ml-1 inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 font-bold text-white" href="${ml.waze}" target="_blank" rel="noopener" aria-label="Cómo llegar con Waze"><i class="fa-brands fa-waze"></i> Waze</a>` : "");
+  // la dirección sale aparte, en su propia franja con botones para llegar
+  $("bizAddress").textContent = "";
+  $("locBar").classList.toggle("hidden", !ml); $("locBar").classList.toggle("flex", !!ml);
+  if (ml) {
+    $("locAddr").textContent = s.address || "Ver en el mapa";
+    $("locCity").textContent = [s.city, s.geo ? "Ubicación exacta" : ""].filter(Boolean).join(" · ");
+    $("locWaze").href = ml.waze; $("locMaps").href = ml.gmaps;
+    $("locWaze").setAttribute("aria-label", "Cómo llegar con Waze a " + (s.businessName || "el negocio"));
+    $("locMaps").setAttribute("aria-label", "Cómo llegar con Google Maps a " + (s.businessName || "el negocio"));
+  }
   $("bizSlogan").textContent = ap.slogan || "";
   $("bizSlogan").classList.toggle("hidden", !ap.slogan);
   const logo = $("bizLogo");
-  logo.classList.toggle("hidden", !ap.logo && !ap.colors);
-  logo.classList.toggle("grid", !!(ap.logo || ap.colors));
   logo.innerHTML = ap.logo ? `<img src="${ap.logo}" alt="Logo de ${esc(s.businessName || "")}" class="h-full w-full object-cover">`
     : esc((s.businessName || "").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase());
   document.title = (s.businessName ? s.businessName + " · " : "") + "Reserva tu cita";
   if (s.habeasDataText) $("habeasText").textContent = s.habeasDataText;
   applyBrandColors(ap);
+  // imagen de fondo del encabezado (degradada)
+  const hdr = document.querySelector("header"), bgCss = headerBgCss(ap.colors?.header, ap.headerBg);
+  hdr.style.background = bgCss || ""; hdr.classList.toggle("has-photo", !!bgCss);
   setDialogBrand(s.businessName, ap.logo);
   $("h-day").textContent = T("calendarTitle");
   if (!$("btnBook").dataset.label) $("btnBook").textContent = T("bookButton");
@@ -178,14 +192,14 @@ function renderNav() {
   const nav = $("nav");
   if (S.user) {
     const active = S.mine.filter((a) => ["pending_payment", "pending_verification", "confirmed"].includes(a.status)).length;
-    nav.innerHTML = `<button id="btnLogout" class="px-1 text-sm font-semibold text-white/75 hover:text-white">Salir</button>`;
-    // "Mi cuenta" va abajo, en la misma línea del estado del equipo
-    $("btnMine").innerHTML = `<i class="fa-regular fa-user mr-1"></i>Mi cuenta${active ? ` <span class="ml-1 rounded-full bg-pole-red px-1.5 text-[10px] text-white">${active}</span>` : ""}`;
-    $("btnMine").classList.remove("hidden");
+    nav.innerHTML = `<button id="btnLogout" class="logout-round" aria-label="Salir" title="Salir"><i class="fa-solid fa-power-off"></i></button>`;
+    // "Mi cuenta" va en la línea de las redes sociales, a la izquierda
+    $("btnMine").innerHTML = `<i class="fa-regular fa-user"></i>Mi cuenta${active ? ` <span class="rounded-full bg-pole-red px-1.5 text-[10px] text-white">${active}</span>` : ""}`;
+    $("btnMine").classList.remove("hidden"); $("btnMine").classList.add("inline-flex");
     $("btnMine").onclick = () => openAccount("citas");
     $("btnLogout").onclick = () => signOut(auth);
   } else {
-    $("btnMine").classList.add("hidden");
+    $("btnMine").classList.add("hidden"); $("btnMine").classList.remove("inline-flex");
     nav.innerHTML = `
       <button id="btnLogin" class="btn-ghost text-sm text-white/80">Ingresar</button>`;
     $("btnLogin").onclick = () => openAuth("login");
@@ -957,6 +971,7 @@ getDoc(doc(db, "platform", "public")).then((d) => {
 }).catch(() => {});
 $("btnTrial").onclick = () => {
   const logged = !!auth.currentUser;
+  $("trialTitle").textContent = "Crea tu agenda gratis";
   $("trialSub").textContent = `Gratis por ${Number(PLAT.trialDays || 30)} días, con reservas hasta ${Number(PLAT.trialRules?.daysAhead || 5)} días adelante y funciones básicas. Activa tu plan cuando quieras (${PLAT.planPriceCOP ? cop(PLAT.planPriceCOP) + " al mes" : "mensualidad"}) para desbloquear todo.`;
   $("trialAccount").classList.toggle("hidden", logged);
   $("trialLogged").classList.toggle("hidden", !logged);
@@ -985,17 +1000,31 @@ $("trialForm").addEventListener("submit", async (e) => {
         else throw new Error(authError(err));
       }
     }
-    const r = await api("trialSignup", { name, type: f.type.value, ownerName: f.ownerName.value.trim(), whatsapp: phone });
+    const r = await api("trialSignup", { name, type: f.type.value, ownerName: f.ownerName.value.trim(), whatsapp: phone, ref: REF_CODE });
     const base = location.origin + location.pathname.replace(/index\.html$/, "");
     const panel = `${base}admin.html?b=${r.slug}`, page = `${base}index.html?b=${r.slug}`;
     $("trialForm").classList.add("hidden");
     $("trialDone").classList.remove("hidden");
+    $("trialTitle").textContent = "¡Listo!";
+    $("trialSub").textContent = "";
     $("trialDone").innerHTML = `
       <p class="text-4xl">🎉</p>
       <p class="mt-1 font-narrow text-2xl font-bold">¡${esc(name)} ya tiene agenda!</p>
-      <p class="mb-4 text-sm text-ink/70">Prueba gratis hasta el ${fechaLarga(r.until)}. Configura tus servicios, horario y medios de pago desde tu panel.</p>
-      <a class="btn-primary block w-full py-3" href="${panel}">Ir a mi panel</a>
-      <div class="mt-2 grid grid-cols-2 gap-2"><a class="btn-light text-sm" href="${page}" target="_blank" rel="noopener">Ver mi página</a><button class="btn-light text-sm" data-copy="${page}">Copiar mi enlace</button></div>`;
+      <p class="mb-4 text-sm text-ink/70">Prueba gratis hasta el ${fechaLarga(r.until)}${r.bonus ? ` (incluye ${r.bonus} días extra por invitación 🎁)` : ""}.</p>
+      <div class="mb-4 rounded-2xl bg-paper p-4 text-left">
+        <p class="mb-2 text-sm font-bold">Tus primeros pasos</p>
+        <ol class="space-y-2 text-sm">
+          <li class="flex gap-2"><span class="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-ink text-xs font-bold text-white">1</span><span>Entra a tu <b>panel</b>: ahí manejas tu negocio.</span></li>
+          <li class="flex gap-2"><span class="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-ink text-xs font-bold text-white">2</span><span>Pon tus <b>servicios, precios y horario</b>.</span></li>
+          <li class="flex gap-2"><span class="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-ink text-xs font-bold text-white">3</span><span>Agrega <b>cómo te pagan el abono</b> (Nequi o Bre-B).</span></li>
+          <li class="flex gap-2"><span class="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-ink text-xs font-bold text-white">4</span><span>Comparte tu <b>enlace de citas</b> con tus clientes.</span></li>
+        </ol>
+        <p class="mt-2 text-xs text-ink/60">En tu panel te guiamos paso a paso.</p>
+      </div>
+      <a class="btn-primary block w-full py-3" href="${panel}&guia=1">Empezar: primeros pasos →</a>
+      <p class="mb-1 mt-4 text-xs font-semibold text-ink/60">Tu enlace de citas (el que usan tus clientes para reservar)</p>
+      <p class="mb-2 truncate rounded-lg bg-paper px-3 py-2 font-mono text-xs">${esc(page)}</p>
+      <div class="grid grid-cols-2 gap-2"><a class="btn-light text-sm" href="${page}" target="_blank" rel="noopener">Ver cómo reservan</a><button class="btn-light text-sm" data-copy="${page}">Copiar enlace</button></div>`;
   } catch (err) { toast(err.message || "No se pudo crear la agenda.", "error"); }
   finally { setBusy(btn, false); }
 });
@@ -1035,15 +1064,17 @@ if (!S.dead) onSnapshot(collection(db, bpath("stories")), (q) => {
   renderStories();
 }, () => {});
 function renderStories() {
-  const bar = $("storiesBar");
-  bar.classList.toggle("hidden", !STORIES.length);
-  if (!STORIES.length) return;
-  const sv = seen(), logo = S.settings?.appearance?.logo;
-  const allSeen = STORIES.every((x) => sv.includes(x.id));
-  bar.innerHTML = `<button class="story-btn" data-story="0"><span class="story-ring ${allSeen ? "seen" : ""}"><span style="${logo ? `background-image:url('${logo}')` : `background:${STORIES[0].bg || "#14213D"}`}">${logo ? "" : esc((S.settings?.businessName || "").slice(0, 2).toUpperCase())}</span></span><span class="w-full truncate text-center">Novedades</span></button>`
-    + STORIES.map((x, i) => `<button class="story-btn" data-story="${i}"><span class="story-ring ${sv.includes(x.id) ? "seen" : ""}"><span style="${x.img ? `background-image:url('${x.img}')` : `background:${x.bg || "#14213D"}`}">${x.img ? "" : esc((x.text || "").slice(0, 16))}</span></span><span class="w-full truncate text-center">${esc((x.text || "Estado").split("\n")[0].slice(0, 12))}</span></button>`).join("");
+  // los estados viven en el logo: anillo de colores + "NUEVO" mientras haya alguno sin ver
+  const wrap = $("bizLogoWrap"), sv = seen();
+  const has = STORIES.length > 0, fresh = has && STORIES.some((x) => !sv.includes(x.id));
+  wrap.classList.toggle("has-stories", has);
+  wrap.classList.toggle("seen", has && !fresh);
+  $("storyPill").classList.toggle("hidden", !fresh);
+  $("storyHint").classList.toggle("hidden", !fresh);
+  wrap.setAttribute("aria-label", has ? `Ver los estados de ${S.settings?.businessName || "el negocio"}` : "Logo del negocio");
 }
-$("storiesBar").addEventListener("click", (e) => { const b = e.target.closest("[data-story]"); if (b) openStoryViewer(Number(b.dataset.story)); });
+$("bizLogoWrap").addEventListener("click", () => { if (STORIES.length) { const sv = seen(); const first = STORIES.findIndex((x) => !sv.includes(x.id)); openStoryViewer(first >= 0 ? first : 0); } });
+$("storyHint").addEventListener("click", () => $("bizLogoWrap").click());
 function openStoryViewer(start) {
   let i = start, t0 = 0, raf = 0, paused = false;
   const DUR = 5000;
@@ -1087,4 +1118,23 @@ function openStoryViewer(start) {
   wrap.addEventListener("pointerdown", () => { paused = true; });
   wrap.addEventListener("pointerup", () => { paused = false; });
   draw();
+}
+
+// ================= Enlace de invitación (programa de referidos) =================
+var REF_CODE = (() => {
+  const q = new URLSearchParams(location.search).get("ref");
+  const clean = (v) => String(v || "").toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 30);
+  try { if (q) localStorage.setItem("refCode", clean(q)); return clean(q) || clean(localStorage.getItem("refCode")); } catch { return clean(q); }
+})();
+if (new URLSearchParams(location.search).get("ref")) {
+  // llegó con una invitación: se muestra la creación de tienda de una vez
+  getDoc(doc(db, "businesses", REF_CODE)).then((d) => {
+    const inviter = d.exists() ? d.data().name : "";
+    const bonus = Number(PLAT?.referral?.bonusDays ?? 7);
+    if (S.dead) {
+      $("unTitle").textContent = inviter ? `${inviter} te invita a tener tu agenda en línea` : "Crea tu agenda en línea";
+      $("unText").textContent = `Tus clientes apartan su cita solos y pagan el abono por adelantado.${bonus && inviter ? ` Por venir invitado tienes ${bonus} días extra de prueba gratis.` : ""}`;
+    }
+    setTimeout(() => $("btnTrial").click(), 600);
+  }).catch(() => setTimeout(() => $("btnTrial").click(), 600));
 }

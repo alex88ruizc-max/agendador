@@ -9,9 +9,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Archivo+Narrow:wght@500;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="theme.js?v=2026-10-08y"></script>
+  <script src="theme.js?v=2026-10-09k"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="styles.css?v=2026-10-08y">
+  <link rel="stylesheet" href="styles.css?v=2026-10-09k">
   <style>
     /* ===== Panel del superusuario: claro, frío, con un solo elemento protagonista (el carril de cobros) ===== */
     .sp { --canvas:#F2F5F8; --paperw:#FFFFFF; --sink:#14213D; --soft:#5B6782; --hair:#DDE3EA; --sblue:#2B59C3; --sred:#D7263D; --mint:#1E9E63; --sky:#3F8FD6; --amber:#C77700;
@@ -165,6 +165,9 @@
                 <label class="field"><span>Mensualidad (COP)</span><input id="plPrice" type="number" min="0" step="1000"></label>
                 <label class="field"><span>Días gratis</span><input id="plDays" type="number" min="1" max="90"></label>
               </div>
+              <p class="mb-1 mt-4 text-sm font-semibold">Paquetes con descuento</p>
+              <p class="soft mb-2 text-xs">Escribe cuánto cuesta pagar varios meses juntos. Entre más meses, más barato les sale. Déjalo vacío para cobrar el precio normal.</p>
+              <div id="plBundles" class="grid gap-2 sm:grid-cols-3"></div>
               <label class="mt-3 flex items-center gap-2 text-sm"><input id="plTrial" type="checkbox" class="h-4 w-4"> Mostrar “Probar gratis” en las páginas de las tiendas</label>
               <p class="soft mt-1 text-xs">El precio aplica a las tiendas nuevas. Para cambiar el de una tienda existente, ábrela en Tiendas.</p>
             </div>
@@ -176,8 +179,20 @@
               <div id="trLocks" class="grid gap-2 sm:grid-cols-2"></div>
             </div>
             <div class="sp-card">
+              <h2 class="disp mb-1 text-[18px] font-bold">Programa de referidos</h2>
+              <p class="soft mb-3 text-sm">Cada vez que una tienda invitada paga (con dinero real), quien la invitó gana descuento en su propio plan, y también los de arriba en la red. Nunca es dinero.</p>
+              <label class="mb-3 flex items-center gap-2 text-sm"><input id="rfOn" type="checkbox" class="h-4 w-4"> Programa activo</label>
+              <p class="mb-1 text-sm font-semibold">Porcentaje por nivel</p>
+              <div id="rfLevels" class="mb-3 grid grid-cols-3 gap-2 sm:grid-cols-6"></div>
+              <div class="grid gap-3 sm:grid-cols-2">
+                <label class="field"><span>Máximo guardado (meses de su plan)</span><input id="rfCap" type="number" min="1" max="12"></label>
+                <label class="field"><span>Días extra de prueba para el invitado</span><input id="rfBonus" type="number" min="0" max="60"></label>
+              </div>
+              <div id="rfTop" class="mt-3"></div>
+            </div>
+            <div class="sp-card">
               <h2 class="disp mb-1 text-[18px] font-bold">Pago automático por Bre-B</h2>
-              <p class="soft mb-3 text-sm">Cada pago lleva un valor único (por ejemplo $50.037) y el sistema lee en tu Gmail los avisos de Nequi para activar el plan solo.</p>
+              <p class="soft mb-3 text-sm">El primero que paga envía el valor exacto; si otra tienda está pagando al mismo tiempo, a ella le toca +$1, a la siguiente +$2, y así. Cada pago dura 30 minutos, así los números se liberan rápido. El sistema lee en tu Gmail los avisos de Nequi y activa el plan solo.</p>
               <label class="mb-3 flex items-center gap-2 text-sm"><input id="bbOn" type="checkbox" class="h-4 w-4"> Ofrecer el pago automático en “Mi plan”</label>
               <div class="grid gap-3 sm:grid-cols-2">
                 <label class="field"><span>Tu llave Bre-B</span><input id="bbKey" placeholder="@tullave o número"></label>
@@ -243,6 +258,6 @@
     </div>
   </div>
 
-  <script type="module" src="super.js?v=2026-10-08y"></script>
+  <script type="module" src="super.js?v=2026-10-09k"></script>
 </body>
 </html>

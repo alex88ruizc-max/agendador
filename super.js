@@ -3,7 +3,7 @@ import { onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordRe
 import {
   doc, getDoc, setDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp, where
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { APP_VERSION, readPublishedVersion, reloadFresh, startUpdateWatcher, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-10-08y";
+import { APP_VERSION, readPublishedVersion, reloadFresh, startUpdateWatcher, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-10-09k";
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on) => $(id).classList.toggle("hidden", !on);
@@ -363,6 +363,8 @@ function openStore(biz) {
       <div class="col-span-2"><dt class="soft text-xs">Plan</dt><dd class="font-semibold">${planLine(bl)}</dd></div>
       <div><dt class="soft text-xs">Dueño</dt><dd class="truncate font-semibold">${esc(bl.ownerEmail || "Sin correo")}</dd></div>
       <div><dt class="soft text-xs">WhatsApp</dt><dd class="font-semibold">${ph ? esc(ph) : "Sin número"}</dd></div>
+      ${biz.referredBy ? `<div class="col-span-2"><dt class="soft text-xs">Invitada por</dt><dd class="font-semibold">${esc(Z.list.find((x) => x.id === biz.referredBy)?.name || biz.referredBy)}</dd></div>` : ""}
+      ${Number(bl.creditCOP || 0) ? `<div class="col-span-2"><dt class="soft text-xs">Descuento por referidos guardado</dt><dd class="font-semibold">${cop(bl.creditCOP)}</dd></div>` : ""}
       ${sx && !sx.error ? `<div><dt class="soft text-xs">Citas este mes</dt><dd class="font-semibold">${sx.monthAppointments}</dd></div><div><dt class="soft text-xs">Clientes</dt><dd class="font-semibold">${sx.customers}</dd></div>` : ""}
       ${biz.status !== "active" && biz.suspendReason ? `<div class="col-span-2"><dt class="soft text-xs">Motivo de la pausa</dt><dd class="font-semibold">${esc(biz.suspendReason)}</dd></div>` : ""}
     </dl>
@@ -532,6 +534,15 @@ async function loadPlanCfg() {
   PL.methods = (pp.payMethods || []).map((m) => ({ ...m }));
   const tr = { daysAhead: 5, locked: ["clients", "marketing", "appearance", "images", "team"], ...(pp.trialRules || {}) };
   $("trDays").value = tr.daysAhead;
+  const rf = { enabled: true, levels: [20, 10, 8, 6, 4, 2], capMonths: 3, bonusDays: 7, ...(pp.referral || {}) };
+  $("rfOn").checked = rf.enabled !== false; $("rfCap").value = rf.capMonths; $("rfBonus").value = rf.bonusDays;
+  $("rfLevels").innerHTML = Array.from({ length: 6 }, (_, i) => `<label class="rounded-xl p-2 text-center" style="background:var(--canvas)"><span class="soft block text-[11px] font-semibold">Nivel ${i + 1}</span>
+    <span class="flex items-center justify-center gap-0.5"><input type="number" min="0" max="50" data-rfl="${i}" value="${Number(rf.levels[i] || 0)}" class="w-12 rounded-lg border border-line px-1 py-1 text-center font-bold">%</span></label>`).join("");
+  const counts = {}; Z.list.forEach((b) => { if (b.referredBy) counts[b.referredBy] = (counts[b.referredBy] || 0) + 1; });
+  const top = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  $("rfTop").innerHTML = top.length ? `<p class="mb-1 text-sm font-semibold">Los que más invitan</p>${top.map(([id, n], i) => `<p class="flex justify-between border-t border-line py-1.5 text-sm"><span>${i + 1}. ${esc(Z.list.find((b) => b.id === id)?.name || id)}</span><b>${n} invitada${n === 1 ? "" : "s"}</b></p>`).join("")}` : `<p class="soft text-xs">Todavía nadie ha invitado tiendas.</p>`;
+  PL.bundles = { ...(pp.planBundles || {}) };
+  renderBundles();
   $("trLocks").innerHTML = TRIAL_FEATURES.map(([k, t, d]) => `<label class="flex items-start gap-2 rounded-xl p-2.5 text-sm" style="background:var(--canvas)"><input type="checkbox" class="mt-0.5 h-4 w-4" data-trl="${k}" ${tr.locked.includes(k) ? "checked" : ""}><span><b>${t}</b><br><span class="soft text-xs">${d}</span></span></label>`).join("");
   $("bbOn").checked = !!pp.brebEnabled; $("bbKey").value = pp.brebKey || ""; $("bbHolder").value = pp.brebHolder || ""; $("bbSender").value = pp.brebSender || "nequi";
   PL.brebQr = pp.brebQr || ""; $("bbQrImg").src = PL.brebQr; $("bbQrImg").classList.toggle("hidden", !PL.brebQr);
@@ -554,6 +565,23 @@ function renderPlMethods() {
       <button type="button" class="btn-sm" data-plrm="${i}">Quitar</button>
     </div></div>`).join("") || `<p class="text-sm text-ink/60">Agrega al menos un medio de pago.</p>`;
 }
+// Paquetes: total por 3, 6 y 12 meses, con el ahorro calculado al instante
+function renderBundles() {
+  const price = Number($("plPrice").value || 0);
+  $("plBundles").innerHTML = [3, 6, 12].map((m) => {
+    const v = Number(PL.bundles?.[m] || 0), full = price * m, save = v && full > v ? full - v : 0;
+    return `<label class="rounded-xl p-2.5" style="background:var(--canvas)"><span class="block text-sm font-bold">${m} meses</span>
+      <input type="number" min="0" step="1000" data-bundle="${m}" value="${v || ""}" placeholder="${full ? full : ""}" class="mt-1 w-full rounded-lg border border-line px-2 py-1.5">
+      <span class="mt-1 block text-xs ${save ? "font-semibold" : "soft"}" style="${save ? "color:#16774b" : ""}">${save ? `Ahorran ${cop(save)} (-${Math.round((save / full) * 100)}%), ${cop(Math.round(v / m / 100) * 100)} al mes` : `Normal: ${cop(full)}`}</span></label>`;
+  }).join("");
+}
+$("plBundles").addEventListener("input", (e) => {
+  const i = e.target.closest("[data-bundle]"); if (!i) return;
+  PL.bundles[i.dataset.bundle] = Number(i.value || 0);
+  const pos = i.selectionStart; renderBundles();
+  const again = document.querySelector(`[data-bundle="${i.dataset.bundle}"]`); again.focus(); try { again.setSelectionRange(pos, pos); } catch { /* number */ }
+});
+$("plPrice").addEventListener("input", renderBundles);
 $("plAdd").onclick = () => { readPl(); PL.methods.push({ label: "", account: "", holder: "", qr: "" }); renderPlMethods(); };
 $("plMethods").addEventListener("click", (e) => { const b = e.target.closest("[data-plrm]"); if (b) { readPl(); PL.methods.splice(Number(b.dataset.plrm), 1); renderPlMethods(); } });
 $("plMethods").addEventListener("change", async (e) => {
@@ -587,6 +615,9 @@ $("plSave").onclick = async () => {
       payMethods: PL.methods.filter((m) => m.label && m.account),
       brebEnabled: $("bbOn").checked, brebKey: $("bbKey").value.trim(), brebHolder: $("bbHolder").value.trim(),
       brebSender: $("bbSender").value.trim() || "nequi", brebQr: PL.brebQr || "",
+      referral: { enabled: $("rfOn").checked, levels: [...document.querySelectorAll("[data-rfl]")].map((x) => Math.min(50, Math.max(0, Number(x.value || 0)))),
+        capMonths: Math.min(12, Math.max(1, Number($("rfCap").value || 3))), bonusDays: Math.min(60, Math.max(0, Number($("rfBonus").value || 0))) },
+      planBundles: { 3: Number(PL.bundles?.[3] || 0), 6: Number(PL.bundles?.[6] || 0), 12: Number(PL.bundles?.[12] || 0) }, // 0 = precio normal
       trialRules: { daysAhead: Math.min(60, Math.max(1, Number($("trDays").value || 5))), locked: [...document.querySelectorAll("[data-trl]:checked")].map((x) => x.dataset.trl) }
     }, { merge: true });
     toast("Guardado. Los dueños ya lo ven en “Mi plan”.");

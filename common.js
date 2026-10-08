@@ -2,7 +2,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js?v=2026-10-08y";
+import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js?v=2026-10-09k";
 
 export const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
@@ -16,7 +16,7 @@ export function businessFromUrl() {
 export const bpath = (...parts) => ["businesses", BID, ...parts].join("/");
 
 // Versión de la página: cámbiala en cada actualización para comprobar que se publicó
-export const APP_VERSION = '2026-10-08y';
+export const APP_VERSION = '2026-10-09k';
 
 export const UNIT = 15;          // unidad interna de bloqueo (minutos)
 const TZ = "America/Bogota";     // Colombia no usa horario de verano
@@ -113,6 +113,20 @@ Si necesitas cancelar o reprogramar, avísanos con al menos 2 horas de anticipac
 export const DEFAULT_WA_RESCHEDULE =
 `Hola {nombre}, te escribimos de {negocio}. Por un imprevisto no podremos atenderte el {fecha} a las {hora}. ¿Te sirve otra hora? Tu abono queda guardado para la nueva cita. Reserva: {codigo}`;
 
+// Imagen de fondo del encabezado con degradado para que el texto siempre se lea
+export function headerBgCss(headerColor, hb) {
+  if (!hb || !hb.img) return "";
+  const hex = /^#[0-9a-f]{6}$/i.test(headerColor || "") ? headerColor : "#17222E";
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  const show = Math.min(90, Math.max(10, Number(hb.show ?? 45))) / 100;
+  const end = Math.max(0.12, 1 - show), mid = (0.94 + end) / 2;
+  const c = hb.style === "brand" ? [r, g, b] : [15, 22, 32];
+  const rgba = (a) => `rgba(${c[0]},${c[1]},${c[2]},${a.toFixed(2)})`;
+  const grad = hb.style === "brand"
+    ? `linear-gradient(180deg, ${rgba(end)} 0%, ${rgba(mid)} 62%, ${rgba(0.96)} 100%)`
+    : `linear-gradient(90deg, ${rgba(0.95)} 0%, ${rgba(mid)} 48%, ${rgba(end)} 100%)`;
+  return `${grad}, center / cover no-repeat url('${hb.img}')`;
+}
 // Botones para llegar al negocio: con el punto exacto (si se guardó) o con la dirección
 export function mapLinks(st = {}) {
   const g = st.geo && Number.isFinite(st.geo.lat) && Number.isFinite(st.geo.lng) ? `${st.geo.lat},${st.geo.lng}` : "";

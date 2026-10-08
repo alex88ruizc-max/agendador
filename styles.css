@@ -343,3 +343,64 @@ body.branded .sp-quick-side { background:var(--b-primary); color:var(--b-on-prim
 .funnel-row { display:grid; grid-template-columns:7.5rem 1fr 2.6rem; align-items:center; gap:8px; font-size:12.5px; padding:5px 0; }
 .funnel-row .track { height:12px; border-radius:999px; background:#eef1f5; overflow:hidden; }
 .funnel-row .fill { height:100%; border-radius:999px; background:var(--sblue); }
+
+/* ===== Al tocar, que se sienta el botón ===== */
+button, a, [role="button"], label.btn-sm, label.btn-light { -webkit-tap-highlight-color: transparent; }
+:where(button, a.btn-primary, a.btn-light, a.btn-sm, a.btn-ghost, a.btn-dark, a.link-act, a.menu-item, a.todo, a.sp-card, a.act, label.btn-sm, label.btn-light, label.pay-drop, [role="button"]) {
+  transition: transform .09s ease, filter .12s ease, box-shadow .12s ease;
+}
+:where(button, a.btn-primary, a.btn-light, a.btn-sm, a.btn-ghost, a.btn-dark, a.link-act, a.menu-item, a.todo, a.sp-card, a.act, label.btn-sm, label.btn-light, label.pay-drop, [role="button"]):not(:disabled):active {
+  transform: scale(.96); filter: brightness(.94);
+}
+:where(.q-slot, .chip, .fchip, .q-chip, .q-day, .story-btn, .admin-tab, .nv, .slot):not(:disabled):active { transform: scale(.93); }
+.sp-bnav .nv-quick:active span, .nv-quick:active span { transform: scale(.9); }
+@media (prefers-reduced-motion: reduce) {
+  :where(button, a, label, [role="button"]):active { transform: none !important; }
+}
+.nv-quick span { transition: transform .09s ease; }
+
+/* ===== Asistente de inicio ===== */
+.wizard { position:fixed; inset:0; z-index:110; background:var(--canvas, #F2F5F8); display:flex; flex-direction:column; color:var(--sink, #14213D);
+  padding:calc(12px + env(safe-area-inset-top, 0px)) 0 calc(10px + env(safe-area-inset-bottom, 0px)); }
+body.wiz-on { overflow:hidden; }
+body.wiz-on .sp-bnav { display:none !important; }
+.wz-top { display:flex; align-items:center; gap:10px; padding:0 16px 10px; max-width:560px; width:100%; margin:0 auto; }
+.wz-x { width:34px; height:34px; border-radius:50%; background:#fff; font-size:15px; flex-shrink:0; }
+.wz-bar { flex:1; height:6px; border-radius:6px; background:#dde3ea; overflow:hidden; }
+.wz-bar i { display:block; height:100%; background:var(--sblue, #2B59C3); border-radius:6px; transition:width .35s ease; }
+.wz-body { flex:1; overflow-y:auto; padding:6px 16px 16px; max-width:560px; width:100%; margin:0 auto; }
+.wz-h { font-family:"Bricolage Grotesque", system-ui, sans-serif; font-size:26px; font-weight:800; line-height:1.1; letter-spacing:-.01em; margin-top:6px; }
+.wz-sub { font-size:14px; color:var(--soft, #5B6782); margin:6px 0 14px; line-height:1.45; }
+.wz-opt { display:flex; align-items:center; gap:10px; width:100%; border:1.5px solid var(--hair, #DDE3EA); background:#fff; border-radius:16px; padding:11px 12px; margin-top:8px; }
+.wz-opt[aria-pressed="true"] { border-color:var(--sink, #14213D); box-shadow:0 0 0 1px var(--sink, #14213D); }
+.wz-foot { display:flex; gap:8px; padding:8px 16px 0; max-width:560px; width:100%; margin:0 auto; }
+.wz-skip { display:block; margin:8px auto 0; font-size:13px; color:var(--soft, #5B6782); text-decoration:underline; }
+/* redes en la página de citas */
+.biz-social a { display:grid; place-items:center; width:30px; height:30px; border-radius:50%; background:rgba(255,255,255,.14); color:#fff; font-size:15px; }
+
+/* ===== Ubicación visible en la página de citas ===== */
+.loc-bar { align-items:center; gap:12px; background:#fff; border:1px solid var(--line, #D3DAD6); border-radius:20px; padding:12px; box-shadow:0 6px 20px -14px rgba(23,34,46,.45); }
+.loc-pin { display:grid; place-items:center; width:44px; height:44px; border-radius:14px; background:#fde8eb; color:#D7263D; font-size:20px; flex-shrink:0; }
+@media (prefers-reduced-motion: no-preference) { .loc-pin i { animation:pinBounce 2.4s ease-in-out infinite; } }
+@keyframes pinBounce { 0%, 70%, 100% { transform:translateY(0); } 80% { transform:translateY(-4px); } 90% { transform:translateY(0); } }
+.loc-btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; min-width:88px; border-radius:12px; padding:7px 10px; font-size:13px; font-weight:800; text-decoration:none; }
+.loc-waze { background:#33ccff; color:#0b2540; }
+.loc-maps { background:#fff; color:#17222E; border:1px solid var(--line, #D3DAD6); }
+
+/* ===== Encabezado: logo con estados (como Epic), Mi cuenta y salir ===== */
+.logo-ring { position:relative; border-radius:9999px; padding:3px; background:transparent; }
+.logo-ring.has-stories { background:conic-gradient(#D7263D, #f59e0b, #2B59C3, #D7263D); cursor:pointer; }
+.logo-ring.has-stories.seen { background:#6b7280; }
+.logo-ring .logo-in { display:grid; place-items:center; width:60px; height:60px; border-radius:9999px; overflow:hidden; background:rgba(255,255,255,.12); border:3px solid var(--ink, #17222E); font-family:"Archivo Narrow", system-ui, sans-serif; font-size:20px; font-weight:800; color:#fff; }
+body.branded .logo-ring .logo-in { border-color:var(--b-header); }
+.logo-ring .logo-in img { width:100%; height:100%; object-fit:cover; }
+.story-pill { position:absolute; top:-9px; left:50%; transform:translateX(-50%); z-index:2; white-space:nowrap; font-size:9px; font-weight:900; letter-spacing:.06em; padding:1px 7px; border-radius:9999px; background:#f59e0b; color:#1a1200; border:2px solid var(--ink, #17222E); }
+@media (prefers-reduced-motion: no-preference) { .story-pill { animation:pillBeat 1.6s ease-in-out infinite; } }
+@keyframes pillBeat { 0%, 100% { transform:translateX(-50%) scale(1); } 50% { transform:translateX(-50%) scale(1.1); } }
+.logout-round { display:grid; place-items:center; width:38px; height:38px; border-radius:9999px; background:#D7263D; color:#fff; font-size:15px; box-shadow:0 6px 14px -6px rgba(215,38,61,.8); }
+.biz-social a { width:32px; height:32px; font-size:16px; }
+
+/* encabezado con foto: íconos de redes semitransparentes con desenfoque */
+header.has-photo { color:#fff; }
+header.has-photo .biz-social a { background:rgba(255,255,255,.18); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); }
+header.has-photo .logo-ring .logo-in { border-color:rgba(15,22,32,.9); }

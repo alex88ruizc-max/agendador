@@ -11,31 +11,54 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Archivo+Narrow:wght@500;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="theme.js?v=2026-10-08y"></script>
+  <script src="theme.js?v=2026-10-09k"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="styles.css?v=2026-10-08y">
+  <link rel="stylesheet" href="styles.css?v=2026-10-09k">
 </head>
 <body class="bg-paper text-ink font-sans antialiased">
 
   <!-- Encabezado -->
   <header class="pole-top bg-ink text-white">
-    <div class="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-4">
-      <div class="flex min-w-0 items-center gap-3">
-        <div id="bizLogo" class="hidden h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-xl bg-white/10 font-narrow text-lg font-bold"></div>
+    <div class="relative mx-auto max-w-5xl px-4 pb-3.5 pt-5">
+      <nav id="nav" class="absolute right-4 top-4"></nav>
+      <div class="flex min-w-0 items-center gap-3 pr-12">
+        <button id="bizLogoWrap" type="button" class="logo-ring shrink-0" aria-label="Logo del negocio">
+          <span id="storyPill" class="story-pill hidden">NUEVO</span>
+          <span id="bizLogo" class="logo-in">?</span>
+        </button>
         <div class="min-w-0">
           <h1 id="bizName" class="truncate font-narrow text-2xl font-bold leading-tight">Reserva tu cita</h1>
           <p id="bizSlogan" class="hidden line-clamp-2 text-sm leading-snug text-white/80"></p>
-          <p id="bizAddress" class="truncate text-xs text-white/70"></p>
+          <button id="storyHint" type="button" class="mt-0.5 hidden text-left text-[11.5px] font-extrabold" style="color:#fbbf24">● Toca el logo para ver los estados</button>
+          <p id="bizAddress" class="hidden"></p>
         </div>
       </div>
-      <nav id="nav" class="flex shrink-0 items-center gap-2"></nav>
+      <div id="hdrRow2" class="mt-3 flex items-center gap-2">
+        <button id="btnMine" class="hidden shrink-0 items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[12.5px] font-extrabold text-ink"></button>
+        <span class="flex-1"></span>
+        <div id="bizSocial" class="biz-social hidden flex-wrap gap-1.5"></div>
+      </div>
     </div>
   </header>
 
   <main class="mx-auto max-w-5xl px-4 pb-16 pt-6">
+    <!-- Ubicación del negocio: bien visible, con botones para llegar -->
+    <section id="locBar" class="loc-bar mb-4 hidden" aria-label="Ubicación del negocio">
+      <span class="loc-pin" aria-hidden="true"><i class="fa-solid fa-location-dot"></i></span>
+      <div class="min-w-0 flex-1">
+        <p class="text-[11px] font-bold uppercase tracking-wider text-ink/50">Estamos en</p>
+        <p id="locAddr" class="truncate text-[15px] font-bold leading-tight"></p>
+        <p id="locCity" class="truncate text-xs text-ink/60"></p>
+      </div>
+      <div class="flex shrink-0 flex-col gap-1.5">
+        <a id="locWaze" class="loc-btn loc-waze" target="_blank" rel="noopener"><i class="fa-brands fa-waze"></i>Waze</a>
+        <a id="locMaps" class="loc-btn loc-maps" target="_blank" rel="noopener"><i class="fa-solid fa-map-location-dot"></i>Maps</a>
+      </div>
+    </section>
+
     <!-- Aviso destacado y estados del negocio -->
     <p id="promoBar" class="mb-4 hidden rounded-2xl px-4 py-3 text-sm font-bold text-white" style="background:linear-gradient(90deg,#D7263D,#f59e0b)"></p>
-    <div id="storiesBar" class="c-stories mb-4 hidden" aria-label="Estados del negocio"></div>
+    <div id="storiesBar" class="hidden"></div>
     <section id="unavailable" class="mx-auto mt-10 hidden max-w-md rounded-2xl bg-white p-6 text-center">
       <h2 id="unTitle" class="font-narrow text-2xl font-bold"></h2><p id="unText" class="mt-2 text-ink/70"></p>
     </section>
@@ -90,7 +113,6 @@
     <!-- Estado del equipo -->
     <section aria-label="Equipo" class="mb-6 flex items-start justify-between gap-2">
       <div id="staffStatus" class="flex min-w-0 flex-wrap gap-2"></div>
-      <button id="btnMine" class="btn-light hidden shrink-0 whitespace-nowrap px-3 py-1.5 text-sm"></button>
     </section>
 
     <!-- Paso 1: día y horario -->
@@ -279,6 +301,6 @@
     </div>
   </div>
 
-  <script type="module" src="app.js?v=2026-10-08y"></script>
+  <script type="module" src="app.js?v=2026-10-09k"></script>
 </body>
 </html>

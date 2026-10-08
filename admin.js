@@ -5,9 +5,9 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   startUpdateWatcher, applyBrandColors, uiConfirm, uiPrompt, setDialogBrand, viewImage, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, hora12, fechaLarga, fechaCorta, toMillis, cop, esc, normalizePhone,
-  waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, DEFAULT_WA_RESCHEDULE, computeSlots, staffHours, mapLinks, onColor, darken,
+  waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, DEFAULT_WA_RESCHEDULE, computeSlots, staffHours, mapLinks, headerBgCss, onColor, darken,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-10-08y";
+} from "./common.js?v=2026-10-09k";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -106,7 +106,12 @@ function start() {
     A.settings = s.data() || {};
     setDialogBrand(A.settings.businessName || A.biz?.name, A.settings.appearance?.logo);
     applyPanelBrand(); if (A.me) renderTabs();
-    if (!A.geoAsked && isOwner() && !A.me?.isSuper && !A.settings.geo) { A.geoAsked = true; setTimeout(() => requestGeo(false), 2500); }
+    // recién creada desde "Probar gratis": abre la guía de primeros pasos
+    // asistente de inicio: la primera vez (o al llegar desde "Probar gratis")
+    if (!A.wizAuto && isOwner() && !A.me?.isSuper && (!A.settings.setupDone || new URLSearchParams(location.search).get("guia") === "1")) {
+      A.wizAuto = true; A.geoAsked = true;
+      setTimeout(() => { if (new URLSearchParams(location.search).get("guia")) history.replaceState(null, "", location.pathname + "?b=" + encodeURIComponent(bpath().split("/")[1])); openWizard(); }, 700);
+    } else if (!A.geoAsked && isOwner() && !A.me?.isSuper && !A.settings.geo) { A.geoAsked = true; setTimeout(() => requestGeo(false), 2500); }
     renderAgenda(); renderStaffTab(); if (typeof renderHome === "function" && A.tab === "home") renderHome();
   }, onErr));
   A.unsubs.push(onSnapshot(collection(db, bpath("services")), (q) => {
@@ -159,7 +164,7 @@ function subscribeDay() {
 // ================= Pestañas =================
 // Secciones del menú: [nombre, ícono, color del ícono]
 const TABS = {
-  home: ["Inicio", "fa-house", "#2B59C3"], marketing: ["Marketing", "fa-bullhorn", "#D7263D"], activity: ["Actividad", "fa-chart-line", "#0891b2"],
+  home: ["Inicio", "fa-house", "#2B59C3"], marketing: ["Marketing", "fa-bullhorn", "#D7263D"], activity: ["Actividad", "fa-chart-line", "#0891b2"], referrals: ["Referidos", "fa-gift", "#D7263D"],
   agenda: ["Agenda", "fa-calendar-days", "#2563eb"], staff: ["Equipo y descansos", "fa-users", "#7c3aed"],
   clients: ["Clientes", "fa-address-book", "#db2777"], services: ["Servicios", "fa-scissors", "#ea580c"],
   appearance: ["Apariencia", "fa-palette", "#c026d3"], images: ["Imágenes", "fa-image", "#0891b2"], plan: ["Mi plan", "fa-crown", "#ca8a04"],
@@ -180,7 +185,7 @@ function lockCard(id) {
     <button class="btn-primary mt-4" data-goplan="1">👑 Activar mi plan</button></div>`;
 }
 document.addEventListener("click", (e) => { if (e.target.closest("[data-goplan]")) { e.preventDefault(); goTab("plan"); } });
-const ALL_TABS = ["home", "activity", "agenda", "staff", "clients", "services", "marketing", "appearance", "images", "plan", "settings"];
+const ALL_TABS = ["home", "activity", "referrals", "agenda", "staff", "clients", "services", "marketing", "appearance", "images", "plan", "settings"];
 const LOCKED_TABS = ["home", "appearance", "settings", "plan"]; // siempre visibles para poder deshacer cambios
 const PANEL_DEFAULT = { useBrand: true, linkLabel: "Link clientes", shareMsg: "Agenda tu cita en {negocio} aquí: {link}", columns: 3, style: "cards", colorIcons: true, order: ALL_TABS, hidden: [] };
 function panelPrefs() {
@@ -191,7 +196,7 @@ function panelPrefs() {
 }
 function renderTabs() {
   const P = panelPrefs();
-  const allowed = ["home", "agenda", "staff"].concat(isOwner() ? ["activity", "clients", "services", "marketing", "appearance", "images", "plan", "settings"] : []);
+  const allowed = ["home", "agenda", "staff"].concat(isOwner() ? ["activity", "referrals", "clients", "services", "marketing", "appearance", "images", "plan", "settings"] : []);
   const ids = P.order.filter((id) => allowed.includes(id) && (!P.hidden.includes(id) || A.tab === id));
   const t = $("tabs");
   t.className = `grid gap-1.5 lg:grid-cols-1 ${({ 2: "grid-cols-2", 3: "grid-cols-3", 4: "grid-cols-4" })[P.columns] || "grid-cols-3"} ${P.style === "list" ? "tabs-list" : ""} ${P.colorIcons ? "" : "tabs-mono"}`;
@@ -233,6 +238,7 @@ function switchTab(id) {
   if (A.tab === "plan") renderPlan();
   if (A.tab === "marketing") renderMarketing();
   if (A.tab === "activity") renderActivity();
+  if (A.tab === "referrals") renderReferrals();
 }
 
 // ================= Modal genérico =================
@@ -1235,6 +1241,18 @@ function renderAppearance() {
         <label class="field"><span>Eslogan (opcional)</span><input id="apSlogan" maxlength="60" value="${esc(ap.slogan || "")}" placeholder="Ej. Estilo clásico desde 1998"></label>
       </div>
       <div class="rounded-xl border border-line bg-white p-4">
+        <h3 class="mb-1 font-narrow text-xl font-bold">Imagen de fondo del encabezado</h3>
+        <p class="mb-3 text-xs text-ink/60">Una foto de tu local, tu silla o un corte. Se degrada sola para que tu nombre y tus botones se lean bien.</p>
+        <div class="mb-3 flex items-center gap-3">
+          <div id="apBgPrev" class="grid h-16 w-28 shrink-0 place-items-center overflow-hidden rounded-xl border border-line bg-paper bg-cover bg-center text-xl"></div>
+          <div class="flex flex-wrap gap-2"><label class="btn-sm cursor-pointer">📷 ${ap.headerBg?.img ? "Cambiar" : "Subir"} imagen<input id="apBgFile" type="file" accept="image/*" class="hidden"></label><button id="apBgDel" type="button" class="btn-sm">Quitar</button></div>
+        </div>
+        <p class="mb-1.5 text-xs font-semibold text-ink/60">Estilo del degradado</p>
+        <div class="mb-3 flex flex-wrap gap-2"><button type="button" class="chip" data-apbg="dark" aria-pressed="${(ap.headerBg?.style || "dark") === "dark"}">Oscuro</button><button type="button" class="chip" data-apbg="brand" aria-pressed="${ap.headerBg?.style === "brand"}">Color de mi marca</button></div>
+        <label class="block text-xs font-semibold text-ink/60">¿Cuánto se ve la foto?
+          <span class="mt-1 flex items-center gap-2 font-normal">Poco<input id="apBgShow" type="range" min="10" max="90" step="5" value="${Number(ap.headerBg?.show ?? 45)}" class="flex-1">Mucho</span></label>
+      </div>
+      <div class="rounded-xl border border-line bg-white p-4">
         <h3 class="mb-3 font-narrow text-xl font-bold">Colores</h3>
         <div class="mb-3 grid grid-cols-3 gap-2">${col("header", "Encabezado", "#17222E")}${col("primary", "Principal", "#24508A")}${col("bg", "Fondo", "#EEF1EF")}</div>
         <p class="mb-2 text-xs text-ink/60">Temas listos:</p>
@@ -1285,12 +1303,24 @@ function renderAppearance() {
     try { ap.logo = await imgToDataUrl(f, 320); renderApPreview(); toast("Logo listo. Toca “Guardar apariencia”."); } catch { toast("No se pudo leer la imagen.", "error"); }
   };
   $("apLogoDel").onclick = () => { ap.logo = ""; renderApPreview(); };
+  ap.headerBg = ap.headerBg || { img: "", style: "dark", show: 45 };
+  $("apBgFile").onchange = async (e) => {
+    const f = e.target.files[0]; if (!f) return;
+    try { ap.headerBg.img = await imgToDataUrl(f, 1100, "image/jpeg"); renderApPreview(); toast("Imagen lista. Toca “Guardar apariencia”."); } catch { toast("No se pudo leer la imagen.", "error"); }
+  };
+  $("apBgDel").onclick = () => { ap.headerBg.img = ""; renderApPreview(); };
+  $("tab-appearance").querySelectorAll("[data-apbg]").forEach((b) => b.onclick = () => {
+    ap.headerBg.style = b.dataset.apbg;
+    $("tab-appearance").querySelectorAll("[data-apbg]").forEach((x) => x.setAttribute("aria-pressed", x === b ? "true" : "false"));
+    renderApPreview();
+  });
+  $("apBgShow").oninput = (e) => { ap.headerBg.show = Number(e.target.value); renderApPreview(); };
   $("apSave").onclick = async () => {
     sync();
     if (ap.resetColors) { ap.colors = {}; delete ap.resetColors; }
     const btn = $("apSave"); setBusy(btn, true, "Guardando…");
     try {
-      const appearance = { logo: ap.logo || "", slogan: ap.slogan || "", colors: ap.colors, texts: ap.texts };
+      const appearance = { logo: ap.logo || "", slogan: ap.slogan || "", colors: ap.colors, texts: ap.texts, headerBg: ap.headerBg || { img: "", style: "dark", show: 45 } };
       const panel = {
         useBrand: $("pnBrand").checked, columns: Number($("pnCols").value), style: $("pnStyle").value, colorIcons: $("pnIcons").checked,
         order: A.pn.order, hidden: A.pn.hidden, linkLabel: $("pnLabel").value.trim() || PANEL_DEFAULT.linkLabel, shareMsg: $("pnShare").value.trim() || PANEL_DEFAULT.shareMsg
@@ -1321,9 +1351,11 @@ function renderApPreview() {
   const t = (k, d) => (ap.texts[k] || "").trim() || d;
   const logo = ap.logo ? `<img src="${ap.logo}" alt="" class="h-full w-full object-cover">` : esc(apInitials());
   $("apLogoPrev").innerHTML = logo;
+  const bgCss = headerBgCss(header, ap.headerBg);
+  if ($("apBgPrev")) { $("apBgPrev").style.background = bgCss || ""; $("apBgPrev").textContent = ap.headerBg?.img ? "" : "🖼️"; }
   $("apPreview").innerHTML = `
     <div class="mx-auto max-w-sm overflow-hidden rounded-2xl border border-line shadow" style="background:${bg}">
-      <div style="background:${header};color:${oh}" class="flex items-center gap-3 p-3">
+      <div style="background:${bgCss ? bgCss.replace(/'/g, "&#39;") : header};color:${bgCss ? "#fff" : oh}" class="flex items-center gap-3 p-3">
         <div class="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl font-bold" style="background:rgba(255,255,255,.12)">${logo}</div>
         <div class="min-w-0"><p class="truncate font-narrow text-lg font-bold">${esc($("apName").value || "Tu negocio")}</p>${ap.slogan ? `<p class="truncate text-xs" style="opacity:.8">${esc(ap.slogan)}</p>` : ""}</div>
       </div>
@@ -1590,6 +1622,27 @@ function renderPlan() {
   }, onErr);
   A.unsubs.push(() => unsubPlan?.());
   A.planMonths = A.planMonths || 1;
+  // Precio de un paquete de meses: usa el descuento que define el superusuario (Cobros > Paquetes)
+  function planTotal(m) {
+    const price = Number(bl.priceCOP || 0), base = Number(pp.planPriceCOP || 0), pack = Number((pp.planBundles || {})[m] || 0);
+    if (m === 1 || !pack || !base) return price * m;
+    return Math.round((price * m * (pack / (base * m))) / 100) * 100;
+  }
+  const credit = () => Number(bl.creditCOP || 0);
+  const netOf = (m) => Math.max(0, planTotal(m) - credit());
+  function monthsPicker(sel) {
+    const price = Number(bl.priceCOP || 0);
+    const chips = [1, 3, 6, 12].map((m) => {
+      const tot = planTotal(m), off = price * m > tot ? Math.round((1 - tot / (price * m)) * 100) : 0;
+      return `<button class="relative rounded-2xl border px-3 py-2 text-left ${sel === m ? "text-white" : "bg-white"}" style="${sel === m ? "background:var(--sink);border-color:var(--sink)" : "border-color:var(--hair)"}" data-pm="${m}" aria-pressed="${sel === m}">
+        ${off ? `<span class="absolute -right-1.5 -top-2 rounded-full px-1.5 py-0.5 text-[10px] font-extrabold text-white" style="background:var(--sred)">-${off}%</span>` : ""}
+        <span class="block text-sm font-bold">${m === 1 ? "1 mes" : m + " meses"}</span><span class="block text-xs ${sel === m ? "text-white/75" : "soft"}">${cop(tot)}</span></button>`;
+    }).join("");
+    const tot = planTotal(sel), save = price * sel - tot;
+    return `<div class="mb-2 grid grid-cols-4 gap-2">${chips}</div>
+      ${credit() > 0 ? `<p class="mb-2 rounded-xl px-3 py-2 text-sm font-semibold" style="background:#fff7e0;color:#8a5a00">🎁 Descuento por referidos: −${cop(Math.min(credit(), tot))}${netOf(sel) === 0 ? ". ¡Este pago te sale gratis!" : `. Pagas ${cop(netOf(sel))}.`}</p>` : ""}
+      ${save > 0 ? `<p class="q-pop mb-3 rounded-xl px-3 py-2 text-sm font-semibold" style="background:#e9f7f0;color:#16774b">🎉 Ahorras ${cop(save)}: te sale a ${cop(Math.round(tot / sel / 100) * 100)} al mes en vez de ${cop(price)}.</p>` : `<div class="mb-3"></div>`}`;
+  }
   // Bloque del pago automático por Bre-B (monto único que el sistema reconoce solo)
   function brebBlock() {
     const o = bl.pendingOrder && bl.pendingOrder.status === "pending" && toMillis(bl.pendingOrder.expiresAt) > Date.now() ? bl.pendingOrder : null;
@@ -1597,20 +1650,33 @@ function renderPlan() {
     if (!o) return `<section class="rounded-xl border-2 border-emerald-500 bg-white p-4">
       <div class="mb-1 flex items-center gap-2"><span class="text-xl">⚡</span><h3 class="font-narrow text-xl font-bold">Pago automático Bre-B</h3></div>
       <p class="mb-3 text-sm text-ink/70">Pagas desde Nequi, Bancolombia o cualquier banco con la llave Bre-B y tu plan se activa solo en pocos minutos. Sin comprobante.</p>
-      ${bl.mode === "monthly" ? `<div class="mb-3 flex flex-wrap gap-2">${[1, 3, 6, 12].map((m) => `<button class="chip" data-pm="${m}" aria-pressed="${months === m}">${m === 1 ? "1 mes" : m + " meses"}</button>`).join("")}</div>` : ""}
-      <button id="brebGo" class="btn-primary w-full py-3 !bg-emerald-600">Pagar ${cop(Number(bl.priceCOP || 0) * months)} con Bre-B</button></section>`;
+      ${bl.mode === "monthly" ? monthsPicker(months) : ""}
+      <button id="brebGo" class="btn-primary w-full py-3 !bg-emerald-600">${netOf(months) === 0 ? "🎁 Activar gratis con mis referidos" : `Pagar ${cop(netOf(months))} con Bre-B`}</button></section>`;
     return `<section class="rounded-xl border-2 border-emerald-500 bg-white p-4">
       <div class="mb-2 flex items-center justify-between gap-2"><div class="flex items-center gap-2"><span class="text-xl">⚡</span><h3 class="font-narrow text-xl font-bold">Paga con Bre-B</h3></div>
-        <span class="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-800"><span class="spin mr-1"></span>Esperando pago</span></div>
+        <span class="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">⏱ <span id="brebLeft">--:--</span></span></div>
       <div class="pay-amount mb-2"><div><p class="text-[11px] font-semibold uppercase tracking-wider text-ink/60">Envía exactamente</p>
         <p class="font-narrow text-3xl font-bold leading-none">${cop(o.amountCOP)}</p>
-        <p class="mt-1 text-[11px] text-ink/60">${o.months} mes(es). El valor incluye ${cop(o.amountCOP - o.baseCOP)} para reconocer tu pago.</p></div>
+        <p class="mt-1 text-[11px] text-ink/60">${o.months} mes(es).${o.amountCOP > o.baseCOP ? ` Incluye ${cop(o.amountCOP - o.baseCOP)} para reconocer tu pago, porque otra tienda está pagando al mismo tiempo.` : " Valor exacto de tu plan, sin recargo."}</p></div>
         <button type="button" class="pay-ibtn" data-copy="${o.amountCOP}" aria-label="Copiar monto"><i class="fa-regular fa-copy"></i></button></div>
       <div class="pay-row"><div class="min-w-0 flex-1"><p class="text-[10px] font-bold uppercase tracking-wider text-ink/55">Llave Bre-B${pp.brebHolder ? ` · <span class="normal-case tracking-normal">${esc(pp.brebHolder)}</span>` : ""}</p>
         <p class="truncate font-mono text-[15px] font-bold">${esc(pp.brebKey)}</p></div>
         ${pp.brebQr ? `<button type="button" class="pay-ibtn" id="brebQr" aria-label="Ver QR"><i class="fa-solid fa-qrcode"></i></button>` : ""}
         <button type="button" class="pay-ibtn main" data-copy="${esc(pp.brebKey)}" aria-label="Copiar llave"><i class="fa-regular fa-copy"></i></button></div>
-      <p class="mt-2 text-xs leading-snug text-ink/65">⚠️ Envía <b>el valor exacto</b>, con los últimos pesos incluidos. Tu plan se activa solo entre 5 y 10 minutos después de pagar; esta pantalla se actualiza sola. Vigente hasta ${new Date(toMillis(o.expiresAt)).toLocaleString("es-CO", { timeZone: "America/Bogota", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}.</p>
+      <p class="mt-2 text-xs leading-snug text-ink/65">⚠️ Envía <b>exactamente ${cop(o.amountCOP)}</b> antes de que termine el tiempo. Tu plan se activa solo entre 5 y 10 minutos después de pagar; esta pantalla se actualiza sola.</p>
+      <div class="mt-3 rounded-2xl border border-dashed p-3" style="border-color:var(--hair)">
+        <button id="brebOtherBtn" class="w-full text-left text-sm font-bold">💬 ¿Pagaste otro valor?</button>
+        <p class="soft mt-0.5 text-xs">Adjunta la captura de tu pago aquí y te ayudamos. Te avisamos cuando se active tu plan.</p>
+        <div id="brebOther" class="mt-2 hidden space-y-2">
+          <label class="field"><span>¿Cuánto enviaste? (opcional)</span><input id="brebOtherAmt" type="number" inputmode="numeric" min="0" placeholder="Ej. 20000"></label>
+          <label class="pay-drop" for="brebOtherFile"><span class="pay-drop-ico"><i class="fa-solid fa-camera"></i></span>
+            <span id="brebOtherLbl" class="min-w-0 flex-1 text-sm"><b>Adjunta la captura del pago</b><br><span class="soft text-xs">Toca para elegir la imagen</span></span>
+            <img id="brebOtherPrev" class="hidden h-12 w-12 rounded-md object-cover" alt=""></label>
+          <input id="brebOtherFile" type="file" accept="image/*" class="hidden">
+          <button id="brebOtherSend" class="btn-primary w-full">Enviar captura</button>
+        </div>
+      </div>
+      <button id="brebCancel" class="mt-2 w-full py-1 text-center text-xs text-ink/50 underline">Cancelar este pago</button>
     </section>`;
   }
   function draw() {
@@ -1631,7 +1697,7 @@ function renderPlan() {
     const methods = pp.payMethods || [];
     const canPay = bl.mode === "monthly" || (bl.mode === "one_time" && !bl.paidOnce);
     const months = bl.mode === "monthly" ? A.planMonths : 1;
-    const total = price * months;
+    const total = netOf(months);
     el.innerHTML = `
       <div class="space-y-3">
         <section class="rounded-xl border border-line bg-white p-4">
@@ -1649,7 +1715,7 @@ function renderPlan() {
         ${canPay ? `<${pp.brebEnabled && pp.brebKey ? "details" : "section"} class="rounded-xl border border-line bg-white p-4">
           ${pp.brebEnabled && pp.brebKey ? `<summary class="cursor-pointer font-semibold">¿Pagaste por otro medio? Sube el comprobante</summary><div class="mt-3"></div>` : ""}
           <h3 class="mb-2 font-narrow text-xl font-bold">${bl.trial ? "Pagar mi plan" : "Renovar mi plan"}</h3>
-          ${bl.mode === "monthly" ? `<div class="mb-3 flex flex-wrap gap-2">${[1, 3, 6, 12].map((m) => `<button class="chip" data-pm="${m}" aria-pressed="${months === m}">${m === 1 ? "1 mes" : m + " meses"}</button>`).join("")}</div>` : ""}
+          ${bl.mode === "monthly" ? monthsPicker(months) : ""}
           <div class="pay-amount mb-2"><div><p class="text-[11px] font-semibold uppercase tracking-wider text-ink/60">Envía exactamente</p><p class="font-narrow text-3xl font-bold leading-none">${cop(total)}</p></div>
             <button type="button" class="pay-ibtn" data-copy="${total}" aria-label="Copiar monto"><i class="fa-regular fa-copy"></i></button></div>
           <div class="space-y-1.5">${methods.length ? methods.map((m, i) => `
@@ -1669,9 +1735,42 @@ function renderPlan() {
     el.querySelectorAll("[data-pm]").forEach((b) => b.onclick = () => { A.planMonths = Number(b.dataset.pm); draw(); });
     if ($("brebGo")) $("brebGo").onclick = async () => {
       const btn = $("brebGo"); setBusy(btn, true, "Generando tu pago…");
-      try { await api("createPlanOrder", { months: A.planMonths }); } catch (err) { toast(err.message, "error"); setBusy(btn, false); }
+      try {
+        const r = await api("createPlanOrder", { months: A.planMonths });
+        if (r?.free) { toast(`🎉 ¡Listo! Tu plan quedó activo${r.paidUntil ? " hasta el " + fechaLarga(r.paidUntil) : ""} gracias a tus referidos.`); setBusy(btn, false); }
+      } catch (err) { toast(err.message, "error"); setBusy(btn, false); }
     };
     if ($("brebQr")) $("brebQr").onclick = () => viewImage(pp.brebQr, `Bre-B: ${pp.brebKey}`);
+    if ($("brebOtherBtn")) {
+      $("brebOtherBtn").onclick = () => $("brebOther").classList.toggle("hidden");
+      $("brebOtherFile").onchange = (e) => {
+        const f = e.target.files[0]; if (!f) return;
+        $("brebOtherPrev").src = URL.createObjectURL(f); $("brebOtherPrev").classList.remove("hidden");
+        $("brebOtherLbl").innerHTML = `<b class="text-emerald-700">✓ Captura lista</b><br><span class="soft text-xs">Toca para cambiarla</span>`;
+        A.otherProof = imgToDataUrl(f, 1280, "image/jpeg");
+      };
+      $("brebOtherSend").onclick = async () => {
+        if (!A.otherProof) return toast("Primero adjunta la captura del pago.", "error");
+        const btn = $("brebOtherSend"); setBusy(btn, true, "Enviando…");
+        try {
+          await api("submitPlanProof", { image: await A.otherProof, months: bl.pendingOrder?.months || 1, paidAmount: Number($("brebOtherAmt").value || 0), reference: "Pagó otro valor por Bre-B" });
+          A.otherProof = null;
+          toast("¡Recibido! Revisamos tu pago y te avisamos cuando se active tu plan.");
+        } catch (err) { toast(err.message, "error"); setBusy(btn, false); }
+      };
+    }
+    if ($("brebCancel")) $("brebCancel").onclick = async () => {
+      if (!(await uiConfirm("¿Cancelar este pago?", "Si ya transferiste, no lo canceles: tu plan se activa solo en unos minutos.", { okText: "Sí, cancelar", cancelText: "Volver", danger: true }))) return;
+      try { await api("cancelPlanOrder", {}); toast("Pago cancelado. Puedes generar otro cuando quieras."); } catch (err) { toast(err.message, "error"); }
+    };
+    // reloj del pago: al terminar, vuelve a mostrar el botón para generar otro
+    clearInterval(A.brebTimer);
+    if ($("brebLeft") && bl.pendingOrder) A.brebTimer = setInterval(() => {
+      const left = toMillis(bl.pendingOrder?.expiresAt) - Date.now(), el2 = $("brebLeft");
+      if (!el2) return clearInterval(A.brebTimer);
+      if (left <= 0) { clearInterval(A.brebTimer); return draw(); }
+      el2.textContent = `${Math.floor(left / 60000)}:${String(Math.floor((left % 60000) / 1000)).padStart(2, "0")}`;
+    }, 1000);
     el.querySelectorAll("[data-planqr]").forEach((b) => b.onclick = () => { const m = methods[Number(b.dataset.planqr)]; viewImage(m.qr, `${m.label}: ${m.account}`); });
     if ($("planFile")) $("planFile").onchange = (e) => {
       const f = e.target.files[0]; if (!f) return;
@@ -1829,7 +1928,12 @@ function renderHome() {
   const rec = isOwner() ? buildRecs()[0] : null;
   const recHtml = rec ? `<div class="todo mt-3" style="border:1.5px solid #f3d27a"><span class="ic" style="background:#fff7e0;color:#a86e00"><i class="fa-solid fa-lightbulb"></i></span>
       <p class="min-w-0 flex-1 text-[13.5px] leading-snug">${rec.txt}</p>${rec.act ? `<button class="act" style="background:var(--sink);color:#fff" data-hrec="0">${rec.act}</button>` : ""}</div>` : "";
-  el.innerHTML = `${liveHtml}${teamHtml}${recHtml}
+  const refOn = isOwner() && A.plat?.referral?.enabled !== false;
+  const refHtml = refOn ? `<button class="todo mt-3 w-full text-left" data-hgo="referrals" style="background:linear-gradient(135deg,#14213D,#2B59C3);color:#fff">
+      <span class="ic" style="background:rgba(255,255,255,.15);color:#ffd166"><i class="fa-solid fa-gift"></i></span>
+      <span class="min-w-0 flex-1 text-[13.5px] leading-snug"><b>Invita y paga menos</b><br><span class="opacity-80">Gana ${refLevels()[0]}% de descuento cada mes que paguen tus invitados.</span></span>
+      <span class="rounded-full px-2 py-0.5 text-[10px] font-extrabold" style="background:var(--sred)">Nuevo</span></button>` : "";
+  el.innerHTML = `${liveHtml}${teamHtml}${recHtml}${refHtml}
     <div class="sp-card mt-3" id="chairCard"><div class="flex items-center justify-between gap-2"><h2 class="disp text-[18px] font-bold">Hoy en la silla</h2>
       ${freeLater.length ? `<button class="rounded-full px-3 py-1.5 text-xs font-bold ${H.showFree ? "" : "t-late"}" style="${H.showFree ? "background:var(--sink);color:#fff" : ""}" data-hfree="1" aria-expanded="${!!H.showFree}">${freeLater.length} hueco${freeLater.length === 1 ? "" : "s"} libre${freeLater.length === 1 ? "" : "s"} ${H.showFree ? "▴" : "▾"}</button>` : `<span class="soft text-xs">Sin huecos libres</span>`}</div>${chair}
       ${H.showFree && freeLater.length ? `<div class="q-pop mt-3 rounded-2xl p-3" style="background:var(--canvas)">
@@ -2195,7 +2299,7 @@ function guideCard() {
 }
 function openGuide() {
   const steps = guideSteps(), g = guideProgress();
-  openM("Guía de configuración", `
+  openM(g.done === 0 ? "Tus primeros pasos" : "Guía de configuración", `
     <p class="soft -mt-2 mb-4 text-sm">${g.next ? `Llevas ${g.done} de ${g.total} pasos. Cada uno te lleva al lugar exacto y te dice qué hacer.` : "¡Tu agenda está lista! Puedes volver a cualquier paso cuando quieras."}</p>
     <div class="space-y-2">${steps.map((x) => `
       <div class="flex items-start gap-3 rounded-2xl p-3" style="background:${x.ok ? "#f1faf5" : "var(--canvas)"}">
@@ -2426,3 +2530,391 @@ function requestGeo(manual) {
     if (manual || err.code === 1) toast(err.code === 1 ? "Para guardar la ubicación, permite el acceso a tu ubicación en el navegador (el ícono del candado junto a la dirección)." : "No se pudo leer la ubicación. Intenta de nuevo.", "error");
   }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
 }
+
+// =====================================================================
+//  REFERIDOS: invita tiendas y paga menos (solo descuento en tu propio plan)
+// =====================================================================
+const refLevels = () => (A.plat?.referral?.levels?.length ? A.plat.referral.levels : [20, 10, 8, 6, 4, 2]).map(Number);
+const refCap = () => Math.max(1, Number(A.plat?.referral?.capMonths || 3));
+const REF = { unsubs: [] };
+function refLink() { return new URL("index.html?ref=" + encodeURIComponent(bpath().split("/")[1]), location.href).href; }
+function renderReferrals() {
+  const el = $("tab-referrals");
+  if (A.plat?.referral?.enabled === false) { el.innerHTML = `<div class="sp-card soft text-sm">El programa de referidos está pausado por ahora.</div>`; return; }
+  if (!REF.started) {
+    REF.started = true;
+    const bid = bpath().split("/")[1];
+    REF.unsubs.push(onSnapshot(doc(db, bpath("private", "billing")), (d) => { REF.bl = d.data() || {}; if (A.tab === "referrals") renderReferrals(); }, onErr));
+    REF.unsubs.push(onSnapshot(query(collection(db, "businesses"), where("referredBy", "==", bid)), (q) => { REF.kids = q.docs.map((d) => ({ id: d.id, ...d.data() })); if (A.tab === "referrals") renderReferrals(); }, () => {}));
+    REF.unsubs.push(onSnapshot(collection(db, bpath("refMoves")), (q) => { REF.moves = q.docs.map((d) => d.data()).sort((a, b) => toMillis(b.at) - toMillis(a.at)); if (A.tab === "referrals") renderReferrals(); }, () => {}));
+    A.unsubs.push(() => { REF.unsubs.forEach((f) => f()); REF.unsubs = []; REF.started = false; });
+  }
+  const bl = REF.bl || {}, kids = REF.kids || [], moves = REF.moves || [];
+  const credit = Number(bl.creditCOP || 0), price = Number(bl.priceCOP || 0), cap = refCap() * price;
+  const lv = refLevels();
+  const month = bogNow().date.slice(0, 7);
+  const payingNow = new Set(moves.filter((m) => m.type === "earn" && m.level === 1 && new Date(toMillis(m.at) - 5 * 3600000).toISOString().slice(0, 7) === month).map((m) => m.fromKey || m.fromId)).size;
+  const need = lv[0] > 0 ? Math.ceil(100 / lv[0]) : 0;
+  const saved = moves.filter((m) => m.type === "use").reduce((t, m) => t + Number(m.amountCOP || 0), 0);
+  const link = refLink(), name = A.settings?.businessName || A.biz?.name || "";
+  const inviteMsg = `¡Hola! Uso una agenda en línea para ${name} y mis clientes apartan su cita solos 💈. Créala gratis con mi enlace y te regalan días extra de prueba: ${link}`;
+  el.innerHTML = `
+    <div class="sp-card" style="background:linear-gradient(135deg,#14213D,#2B59C3);color:#fff">
+      <p class="disp text-[38px] font-extrabold leading-none" style="color:#ffd166">${cop(credit)}</p>
+      <p class="mt-1 text-sm opacity-85">Descuento acumulado para tu plan</p>
+      ${need ? `<p class="mt-3 text-xs opacity-90">${payingNow} de ${need} invitados pagando este mes</p>
+        <div class="mt-1.5 flex gap-1">${Array.from({ length: need }, (_, i) => `<span class="h-2 flex-1 rounded-full" style="background:${i < payingNow ? "#ffd166" : "rgba(255,255,255,.25)"}"></span>`).join("")}</div>
+        <p class="mt-1.5 text-xs font-bold">${payingNow >= need ? "🎉 ¡Tu próximo mes sale gratis!" : `Te faltan ${need - payingNow} para tu mes gratis 🎁`}</p>` : ""}
+    </div>
+
+    <div class="sp-h"><h2>Comparte tu <span style="color:var(--sred)">enlace de invitación</span></h2></div>
+    <div class="grid grid-cols-4 gap-2 text-center text-[11.5px] font-semibold">
+      <a class="sp-card !p-3" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(inviteMsg)}"><i class="fa-brands fa-whatsapp mb-1 block text-xl" style="color:var(--mint)"></i>WhatsApp</a>
+      <button class="sp-card !p-3" data-ref="qr"><i class="fa-solid fa-qrcode mb-1 block text-xl"></i>QR</button>
+      <button class="sp-card !p-3" data-ref="share"><i class="fa-solid fa-share-nodes mb-1 block text-xl"></i>Compartir</button>
+      <button class="sp-card !p-3" data-copy="${esc(link)}"><i class="fa-solid fa-link mb-1 block text-xl"></i>Copiar</button>
+    </div>
+
+    <div class="sp-h"><h2>Tus invitados</h2><span>${kids.length}</span></div>
+    <div class="sp-card !py-1">${kids.length ? kids.slice().sort((a, b) => toMillis(a.createdAt) - toMillis(b.createdAt)).map((k, i) => {
+      const paying = !k.trial && k.status === "active";
+      const tone = paying ? "t-ok" : k.status !== "active" ? "t-off" : "t-trial";
+      return `<div class="who-row"><span class="who-av ${tone}">${i + 1}</span>
+        <span class="min-w-0 flex-1"><b>Referido ${i + 1}</b><br><span class="soft text-[11px]">Desde ${new Date(toMillis(k.createdAt)).toLocaleDateString("es-CO", { timeZone: "America/Bogota", day: "numeric", month: "short" })}</span></span>
+        <span class="${tone} rounded-full px-2 py-0.5 text-[11px] font-bold">${paying ? "✓ Pagando" : k.status !== "active" ? "Pausada" : "En prueba"}</span></div>`;
+    }).join("") : `<p class="soft py-3 text-sm">Aún no tienes invitados. Comparte tu enlace con otros barberos, salones o spas.</p>`}</div>
+
+    <div class="sp-h"><h2>Movimientos</h2><span>${saved ? "ahorrado: " + cop(saved) : ""}</span></div>
+    <div class="sp-card !py-1">${moves.length ? moves.slice(0, 30).map((m) => {
+      const tone = m.type === "use" ? "t-late" : m.type === "cap" ? "t-off" : m.level === 1 ? "t-ok" : m.level === 2 ? "t-trial" : "t-off";
+      const tag = m.type === "use" ? "Usado" : m.type === "cap" ? "Tope" : "Nivel " + m.level;
+      const txt = m.type === "use" ? "Aplicado a tu plan"
+        : m.type === "cap" ? `Llegaste al máximo guardado (${refCap()} meses de plan)`
+        : `${m.level > 1 ? `Un referido de nivel ${m.level}` : "Un referido"} pagó su plan: ganaste el ${m.pct || ""}% de tu plan`;
+      return `<div class="who-row"><span class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-extrabold ${tone}">${tag}</span>
+        <span class="min-w-0 flex-1 text-[13px]">${esc(txt)}<br><span class="soft text-[11px]">${new Date(toMillis(m.at)).toLocaleDateString("es-CO", { timeZone: "America/Bogota", day: "numeric", month: "short" })}</span></span>
+        <b class="shrink-0" style="color:${m.type === "use" ? "var(--sink)" : "var(--mint)"}">${m.type === "use" ? "−" : "+"}${cop(m.amountCOP)}</b></div>`;
+    }).join("") : `<p class="soft py-3 text-sm">No hay movimientos todavía.</p>`}</div>
+
+    <div class="sp-h"><h2>Cómo funciona</h2></div>
+    <div class="sp-card space-y-3 text-[13px] leading-snug">
+      <p>🎁 <b>Ganas cada mes que tus invitados paguen su plan:</b> ${lv[0]}% de lo que paga quien invitaste${lv.length > 1 ? `, ${lv[1]}% de los que invite esa tienda${lv.length > 2 ? ` y ${lv.slice(2).join("%, ")}% en los siguientes niveles` : ""}` : ""}.</p>
+      <p>💳 <b>Se descuenta solo</b> en tu próximo pago en “Mi plan”. Si tu descuento cubre todo, ese mes te sale gratis.</p>
+      <p>📦 <b>Puedes guardar hasta ${refCap()} meses de tu plan</b> (${cop(cap)}). Lo que pase de ahí no se acumula.</p>
+      <p class="soft text-xs">El descuento solo se usa en tu propio plan; no se cambia por dinero. Tus invitados reciben días extra de prueba gratis.</p>
+    </div>`;
+}
+$("tab-referrals").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-ref]"); if (!b) return;
+  const link = refLink();
+  if (b.dataset.ref === "share") { if (navigator.share) { try { await navigator.share({ title: "Agenda en línea gratis", text: "Crea tu agenda en línea con mi enlace:", url: link }); } catch { /* canceló */ } } else copyText(link); }
+  if (b.dataset.ref === "qr") {
+    await loadScript("https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js").catch(() => {});
+    if (!window.QRious) return toast("No se pudo generar el QR.", "error");
+    viewImage(new window.QRious({ value: link, size: 700, level: "M" }).toDataURL(), "Escanéalo para crear tu agenda gratis");
+  }
+});
+
+// =====================================================================
+//  ASISTENTE DE INICIO: toda la configuración de la tienda, paso a paso
+// =====================================================================
+const W = { i: 0, open: false };
+const WDAYS = [[1, "L"], [2, "M"], [3, "M"], [4, "J"], [5, "V"], [6, "S"], [0, "D"]];
+const SOCIALS = [
+  ["instagram", "fa-instagram", "#E1306C", "Instagram", "@tunegocio", (v) => /^https?:/.test(v) ? v : "https://instagram.com/" + v.replace(/^@/, "")],
+  ["facebook", "fa-facebook", "#1877F2", "Facebook", "Nombre de tu página o enlace", (v) => /^https?:/.test(v) ? v : "https://facebook.com/" + v.replace(/^@/, "")],
+  ["tiktok", "fa-tiktok", "#111111", "TikTok", "@tunegocio", (v) => /^https?:/.test(v) ? v : "https://tiktok.com/@" + v.replace(/^@/, "")],
+  ["youtube", "fa-youtube", "#FF0000", "YouTube", "Enlace de tu canal", (v) => /^https?:/.test(v) ? v : "https://youtube.com/@" + v.replace(/^@/, "")]
+];
+const socialHandle = (url = "") => url.replace(/^https?:\/\/(www\.)?(instagram|facebook|tiktok|youtube)\.com\/@?/, "@").replace(/\/$/, "");
+function wizInit() {
+  const s = A.settings || {}, hrs = s.businessHours || {};
+  const first = Object.values(hrs).find((d) => (d || []).length) || [{ open: "09:00", close: "19:00" }];
+  const team = A.staff.filter((x) => x.active !== false).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const pm = (s.paymentMethods || [])[0] || {};
+  W.d = {
+    name: s.businessName || A.biz?.name || "", type: s.businessType || "barberia", phone: (s.whatsapp || "").replace(/^\+?57/, ""),
+    address: s.address || "", city: s.city || "", logo: s.appearance?.logo || "", logoNew: "",
+    social: Object.fromEntries(SOCIALS.map(([k]) => [k, socialHandle(s.social?.[k] || "")])),
+    count: Math.max(1, team.length), names: team.map((x) => x.name),
+    days: new Set(WDAYS.map(([d]) => d).filter((d) => (hrs[String(d)] || []).length).length ? WDAYS.map(([d]) => d).filter((d) => (hrs[String(d)] || []).length) : [1, 2, 3, 4, 5, 6]),
+    lunch: first.length > 1, open: first[0].open, close: (first[1] || first[0]).close, lunchFrom: first.length > 1 ? first[0].close : "13:00", lunchTo: first.length > 1 ? first[1].open : "14:00",
+    slot: Number(s.slotDurationMinutes || 30),
+    svc: Object.fromEntries(A.services.map((x) => [x.id, { on: x.active !== false, price: Number(x.priceCOP || 0) }])),
+    deposit: Number(s.depositAmountCOP ?? 5000), pmLabel: pm.label || "Nequi", pmAccount: pm.account || "", pmHolder: pm.holder || "", pmQr: pm.qr || "",
+    geo: s.geo || null, geoMode: s.geoMode || ""
+  };
+}
+const toMinW = (t) => { const [h, m] = String(t || "0:0").split(":").map(Number); return h * 60 + m; };
+function wizTurns() {
+  const d = W.d, slot = d.slot;
+  const parts = d.lunch ? [[d.open, d.lunchFrom], [d.lunchTo, d.close]] : [[d.open, d.close]];
+  const out = [];
+  parts.forEach(([o, c]) => { for (let t = toMinW(o); t + slot <= toMinW(c); t += slot) out.push(t); });
+  return out;
+}
+const STEPS = [
+  { id: "hi", essential: true, next: "Empezar", html: () => `<p class="text-5xl">💈</p><h3 class="wz-h">Armemos tu agenda en 3 minutos</h3>
+      <p class="wz-sub">Te hacemos unas preguntas y dejamos todo listo para que tus clientes reserven solos. Puedes cambiar todo después.</p>
+      <div class="sp-card text-[14px] leading-8">✓ Tu negocio y tu logo<br>✓ Tus redes sociales<br>✓ Tu equipo, horario y turnos<br>✓ Servicios y abono<br>✓ Ubicación para Waze<br>⭐ <b>Avisos en tu Telegram</b></div>` },
+  { id: "biz", essential: true, html: () => {
+      const d = W.d, logo = d.logoNew || d.logo;
+      return `<h3 class="wz-h">Tu negocio</h3><p class="wz-sub">Así te verán tus clientes en tu página de citas.</p>
+      <div class="sp-card flex items-center gap-3">
+        <label for="wLogo" class="grid h-20 w-20 shrink-0 cursor-pointer place-items-center overflow-hidden rounded-full border-2 border-dashed text-center text-[11px] font-bold" style="border-color:var(--hair);${logo ? `background:center/cover url('${logo}');border-style:solid` : ""}">${logo ? "" : "📷<br>Logo"}</label>
+        <input id="wLogo" type="file" accept="image/*" class="hidden">
+        <div class="min-w-0 text-[13px]"><b>Tu logo o una foto de tu negocio</b><br><span class="soft">Sale arriba en tu página, en tus estados y en tus imágenes.</span><br><label for="wLogo" class="mt-1 inline-block cursor-pointer font-bold" style="color:var(--sblue)">${logo ? "Cambiar imagen" : "Subir imagen"}</label></div>
+      </div>
+      <label class="field mt-3"><span>Nombre del negocio</span><input id="wName" value="${esc(d.name)}" maxlength="60"></label>
+      <p class="mb-1 mt-3 text-sm font-semibold soft">Tipo</p><div class="flex flex-wrap gap-2">${[["barberia", "Barbería"], ["salon", "Salón"], ["unas", "Uñas"], ["spa", "Spa"], ["otro", "Otro"]].map(([k, t]) => `<button type="button" class="q-chip" data-wtype="${k}" aria-pressed="${d.type === k}">${t}</button>`).join("")}</div>
+      <label class="field mt-3"><span>WhatsApp del negocio</span><div class="flex items-center gap-2 rounded-xl border border-line bg-white px-3"><span class="soft text-sm">🇨🇴 +57</span><input id="wPhone" type="tel" inputmode="numeric" value="${esc(d.phone)}" placeholder="300 123 4567" class="w-full border-0 py-2.5 outline-none"></div></label>
+      <div class="mt-3 grid grid-cols-[1fr_8rem] gap-2"><label class="field"><span>Dirección</span><input id="wAddr" value="${esc(d.address)}" placeholder="Cra 15A #80-58"></label><label class="field"><span>Ciudad</span><input id="wCity" value="${esc(d.city)}" placeholder="Soledad"></label></div>`;
+    },
+    save: async () => {
+      const d = W.d;
+      d.name = $("wName").value.trim(); d.address = $("wAddr").value.trim(); d.city = $("wCity").value.trim();
+      const phone = normalizePhone($("wPhone").value);
+      if (d.name.length < 2) throw new Error("Escribe el nombre de tu negocio.");
+      if (!phone) throw new Error("Escribe un WhatsApp válido.");
+      d.phone = $("wPhone").value;
+      const data = { businessName: d.name, businessType: d.type, whatsapp: phone, address: d.address, city: d.city,
+        staffLabel: { barberia: "Barbero", salon: "Estilista", unas: "Manicurista", spa: "Profesional", otro: "Profesional" }[d.type] };
+      if (d.logoNew) { data.appearance = { logo: d.logoNew }; d.logo = d.logoNew; d.logoNew = ""; }
+      await setDoc(doc(db, bpath("settings", "general")), data, { merge: true });
+    } },
+  { id: "social", html: () => `<h3 class="wz-h">Tus redes sociales</h3><p class="wz-sub">Aparecen como íconos en tu página de citas para que te sigan y vean tus trabajos.</p>
+      <div class="space-y-2">${SOCIALS.map(([k, ic, col, t, ph]) => `<label class="sp-card flex items-center gap-3 !py-2.5"><i class="fa-brands ${ic} w-7 text-center text-2xl" style="color:${col}"></i>
+        <span class="min-w-0 flex-1"><span class="soft block text-[11px] font-bold">${t}</span><input data-wsoc="${k}" value="${esc(W.d.social[k] || "")}" placeholder="${ph}" class="w-full border-0 p-0 text-[15px] outline-none"></span></label>`).join("")}</div>`,
+    save: async () => {
+      const social = {};
+      document.querySelectorAll("[data-wsoc]").forEach((i) => { const v = i.value.trim(); W.d.social[i.dataset.wsoc] = v; const def = SOCIALS.find((x) => x[0] === i.dataset.wsoc); social[i.dataset.wsoc] = v ? def[5](v) : ""; });
+      await setDoc(doc(db, bpath("settings", "general")), { social }, { merge: true });
+    } },
+  { id: "team", essential: true, html: () => {
+      const d = W.d;
+      return `<h3 class="wz-h">¿Cuántas personas atienden?</h3><p class="wz-sub">Cada una tendrá su agenda. Tus clientes podrán elegir con quién.</p>
+      <div class="flex gap-2">${[1, 2, 3, 4, 5].map((n) => `<button type="button" class="q-chip !px-5 !py-3 text-base" data-wcount="${n}" aria-pressed="${d.count === n}">${n === 5 ? "5+" : n}</button>`).join("")}</div>
+      <p class="mb-1 mt-4 text-sm font-semibold soft">Sus nombres</p>
+      <div class="space-y-2">${Array.from({ length: d.count }, (_, i) => `<input data-wname="${i}" value="${esc(d.names[i] || "")}" placeholder="${i === 0 ? "Tu nombre" : "Nombre de la persona " + (i + 1)}" class="w-full rounded-xl border border-line bg-white px-3 py-2.5">`).join("")}</div>`;
+    },
+    save: async () => {
+      const d = W.d;
+      document.querySelectorAll("[data-wname]").forEach((i) => { d.names[Number(i.dataset.wname)] = i.value.trim(); });
+      const names = d.names.slice(0, d.count).map((n, i) => n || (i === 0 ? "Yo" : "Persona " + (i + 1)));
+      const team = A.staff.slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      const ops = names.map((name, i) => {
+        const ex = team[i];
+        if (ex) return setDoc(doc(db, bpath("staff", ex.id)), { name, order: i, active: true }, { merge: true });
+        return setDoc(doc(db, bpath("staff", "b" + Date.now().toString(36) + i)), { name, order: i, active: true, serviceIds: [], status: "ready", busyUntil: null, busyReason: "", activeBreakId: null });
+      });
+      team.slice(names.length).forEach((x) => ops.push(setDoc(doc(db, bpath("staff", x.id)), { active: false }, { merge: true })));
+      await Promise.all(ops);
+    } },
+  { id: "hours", essential: true, html: () => {
+      const d = W.d, turns = wizTurns();
+      return `<h3 class="wz-h">¿Cuándo atiendes?</h3><p class="wz-sub">Toca los días que abres y cómo es tu jornada.</p>
+      <div class="flex justify-between gap-1">${WDAYS.map(([k, t]) => `<button type="button" class="q-chip !w-10 !px-0 text-center" data-wday="${k}" aria-pressed="${d.days.has(k)}">${t}</button>`).join("")}</div>
+      <button type="button" class="wz-opt" data-wlunch="0" aria-pressed="${!d.lunch}"><span class="text-xl">☀️</span><span class="flex-1 text-left"><b>Jornada corrida</b><br><span class="soft text-xs">Sin parar al mediodía</span></span></button>
+      <button type="button" class="wz-opt" data-wlunch="1" aria-pressed="${d.lunch}"><span class="text-xl">🍽️</span><span class="flex-1 text-left"><b>Con hora de almuerzo</b><br><span class="soft text-xs">Dos turnos en el día</span></span></button>
+      <div class="sp-card mt-2 grid grid-cols-2 gap-2 text-sm">
+        <label class="field"><span>Abres</span><input type="time" step="900" data-wt="open" value="${d.open}"></label><label class="field"><span>Cierras</span><input type="time" step="900" data-wt="close" value="${d.close}"></label>
+        ${d.lunch ? `<label class="field"><span>Sales a almorzar</span><input type="time" step="900" data-wt="lunchFrom" value="${d.lunchFrom}"></label><label class="field"><span>Vuelves</span><input type="time" step="900" data-wt="lunchTo" value="${d.lunchTo}"></label>` : ""}
+      </div>
+      <p class="mb-1 mt-3 text-sm font-semibold soft">¿Cada cuánto das un turno?</p>
+      <div class="flex flex-wrap gap-2">${[15, 30, 45, 60].map((m) => `<button type="button" class="q-chip" data-wslot="${m}" aria-pressed="${d.slot === m}">${m === 60 ? "1 hora" : m + " min"}</button>`).join("")}</div>
+      <div class="sp-card mt-3"><p class="text-[13px]"><b>Así verán tus clientes un día</b> <span class="soft">· ${turns.length} turnos por persona</span></p>
+        <div class="mt-1.5 flex flex-wrap gap-1">${turns.slice(0, 7).map((t) => `<span class="rounded-full border border-line px-2 py-0.5 text-xs font-bold">${hora12(String(Math.floor(t / 60)).padStart(2, "0") + ":" + String(t % 60).padStart(2, "0"))}</span>`).join("")}${turns.length > 7 ? `<span class="soft px-1 text-xs">… hasta ${hora12(String(Math.floor(turns[turns.length - 1] / 60)).padStart(2, "0") + ":" + String(turns[turns.length - 1] % 60).padStart(2, "0"))}</span>` : ""}</div></div>`;
+    },
+    save: async () => {
+      const d = W.d;
+      if (!d.days.size) throw new Error("Elige al menos un día.");
+      if (toMinW(d.close) <= toMinW(d.open)) throw new Error("La hora de cierre debe ser después de la apertura.");
+      if (d.lunch && !(toMinW(d.lunchFrom) > toMinW(d.open) && toMinW(d.lunchTo) > toMinW(d.lunchFrom) && toMinW(d.close) > toMinW(d.lunchTo))) throw new Error("Revisa la hora de almuerzo.");
+      const iv = d.lunch ? [{ open: d.open, close: d.lunchFrom }, { open: d.lunchTo, close: d.close }] : [{ open: d.open, close: d.close }];
+      const businessHours = Object.fromEntries([0, 1, 2, 3, 4, 5, 6].map((k) => [String(k), d.days.has(k) ? iv : []]));
+      await updateDoc(doc(db, bpath("settings", "general")), { businessHours, slotDurationMinutes: d.slot });
+    } },
+  { id: "services", html: () => `<h3 class="wz-h">Tus servicios</h3><p class="wz-sub">Marca los que haces y pon tu precio. Después puedes agregar más.</p>
+      <div class="sp-card !py-1">${A.services.slice().sort((a, b) => (a.order ?? 99) - (b.order ?? 99)).map((x) => { const v = W.d.svc[x.id] || { on: true, price: x.priceCOP };
+        return `<div class="flex items-center gap-3 border-t border-line py-2.5 first:border-0"><button type="button" class="grid h-6 w-6 shrink-0 place-items-center rounded-md text-xs font-bold" style="${v.on ? "background:var(--sink);color:#fff" : "border:1.5px solid #c9d2de"}" data-wsvc="${x.id}" aria-pressed="${v.on}" aria-label="${esc(x.name)}">${v.on ? "✓" : ""}</button>
+          <span class="min-w-0 flex-1 text-[14px]"><b>${esc(x.name)}</b><br><span class="soft text-xs">${Number(x.minutes || 0)} min${x.type === "addon" ? ", se suma a otro" : ""}</span></span>
+          <span class="flex items-center rounded-lg border border-line px-2"><span class="soft text-sm">$</span><input data-wprice="${x.id}" type="number" inputmode="numeric" step="1000" value="${v.price}" class="w-20 border-0 py-1.5 text-right font-bold outline-none"></span></div>`; }).join("")}</div>`,
+    save: async () => {
+      document.querySelectorAll("[data-wprice]").forEach((i) => { W.d.svc[i.dataset.wprice].price = Number(i.value || 0); });
+      await Promise.all(A.services.map((x) => { const v = W.d.svc[x.id]; if (!v) return null;
+        if (v.on === (x.active !== false) && v.price === Number(x.priceCOP || 0)) return null;
+        return setDoc(doc(db, bpath("services", x.id)), { active: v.on, priceCOP: v.price }, { merge: true }); }));
+    } },
+  { id: "deposit", html: () => {
+      const d = W.d;
+      return `<h3 class="wz-h">Abono para apartar</h3><p class="wz-sub">Con abono la gente no te deja plantado: lo paga por adelantado y el resto en tu local.</p>
+      <div class="flex flex-wrap gap-2">${[[0, "Sin abono"], [5000, "$5.000"], [10000, "$10.000"], [15000, "$15.000"]].map(([v, t]) => `<button type="button" class="q-chip" data-wdep="${v}" aria-pressed="${d.deposit === v}">${t}</button>`).join("")}</div>
+      ${d.deposit ? `<p class="mb-1 mt-4 text-sm font-semibold soft">¿Dónde te pagan?</p>
+      <div class="flex flex-wrap gap-2">${["Nequi", "Daviplata", "Bre-B", "Bancolombia"].map((t) => `<button type="button" class="q-chip" data-wpml="${t}" aria-pressed="${d.pmLabel === t}">${t}</button>`).join("")}</div>
+      <div class="sp-card mt-2 space-y-2">
+        <label class="field"><span>${d.pmLabel === "Bre-B" ? "Tu llave Bre-B" : "Número de " + d.pmLabel}</span><input id="wPmAcc" value="${esc(d.pmAccount)}" placeholder="${d.pmLabel === "Bre-B" ? "@tullave" : "300 123 4567"}"></label>
+        <label class="field"><span>A nombre de</span><input id="wPmHolder" value="${esc(d.pmHolder)}" placeholder="Nombre del titular"></label>
+        <label class="flex cursor-pointer items-center gap-3 rounded-xl p-2" style="background:var(--canvas)"><span class="grid h-12 w-12 place-items-center overflow-hidden rounded-lg bg-white text-xl" style="${d.pmQr ? `background:center/contain no-repeat url('${d.pmQr}') #fff` : ""}">${d.pmQr ? "" : "🔳"}</span>
+          <span class="text-sm"><b>${d.pmQr ? "Cambiar QR" : "Subir tu QR de pago"}</b><br><span class="soft text-xs">Opcional: tus clientes lo escanean desde su banco</span></span><input id="wPmQr" type="file" accept="image/*" class="hidden"></label>
+      </div>` : `<p class="soft mt-4 text-sm">Sin abono, el cupo se aparta sin pago. Puedes activarlo después en Configuración.</p>`}`;
+    },
+    save: async () => {
+      const d = W.d;
+      if ($("wPmAcc")) { d.pmAccount = $("wPmAcc").value.trim(); d.pmHolder = $("wPmHolder").value.trim(); }
+      const data = { depositAmountCOP: d.deposit };
+      if (d.deposit && !d.pmAccount) throw new Error("Escribe dónde te pagan el abono, o elige “Sin abono”.");
+      if (d.deposit) {
+        const rest = (A.settings.paymentMethods || []).slice(1);
+        data.paymentMethods = [{ label: d.pmLabel, account: d.pmAccount, holder: d.pmHolder, qr: d.pmQr || "" }, ...rest];
+      }
+      await setDoc(doc(db, bpath("settings", "general")), data, { merge: true });
+    } },
+  { id: "geo", html: () => {
+      const d = W.d;
+      const box = d.geo ? `${d.geo.lng - 0.004},${d.geo.lat - 0.0025},${d.geo.lng + 0.004},${d.geo.lat + 0.0025}` : "";
+      return `<h3 class="wz-h">📍 Ubica tu negocio</h3>
+      <p class="wz-sub">Para crear el botón <b style="color:#0b6fa8">“Cómo llegar con Waze”</b>: lo verán en tu página de citas, en el comprobante de su reserva y en el WhatsApp de confirmación. Llegan directo a tu puerta.</p>
+      <div class="sp-card text-[12.5px]">🔒 Solo guardamos la ubicación de tu <b>local</b>, una vez. No seguimos tu celular. Hazlo estando dentro de tu negocio.</div>
+      ${d.geo ? `<iframe title="Tu local en el mapa" class="mt-3 h-44 w-full rounded-2xl border border-line" src="https://www.openstreetmap.org/export/embed.html?bbox=${box}&layer=mapnik&marker=${d.geo.lat},${d.geo.lng}"></iframe>
+        <p class="mt-1 text-sm font-bold" style="color:var(--mint)">✓ Ubicación lista${d.geo.acc ? ` (precisión ${d.geo.acc} m)` : ""}. <button type="button" class="underline" data-wgeo="find">Volver a buscar</button></p>` : `
+      <button type="button" class="wz-opt" data-wgeo="find"><span class="text-xl">📍</span><span class="flex-1 text-left"><b>Estoy en mi local: activar ubicación</b><br><span class="soft text-xs">Llegan exacto con Waze o Google Maps</span></span></button>`}
+      <button type="button" class="wz-opt" data-wgeo="address" aria-pressed="${d.geoMode === "address" && !d.geo}"><span class="text-xl">🏠</span><span class="flex-1 text-left"><b>Usar solo mi dirección</b><br><span class="soft text-xs">Waze busca la calle escrita; puede no llegar exacto</span></span></button>`;
+    },
+    save: async () => {
+      const d = W.d;
+      if (d.geo) await updateDoc(doc(db, bpath("settings", "general")), { geo: d.geo, geoMode: "gps" });
+      else if (d.geoMode === "address") await updateDoc(doc(db, bpath("settings", "general")), { geoMode: "address" });
+    } },
+  { id: "telegram", skipTxt: "Lo conecto después (no recibirás avisos)", html: () => {
+      const on = !!A.tg?.owner;
+      return `<span class="inline-block rounded-full px-2.5 py-1 text-[11px] font-extrabold" style="background:#fff3dc;color:#9a5a00">⭐ PASO MÁS IMPORTANTE</span>
+      <h3 class="wz-h mt-2">Recibe tus citas en Telegram</h3>
+      <p class="wz-sub">Te llega cada reserva al instante y <b>apruebas los abonos con un toque</b>, sin abrir el panel.</p>
+      <div class="rounded-2xl p-2.5" style="background:#e7f1fb"><div class="rounded-2xl rounded-bl-sm bg-white p-2.5 text-[12.5px] leading-snug shadow-sm">💈 <b>NUEVA RESERVA</b> R-8K2PQ<br>Juan Pérez · Corte + barba<br>Hoy 3:30 p. m.<br>Abono $5.000 · 📎 comprobante</div>
+        <div class="mt-1.5 grid grid-cols-2 gap-1.5 text-center text-xs font-bold" style="color:#2a7bc0"><span class="rounded-xl bg-white py-2">✅ Aprobar</span><span class="rounded-xl bg-white py-2">❌ Rechazar</span></div></div>
+      ${on ? `<div class="mt-3 rounded-2xl p-4 text-center font-extrabold" style="background:#e2f5ec;color:#16774b">✓ ¡Telegram conectado! Te llegó un mensaje de bienvenida.</div>` : `
+      <div class="sp-card mt-3 text-[13.5px] leading-relaxed">
+        <p><b>1.</b> ¿No tienes Telegram? Instálalo gratis:</p>
+        <div class="my-2 grid grid-cols-2 gap-2"><a class="btn-light text-center text-sm" target="_blank" rel="noopener" href="https://play.google.com/store/apps/details?id=org.telegram.messenger"><i class="fa-brands fa-google-play"></i> Android</a><a class="btn-light text-center text-sm" target="_blank" rel="noopener" href="https://apps.apple.com/app/telegram-messenger/id686449807"><i class="fa-brands fa-apple"></i> iPhone</a></div>
+        <p><b>2.</b> Toca <b>Conectar</b>: se abre Telegram. Allá toca <b>Iniciar</b>.</p>
+        <p><b>3.</b> Vuelve aquí: esta pantalla se pone en verde sola.</p>
+      </div>
+      <button type="button" id="wTgGo" class="mt-3 w-full rounded-2xl py-3.5 text-[15px] font-extrabold text-white" style="background:#2a9ee0"><i class="fa-brands fa-telegram"></i> Conectar mi Telegram</button>
+      <p id="wTgWait" class="soft mt-2 hidden text-center text-sm"><span class="spin mr-1"></span>Esperando que toques Iniciar en Telegram…</p>`}`;
+    } },
+  { id: "done", essential: true, next: "Ir a mi panel", html: () => {
+      const d = W.d, link = $("linkUrl").textContent;
+      const ok = (b, t) => `<span class="${b ? "" : "soft line-through"}">${b ? "✓" : "○"} ${t}</span>`;
+      return `<p class="text-5xl">🎉</p><h3 class="wz-h">¡Tu agenda está lista!</h3><p class="wz-sub">Ya puedes recibir reservas. Comparte tu enlace de citas:</p>
+      <div class="sp-card"><p class="soft text-[11px] font-bold">TU ENLACE DE CITAS</p><p class="mt-1 break-all font-mono text-[12.5px]">${esc(link)}</p></div>
+      <div class="mt-2 grid grid-cols-4 gap-2 text-center text-[11.5px] font-semibold">
+        <button class="link-act" data-link="wa"><i class="fa-brands fa-whatsapp"></i>WhatsApp</button><button class="link-act" data-link="qr"><i class="fa-solid fa-qrcode"></i>QR</button>
+        <button class="link-act" data-link="share"><i class="fa-solid fa-share-nodes"></i>Compartir</button><button class="link-act" data-link="copy"><i class="fa-regular fa-copy"></i>Copiar</button></div>
+      <div class="sp-card mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[12.5px]">${ok(d.name, "Negocio")}${ok(d.logo, "Logo")}${ok(Object.values(d.social).some(Boolean), "Redes")}${ok(true, d.count + (d.count === 1 ? " persona" : " personas"))}${ok(d.days.size, "Horario")}${ok(true, "Servicios")}${ok(true, d.deposit ? "Abono" : "Sin abono")}${ok(d.geo || d.geoMode === "address", "Ubicación")}${ok(A.tg?.owner, "Telegram")}</div>
+      <p class="soft mt-2 text-xs">Lo pendiente queda en la Guía de configuración (menú de tu inicial).</p>`;
+    } }
+];
+function openWizard(start) {
+  if (!A.settings) return;
+  wizInit();
+  W.i = Math.min(Number(start ?? A.settings.setupStep ?? 0) || 0, STEPS.length - 1);
+  W.open = true;
+  let el = $("wizard");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "wizard"; el.className = "wizard"; el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true"); el.setAttribute("aria-label", "Asistente de inicio");
+    document.body.appendChild(el);
+    el.addEventListener("click", wizClick); el.addEventListener("input", wizInput); el.addEventListener("change", wizChange);
+  }
+  document.body.classList.add("wiz-on");
+  drawWizard();
+}
+function drawWizard() {
+  const st = STEPS[W.i], el = $("wizard");
+  el.innerHTML = `<div class="wz-top"><button type="button" class="wz-x" data-wx="close" aria-label="Cerrar">✕</button><span class="soft text-xs font-bold">Paso ${W.i + 1} de ${STEPS.length}</span><span class="wz-bar"><i style="width:${((W.i + 1) / STEPS.length) * 100}%"></i></span></div>
+    <div class="wz-body q-pop">${st.html()}</div>
+    <div class="wz-foot">${W.i ? `<button type="button" class="btn-light !px-5" data-wx="back">Atrás</button>` : ""}<button type="button" class="btn-primary flex-1 py-3.5 text-base" data-wx="next">${st.next || "Siguiente"}</button></div>
+    ${st.essential ? "" : `<button type="button" class="wz-skip" data-wx="skip">${st.skipTxt || "Lo hago después"}</button>`}`;
+  el.querySelector(".wz-body").scrollTop = 0;
+  if (st.id === "telegram") wizWatchTg();
+}
+async function wizClick(e) {
+  const d = W.d, t = e.target;
+  const x = t.closest("[data-wx]");
+  if (x) {
+    const act = x.dataset.wx;
+    if (act === "close") {
+      if (!(await uiConfirm("¿Terminar después?", "Lo que ya guardaste queda listo. El resto lo encuentras en la Guía de configuración, en el menú de tu inicial.", { okText: "Salir", cancelText: "Seguir" }))) return;
+      return closeWizard(true);
+    }
+    if (act === "back") { W.i--; return drawWizard(); }
+    if (act === "skip") { W.i++; updateDoc(doc(db, bpath("settings", "general")), { setupStep: W.i }).catch(() => {}); return drawWizard(); }
+    if (act === "next") {
+      const st = STEPS[W.i];
+      if (st.id === "done") return closeWizard(true);
+      setBusy(x, true, "Guardando…");
+      try {
+        if (st.save) await st.save();
+        W.i++;
+        updateDoc(doc(db, bpath("settings", "general")), { setupStep: W.i }).catch(() => {});
+        drawWizard();
+      } catch (err) { toast(err.message, "error"); setBusy(x, false); }
+      return;
+    }
+  }
+  const ty = t.closest("[data-wtype]"); if (ty) { d.name = $("wName").value; d.address = $("wAddr").value; d.city = $("wCity").value; d.phone = $("wPhone").value; d.type = ty.dataset.wtype; return drawWizard(); }
+  const ct = t.closest("[data-wcount]"); if (ct) { document.querySelectorAll("[data-wname]").forEach((i) => { d.names[Number(i.dataset.wname)] = i.value; }); d.count = Number(ct.dataset.wcount); return drawWizard(); }
+  const dy = t.closest("[data-wday]"); if (dy) { const k = Number(dy.dataset.wday); d.days.has(k) ? d.days.delete(k) : d.days.add(k); return drawWizard(); }
+  const lu = t.closest("[data-wlunch]"); if (lu) { d.lunch = lu.dataset.wlunch === "1"; return drawWizard(); }
+  const sl = t.closest("[data-wslot]"); if (sl) { d.slot = Number(sl.dataset.wslot); return drawWizard(); }
+  const sv = t.closest("[data-wsvc]"); if (sv) { document.querySelectorAll("[data-wprice]").forEach((i) => { d.svc[i.dataset.wprice].price = Number(i.value || 0); }); d.svc[sv.dataset.wsvc].on = !d.svc[sv.dataset.wsvc].on; return drawWizard(); }
+  const dp = t.closest("[data-wdep]"); if (dp) { if ($("wPmAcc")) { d.pmAccount = $("wPmAcc").value; d.pmHolder = $("wPmHolder").value; } d.deposit = Number(dp.dataset.wdep); return drawWizard(); }
+  const pl = t.closest("[data-wpml]"); if (pl) { if ($("wPmAcc")) { d.pmAccount = $("wPmAcc").value; d.pmHolder = $("wPmHolder").value; } d.pmLabel = pl.dataset.wpml; return drawWizard(); }
+  const ge = t.closest("[data-wgeo]");
+  if (ge) {
+    if (ge.dataset.wgeo === "address") { d.geo = null; d.geoMode = "address"; return drawWizard(); }
+    if (!navigator.geolocation) return toast("Este dispositivo no permite leer la ubicación.", "error");
+    toast("Buscando tu ubicación…");
+    navigator.geolocation.getCurrentPosition((p) => {
+      d.geo = { lat: Math.round(p.coords.latitude * 1e6) / 1e6, lng: Math.round(p.coords.longitude * 1e6) / 1e6, acc: Math.round(p.coords.accuracy) };
+      d.geoMode = "gps"; drawWizard();
+      if (d.geo.acc > 150) toast(`Precisión aproximada de ${d.geo.acc} m. Si puedes, hazlo desde el celular dentro de tu local.`, "error");
+    }, (err) => toast(err.code === 1 ? "Permite el acceso a la ubicación (ícono del candado junto a la dirección) o usa solo tu dirección." : "No se pudo leer la ubicación. Intenta de nuevo.", "error"), { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+    return;
+  }
+  if (t.closest("#wTgGo")) {
+    const btn = $("wTgGo"); setBusy(btn, true, "Abriendo Telegram…");
+    let bot = "";
+    try { bot = ((await getDoc(doc(db, "platform", "public"))).data()?.telegramBot || "").replace(/^@/, "").trim(); } catch { /* sin bot */ }
+    if (!bot) { setBusy(btn, false); return toast("El bot de la plataforma aún no está listo. Avísale a soporte.", "error"); }
+    const code = Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4);
+    try { await setDoc(doc(db, "telegramLinks", code), { businessId: bpath().split("/")[1], target: "owner", createdAt: serverTimestamp() }); }
+    catch (err) { setBusy(btn, false); return toast(err.message, "error"); }
+    window.open(`https://t.me/${bot}?start=${code}`, "_blank");
+    setBusy(btn, false); btn.innerHTML = '<i class="fa-brands fa-telegram"></i> Abrir Telegram otra vez';
+    $("wTgWait")?.classList.remove("hidden");
+  }
+}
+function wizInput(e) {
+  const t = e.target, d = W.d;
+  if (t.dataset.wt) { d[t.dataset.wt] = t.value; clearTimeout(W.tT); W.tT = setTimeout(() => { const pos = t.dataset.wt; drawWizard(); document.querySelector(`[data-wt="${pos}"]`)?.focus(); }, 700); }
+}
+async function wizChange(e) {
+  const t = e.target, d = W.d;
+  if (t.id === "wLogo" && t.files[0]) { d.name = $("wName").value; d.address = $("wAddr").value; d.city = $("wCity").value; d.phone = $("wPhone").value; d.logoNew = await imgToDataUrl(t.files[0], 420, "image/jpeg"); drawWizard(); }
+  if (t.id === "wPmQr" && t.files[0]) { if ($("wPmAcc")) { d.pmAccount = $("wPmAcc").value; d.pmHolder = $("wPmHolder").value; } d.pmQr = await imgToDataUrl(t.files[0], 480, "image/jpeg"); drawWizard(); }
+}
+function wizWatchTg() {
+  clearInterval(W.tgT);
+  W.tgT = setInterval(() => {
+    if (!W.open || STEPS[W.i].id !== "telegram") return clearInterval(W.tgT);
+    if (A.tg?.owner) { clearInterval(W.tgT); toast("¡Telegram conectado! Ya te llegarán los avisos."); drawWizard(); }
+  }, 1500);
+}
+function closeWizard(done) {
+  W.open = false; clearInterval(W.tgT);
+  $("wizard")?.remove(); document.body.classList.remove("wiz-on");
+  if (done) updateDoc(doc(db, bpath("settings", "general")), { setupDone: true }).catch(() => {});
+  renderHome();
+}
+document.addEventListener("click", (e) => { if (e.target.closest("[data-wizopen]")) { closeMenus(); openWizard(0); } });
