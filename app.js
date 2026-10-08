@@ -9,7 +9,7 @@ import {
   startUpdateWatcher, applyBrandColors, warmServer, uiConfirm, setDialogBrand, viewImage, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, dow, hora12, fechaLarga, fechaCorta, toMillis, cop, esc,
   normalizePhone, waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, computeSlots, dayCapacityUnits, staffHours,
   toast, openModal, closeModal, setBusy, copyText, tmin, mstr, UNIT
-} from "./common.js?v=2026-10-08n";
+} from "./common.js?v=2026-10-08o";
 
 const $ = (id) => document.getElementById(id);
 const S = {
@@ -172,12 +172,14 @@ function renderNav() {
   const nav = $("nav");
   if (S.user) {
     const active = S.mine.filter((a) => ["pending_payment", "pending_verification", "confirmed"].includes(a.status)).length;
-    nav.innerHTML = `
-      <button id="btnLogout" class="px-1 text-xs font-semibold text-white/75 hover:text-white">Salir</button>
-      <button id="btnMine" class="btn-light whitespace-nowrap px-3 py-1.5 text-xs">Mi cuenta${active ? ` <span class="ml-1 rounded-full bg-pole-red px-1.5 text-[10px] text-white">${active}</span>` : ""}</button>`;
+    nav.innerHTML = `<button id="btnLogout" class="px-1 text-sm font-semibold text-white/75 hover:text-white">Salir</button>`;
+    // "Mi cuenta" va abajo, en la misma línea del estado del equipo
+    $("btnMine").innerHTML = `<i class="fa-regular fa-user mr-1"></i>Mi cuenta${active ? ` <span class="ml-1 rounded-full bg-pole-red px-1.5 text-[10px] text-white">${active}</span>` : ""}`;
+    $("btnMine").classList.remove("hidden");
     $("btnMine").onclick = () => openAccount("citas");
     $("btnLogout").onclick = () => signOut(auth);
   } else {
+    $("btnMine").classList.add("hidden");
     nav.innerHTML = `
       <button id="btnLogin" class="btn-ghost text-sm text-white/80">Ingresar</button>`;
     $("btnLogin").onclick = () => openAuth("login");
