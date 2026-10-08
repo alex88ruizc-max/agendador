@@ -7,7 +7,7 @@ import {
   startUpdateWatcher, applyBrandColors, uiConfirm, uiPrompt, setDialogBrand, viewImage, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, hora12, fechaLarga, fechaCorta, toMillis, cop, esc, normalizePhone,
   waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, DEFAULT_WA_RESCHEDULE, computeSlots, staffHours, mapLinks, headerBgCss, onColor, darken,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-10-09l";
+} from "./common.js?v=2026-10-09m";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -2252,6 +2252,10 @@ async function loadLost() {
 //  GUÍA DE CONFIGURACIÓN: paso a paso para dejar la tienda lista
 // =====================================================================
 const guideDone = () => A.settings?.guideDone || [];
+// lo que ya se hizo en el asistente de inicio cuenta como hecho en la guía
+const WIZ_ORDER = ["hi", "biz", "social", "team", "hours", "services", "deposit", "geo", "telegram", "done"];
+const wizPassed = (id) => !!A.settings?.setupDone || Number(A.settings?.setupStep || 0) > WIZ_ORDER.indexOf(id);
+const stepDone = (id, wizId) => guideDone().includes(id) || wizPassed(wizId || id);
 function guideSteps() {
   const s = A.settings || {};
   const hasHours = Object.values(s.businessHours || {}).some((d) => (d || []).length);
@@ -2260,28 +2264,28 @@ function guideSteps() {
       ok: !!(s.businessName && s.whatsapp && s.address), tab: "settings", focus: "stName",
       tip: "Escribe el nombre, el WhatsApp y la dirección. Al final de la página toca Guardar." },
     { id: "hours", ic: "fa-clock", t: "Horario de atención", d: "Los días y horas en que abres. Si cierras a almorzar, usa el segundo turno.",
-      ok: hasHours && guideDone().includes("hours"), tab: "settings", focus: "[data-dow]", manual: true,
+      ok: hasHours && stepDone("hours"), tab: "settings", focus: "[data-dow]", manual: true,
       tip: "Marca los días que abres y pon apertura y cierre. Al final toca Guardar." },
     { id: "slot", ic: "fa-stopwatch", t: "Duración de cada turno", d: `Cada cuánto se abre un cupo en tu agenda (ahora: ${Number(s.slotDurationMinutes || 30)} minutos). Elige el tiempo de tu servicio más común.`,
-      ok: guideDone().includes("slot"), tab: "settings", focus: "stSlot", manual: true,
+      ok: stepDone("slot", "hours"), tab: "settings", focus: "stSlot", manual: true,
       tip: "En “Duración de cada cupo” elige 15, 30, 45 o 60 minutos (o Personalizado). Baja y toca Guardar." },
     { id: "services", ic: "fa-scissors", t: "Servicios y precios", d: "Revisa los servicios de ejemplo: cambia precios y duración, y oculta los que no haces.",
-      ok: guideDone().includes("services"), tab: "services", manual: true,
+      ok: stepDone("services"), tab: "services", manual: true,
       tip: "Toca Editar en cada servicio para poner tu precio y duración." },
     { id: "geo", ic: "fa-location-dot", t: "Ubicación para Waze", d: "Guardamos el punto exacto de tu local para que tus clientes lleguen con Waze o Google Maps.",
-      ok: !!s.geo, guide: "geo" },
+      ok: !!s.geo || s.geoMode === "address", guide: "geo" },
     { id: "pay", ic: "fa-qrcode", t: "Cómo te pagan el abono", d: "Tu Nequi, Daviplata o llave Bre-B con su QR, y cuánto cobras para apartar el cupo.",
-      ok: (s.paymentMethods || []).length > 0, tab: "settings", focus: "pmList",
+      ok: (s.paymentMethods || []).length > 0 || (Number(s.depositAmountCOP || 0) === 0 && wizPassed("deposit")), tab: "settings", focus: "pmList",
       tip: "Toca “Agregar medio de pago”, escribe tu número o llave y sube el QR. Revisa el valor del abono arriba y toca Guardar." },
     { id: "telegram", ic: "fa-paper-plane", t: "Avisos en tu Telegram", d: "Te llegan las reservas, los comprobantes con botón para aprobar y los recordatorios.",
       ok: !!A.tg?.owner, guide: "telegram" },
     { id: "team", ic: "fa-users", t: "Tu equipo y sus horarios", d: "Agrega a cada barbero, su horario propio y sus días libres. Si trabajas solo, revisa el tuyo.",
-      ok: guideDone().includes("team"), tab: "staff", manual: true,
+      ok: stepDone("team"), tab: "staff", manual: true,
       tip: "En Disponibilidad toca Editar horario. Para agregar personas usa “Agregar al equipo”." },
     { id: "brand", ic: "fa-palette", t: "Tu logo y colores", d: "Que tu página se vea como tu negocio.", optional: true,
       ok: !!s.appearance?.logo, tab: "appearance", tip: "Sube tu logo, elige un tema o tus colores y toca Guardar apariencia." },
     { id: "share", ic: "fa-share-nodes", t: "Comparte tu enlace", d: "Ponlo en tu estado de WhatsApp, en Instagram y en tu perfil de Google.",
-      ok: guideDone().includes("share"), guide: "share" }
+      ok: guideDone().includes("share") || !!s.setupDone, guide: "share" }
   ];
 }
 function guideProgress() { const st = guideSteps().filter((x) => !x.optional); return { done: st.filter((x) => x.ok).length, total: st.length, next: guideSteps().find((x) => !x.ok && !x.optional) }; }
