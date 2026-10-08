@@ -41,7 +41,7 @@ onAuthStateChanged(auth, async (u) => {
   $("publicLink").href = "index.html?b=" + encodeURIComponent(bid);
   const bizSnap = await getDoc(doc(db, "businesses", bid)).catch(() => null);
   A.biz = bizSnap?.data() || { name: bid, status: "active" };
-  $("who").textContent = `${A.biz.name}. ${u.email} (${isSuper ? "superusuario" : isOwner() ? "dueño" : "barbero"})`;
+  $("who").textContent = `${A.biz.name}. ${u.email} (${isSuper ? "superusuario" : isOwner() ? "dueño" : "equipo"})`;
   show("deniedView", false); show("appView", true);
   renderPlanBanner();
   start();
@@ -90,7 +90,7 @@ function start() {
 async function renderPlanBanner() {
   const el = $("planBanner"); el.classList.add("hidden");
   const msgs = [];
-  if (A.me.isSuper) msgs.push(`Estás viendo el panel de ${esc(A.biz.name)} como superusuario. <a class="underline" href="super.html">Volver a mis barberías</a>`);
+  if (A.me.isSuper) msgs.push(`Estás viendo el panel de ${esc(A.biz.name)} como superusuario. <a class="underline" href="super.html">Volver a mis negocios</a>`);
   if (A.biz.status !== "active") msgs.push("⛔ Tu agenda en línea está suspendida: tus clientes no pueden reservar desde la página. Comunícate con soporte para reactivarla.");
   if (isOwner()) {
     try {
@@ -115,7 +115,7 @@ function subscribeDay() {
 
 // ================= Pestañas =================
 function renderTabs() {
-  const tabs = [["agenda", "Agenda"], ["staff", "Barberos y descansos"]];
+  const tabs = [["agenda", "Agenda"], ["staff", "Equipo y descansos"]];
   if (isOwner()) tabs.push(["clients", "Clientes"], ["services", "Servicios"], ["settings", "Configuración"]);
   $("tabs").innerHTML = tabs.map(([id, t]) => `<button class="tab whitespace-nowrap px-4 ${A.tab === id ? "tab-on" : ""}" data-tab="${id}">${t}</button>`).join("");
 }
@@ -257,7 +257,7 @@ async function aptAction(b) {
       setBusy(b, true, "Guardando…"); await api("setAttendance", { code: a.code, attended: false }); toast("Marcada como inasistencia.");
     }
     if (act === "cancel") {
-      const reason = prompt(`Motivo de la cancelación de ${a.code}:`, "Cancelada por la barbería");
+      const reason = prompt(`Motivo de la cancelación de ${a.code}:`, "Cancelada por el negocio");
       if (reason === null) return;
       setBusy(b, true, "Cancelando…"); await api("cancelAppointment", { code: a.code, reason }); toast("Cita cancelada. El cupo quedó libre.");
     }
@@ -346,7 +346,7 @@ function renderModalSlots() {
   });
   if (!slots.some((s) => s.time === m.time)) { m.time = null; $("mSave").disabled = true; }
   $("mSlots").innerHTML = slots.map((s) => `<button type="button" class="slot" data-time="${s.time}" aria-pressed="${s.time === m.time}">${hora12(s.time)}</button>`).join("")
-    || `<p class="col-span-4 text-sm text-ink/60">No hay horas libres ese día para este barbero.</p>`;
+    || `<p class="col-span-4 text-sm text-ink/60">No hay horas libres ese día para esta persona.</p>`;
 }
 async function saveAptModal() {
   const m = A.m, btn = $("mSave");
@@ -390,7 +390,7 @@ function renderStaffTab() {
   el.innerHTML = `
     ${isOwner() ? `<div class="mb-4 flex flex-wrap items-center justify-between gap-2">
       <p class="text-sm text-ink/70">${ownerTg ? "Tu Telegram de dueño está conectado." : "Conecta tu Telegram de dueño en Configuración para recibir todos los avisos."}</p>
-      <button class="btn-primary" data-sact="new">+ Agregar barbero</button></div>` : ""}
+      <button class="btn-primary" data-sact="new">+ Agregar al equipo</button></div>` : ""}
     <div class="grid gap-3 md:grid-cols-2">
     ${list.map((s) => {
       const busy = isBusy(s);
@@ -406,6 +406,7 @@ function renderStaffTab() {
         <div class="mt-3 flex flex-wrap gap-2">
           ${canBreak ? (busy ? `<button class="btn-primary !bg-emerald-700" data-sact="end" data-id="${s.id}">Ya estoy disponible</button>`
                               : `<button class="btn-dark" data-sact="break" data-id="${s.id}">Tomar descanso</button>`) : ""}
+          ${!isOwner() && s.id === A.me.staffId ? `<button class="btn-sm" data-sact="mysvc" data-id="${s.id}">Mis servicios</button>` : ""}
           ${isOwner() ? `<button class="btn-sm" data-sact="edit" data-id="${s.id}">Editar</button>
             <button class="btn-sm" data-sact="tg" data-id="${s.id}">${tgOn ? "Telegram conectado ✓ (reconectar)" : "Conectar Telegram"}</button>` : ""}
         </div>
@@ -425,6 +426,7 @@ $("tab-staff").addEventListener("click", async (e) => {
     catch (err) { toast(err.message, "error"); setBusy(b, false); }
   }
   if (act === "edit" || act === "new") openStaffEdit(s);
+  if (act === "mysvc") openMyServices(s);
   if (act === "tg") tgLink(s.id);
 });
 
@@ -491,23 +493,38 @@ async function brPreview() {
   } catch (err) { info.innerHTML = `<p class="text-rose-800">${esc(err.message)}</p>`; }
 }
 
+// Cada profesional marca qué servicios realiza
+function openMyServices(s) {
+  const mains = A.services.filter((x) => x.type !== "addon" && x.active !== false);
+  openM("Mis servicios", `
+    <p class="mb-3 text-sm text-ink/75">Marca los servicios que realizas. En la página solo te podrán agendar esos. Si no marcas ninguno, apareces en todos.</p>
+    <div id="msList" class="mb-4 grid gap-1">${mains.map((x) => `<label class="flex items-center gap-2 text-sm"><input type="checkbox" value="${x.id}" class="h-4 w-4" ${s.serviceIds?.includes(x.id) ? "checked" : ""}> ${esc(x.name)}${x.category ? ` <span class="text-ink/50">(${esc(x.category)})</span>` : ""}</label>`).join("")}</div>
+    <button id="msSave" class="btn-primary w-full">Guardar</button>`);
+  $("msSave").onclick = async () => {
+    try {
+      await updateDoc(doc(db, bpath("staff", s.id)), { serviceIds: [...$("msList").querySelectorAll("input:checked")].map((i) => i.value) });
+      closeM(); toast("Listo, tus servicios quedaron actualizados.");
+    } catch (err) { toast("No se pudo guardar: " + err.message, "error"); }
+  };
+}
+
 async function openStaffEdit(s) {
   const isNew = !s;
   let panelEmail = "";
   if (s) { try { panelEmail = (await getDoc(doc(db, bpath("private", "access")))).data()?.emails?.[s.id] || ""; } catch { /* sin acceso */ } }
   const mains = A.services.filter((x) => x.type !== "addon");
-  openM(isNew ? "Agregar barbero" : "Editar " + s.name, `
+  openM(isNew ? "Agregar al equipo" : "Editar " + s.name, `
     <label class="field mb-3"><span>Nombre</span><input id="sfName" value="${esc(s?.name || "")}"></label>
     <label class="field mb-3"><span>Orden en la lista</span><input id="sfOrder" type="number" value="${s?.order ?? A.staff.length + 1}"></label>
     <label class="mb-3 flex items-center gap-2 text-sm"><input id="sfActive" type="checkbox" class="h-4 w-4" ${s?.active === false ? "" : "checked"}> Activo (aparece en la página)</label>
-    <p class="mb-1 text-sm font-semibold">Servicios principales que realiza</p>
+    <p class="mb-1 text-sm font-semibold">Servicios que realiza</p>
     <p class="mb-2 text-xs text-ink/60">Si no marcas ninguno, puede hacer todos.</p>
     <div id="sfServ" class="mb-4 grid gap-1">${mains.map((x) => `<label class="flex items-center gap-2 text-sm"><input type="checkbox" value="${x.id}" class="h-4 w-4" ${s?.serviceIds?.includes(x.id) ? "checked" : ""}> ${esc(x.name)}</label>`).join("")}</div>
     <button id="sfSave" class="btn-primary w-full">Guardar</button>
     ${s ? `<div class="mt-6 rounded-lg bg-paper p-3">
-      <p class="mb-1 text-sm font-semibold">Acceso al panel para este barbero</p>
+      <p class="mb-1 text-sm font-semibold">Acceso al panel para esta persona</p>
       <p class="mb-2 text-xs text-ink/60">Con acceso puede ver su agenda y tomar descansos. No ve clientes, servicios ni configuración.</p>
-      <div class="flex gap-2"><input id="sfEmail" type="email" placeholder="correo del barbero" value="${esc(panelEmail)}" class="min-w-0 flex-1 rounded border border-line px-2 py-1.5">
+      <div class="flex gap-2"><input id="sfEmail" type="email" placeholder="correo de la persona" value="${esc(panelEmail)}" class="min-w-0 flex-1 rounded border border-line px-2 py-1.5">
       <button id="sfAccess" type="button" class="btn-dark">${panelEmail ? "Actualizar" : "Dar acceso"}</button></div>
       ${panelEmail ? `<button id="sfRevoke" type="button" class="mt-2 text-sm text-pole-red underline">Quitar acceso</button>` : ""}
       <div id="sfAccessMsg" class="mt-2 text-sm"></div></div>` : ""}`);
@@ -519,11 +536,11 @@ async function openStaffEdit(s) {
         const r = await api("setBarberAccess", { staffId: s.id, email });
         if (r.removed) { msg.textContent = "Acceso quitado."; return; }
         msg.innerHTML = r.tempPassword
-          ? `Listo. Envíale al barbero: entra a <b>${esc(location.origin + location.pathname)}</b> con <b>${esc(r.email)}</b> y la contraseña temporal <b>${esc(r.tempPassword)}</b> <button type="button" class="btn-sm" data-copy="${esc(`Panel: ${location.origin + location.pathname}\nCorreo: ${r.email}\nContraseña: ${r.tempPassword}`)}">Copiar</button>`
+          ? `Listo. Envíale este acceso: entra a <b>${esc(location.origin + location.pathname)}</b> con <b>${esc(r.email)}</b> y la contraseña temporal <b>${esc(r.tempPassword)}</b> <button type="button" class="btn-sm" data-copy="${esc(`Panel: ${location.origin + location.pathname}\nCorreo: ${r.email}\nContraseña: ${r.tempPassword}`)}">Copiar</button>`
           : `Listo. ${esc(r.email)} ya tenía cuenta: entra con su contraseña de siempre.`;
       } catch (err) { msg.textContent = err.message; }
     };
-    $("sfAccess").onclick = () => { const e = $("sfEmail").value.trim(); if (!e) return toast("Escribe el correo del barbero.", "error"); access(e); };
+    $("sfAccess").onclick = () => { const e = $("sfEmail").value.trim(); if (!e) return toast("Escribe el correo.", "error"); access(e); };
     if ($("sfRevoke")) $("sfRevoke").onclick = () => { if (confirm("¿Quitarle el acceso al panel?")) access(""); };
   }
   $("sfSave").onclick = async () => {
@@ -548,7 +565,7 @@ async function tgLink(target) {
   catch (err) { return toast("No se pudo crear el enlace: " + err.message, "error"); }
   const link = `https://t.me/${bot}?start=${code}`;
   openM("Conectar Telegram", `
-    <p class="mb-3">Abre este enlace en el celular ${target === "owner" ? "donde quieres recibir los avisos" : "del barbero"} y toca <b>Iniciar</b> en Telegram. Llegará un mensaje confirmando la conexión.</p>
+    <p class="mb-3">Abre este enlace en el celular ${target === "owner" ? "donde quieres recibir los avisos" : "de esa persona"} y toca <b>Iniciar</b> en Telegram. Llegará un mensaje confirmando la conexión.</p>
     <p class="mb-4 break-all rounded-lg bg-paper p-3 text-sm">${link}</p>
     <div class="flex flex-wrap gap-2"><a class="btn-primary" href="${link}" target="_blank" rel="noopener">Abrir Telegram</a>
     <button class="btn-light" data-copy="${link}">Copiar enlace</button></div>`);
@@ -625,28 +642,70 @@ async function openClient(u) {
 
 // ================= Servicios =================
 const TYPE_LABEL = { base: "Principal", addon: "Agregado", special: "Especial" };
+// Plantillas para arrancar rápido según el tipo de negocio: [nombre, tipo, precio, minutos, categoría]
+const TEMPLATES = {
+  barberia: { label: "Barbería", items: [
+    ["Corte clásico", "base", 20000, 30, "Cortes"], ["Corte moderno / degradado", "base", 25000, 45, "Cortes"], ["Corte niño", "base", 18000, 30, "Cortes"],
+    ["Arreglo de barba", "special", 15000, 30, "Barba"], ["Barba con toalla caliente", "special", 20000, 30, "Barba"],
+    ["Cejas", "addon", 5000, 10, "Agregados"], ["Diseño o línea", "addon", 5000, 10, "Agregados"], ["Mascarilla negra", "addon", 10000, 15, "Agregados"],
+    ["Color / tinte", "special", 60000, 90, "Color"]] },
+  salon: { label: "Salón de belleza", items: [
+    ["Corte dama", "base", 35000, 45, "Cabello"], ["Cepillado", "base", 30000, 45, "Cabello"], ["Ondas / planchado", "base", 35000, 60, "Cabello"],
+    ["Tinte completo", "special", 120000, 120, "Color"], ["Mechas / balayage", "special", 250000, 180, "Color"], ["Keratina", "special", 180000, 150, "Tratamientos"],
+    ["Hidratación capilar", "addon", 25000, 30, "Tratamientos"], ["Manicure", "base", 20000, 45, "Uñas"], ["Pedicure", "base", 28000, 60, "Uñas"],
+    ["Diseño de cejas", "base", 15000, 30, "Cejas y pestañas"], ["Lifting de pestañas", "base", 60000, 60, "Cejas y pestañas"], ["Maquillaje social", "base", 80000, 60, "Maquillaje"]] },
+  unas: { label: "Uñas y spa", items: [
+    ["Manicure tradicional", "base", 20000, 45, "Manos"], ["Manicure semipermanente", "base", 35000, 60, "Manos"], ["Uñas en acrílico", "base", 80000, 120, "Manos"],
+    ["Retiro de acrílico", "addon", 15000, 30, "Manos"], ["Pedicure tradicional", "base", 28000, 60, "Pies"], ["Pedicure spa", "base", 45000, 75, "Pies"],
+    ["Decoración / diseño", "addon", 10000, 15, "Extras"], ["Parafina", "addon", 15000, 15, "Extras"], ["Masaje relajante", "base", 90000, 60, "Spa"], ["Limpieza facial", "base", 80000, 60, "Spa"]] }
+};
 function renderServices() {
   if (!isOwner()) return;
   $("tab-services").innerHTML = `
     <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
-      <p class="max-w-xl text-sm text-ink/70">Principal: el cliente elige uno (corte clásico, moderno…). Agregado: solo se suma a un principal (barba, cejas…). Especial: puede ser principal o agregado (color, keratina…).</p>
-      <button class="btn-primary" data-svc="">+ Nuevo servicio</button>
+      <p class="max-w-xl text-sm text-ink/70">Principal: el cliente elige uno. Agregado: solo se suma a un principal. Especial: puede ser principal o agregado. La categoría agrupa los servicios en la página (Cabello, Uñas, Barba…).</p>
+      <div class="flex flex-wrap gap-2"><button class="btn-light" data-tpl="1">Cargar plantilla</button><button class="btn-primary" data-svc="">+ Nuevo servicio</button></div>
     </div>
     <div class="overflow-x-auto rounded-xl border border-line bg-white"><table class="w-full min-w-[560px] text-sm">
-      <thead class="bg-paper text-left"><tr><th class="p-3">Servicio</th><th class="p-3">Tipo</th><th class="p-3">Precio</th><th class="p-3">Minutos</th><th class="p-3"></th></tr></thead>
+      <thead class="bg-paper text-left"><tr><th class="p-3">Servicio</th><th class="p-3">Categoría</th><th class="p-3">Tipo</th><th class="p-3">Precio</th><th class="p-3">Minutos</th><th class="p-3"></th></tr></thead>
       <tbody>${A.services.map((s) => `<tr class="border-t border-line ${s.active === false ? "opacity-50" : ""}">
-        <td class="p-3 font-semibold">${esc(s.name)}${s.active === false ? " (oculto)" : ""}</td><td class="p-3">${TYPE_LABEL[s.type] || s.type}</td>
+        <td class="p-3 font-semibold">${esc(s.name)}${s.active === false ? " (oculto)" : ""}</td><td class="p-3">${esc(s.category || "")}</td><td class="p-3">${TYPE_LABEL[s.type] || s.type}</td>
         <td class="p-3">${cop(s.priceCOP)}</td><td class="p-3">${s.type === "addon" ? "+" : ""}${s.minutes}</td>
         <td class="p-3 text-right"><button class="btn-sm" data-svc="${s.id}">Editar</button></td></tr>`).join("")}</tbody></table></div>`;
 }
 $("tab-services").addEventListener("click", (e) => {
+  if (e.target.closest("[data-tpl]")) return openTemplates();
   const b = e.target.closest("[data-svc]"); if (!b) return;
   openService(A.services.find((s) => s.id === b.dataset.svc));
 });
+function openTemplates() {
+  openM("Cargar plantilla de servicios", `
+    <p class="mb-3 text-sm text-ink/75">Agrega servicios de ejemplo según tu tipo de negocio. No borra los que ya tienes. Después ajustas nombres, precios y tiempos.</p>
+    <div class="mb-4 grid gap-2">${Object.entries(TEMPLATES).map(([k, t]) => `<label class="flex items-start gap-2 rounded-lg border border-line p-3 text-sm"><input type="radio" name="tpl" value="${k}" class="mt-0.5 h-4 w-4"><span><b>${t.label}</b><br><span class="text-ink/60">${t.items.slice(0, 4).map((i) => esc(i[0])).join(", ")}…</span></span></label>`).join("")}</div>
+    <label class="mb-4 flex items-center gap-2 text-sm"><input id="tplHide" type="checkbox" class="h-4 w-4"> Ocultar los servicios que tengo ahora</label>
+    <button id="tplSave" class="btn-primary w-full">Agregar servicios</button>`);
+  $("tplSave").onclick = async () => {
+    const k = document.querySelector("input[name=tpl]:checked")?.value;
+    if (!k) return toast("Elige una plantilla.", "error");
+    const btn = $("tplSave"); setBusy(btn, true, "Agregando…");
+    try {
+      if ($("tplHide").checked) for (const s of A.services) await setDoc(doc(db, bpath("services", s.id)), { active: false }, { merge: true });
+      let order = A.services.length;
+      for (const [name, type, priceCOP, minutes, category] of TEMPLATES[k].items) {
+        const id = "s" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+        await setDoc(doc(db, bpath("services", id)), { name, type, priceCOP, minutes, category, description: "", active: true, order: ++order });
+      }
+      closeM(); toast("Servicios agregados. Ajusta precios y tiempos a tu gusto.");
+    } catch (err) { toast(err.message, "error"); setBusy(btn, false); }
+  };
+}
 function openService(s) {
+  const cats = [...new Set(A.services.map((x) => (x.category || "").trim()).filter(Boolean))];
   openM(s ? "Editar servicio" : "Nuevo servicio", `
     <label class="field mb-3"><span>Nombre</span><input id="svName" value="${esc(s?.name || "")}"></label>
     <label class="field mb-3"><span>Descripción corta (opcional)</span><input id="svDesc" value="${esc(s?.description || "")}"></label>
+    <label class="field mb-3"><span>Categoría (agrupa en la página)</span><input id="svCat" list="svCats" value="${esc(s?.category || "")}" placeholder="Cabello, Uñas, Barba…">
+      <datalist id="svCats">${cats.map((c) => `<option value="${esc(c)}">`).join("")}</datalist></label>
     <label class="field mb-3"><span>Tipo</span><select id="svType">
       ${Object.entries(TYPE_LABEL).map(([k, v]) => `<option value="${k}" ${(s?.type || "base") === k ? "selected" : ""}>${v}</option>`).join("")}</select></label>
     <div class="mb-3 grid grid-cols-3 gap-3">
@@ -661,7 +720,7 @@ function openService(s) {
     const name = $("svName").value.trim(); if (!name) return toast("Escribe el nombre.", "error");
     const id = s?.id || "s" + Date.now().toString(36);
     const data = {
-      name, description: $("svDesc").value.trim(), type: $("svType").value, priceCOP: Number($("svPrice").value || 0),
+      name, description: $("svDesc").value.trim(), category: $("svCat").value.trim(), type: $("svType").value, priceCOP: Number($("svPrice").value || 0),
       minutes: Number($("svMin").value || 0), order: Number($("svOrder").value || 0), active: $("svActive").checked
     };
     try { await setDoc(doc(db, bpath("services", id)), data, { merge: true }); closeM(); toast("Servicio guardado."); }
@@ -691,13 +750,17 @@ function renderSettings() {
         ${txt("stPhone", "WhatsApp del negocio", s.whatsapp, 'placeholder="300 123 4567"')}
         ${txt("stAddress", "Dirección", s.address)}
         ${txt("stCity", "Ciudad", s.city)}
+        <label class="field"><span>Tipo de negocio</span><select id="stType">
+          ${[["barberia", "Barbería"], ["salon", "Salón de belleza"], ["unas", "Uñas"], ["spa", "Spa / estética"], ["otro", "Otro"]].map(([k, v]) => `<option value="${k}" ${(s.businessType || "barberia") === k ? "selected" : ""}>${v}</option>`).join("")}</select></label>
+        ${txt("stStaffLabel", "Cómo se llama tu equipo en la página", s.staffLabel || "", 'placeholder="Barbero, Estilista, Manicurista…"')}
       </div>
     </fieldset>
 
     <fieldset class="rounded-xl border border-line bg-white p-4"><legend class="px-1 font-narrow text-xl font-bold">Turnos y abono</legend>
       <div class="grid gap-3 md:grid-cols-3">
-        <label class="field"><span>Duración de cada turno</span><select id="stSlot">
-          ${[15, 30, 45, 60].map((m) => `<option value="${m}" ${Number(s.slotDurationMinutes || 30) === m ? "selected" : ""}>${m} minutos</option>`).join("")}</select></label>
+        <label class="field"><span>Duración de cada cupo</span><select id="stSlot">
+          ${(() => { const cur = Number(s.slotDurationMinutes || 30); const opts = [15, 30, 45, 60, 90, 120]; return opts.map((m) => `<option value="${m}" ${cur === m ? "selected" : ""}>${m < 60 ? m + " minutos" : m === 60 ? "1 hora" : m === 90 ? "1 hora y media" : "2 horas"}</option>`).join("") + `<option value="custom" ${opts.includes(cur) ? "" : "selected"}>Otro…</option>`; })()}</select>
+          <input id="stSlotCustom" type="number" min="15" step="15" class="mt-2 ${[15, 30, 45, 60, 90, 120].includes(Number(s.slotDurationMinutes || 30)) ? "hidden" : ""}" value="${Number(s.slotDurationMinutes || 30)}" placeholder="Minutos (múltiplo de 15)"></label>
         ${num("stDeposit", "Abono para apartar (COP)", s.depositAmountCOP, 'min="0" step="1000"')}
         ${num("stHold", "Minutos para subir el comprobante", s.holdMinutes ?? 30, 'min="5"')}
         ${num("stWindow", "Días hacia adelante que se puede reservar", s.bookingWindowDays ?? 30, 'min="1"')}
@@ -715,9 +778,9 @@ function renderSettings() {
         return `<div class="grid grid-cols-[7rem_1fr] items-center gap-2 border-t border-line pt-2" data-dow="${d}">
           <label class="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" class="h-4 w-4 hOpen" ${h.length ? "checked" : ""}> ${name}</label>
           <div class="flex flex-wrap items-center gap-1 text-sm">
-            <input type="time" class="h1o rounded border border-line px-1" value="${h[0]?.open || "09:00"}"> a <input type="time" class="h1c rounded border border-line px-1" value="${h[0]?.close || "19:00"}">
+            <input type="time" step="900" class="h1o rounded border border-line px-1" value="${h[0]?.open || "09:00"}"> a <input type="time" step="900" class="h1c rounded border border-line px-1" value="${h[0]?.close || "19:00"}">
             <span class="mx-1 text-ink/50">y</span>
-            <input type="time" class="h2o rounded border border-line px-1" value="${h[1]?.open || ""}"> a <input type="time" class="h2c rounded border border-line px-1" value="${h[1]?.close || ""}">
+            <input type="time" step="900" class="h2o rounded border border-line px-1" value="${h[1]?.open || ""}"> a <input type="time" step="900" class="h2c rounded border border-line px-1" value="${h[1]?.close || ""}">
           </div></div>`;
       }).join("")}</div>
       <div class="mt-4"><p class="mb-1 text-sm font-semibold">Días cerrados (festivos, vacaciones)</p>
@@ -758,6 +821,11 @@ function renderSettings() {
     <div class="sticky bottom-3"><button class="btn-primary w-full shadow-lg" type="submit">Guardar configuración</button></div>
   </form>`;
   renderClosed(); renderPM();
+  $("stSlot").onchange = (e) => $("stSlotCustom").classList.toggle("hidden", e.target.value !== "custom");
+  $("stType").onchange = (e) => {
+    const lbl = { barberia: "Barbero", salon: "Estilista", unas: "Manicurista", spa: "Profesional", otro: "Profesional" }[e.target.value];
+    if (!$("stStaffLabel").value.trim()) $("stStaffLabel").value = lbl;
+  };
   $("stClosedAdd").onclick = () => {
     const v = $("stClosedNew").value; if (!v) return;
     if (!A.closedDraft.includes(v)) A.closedDraft.push(v);
@@ -805,12 +873,19 @@ async function saveSettings(e) {
     }
     hours[d] = iv;
   }
+  const slotVal = $("stSlot").value === "custom" ? Number($("stSlotCustom").value) : Number($("stSlot").value);
+  if (!(slotVal >= 15 && slotVal <= 480 && slotVal % 15 === 0)) return toast("La duración del cupo debe ser múltiplo de 15 minutos (15, 30, 45, 60…).", "error");
+  for (const row of document.querySelectorAll("[data-dow]")) {
+    for (const inp of row.querySelectorAll("input[type=time]")) {
+      if (inp.value && Number(inp.value.split(":")[1]) % 15 !== 0) return toast("Las horas de apertura y cierre deben ser en punto, :15, :30 o :45.", "error");
+    }
+  }
   const phone = $("stPhone").value.trim() ? normalizePhone($("stPhone").value) : "";
   if ($("stPhone").value.trim() && !phone) return toast("WhatsApp del negocio inválido.", "error");
   const n = (id) => Number($(id).value || 0);
   const data = {
     businessName: $("stName").value.trim(), whatsapp: phone, address: $("stAddress").value.trim(), city: $("stCity").value.trim(),
-    slotDurationMinutes: Number($("stSlot").value), depositAmountCOP: n("stDeposit"), holdMinutes: Math.max(5, n("stHold")),
+    slotDurationMinutes: slotVal, businessType: $("stType").value, staffLabel: $("stStaffLabel").value.trim(), depositAmountCOP: n("stDeposit"), holdMinutes: Math.max(5, n("stHold")),
     bookingWindowDays: Math.max(1, n("stWindow")), minAdvanceMinutes: n("stAdvance"), toleranceMinutes: n("stTolerance"),
     autoConfirmProof: $("stAuto").checked, businessHours: hours, closedDates: A.closedDraft,
     paymentMethods: A.pmDraft.filter((m) => m.label && m.account), paymentInstructions: $("stPayInstr").value.trim(),

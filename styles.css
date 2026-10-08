@@ -61,3 +61,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .ticket-row dt { color:rgba(23,34,46,.6); } .ticket-row dd { font-weight:600; text-align:right; }
 
 @media (prefers-reduced-motion: reduce) { * { transition:none !important; animation:none !important; } }
+
+.day-strip { scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; }
+.daypill { scroll-snap-align:start; flex:0 0 auto; width:3.6rem; border:1.5px solid var(--line); background:#fff; border-radius:.7rem; padding:.45rem 0; display:flex; flex-direction:column; align-items:center; gap:2px; }
+.daypill:disabled { color:#a6aeab; background:transparent; }
+.daypill[aria-pressed="true"] { background:var(--ink); color:#fff; border-color:var(--ink); }
+.slot:disabled { background:transparent; color:#a6aeab; text-decoration:line-through; border-style:dashed; cursor:default; }
+.choice:disabled { opacity:.55; cursor:not-allowed; }
+.choice:disabled:hover { border-color:var(--line); }

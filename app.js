@@ -8,7 +8,7 @@ import {
 import {
   db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, dow, hora12, fechaLarga, fechaCorta, toMillis, cop, esc,
   normalizePhone, waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, computeSlots, dayCapacityUnits,
-  toast, openModal, closeModal, setBusy, copyText, tmin
+  toast, openModal, closeModal, setBusy, copyText, tmin, mstr, UNIT
 } from "./common.js";
 
 const $ = (id) => document.getElementById(id);
@@ -30,7 +30,7 @@ function showUnavailable(title, text) {
   $("bookBar").classList.add("hidden");
 }
 if (!/^[a-z0-9][a-z0-9-]{1,29}$/.test(BIZ_ID)) {
-  showUnavailable("Falta el enlace de la barbería", "Abre la página con el enlace que te compartió tu barbería.");
+  showUnavailable("Falta el enlace del negocio", "Abre la página con el enlace que te compartieron.");
 } else {
   setBusiness(BIZ_ID);
 }
@@ -38,7 +38,7 @@ if (!/^[a-z0-9][a-z0-9-]{1,29}$/.test(BIZ_ID)) {
 // ================= Datos en tiempo real =================
 function boot() {
 onSnapshot(doc(db, "businesses", BIZ_ID), (s) => {
-  if (!s.exists()) { showUnavailable("No encontramos esta barbería", "Revisa que el enlace esté completo."); return; }
+  if (!s.exists()) { showUnavailable("No encontramos este negocio", "Revisa que el enlace esté completo."); return; }
   S.biz = s.data();
   const off = S.biz.status !== "active";
   $("closedBanner").classList.toggle("hidden", !off);
@@ -48,7 +48,9 @@ onSnapshot(doc(db, "businesses", BIZ_ID), (s) => {
 
 onSnapshot(doc(db, bpath("settings", "general")), (s) => {
   S.settings = s.data() || null;
-  renderBiz(); renderCalendar(); renderSlots(); renderSummary();
+  if (!S.date) S.date = firstOpenDay();
+  subscribeAvail(); subscribeDay(S.date);
+  renderBiz(); renderStaff(); renderAll();
 }, onErr);
 
 onSnapshot(collection(db, bpath("services")), (q) => {
@@ -60,31 +62,34 @@ onSnapshot(collection(db, bpath("services")), (q) => {
 onSnapshot(collection(db, bpath("staff")), (q) => {
   S.staff = q.docs.map((d) => ({ id: d.id, ...d.data() })).filter((s) => s.active !== false)
     .sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
-  renderStaff(); renderCalendar(); renderSlots();
+  renderStaff(); renderAll();
 }, onErr);
 
-subscribeMonth();
 setInterval(() => { renderStaff(); renderSlots(); }, 60000); // refresca horas y estados cada minuto
 renderNav(); renderSummary();
 }
 
-let unsubMonth = null, unsubDay = null, unsubMine = null, unsubCust = null;
-function subscribeMonth() {
-  unsubMonth?.();
-  const m = S.month;
-  unsubMonth = onSnapshot(query(collection(db, bpath("dayAvailability")), where("date", ">=", m + "-01"), where("date", "<=", m + "-31")), (q) => {
+let unsubAvail = null, availKey = "", unsubDay = null, dayKey = "", unsubMine = null, unsubCust = null;
+// Ocupación de todos los días que se pueden reservar (para la tira de días y el mes)
+function subscribeAvail() {
+  const from = bogNow().date, to = maxDate();
+  if (availKey === from + to) return;
+  availKey = from + to; unsubAvail?.();
+  unsubAvail = onSnapshot(query(collection(db, bpath("dayAvailability")), where("date", ">=", from), where("date", "<=", to)), (q) => {
     S.monthAvail = {};
     q.forEach((d) => { S.monthAvail[d.id] = d.data(); });
-    renderCalendar();
+    renderDays(); renderCalendar();
   }, onErr);
 }
 function subscribeDay(date) {
-  unsubDay?.();
+  if (!date || dayKey === date) return;
+  dayKey = date; unsubDay?.(); S.dayLocks = [];
   unsubDay = onSnapshot(query(collection(db, bpath("slotLocks")), where("date", "==", date)), (q) => {
     S.dayLocks = q.docs.map((d) => d.data());
-    renderSlots();
+    renderSlots(); renderServices(); renderSummary();
   }, onErr);
 }
+
 // ================= Sesión =================
 onAuthStateChanged(auth, async (u) => {
   S.user = u;
@@ -117,9 +122,9 @@ function subscribeMine() {
 // ================= Render =================
 function renderBiz() {
   const s = S.settings || {};
-  $("bizName").textContent = s.businessName || "Reserva tu cupo";
+  $("bizName").textContent = s.businessName || "Reserva tu cita";
   $("bizAddress").textContent = [s.address, s.city].filter(Boolean).join(", ");
-  document.title = (s.businessName ? s.businessName + " · " : "") + "Reserva tu cupo";
+  document.title = (s.businessName ? s.businessName + " · " : "") + "Reserva tu cita";
   if (s.habeasDataText) $("habeasText").textContent = s.habeasDataText;
 }
 
@@ -146,53 +151,168 @@ function busyUntilLabel(s) {
   const d = new Date(toMillis(s.busyUntil));
   return d.toLocaleTimeString("es-CO", { timeZone: "America/Bogota", hour: "numeric", minute: "2-digit" });
 }
+const staffLabel = () => S.settings?.staffLabel || "Profesional";
 
 function renderStaff() {
   $("staffStatus").innerHTML = S.staff.map((s) => staffIsBusy(s)
     ? `<span class="flex items-center gap-2 rounded-full border border-line bg-white px-3 py-1.5 text-sm"><i class="dot bg-pole-red"></i><b>${esc(s.name)}</b> en descanso, vuelve a las ${busyUntilLabel(s)}</span>`
     : `<span class="flex items-center gap-2 rounded-full border border-line bg-white px-3 py-1.5 text-sm"><i class="dot bg-emerald-500"></i><b>${esc(s.name)}</b> disponible</span>`
   ).join("");
-
-  const capable = S.staff.filter((s) => !S.mainId || !s.serviceIds?.length || s.serviceIds.includes(S.mainId));
-  if (S.staffId && !capable.some((s) => s.id === S.staffId)) S.staffId = "";
-  $("staffPick").innerHTML = [`<button class="chip" data-staff="" aria-pressed="${!S.staffId}">El primero disponible</button>`]
-    .concat(capable.map((s) => `<button class="chip" data-staff="${esc(s.id)}" aria-pressed="${S.staffId === s.id}">${esc(s.name)}</button>`)).join("");
+  if (S.staffId && !S.staff.some((s) => s.id === S.staffId)) S.staffId = "";
+  $("staffPick").classList.toggle("hidden", S.staff.length < 2);
+  $("staffPick").innerHTML = `<span class="self-center text-sm text-ink/70">${esc(staffLabel())}:</span>` +
+    [`<button class="chip" data-staff="" aria-pressed="${!S.staffId}">Cualquiera</button>`]
+      .concat(S.staff.map((s) => `<button class="chip" data-staff="${esc(s.id)}" aria-pressed="${S.staffId === s.id}">${esc(s.name)}</button>`)).join("");
 }
 $("staffPick").addEventListener("click", (e) => {
   const b = e.target.closest("[data-staff]"); if (!b) return;
   S.staffId = b.dataset.staff; S.time = null;
-  renderStaff(); renderCalendar(); renderSlots(); renderSummary();
+  renderStaff(); renderAll();
 });
 
-function serviceButton(s, pressed, kind) {
-  const meta = s.type === "addon" ? `+${s.minutes} min` : `${s.minutes} min`;
-  return `<button class="choice" data-${kind}="${esc(s.id)}" aria-pressed="${pressed}">
-    <span><span class="block font-semibold">${esc(s.name)}</span><span class="text-xs text-ink/60">${meta}${s.description ? " · " + esc(s.description) : ""}</span></span>
-    <span class="font-bold">${s.type === "addon" ? "+" : ""}${cop(s.priceCOP)}</span></button>`;
+// ---------- Cálculo de cupos ----------
+const slotLen = () => Number(S.settings?.slotDurationMinutes || 30);
+const maxDate = () => addDays(bogNow().date, Math.min(90, Number(S.settings?.bookingWindowDays || 30)));
+const staffPool = () => S.staff.filter((s) => !S.staffId || s.id === S.staffId);
+const hoursOf = (date) => (S.settings?.businessHours || {})[String(dow(date))] || [];
+const isClosed = (date) => !hoursOf(date).length || (S.settings?.closedDates || []).includes(date);
+function firstOpenDay() {
+  const today = bogNow().date, end = maxDate();
+  for (let d = today; d <= end; d = addDays(d, 1)) if (!isClosed(d)) return d;
+  return today;
 }
-function renderServices() {
-  const mains = S.services.filter((s) => s.type !== "addon");
-  if (S.mainId && !mains.some((s) => s.id === S.mainId)) S.mainId = null;
-  $("mainServices").innerHTML = mains.length ? mains.map((s) => serviceButton(s, S.mainId === s.id, "main")).join("")
-    : `<p class="text-sm text-ink/60">Aún no hay servicios publicados.</p>`;
-  const extras = S.services.filter((s) => s.type !== "base" && s.id !== S.mainId);
-  [...S.extras].forEach((id) => { if (!extras.some((s) => s.id === id)) S.extras.delete(id); });
-  $("extrasWrap").classList.toggle("hidden", !S.mainId || !extras.length);
-  $("extraServices").innerHTML = extras.map((s) => serviceButton(s, S.extras.has(s.id), "extra")).join("");
+const takenSet = () => new Set(S.dayLocks.map((l) => `${l.staffId}_${l.time}`));
+// Todos los cupos del día con los profesionales libres en cada uno
+function dayGrid() {
+  if (!S.settings || !S.date || isClosed(S.date)) return [];
+  const now = bogNow(); if (S.date < now.date) return [];
+  const slot = slotLen(), taken = takenSet();
+  const minStart = S.date === now.date ? now.min + Number(S.settings.minAdvanceMinutes || 0) : -1;
+  const out = [];
+  for (const h of hoursOf(S.date)) {
+    const o = tmin(h.open), c = tmin(h.close);
+    for (let t = o; t + slot <= c; t += slot) {
+      if (t < minStart) continue;
+      const free = staffPool().filter((s) => { for (let u = t; u < t + slot; u += UNIT) if (taken.has(`${s.id}_${mstr(u)}`)) return false; return true; }).map((s) => s.id);
+      out.push({ time: mstr(t), free });
+    }
+  }
+  return out;
 }
-$("mainServices").addEventListener("click", (e) => {
-  const b = e.target.closest("[data-main]"); if (!b) return;
-  S.mainId = b.dataset.main; S.extras.delete(S.mainId); S.time = null;
-  renderServices(); renderStaff(); renderSlots(); renderSummary();
+// Minutos seguidos libres de un profesional desde una hora
+function freeFrom(staffId, time) {
+  const t = tmin(time), taken = takenSet();
+  const iv = hoursOf(S.date).map((h) => [tmin(h.open), tmin(h.close)]).find(([o, c]) => t >= o && t < c);
+  if (!iv) return 0;
+  let u = t; while (u < iv[1] && !taken.has(`${staffId}_${mstr(u)}`)) u += UNIT;
+  return u - t;
+}
+const occFor = (minutes) => Math.max(slotLen(), Math.ceil(minutes / slotLen()) * slotLen());
+// Profesionales que pueden atender un servicio de X minutos en la hora elegida
+function staffThatFit(mainId, minutes) {
+  if (!S.time) return [];
+  const need = occFor(minutes);
+  return staffPool().filter((s) => (!mainId || !s.serviceIds?.length || s.serviceIds.includes(mainId)) && freeFrom(s.id, S.time) >= need).map((s) => s.id);
+}
+
+function renderAll() { renderDays(); renderCalendar(); renderSlots(); renderServices(); renderSummary(); }
+
+// ---------- Paso 1: días ----------
+function dayRatio(date) {
+  const staffForCap = S.staffId ? S.staff.filter((s) => s.id === S.staffId) : S.staff;
+  const cap = dayCapacityUnits(S.settings, staffForCap, date);
+  const units = S.monthAvail[date]?.units || {};
+  const booked = S.staffId ? Number(units[S.staffId] || 0) : Object.values(units).reduce((a, n) => a + Number(n || 0), 0);
+  return cap ? booked / cap : null;
+}
+function dotFor(date) {
+  const r = dayRatio(date);
+  if (r === null) return "bg-slate-300";
+  return r >= 1 ? "bg-pole-red" : r >= 0.7 ? "bg-amber-500" : "bg-emerald-500";
+}
+function renderDays() {
+  if (!S.settings) return;
+  const today = bogNow().date, end = maxDate();
+  let html = "";
+  for (let d = today; d <= end; d = addDays(d, 1)) {
+    const closed = isClosed(d), full = dayRatio(d) >= 1;
+    const [y, m, dd] = d.split("-").map(Number);
+    const wd = new Date(Date.UTC(y, m - 1, dd)).toLocaleDateString("es-CO", { timeZone: "UTC", weekday: "short" }).replace(".", "");
+    html += `<button class="daypill" data-date="${d}" aria-pressed="${S.date === d}" ${closed ? "disabled" : ""} aria-label="${fechaLarga(d)}${closed ? ", cerrado" : full ? ", lleno" : ""}">
+      <span class="text-xs">${d === today ? "hoy" : wd}</span><span class="text-lg font-bold leading-none">${dd}</span><i class="dot ${closed ? "bg-slate-300" : dotFor(d)}"></i></button>`;
+  }
+  $("dayStrip").innerHTML = html;
+  $("dayLabel").textContent = S.date ? fechaLarga(S.date) : "";
+  $("dayStrip").querySelector('[aria-pressed="true"]')?.scrollIntoView({ block: "nearest", inline: "center" });
+}
+function selectDate(d) {
+  S.date = d; S.time = null;
+  subscribeDay(d); renderAll();
+}
+$("dayStrip").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-date]"); if (!b || b.disabled) return;
+  selectDate(b.dataset.date);
 });
-$("extraServices").addEventListener("click", (e) => {
-  const b = e.target.closest("[data-extra]"); if (!b) return;
-  const id = b.dataset.extra;
-  S.extras.has(id) ? S.extras.delete(id) : S.extras.add(id);
-  S.time = null;
-  renderServices(); renderSlots(); renderSummary();
+$("btnMonth").onclick = () => {
+  const box = $("monthBox"); const open = box.classList.toggle("hidden") === false;
+  $("btnMonth").textContent = open ? "Ocultar mes" : "Ver mes";
+  if (open) { S.month = (S.date || bogNow().date).slice(0, 7); renderCalendar(); }
+};
+
+function renderCalendar() {
+  if (!S.settings || $("monthBox").classList.contains("hidden")) return;
+  const [y, m] = S.month.split("-").map(Number);
+  const first = `${S.month}-01`;
+  const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const today = bogNow().date, end = maxDate();
+  $("monthLabel").textContent = new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString("es-CO", { timeZone: "UTC", month: "long", year: "numeric" });
+  $("prevMonth").disabled = S.month <= today.slice(0, 7);
+  $("nextMonth").disabled = S.month >= end.slice(0, 7);
+  let html = "<span></span>".repeat((dow(first) + 6) % 7);
+  for (let d = 1; d <= daysInMonth; d++) {
+    const date = `${S.month}-${String(d).padStart(2, "0")}`;
+    let dot = dotFor(date), disabled = false;
+    if (date < today || date > end) { disabled = true; dot = ""; }
+    else if (isClosed(date)) { disabled = true; dot = "bg-slate-300"; }
+    else if (dayRatio(date) >= 1) disabled = true;
+    html += `<button class="day ${disabled ? "" : "bg-paper"}" data-date="${date}" ${disabled ? "disabled" : ""} aria-pressed="${S.date === date}" aria-label="${fechaLarga(date)}">
+      ${d}${dot ? `<i class="dot ${dot}"></i>` : ""}</button>`;
+  }
+  $("calendar").innerHTML = html;
+}
+$("calendar").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-date]"); if (!b || b.disabled) return;
+  selectDate(b.dataset.date);
+  $("monthBox").classList.add("hidden"); $("btnMonth").textContent = "Ver mes";
+});
+function shiftMonth(n) {
+  const [y, m] = S.month.split("-").map(Number);
+  S.month = new Date(Date.UTC(y, m - 1 + n, 1)).toISOString().slice(0, 7);
+  renderCalendar();
+}
+$("prevMonth").onclick = () => shiftMonth(-1);
+$("nextMonth").onclick = () => shiftMonth(1);
+
+// ---------- Paso 1: horas ----------
+function renderSlots() {
+  const box = $("slots"), hint = $("slotsHint");
+  if (!S.settings || !S.date) { box.innerHTML = ""; hint.textContent = ""; return; }
+  if (isClosed(S.date)) { box.innerHTML = ""; hint.textContent = "Ese día el local está cerrado. Elige otro día."; return; }
+  const grid = dayGrid();
+  const free = grid.filter((g) => g.free.length).length;
+  if (S.time && !grid.some((g) => g.time === S.time && g.free.length)) S.time = null;
+  hint.textContent = !grid.length ? "Ya no quedan horas para este día. Elige otro día."
+    : free ? `Cupos de ${slotLen()} min. ${free} libre(s). Toca una hora.` : "Este día ya está lleno. Elige otro día.";
+  box.innerHTML = grid.map((g) => `<button class="slot" data-time="${g.time}" ${g.free.length ? "" : "disabled"} aria-pressed="${S.time === g.time}" aria-label="${hora12(g.time)}, ${g.free.length ? "libre" : "ocupado"}">${hora12(g.time)}</button>`).join("");
+}
+$("slots").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-time]"); if (!b || b.disabled) return;
+  S.time = b.dataset.time;
+  renderSlots(); renderServices(); renderSummary();
+  setTimeout(() => $("servSection").scrollIntoView({ behavior: "smooth", block: "start" }), 50);
 });
 
+// ---------- Paso 2: servicios ----------
 function selection() {
   const byId = Object.fromEntries(S.services.map((s) => [s.id, s]));
   const items = [byId[S.mainId], ...[...S.extras].map((id) => byId[id])].filter(Boolean);
@@ -208,82 +328,62 @@ function expectedDeposit(total) {
   if (mode === "full") return total;
   return Math.min(Number(S.settings?.depositAmountCOP || 0), total);
 }
-
-function renderCalendar() {
-  const [y, m] = S.month.split("-").map(Number);
-  const first = `${S.month}-01`;
-  const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
-  const today = bogNow().date;
-  const maxDate = addDays(today, Number(S.settings?.bookingWindowDays || 30));
-  $("monthLabel").textContent = new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString("es-CO", { timeZone: "UTC", month: "long", year: "numeric" });
-  $("prevMonth").disabled = S.month <= today.slice(0, 7);
-  $("nextMonth").disabled = S.month >= maxDate.slice(0, 7);
-
-  const offset = (dow(first) + 6) % 7;
-  let html = "<span></span>".repeat(offset);
-  const staffForCap = S.staffId ? S.staff.filter((s) => s.id === S.staffId) : S.staff;
-  for (let d = 1; d <= daysInMonth; d++) {
-    const date = `${S.month}-${String(d).padStart(2, "0")}`;
-    const cap = dayCapacityUnits(S.settings, staffForCap, date);
-    const units = S.monthAvail[date]?.units || {};
-    const booked = S.staffId ? Number(units[S.staffId] || 0) : Object.values(units).reduce((a, n) => a + Number(n || 0), 0);
-    const ratio = cap ? booked / cap : 1;
-    let dot = "bg-emerald-500", disabled = false, label = "hay cupos";
-    if (date < today || date > maxDate) { disabled = true; dot = ""; label = "no disponible"; }
-    else if (!cap) { disabled = true; dot = "bg-slate-300"; label = "cerrado"; }
-    else if (ratio >= 1) { disabled = true; dot = "bg-pole-red"; label = "lleno"; }
-    else if (ratio >= 0.7) { dot = "bg-amber-500"; label = "quedan pocos cupos"; }
-    html += `<button class="day ${disabled ? "" : "bg-paper"}" data-date="${date}" ${disabled ? "disabled" : ""} aria-pressed="${S.date === date}" aria-label="${fechaLarga(date)}, ${label}">
-      ${d}${dot ? `<i class="dot ${dot}"></i>` : ""}</button>`;
-  }
-  $("calendar").innerHTML = html;
+function serviceButton(s, pressed, kind, fits) {
+  const meta = s.type === "addon" ? `+${s.minutes} min` : `${s.minutes} min`;
+  return `<button class="choice" data-${kind}="${esc(s.id)}" aria-pressed="${pressed}" ${fits ? "" : "disabled"}>
+    <span><span class="block font-semibold">${esc(s.name)}</span><span class="text-xs text-ink/60">${meta}${s.description ? " · " + esc(s.description) : ""}</span></span>
+    <span class="shrink-0 text-right font-bold">${fits ? (s.type === "addon" ? "+" : "") + cop(s.priceCOP) : `<span class="text-xs font-semibold text-ink/50">No alcanza</span>`}</span></button>`;
 }
-$("calendar").addEventListener("click", (e) => {
-  const b = e.target.closest("[data-date]"); if (!b || b.disabled) return;
-  S.date = b.dataset.date; S.time = null; S.dayLocks = [];
-  subscribeDay(S.date); renderCalendar(); renderSlots(); renderSummary();
+function renderServices() {
+  const sec = $("servSection");
+  sec.classList.toggle("hidden", !S.time);
+  if (!S.time) return;
+  const maxFree = Math.max(0, ...staffPool().map((s) => freeFrom(s.id, S.time)));
+  $("servHint").textContent = `${fechaLarga(S.date)}, ${hora12(S.time)}. Tiempo libre desde esa hora: ${maxFree >= 120 ? Math.floor(maxFree / 60) + " h" + (maxFree % 60 ? " " + (maxFree % 60) + " min" : "") : maxFree + " min"}.`;
+  const mains = S.services.filter((s) => s.type !== "addon");
+  const fitsMain = (s) => staffThatFit(s.id, Number(s.minutes || 0)).length > 0;
+  if (S.mainId && !mains.some((s) => s.id === S.mainId && fitsMain(s))) { S.mainId = null; S.extras.clear(); }
+  const groups = [];
+  mains.forEach((s) => { const c = (s.category || "").trim() || "Servicios"; let g = groups.find((x) => x.c === c); if (!g) groups.push(g = { c, list: [] }); g.list.push(s); });
+  $("mainServices").innerHTML = mains.length ? groups.map((g) => `
+    <div>${groups.length > 1 ? `<p class="mb-2 text-xs font-bold uppercase tracking-wide text-ink/60">${esc(g.c)}</p>` : ""}
+    <div class="grid gap-2 sm:grid-cols-2">${g.list.map((s) => serviceButton(s, S.mainId === s.id, "main", fitsMain(s))).join("")}</div></div>`).join("")
+    : `<p class="text-sm text-ink/60">Aún no hay servicios publicados.</p>`;
+  const extras = S.services.filter((s) => s.type !== "base" && s.id !== S.mainId);
+  [...S.extras].forEach((id) => { if (!extras.some((s) => s.id === id)) S.extras.delete(id); });
+  const base = selection().totalMinutes;
+  const fitsExtra = (s) => S.extras.has(s.id) || staffThatFit(S.mainId, base + Number(s.minutes || 0)).length > 0;
+  $("extrasWrap").classList.toggle("hidden", !S.mainId || !extras.length);
+  $("extraServices").innerHTML = extras.map((s) => serviceButton(s, S.extras.has(s.id), "extra", fitsExtra(s))).join("");
+}
+$("mainServices").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-main]"); if (!b || b.disabled) return;
+  S.mainId = b.dataset.main; S.extras.delete(S.mainId);
+  renderServices(); renderSummary();
 });
-function shiftMonth(n) {
-  const [y, m] = S.month.split("-").map(Number);
-  const d = new Date(Date.UTC(y, m - 1 + n, 1));
-  S.month = d.toISOString().slice(0, 7);
-  subscribeMonth(); renderCalendar();
-}
-$("prevMonth").onclick = () => shiftMonth(-1);
-$("nextMonth").onclick = () => shiftMonth(1);
-
-function currentSlots() {
-  if (!S.mainId || !S.date) return [];
-  return computeSlots({
-    settings: S.settings, staffList: S.staff, locks: S.dayLocks, date: S.date,
-    totalMinutes: selection().totalMinutes, mainId: S.mainId, staffFilter: S.staffId
-  });
-}
-function renderSlots() {
-  const box = $("slots"), hint = $("slotsHint");
-  if (!S.mainId || !S.date) { box.innerHTML = ""; hint.textContent = "Primero elige un servicio y un día."; return; }
-  const slots = currentSlots();
-  if (S.time && !slots.some((s) => s.time === S.time)) { S.time = null; renderSummary(); }
-  hint.textContent = slots.length ? `Horas libres para el ${fechaLarga(S.date)}:` : "No quedan horas libres ese día para este servicio. Prueba otro día u otro barbero.";
-  box.innerHTML = slots.map((s) => `<button class="slot" data-time="${s.time}" aria-pressed="${S.time === s.time}">${hora12(s.time)}</button>`).join("");
-}
-$("slots").addEventListener("click", (e) => {
-  const b = e.target.closest("[data-time]"); if (!b) return;
-  S.time = b.dataset.time;
-  S.slotStaff = currentSlots().find((s) => s.time === S.time)?.staffIds || [];
-  renderSlots(); renderSummary();
+$("extraServices").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-extra]"); if (!b || b.disabled) return;
+  const id = b.dataset.extra;
+  S.extras.has(id) ? S.extras.delete(id) : S.extras.add(id);
+  renderServices(); renderSummary();
 });
 
+function bookingStaff() {
+  const { totalMinutes } = selection();
+  return S.staffId && staffThatFit(S.mainId, totalMinutes).includes(S.staffId) ? S.staffId : staffThatFit(S.mainId, totalMinutes)[0];
+}
 function renderSummary() {
   const { items, totalMinutes, totalCOP } = selection();
   const btn = $("btnBook");
-  if (!items.length) { $("summary").innerHTML = `<span class="text-ink/60">Elige un servicio para empezar.</span>`; btn.disabled = true; return; }
+  if (!S.time) { $("summary").innerHTML = `<span class="text-ink/60">Elige un día y una hora para empezar.</span>`; if (!btn.dataset.label) btn.disabled = true; return; }
+  if (!items.length) { $("summary").innerHTML = `<p class="font-semibold capitalize">${fechaCorta(S.date)} · ${hora12(S.time)}</p><p class="text-ink/60">Ahora elige el servicio.</p>`; if (!btn.dataset.label) btn.disabled = true; return; }
   const dep = expectedDeposit(totalCOP);
   const depText = S.cust?.paymentMode === "preferential" ? "Cliente preferencial: sin abono" : `Abono para apartar ${cop(dep)}`;
+  const who = S.staff.length > 1 ? S.staff.find((s) => s.id === bookingStaff())?.name : "";
   $("summary").innerHTML = `
     <p class="truncate font-semibold">${items.map((i) => esc(i.name)).join(" + ")} · ${cop(totalCOP)}</p>
-    <p class="truncate text-ink/70">${S.date ? fechaCorta(S.date) : "Sin día"}${S.time ? " · " + hora12(S.time) : ""} · ${totalMinutes} min · ${depText}</p>`;
-  if (!btn.dataset.label) btn.disabled = !(S.mainId && S.date && S.time) || S.biz?.status !== "active";
+    <p class="truncate text-ink/70"><span class="capitalize">${fechaCorta(S.date)}</span> · ${hora12(S.time)}${who ? " · " + esc(who) : ""} · ${totalMinutes} min · ${depText}</p>`;
+  if (!btn.dataset.label) btn.disabled = !(S.mainId && S.time && bookingStaff()) || S.biz?.status !== "active";
 }
 
 // ================= Reservar =================
@@ -298,7 +398,7 @@ $("btnBook").onclick = () => {
 // Autorización de datos para ESTA barbería (la primera vez que el cliente reserva aquí)
 function openConsent() {
   $("consentText").textContent = S.settings?.habeasDataText || "Autorizo el tratamiento de mis datos personales para gestionar mis citas.";
-  $("consentBiz").textContent = S.settings?.businessName || S.biz?.name || "esta barbería";
+  $("consentBiz").textContent = S.settings?.businessName || S.biz?.name || "este negocio";
   openModal("consentModal");
 }
 $("btnConsent").onclick = () => { S.consentOk = true; closeModal("consentModal"); doHold(); };
@@ -307,13 +407,14 @@ async function doHold() {
   const btn = $("btnBook");
   setBusy(btn, true, "Apartando…");
   try {
-    const staffId = S.staffId || S.slotStaff[0];
+    const staffId = bookingStaff();
+    if (!staffId) throw new Error("Ese horario ya no alcanza para este servicio. Elige otra hora.");
     const r = await api("createHold", { mainId: S.mainId, extraIds: [...S.extras], staffId, date: S.date, time: S.time, consent: S.consentOk || !!S.cust });
     S.time = null;
     if (r.appointment.status === "confirmed") { toast("¡Cupo confirmado!"); showTicket(r.appointment); }
     else showPay(r.appointment);
   } catch (e) { toast(e.message, "error"); }
-  finally { setBusy(btn, false); delete btn.dataset.label; renderSlots(); renderSummary(); }
+  finally { setBusy(btn, false); delete btn.dataset.label; renderSlots(); renderServices(); renderSummary(); }
 }
 
 // ================= Registro / ingreso =================
