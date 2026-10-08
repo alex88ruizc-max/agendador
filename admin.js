@@ -7,7 +7,7 @@ import {
   startUpdateWatcher, applyBrandColors, uiConfirm, uiPrompt, setDialogBrand, viewImage, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, hora12, fechaLarga, fechaCorta, toMillis, cop, esc, normalizePhone,
   waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, DEFAULT_WA_RESCHEDULE, computeSlots, onColor, darken,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-10-08m";
+} from "./common.js?v=2026-10-08n";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -754,8 +754,13 @@ async function openClient(u) {
     <label class="field mb-4"><span>Notas privadas (el cliente no las ve)</span><textarea id="cNotes" rows="3">${esc(notes)}</textarea></label>
     <button id="cSave" class="btn-primary w-full">Guardar cambios</button>
     <h4 class="mb-2 mt-6 font-narrow text-lg font-bold">Historial de citas</h4>
-    <div id="cHist" class="space-y-2 text-sm"><p class="text-ink/60">Cargando…</p></div>`);
+    <div id="cHist" class="space-y-2 text-sm"><p class="text-ink/60">Cargando…</p></div>
+    <div class="mt-6 border-t border-line pt-4">
+      <button id="cDelete" class="w-full rounded-lg border border-rose-300 py-2.5 text-sm font-semibold text-rose-800"><i class="fa-regular fa-trash-can"></i> Eliminar cliente</button>
+      <p class="mt-1 text-center text-xs text-ink/50">Se borra de tu lista. Sus citas pasadas quedan en la agenda.</p>
+    </div>`);
   $("cBook").onclick = () => openAptModal("new", null, u);
+  $("cDelete").onclick = () => deleteClient(u);
   clientHistory(u).then((list) => {
     if (!$("cHist")) return;
     const done = list.filter((a) => a.status === "attended");
@@ -1507,4 +1512,21 @@ function openStaffHours(x) {
       closeM(); toast("Horario guardado. La página de clientes ya muestra los cupos nuevos.");
     } catch (err) { toast("No se pudo guardar: " + err.message, "error"); setBusy(btn, false); }
   };
+}
+
+// ================= Eliminar cliente =================
+async function deleteClient(u) {
+  const name = `${u.firstName || ""} ${u.lastName || ""}`.trim() || "este cliente";
+  let upcoming = [];
+  try { upcoming = (await clientHistory(u)).filter((a) => ACTIVE.includes(a.status)); } catch { /* sin historial */ }
+  const ok = await uiConfirm(`¿Eliminar a ${name}?`,
+    `Se borra de tu lista de clientes con sus notas privadas y su modo de pago.${upcoming.length ? ` Tiene ${upcoming.length} cita(s) próxima(s): esas no se cancelan, cancélalas desde la Agenda si es necesario.` : ""} Si vuelve a reservar, aparecerá como cliente nuevo. Para impedir que reserve, mejor usa “Bloquear reservas”.`,
+    { okText: "Eliminar", danger: true });
+  if (!ok) return;
+  try {
+    await deleteDoc(doc(db, bpath("customers", u.uid, "private", "admin"))).catch(() => {});
+    await deleteDoc(doc(db, bpath("customers", u.uid)));
+    A.users = A.users.filter((x) => x.uid !== u.uid);
+    closeM(); renderClients(); toast(`${name} fue eliminado de tus clientes.`);
+  } catch (err) { toast("No se pudo eliminar: " + err.message, "error"); }
 }

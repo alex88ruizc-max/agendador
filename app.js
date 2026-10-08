@@ -9,7 +9,7 @@ import {
   startUpdateWatcher, applyBrandColors, warmServer, uiConfirm, setDialogBrand, viewImage, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, dow, hora12, fechaLarga, fechaCorta, toMillis, cop, esc,
   normalizePhone, waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, computeSlots, dayCapacityUnits, staffHours,
   toast, openModal, closeModal, setBusy, copyText, tmin, mstr, UNIT
-} from "./common.js?v=2026-10-08m";
+} from "./common.js?v=2026-10-08n";
 
 const $ = (id) => document.getElementById(id);
 const S = {
@@ -173,8 +173,8 @@ function renderNav() {
   if (S.user) {
     const active = S.mine.filter((a) => ["pending_payment", "pending_verification", "confirmed"].includes(a.status)).length;
     nav.innerHTML = `
-      <button id="btnMine" class="btn-light text-sm">Mi cuenta${active ? ` <span class="ml-1 rounded-full bg-pole-red px-1.5 text-xs text-white">${active}</span>` : ""}</button>
-      <button id="btnLogout" class="btn-ghost text-sm text-white/80">Salir</button>`;
+      <button id="btnLogout" class="px-1 text-xs font-semibold text-white/75 hover:text-white">Salir</button>
+      <button id="btnMine" class="btn-light whitespace-nowrap px-3 py-1.5 text-xs">Mi cuenta${active ? ` <span class="ml-1 rounded-full bg-pole-red px-1.5 text-[10px] text-white">${active}</span>` : ""}</button>`;
     $("btnMine").onclick = () => openAccount("citas");
     $("btnLogout").onclick = () => signOut(auth);
   } else {
