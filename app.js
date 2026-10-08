@@ -9,7 +9,7 @@ import {
   startUpdateWatcher, applyBrandColors, warmServer, uiConfirm, setDialogBrand, viewImage, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, dow, hora12, fechaLarga, fechaCorta, toMillis, cop, esc,
   normalizePhone, waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, computeSlots, dayCapacityUnits, staffHours, mapLinks, headerBgCss,
   toast, openModal, closeModal, setBusy, copyText, tmin, mstr, UNIT
-} from "./common.js?v=2026-10-09n";
+} from "./common.js?v=2026-10-09u";
 
 const $ = (id) => document.getElementById(id);
 const S = {
@@ -214,10 +214,13 @@ function busyUntilLabel(s) {
 const staffLabel = () => S.settings?.staffLabel || "Profesional";
 
 function renderStaff() {
-  $("staffStatus").innerHTML = S.staff.map((s) => staffIsBusy(s)
-    ? `<span class="flex items-center gap-2 rounded-full border border-line bg-white px-3 py-1.5 text-sm"><i class="dot bg-pole-red"></i><b>${esc(s.name)}</b> en descanso, vuelve a las ${busyUntilLabel(s)}</span>`
-    : `<span class="flex items-center gap-2 rounded-full border border-line bg-white px-3 py-1.5 text-sm"><i class="dot bg-emerald-500"></i><b>${esc(s.name)}</b> disponible</span>`
-  ).join("");
+  // Estado en vivo: solo si la barbería lo activó. Nunca dice si está en descanso o atendiendo, solo cuándo queda libre.
+  const live = !!S.settings?.showLiveStatus && S.staff.length > 0;
+  $("liveStatus").classList.toggle("hidden", !live);
+  $("staffStatus").innerHTML = live ? S.staff.map((s) => staffIsBusy(s)
+    ? `<span class="flex items-center gap-2 rounded-full border border-line bg-white px-3 py-1.5 text-sm"><i class="dot bg-pole-red"></i><b>${esc(s.name)}</b> libre a las ${busyUntilLabel(s)}</span>`
+    : `<span class="flex items-center gap-2 rounded-full border border-line bg-white px-3 py-1.5 text-sm"><i class="dot bg-emerald-500"></i><b>${esc(s.name)}</b> libre ahora</span>`
+  ).join("") : "";
   if (S.staffId && !S.staff.some((s) => s.id === S.staffId)) S.staffId = "";
   $("staffPick").classList.toggle("hidden", S.staff.length < 2);
   $("staffPick").innerHTML = `<span class="self-center text-sm text-ink/70">${esc(staffLabel())}:</span>` +
@@ -1122,11 +1125,11 @@ function openStoryViewer(start) {
 
 // ================= Enlace de invitación (programa de referidos) =================
 var REF_CODE = (() => {
-  const q = new URLSearchParams(location.search).get("ref");
+  const sp = new URLSearchParams(location.search), q = sp.get("invita") || sp.get("ref");
   const clean = (v) => String(v || "").toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 30);
   try { if (q) localStorage.setItem("refCode", clean(q)); return clean(q) || clean(localStorage.getItem("refCode")); } catch { return clean(q); }
 })();
-if (new URLSearchParams(location.search).get("ref")) {
+if (new URLSearchParams(location.search).get("invita") || new URLSearchParams(location.search).get("ref")) {
   // llegó con una invitación: se muestra la creación de tienda de una vez
   getDoc(doc(db, "businesses", REF_CODE)).then((d) => {
     const inviter = d.exists() ? d.data().name : "";

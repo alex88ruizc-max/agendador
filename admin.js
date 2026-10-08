@@ -7,7 +7,7 @@ import {
   startUpdateWatcher, applyBrandColors, uiConfirm, uiPrompt, setDialogBrand, viewImage, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, hora12, fechaLarga, fechaCorta, toMillis, cop, esc, normalizePhone,
   waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, DEFAULT_WA_RESCHEDULE, computeSlots, staffHours, mapLinks, headerBgCss, onColor, darken,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-10-09n";
+} from "./common.js?v=2026-10-09u";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -384,7 +384,7 @@ function staffOptions(selected, onlyMine) {
 function openAptModal(mode, apt, prefill) {
   const onlyMine = !isOwner();
   const firstStaff = apt?.staffId || (onlyMine ? A.me.staffId : A.staff.find((s) => s.active !== false)?.id);
-  const mains = A.services.filter((s) => s.active !== false && s.type !== "addon");
+  const mains = A.services.filter((s) => s.active !== false && s.type !== "addon").sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
   A.m = { mode, apt, mainId: mains[0]?.id, extras: new Set(), staffId: firstStaff, date: apt ? bogNow().date : A.date, time: null, locks: [], force: false };
   const html = `
     ${mode === "new" ? `
@@ -993,6 +993,11 @@ function renderSettings() {
         ${txt("stPhone", "WhatsApp del negocio", s.whatsapp, 'placeholder="300 123 4567"')}
         ${txt("stAddress", "Dirección", s.address)}
         ${txt("stCity", "Ciudad", s.city)}
+        <label class="flex cursor-pointer items-start gap-3 rounded-xl p-3 md:col-span-2" style="background:var(--canvas)">
+          <span class="min-w-0 flex-1"><span class="block text-sm font-bold">📡 Estado en vivo en tu página</span>
+            <span class="block text-xs text-ink/65">Tus clientes ven <b>en este momento</b> quién está libre y a qué hora queda libre el que está ocupado. Sirve para que alguien cercano sepa si puede llegar ya. Apagado, solo ven los horarios para reservar.</span></span>
+          <input id="stLive" type="checkbox" class="mt-1 h-5 w-5 shrink-0" ${s.showLiveStatus ? "checked" : ""}>
+        </label>
         <div id="geoBox" class="rounded-xl p-3 md:col-span-2" style="background:var(--canvas)">
           <p class="text-sm font-bold">Cómo llegar (Waze y Google Maps)</p>
           <p class="soft mb-2 text-xs">${s.geo ? "✓ El punto exacto de tu local está guardado. Tus clientes llegan directo." : "Ahora se usa tu dirección. Para que lleguen exacto, toca el botón estando dentro de tu local."}</p>
@@ -1160,7 +1165,7 @@ async function saveSettings(e) {
   const n = (id) => Number($(id).value || 0);
   const data = {
     businessName: $("stName").value.trim(), whatsapp: phone, address: $("stAddress").value.trim(), city: $("stCity").value.trim(),
-    slotDurationMinutes: slotVal, businessType: $("stType").value, staffLabel: $("stStaffLabel").value.trim(), depositAmountCOP: n("stDeposit"), holdMinutes: Math.max(5, n("stHold")),
+    slotDurationMinutes: slotVal, showLiveStatus: $("stLive").checked, businessType: $("stType").value, staffLabel: $("stStaffLabel").value.trim(), depositAmountCOP: n("stDeposit"), holdMinutes: Math.max(5, n("stHold")),
     bookingWindowDays: isTrial() ? Math.min(trialDays(), Math.max(1, n("stWindow"))) : Math.max(1, n("stWindow")), minAdvanceMinutes: n("stAdvance"), toleranceMinutes: n("stTolerance"),
     autoConfirmProof: $("stAuto").checked, businessHours: hours, closedDates: A.closedDraft,
     paymentMethods: A.pmDraft.filter((m) => m.label && m.account).map((m) => ({ label: m.label, account: m.account, holder: m.holder || "", qr: m.qr || "" })), paymentInstructions: $("stPayInstr").value.trim(),
@@ -1922,8 +1927,8 @@ function renderHome() {
   const teamHtml = team.length ? `<div class="mt-3 flex gap-2 overflow-x-auto pb-1">${team.map((s2) => {
       const busy = isBusy(s2);
       return `<button class="team-chip" data-hstaff="${s2.id}"><span class="sdot" style="width:9px;height:9px;border-radius:50%;background:${busy ? "var(--sred)" : "var(--mint)"}"></span>
-        <span class="text-left"><b>${esc(team.length === 1 && s2.id === A.me.staffId ? "Tú" : s2.name)}</b><br><span class="soft text-xs">${busy ? "En descanso hasta " + timeOf(s2.busyUntil) : "Disponible"}</span></span>
-        <span class="ml-1 rounded-full px-2.5 py-1 text-[11px] font-bold ${busy ? "t-ok" : "t-off"}">${busy ? "Ya volví" : "Descanso"}</span></button>`;
+        <span class="text-left"><b>${esc(team.length === 1 && s2.id === A.me.staffId ? "Tú" : s2.name)}</b><br><span class="soft text-xs">${busy ? (isServing(s2) ? "Atendiendo hasta " : "En descanso hasta ") + timeOf(s2.busyUntil) : "Disponible"}</span></span>
+        <span class="ml-1 rounded-full px-2.5 py-1 text-[11px] font-bold ${busy ? "t-ok" : "t-off"}">${busy ? (isServing(s2) ? "✓ Terminé" : "Ya volví") : "Descanso"}</span></button>`;
     }).join("")}</div>` : "";
   const rec = isOwner() ? buildRecs()[0] : null;
   const recHtml = rec ? `<div class="todo mt-3" style="border:1.5px solid #f3d27a"><span class="ic" style="background:#fff7e0;color:#a86e00"><i class="fa-solid fa-lightbulb"></i></span>
@@ -1933,7 +1938,16 @@ function renderHome() {
       <span class="ic" style="background:rgba(255,255,255,.15);color:#ffd166"><i class="fa-solid fa-gift"></i></span>
       <span class="min-w-0 flex-1 text-[13.5px] leading-snug"><b>Invita y paga menos</b><br><span class="opacity-80">Gana ${refLevels()[0]}% de descuento cada mes que paguen tus invitados.</span></span>
       <span class="rounded-full px-2 py-0.5 text-[10px] font-extrabold" style="background:var(--sred)">Nuevo</span></button>` : "";
-  el.innerHTML = `${liveHtml}${teamHtml}${recHtml}${refHtml}
+  const bookUrl = $("linkUrl").textContent || "";
+  const linkHtml = bookUrl ? `<div class="sp-card mb-3" style="background:linear-gradient(135deg,#14213D,#2B59C3);color:#fff">
+      <div class="flex items-center gap-2"><span class="text-lg">📅</span><div class="min-w-0"><p class="text-[15px] font-extrabold leading-tight">Tu enlace de citas</p><p class="text-[11.5px] opacity-80">Para tus clientes: reservan solos con este enlace</p></div></div>
+      <p class="mt-2 truncate rounded-xl px-3 py-2 font-mono text-xs" style="background:rgba(255,255,255,.14)">${esc(bookUrl.replace(/^https?:\/\//, ""))}</p>
+      <div class="mt-2.5 grid gap-2" style="grid-template-columns:1.3fr 1fr 52px">
+        <button class="rounded-2xl py-2.5 text-[14px] font-extrabold" style="background:#25D366;color:#0b3d1f" data-bl="wa"><i class="fa-brands fa-whatsapp"></i> Enviar</button>
+        <button class="rounded-2xl bg-white py-2.5 text-[14px] font-extrabold" style="color:var(--sink)" data-bl="copy"><i class="fa-regular fa-copy"></i> Copiar</button>
+        <button class="rounded-2xl py-2.5 text-[16px]" style="background:rgba(255,255,255,.18)" data-bl="qr" aria-label="Ver QR del enlace"><i class="fa-solid fa-qrcode"></i></button>
+      </div></div>` : "";
+  el.innerHTML = `${linkHtml}${isOwner() ? guideCard() : ""}<div class="home-grid"><div class="home-col">${liveHtml}${teamHtml}
     <div class="sp-card mt-3" id="chairCard"><div class="flex items-center justify-between gap-2"><h2 class="disp text-[18px] font-bold">Hoy en la silla</h2>
       ${freeLater.length ? `<button class="rounded-full px-3 py-1.5 text-xs font-bold ${H.showFree ? "" : "t-late"}" style="${H.showFree ? "background:var(--sink);color:#fff" : ""}" data-hfree="1" aria-expanded="${!!H.showFree}">${freeLater.length} hueco${freeLater.length === 1 ? "" : "s"} libre${freeLater.length === 1 ? "" : "s"} ${H.showFree ? "▴" : "▾"}</button>` : `<span class="soft text-xs">Sin huecos libres</span>`}</div>${chair}
       ${H.showFree && freeLater.length ? `<div class="q-pop mt-3 rounded-2xl p-3" style="background:var(--canvas)">
@@ -1942,10 +1956,10 @@ function renderHome() {
         ${isOwner() ? `<button class="mt-3 w-full rounded-xl py-2.5 text-sm font-bold t-late" data-hfill="story">${lockedNow("marketing") ? "🔒 " : ""}Publicar estos huecos como estado</button>` : ""}
       </div>` : ""}
       <div class="soft mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px]">${isOwner() ? `<button class="font-bold underline" style="color:var(--sblue)" data-gstep="slot">Turnos de ${Number(A.settings?.slotDurationMinutes || 30)} min, cambiar</button>` : ""}<span><span style="color:var(--mint)">●</span> confirmada</span><span><span style="color:var(--amber)">●</span> abono por revisar</span><span><span style="color:#8a94a8">●</span> esperando pago</span><span><span style="color:var(--sred)">|</span> ahora</span></div></div>
+    </div><div class="home-col">${recHtml}${refHtml}
     <div class="sp-h"><h2>Para hoy</h2><span>${todo.length ? todo.length + " pendiente" + (todo.length === 1 ? "" : "s") : ""}</span></div>
     ${todo.join("") || `<div class="todo"><span class="ic t-ok"><i class="fa-solid fa-check"></i></span><p class="flex-1 text-[13.5px]">Todo al día. Usa <b>Cita rápida</b> para agendar a quien llame o llegue.</p></div>`}
-    ${stories}${fill}`;
-  if (isOwner()) el.insertAdjacentHTML("afterbegin", guideCard());
+    ${stories}${fill}</div></div>`;
 }
 function storyBg(x) { return x.img ? `background-image:url('${x.img}')` : `background:${x.bg || "#14213D"}`; }
 $("tab-home").addEventListener("click", async (e) => {
@@ -1958,6 +1972,22 @@ $("tab-home").addEventListener("click", async (e) => {
     return;
   }
   const go = e.target.closest("[data-hgo]"); if (go) return switchTab(go.dataset.hgo);
+  const bl = e.target.closest("[data-bl]");
+  if (bl) {
+    const url = $("linkUrl").textContent, name = A.settings?.businessName || A.biz?.name || "";
+    if (bl.dataset.bl === "copy") {
+      await copyText(url); markGuide("share");
+      bl.innerHTML = '<i class="fa-solid fa-check"></i> ¡Copiado!'; bl.style.background = "#d1fae5";
+      setTimeout(() => { bl.innerHTML = '<i class="fa-regular fa-copy"></i> Copiar'; bl.style.background = "#fff"; }, 2200);
+    }
+    if (bl.dataset.bl === "wa") { markGuide("share"); window.open("https://wa.me/?text=" + encodeURIComponent((panelPrefs().shareMsg || PANEL_DEFAULT.shareMsg).replace(/\{negocio\}/g, name).replace(/\{link\}/g, url)), "_blank"); }
+    if (bl.dataset.bl === "qr") {
+      await loadScript("https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js").catch(() => {});
+      if (!window.QRious) return toast("No se pudo generar el QR.", "error");
+      viewImage(new window.QRious({ value: url, size: 700, level: "M" }).toDataURL(), `${name}: escanéalo para agendar tu cita`);
+    }
+    return;
+  }
   const fr = e.target.closest("[data-hfree]");
   if (fr) { H.showFree = fr.dataset.hfree === "open" ? true : !H.showFree; renderHome(); if (H.showFree) $("chairCard")?.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
   const fa = e.target.closest("[data-hfreeat]"); if (fa) return openQuick({ date: H.today, time: fa.dataset.hfreeat });
@@ -1973,11 +2003,12 @@ $("tab-home").addEventListener("click", async (e) => {
 // =====================================================================
 const Q = {};
 function openQuick(preset = {}) {
-  const mains = A.services.filter((s) => s.active !== false && s.type !== "addon");
+  const mains = A.services.filter((s) => s.active !== false && s.type !== "addon").sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
   if (!mains.length) return toast("Primero crea tus servicios.", "error");
   Object.assign(Q, { date: preset.date || bogNow().date, time: preset.time || null, staffId: null, mainId: mains[0].id, extras: new Set(), known: null, locks: [], phone: "" });
   openM("Cita rápida", `
-    <p class="soft -mt-3 mb-3 text-sm">Para quien llamó o llegó sin cuenta. Toca una hora.</p>
+    <div id="qNow"></div>
+    <p class="soft -mt-1 mb-3 text-sm">O agenda para más tarde: toca una hora.</p>
     <div id="qDays" class="mb-3 flex gap-2 overflow-x-auto pb-1"></div>
     <div class="mb-2 flex items-baseline justify-between"><p id="qSlotsTitle" class="text-sm font-bold"></p><p id="qService" class="soft truncate pl-2 text-xs"></p></div>
     <div id="qSlots" class="grid grid-cols-3 gap-2"></div>
@@ -1991,7 +2022,8 @@ function openQuick(preset = {}) {
       <div id="qStaffWrap" class="hidden"><p class="mb-1.5 mt-3 text-sm font-bold">Con quién</p><div id="qStaff" class="flex flex-wrap gap-2"></div></div>
       <button id="qSave" class="btn-primary mt-4 w-full py-3.5 text-base" disabled>Agendar y enviar por WhatsApp</button>
     </div>`);
-  renderQDays(); renderQMains(); loadQLocks();
+  renderQDays(); renderQMains(); loadQLocks(); renderQNow();
+  $("qNow").onclick = (e) => { if (e.target.closest("[data-walkin]")) openWalkIn(); };
   $("qDays").onclick = (e) => { const b = e.target.closest("[data-qd]"); if (!b) return; Q.date = b.dataset.qd; Q.time = null; renderQDays(); loadQLocks(); };
   $("qSlots").onclick = (e) => {
     const b = e.target.closest("[data-qt]"); if (b) { Q.time = b.dataset.qt; renderQSlots(); $("qAfter").classList.remove("hidden"); $("qAfter").classList.add("q-pop"); setTimeout(() => $("qPhone").focus(), 60); return; }
@@ -2037,7 +2069,7 @@ function renderQSlots() {
   renderQStaff(); updQSave();
 }
 function renderQMains() {
-  const mains = A.services.filter((s) => s.active !== false && s.type !== "addon");
+  const mains = A.services.filter((s) => s.active !== false && s.type !== "addon").sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
   $("qMains").innerHTML = mains.map((s) => `<button class="q-chip" data-qm="${s.id}" aria-pressed="${s.id === Q.mainId}">${esc(s.name)} <span class="opacity-60">${cop(s.priceCOP)}</span></button>`).join("");
   const ex = A.services.filter((s) => s.active !== false && s.type !== "base" && s.id !== Q.mainId);
   $("qExtrasWrap").classList.toggle("hidden", !ex.length);
@@ -2390,7 +2422,10 @@ function openShareGuide() {
   const msg = (panelPrefs().shareMsg || PANEL_DEFAULT.shareMsg).replace(/\{negocio\}/g, name).replace(/\{link\}/g, url);
   openM("Comparte tu enlace", `
     <p class="soft -mt-2 mb-3 text-sm">Entre más lo vean, más reservas te llegan solas. Estos son los mejores lugares:</p>
-    <p class="mb-3 truncate rounded-lg bg-paper px-3 py-2 font-mono text-xs">${esc(url)}</p>
+    <div class="mb-3 flex items-center gap-2 rounded-xl bg-paper p-1.5 pl-3">
+      <p class="min-w-0 flex-1 truncate font-mono text-xs">${esc(url)}</p>
+      <button type="button" id="shareCopy" class="btn-primary shrink-0 !px-4 !py-2 text-sm"><i class="fa-regular fa-copy"></i> Copiar</button>
+    </div>
     <div class="space-y-2 text-sm">
       <a class="todo !mt-0" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(msg)}" data-link-done="1"><span class="ic t-ok"><i class="fa-brands fa-whatsapp"></i></span><span class="flex-1"><b>Estado de WhatsApp</b><br><span class="soft text-xs">Publícalo con la imagen de tus horarios.</span></span></a>
       <button class="todo !mt-0 w-full text-left" data-link="copy"><span class="ic t-trial"><i class="fa-brands fa-instagram"></i></span><span class="flex-1"><b>Biografía de Instagram</b><br><span class="soft text-xs">Copia el enlace y pégalo en “Editar perfil”.</span></span></button>
@@ -2398,6 +2433,11 @@ function openShareGuide() {
       <button class="todo !mt-0 w-full text-left" data-link="qr"><span class="ic t-off"><i class="fa-solid fa-qrcode"></i></span><span class="flex-1"><b>QR en tu local</b><br><span class="soft text-xs">Imprímelo y ponlo en el espejo o la caja.</span></span></button>
     </div>`);
   markGuide("share");
+  $("shareCopy").onclick = async () => {
+    await copyText(url);
+    const b = $("shareCopy"); b.innerHTML = '<i class="fa-solid fa-check"></i> ¡Copiado!'; b.style.background = "var(--mint)";
+    setTimeout(() => { if ($("shareCopy")) { b.innerHTML = '<i class="fa-regular fa-copy"></i> Copiar'; b.style.background = ""; } }, 2200);
+  };
 }
 
 // =====================================================================
@@ -2409,15 +2449,17 @@ function renderMyStatus() {
   if (!me || me.active === false) { b.classList.add("hidden"); return; }
   const busy = isBusy(me);
   b.className = "status-pill" + (busy ? " busy" : "");
-  b.innerHTML = `<span class="sdot"></span><span>${busy ? "Descanso · " + timeOf(me.busyUntil) : "Disponible"}</span>`;
-  b.title = busy ? "Toca cuando vuelvas" : "Toca para tomar un descanso";
+  b.innerHTML = `<span class="sdot"></span><span>${busy ? (isServing(me) ? "Atendiendo · " : "Descanso · ") + timeOf(me.busyUntil) : "Disponible"}</span>`;
+  b.title = busy ? (isServing(me) ? "Toca cuando termines" : "Toca cuando vuelvas") : "Toca para tomar un descanso";
 }
 $("myStatus").onclick = () => toggleStaffStatus(meStaff());
 async function toggleStaffStatus(s) {
   if (!s) return;
   if (!isOwner() && s.id !== A.me?.staffId) return toast("Solo puedes cambiar tu propio estado.", "error");
   if (isBusy(s)) {
-    if (!(await uiConfirm(s.id === A.me?.staffId ? "¿Ya volviste?" : `¿${s.name} ya volvió?`, "Se abren de nuevo sus cupos en la página.", { okText: "Sí, disponible" }))) return;
+    const serving = isServing(s);
+    if (!(await uiConfirm(serving ? (s.id === A.me?.staffId ? "¿Ya terminaste?" : `¿${s.name} ya terminó?`) : (s.id === A.me?.staffId ? "¿Ya volviste?" : `¿${s.name} ya volvió?`),
+      serving ? "Quedas disponible y el tiempo que sobró se abre de nuevo para reservas." : "Se abren de nuevo sus cupos en la página.", { okText: serving ? "✓ Terminé, estoy disponible" : "Sí, disponible" }))) return;
     try { await api("endBreak", { staffId: s.id }); toast(`${s.id === A.me?.staffId ? "Estás" : s.name + " está"} disponible de nuevo.`); } catch (err) { toast(err.message, "error"); }
   } else openBreak(s);
 }
@@ -2541,7 +2583,7 @@ function requestGeo(manual) {
 const refLevels = () => (A.plat?.referral?.levels?.length ? A.plat.referral.levels : [20, 10, 8, 6, 4, 2]).map(Number);
 const refCap = () => Math.max(1, Number(A.plat?.referral?.capMonths || 3));
 const REF = { unsubs: [] };
-function refLink() { return new URL("index.html?ref=" + encodeURIComponent(bpath().split("/")[1]), location.href).href; }
+function refLink() { return new URL("index.html?invita=" + encodeURIComponent(bpath().split("/")[1]), location.href).href; }
 function renderReferrals() {
   const el = $("tab-referrals");
   if (A.plat?.referral?.enabled === false) { el.innerHTML = `<div class="sp-card soft text-sm">El programa de referidos está pausado por ahora.</div>`; return; }
@@ -2571,13 +2613,16 @@ function renderReferrals() {
         <p class="mt-1.5 text-xs font-bold">${payingNow >= need ? "🎉 ¡Tu próximo mes sale gratis!" : `Te faltan ${need - payingNow} para tu mes gratis 🎁`}</p>` : ""}
     </div>
 
-    <div class="sp-h"><h2>Comparte tu <span style="color:var(--sred)">enlace de invitación</span></h2></div>
-    <div class="grid grid-cols-4 gap-2 text-center text-[11.5px] font-semibold">
-      <a class="sp-card !p-3" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(inviteMsg)}"><i class="fa-brands fa-whatsapp mb-1 block text-xl" style="color:var(--mint)"></i>WhatsApp</a>
-      <button class="sp-card !p-3" data-ref="qr"><i class="fa-solid fa-qrcode mb-1 block text-xl"></i>QR</button>
-      <button class="sp-card !p-3" data-ref="share"><i class="fa-solid fa-share-nodes mb-1 block text-xl"></i>Compartir</button>
-      <button class="sp-card !p-3" data-copy="${esc(link)}"><i class="fa-solid fa-link mb-1 block text-xl"></i>Copiar</button>
+    <div class="sp-card mt-4" style="background:linear-gradient(135deg,#7c2d12,#D7263D);color:#fff">
+      <div class="flex items-center gap-2"><span class="text-lg">🤝</span><div class="min-w-0"><p class="text-[15px] font-extrabold leading-tight">Tu enlace de invitación</p><p class="text-[11.5px] opacity-85">Para otros negocios: crean su propia agenda y tú pagas menos</p></div></div>
+      <p class="mt-2 truncate rounded-xl px-3 py-2 font-mono text-xs" style="background:rgba(255,255,255,.14)">${esc(link.replace(/^https?:\/\//, ""))}</p>
+      <div class="mt-2.5 grid gap-2" style="grid-template-columns:1.3fr 1fr 52px">
+        <a class="rounded-2xl py-2.5 text-center text-[14px] font-extrabold" style="background:#25D366;color:#0b3d1f" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(inviteMsg)}"><i class="fa-brands fa-whatsapp"></i> Invitar</a>
+        <button class="rounded-2xl bg-white py-2.5 text-[14px] font-extrabold" style="color:#7c2d12" data-ref="copy"><i class="fa-regular fa-copy"></i> Copiar</button>
+        <button class="rounded-2xl py-2.5 text-[16px]" style="background:rgba(255,255,255,.18)" data-ref="qr" aria-label="Ver QR de invitación"><i class="fa-solid fa-qrcode"></i></button>
+      </div>
     </div>
+    <div class="sp-card mt-2 text-[13px]"><b>⚠️ No es para tus clientes.</b> <span class="soft">Este enlace abre “Crea tu agenda gratis”. Para que tus clientes reserven usa tu <b>enlace de citas</b> (está en Inicio).</span></div>
 
     <div class="sp-h"><h2>Tus invitados</h2><span>${kids.length}</span></div>
     <div class="sp-card !py-1">${kids.length ? kids.slice().sort((a, b) => toMillis(a.createdAt) - toMillis(b.createdAt)).map((k, i) => {
@@ -2611,6 +2656,11 @@ function renderReferrals() {
 $("tab-referrals").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-ref]"); if (!b) return;
   const link = refLink();
+  if (b.dataset.ref === "copy") {
+    await copyText(link);
+    b.innerHTML = '<i class="fa-solid fa-check"></i> ¡Copiado!'; b.style.background = "#fde68a";
+    setTimeout(() => { b.innerHTML = '<i class="fa-regular fa-copy"></i> Copiar'; b.style.background = "#fff"; }, 2200);
+  }
   if (b.dataset.ref === "share") { if (navigator.share) { try { await navigator.share({ title: "Agenda en línea gratis", text: "Crea tu agenda en línea con mi enlace:", url: link }); } catch { /* canceló */ } } else copyText(link); }
   if (b.dataset.ref === "qr") {
     await loadScript("https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js").catch(() => {});
@@ -2959,3 +3009,73 @@ function closeWizard(done) {
   renderHome();
 }
 document.addEventListener("click", (e) => { if (e.target.closest("[data-wizopen]")) { closeMenus(); openWizard(0); } });
+
+// =====================================================================
+//  ATENDER AHORA: llegó alguien y hay un barbero libre en este momento
+// =====================================================================
+const isServing = (st) => /^atendiendo/i.test(st?.busyReason || "");
+function freeNowStaff() {
+  const n = bogNow(), today = n.date;
+  const nowMin = n.min;
+  return myStaff().filter((st) => {
+    if (isBusy(st)) return false;
+    const open = staffHours(A.settings, st, today).some((h) => { const [oh, om] = h.open.split(":").map(Number), [ch, cm] = h.close.split(":").map(Number); return nowMin >= oh * 60 + om && nowMin < ch * 60 + cm; });
+    if (!open) return false;
+    return !H.apts.some((a) => a.staffId === st.id && ["confirmed", "pending_verification", "pending_payment"].includes(a.status)
+      && (() => { const [h, m] = a.startTime.split(":").map(Number), st0 = h * 60 + m; return nowMin >= st0 && nowMin < st0 + Number(a.occupiedMinutes || 30); })());
+  });
+}
+function renderQNow() {
+  const free = freeNowStaff();
+  $("qNow").innerHTML = free.length ? `<button type="button" data-walkin="1" class="mb-3 flex w-full items-center gap-3 rounded-2xl p-3 text-left text-white" style="background:linear-gradient(135deg,#1E9E63,#16774b)">
+      <span class="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white/20 text-xl">⚡</span>
+      <span class="min-w-0 flex-1"><b class="block text-[15px]">Atender ahora</b><span class="text-xs opacity-90">Llegó alguien: ${esc(free.map((x) => x.id === A.me?.staffId && free.length === 1 ? "estás libre" : x.name).join(", "))}${free.length === 1 && free[0].id !== A.me?.staffId ? " está libre" : ""} ya mismo</span></span>
+      <i class="fa-solid fa-chevron-right opacity-80"></i></button>` : `<div class="mb-3 flex w-full items-center gap-3 rounded-2xl p-3" style="background:var(--canvas)">
+      <span class="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white text-xl opacity-60">⚡</span>
+      <span class="min-w-0 flex-1"><b class="block text-[15px] text-ink/60">Atender ahora</b><span class="soft text-xs">${walkInReason()}</span></span></div>`;
+}
+// por qué no se puede atender ya mismo (para que el botón no "desaparezca" sin explicación)
+function walkInReason() {
+  const team = myStaff(), n = bogNow();
+  if (!team.length) return "No hay personas activas en tu equipo.";
+  const inHours = team.some((st) => staffHours(A.settings, st, n.date).some((h) => { const [oh, om] = h.open.split(":").map(Number), [ch, cm] = h.close.split(":").map(Number); return n.min >= oh * 60 + om && n.min < ch * 60 + cm; }));
+  if (!inHours) return "Ahora estás fuera de tu horario de atención.";
+  if (team.every((st) => isBusy(st))) return "Todos están ocupados o en descanso. Toca “Terminé” cuando quedes libre.";
+  return "Todos tienen una cita en este momento.";
+}
+function openWalkIn() {
+  const free = freeNowStaff();
+  if (!free.length) return toast("Nadie está libre en este momento.", "error");
+  const mains = A.services.filter((x) => x.active !== false && x.type !== "addon").sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
+  const extras = A.services.filter((x) => x.active !== false && x.type !== "base");
+  const WK = { main: mains[0]?.id, extras: new Set(), staff: free[0].id };
+  const mins = () => { const by = Object.fromEntries(A.services.map((x) => [x.id, x])); return [WK.main, ...WK.extras].reduce((t, id) => t + Number(by[id]?.minutes || 0), 0) || 30; };
+  const endLabel = () => { const n = bogNow().min + mins(); return hora12(String(Math.floor(n / 60) % 24).padStart(2, "0") + ":" + String(n % 60).padStart(2, "0")); };
+  const draw = () => {
+    $("modalBody").innerHTML = `
+      <p class="soft -mt-3 mb-4 text-sm">Para quien llegó sin cita. Bloqueamos ese tiempo en la agenda para que nadie reserve encima, y cuando termines tocas <b>Terminé</b>.</p>
+      ${free.length > 1 ? `<p class="mb-1.5 text-sm font-bold">¿Quién atiende?</p><div class="mb-3 flex flex-wrap gap-2">${free.map((x) => `<button class="q-chip" data-wks="${x.id}" aria-pressed="${WK.staff === x.id}">${esc(x.name)}</button>`).join("")}</div>` : ""}
+      <p class="mb-1.5 text-sm font-bold">¿Qué se va a hacer?</p>
+      <div class="flex flex-wrap gap-2">${mains.map((x) => `<button class="q-chip" data-wkm="${x.id}" aria-pressed="${WK.main === x.id}">${esc(x.name)}</button>`).join("")}</div>
+      ${extras.length ? `<div class="mt-2 flex flex-wrap gap-2">${extras.filter((x) => x.id !== WK.main).map((x) => `<button class="q-chip" data-wkx="${x.id}" aria-pressed="${WK.extras.has(x.id)}">+ ${esc(x.name)}</button>`).join("")}</div>` : ""}
+      <div class="mt-4 rounded-2xl p-3 text-sm" style="background:var(--canvas)">⏱ <b>${mins()} min</b>: queda ocupado hasta las <b>${endLabel()}</b>. Si terminas antes, toca <b>Terminé</b> y el tiempo que sobre se abre de nuevo.</div>
+      <button id="wkGo" class="btn-primary mt-4 w-full py-3.5 text-base">⚡ Empezar ahora</button>`;
+  };
+  openM("Atender ahora", ""); draw();
+  $("modalBody").onclick = async (e) => {
+    const sb = e.target.closest("[data-wks]"); if (sb) { WK.staff = sb.dataset.wks; return draw(); }
+    const mb = e.target.closest("[data-wkm]"); if (mb) { WK.main = mb.dataset.wkm; WK.extras.delete(WK.main); return draw(); }
+    const xb = e.target.closest("[data-wkx]"); if (xb) { const id = xb.dataset.wkx; WK.extras.has(id) ? WK.extras.delete(id) : WK.extras.add(id); return draw(); }
+    if (!e.target.closest("#wkGo")) return;
+    const btn = $("wkGo"); setBusy(btn, true, "Revisando la agenda…");
+    const names = [WK.main, ...WK.extras].map((id) => A.services.find((x) => x.id === id)?.name).filter(Boolean).join(" + ");
+    try {
+      const pv = await api("startBreak", { staffId: WK.staff, minutes: mins(), reason: "Atendiendo: " + names, preview: true });
+      if (pv.conflicts?.length && !(await uiConfirm("Se cruza con una cita", `${pv.conflicts.map((c) => `${c.customer?.firstName || "Un cliente"} a las ${hora12(c.startTime)}`).join(", ")}. ¿Igual atiendes ahora?`, { okText: "Sí, atender", cancelText: "No" }))) { setBusy(btn, false); return; }
+      setBusy(btn, true, "Empezando…");
+      await api("startBreak", { staffId: WK.staff, minutes: mins(), reason: "Atendiendo: " + names, preview: false });
+      $("modalBody").onclick = null; closeM();
+      toast(`⚡ Atendiendo hasta las ${endLabel()}. Cuando termines, toca “Terminé”.`);
+    } catch (err) { toast(err.message, "error"); setBusy(btn, false); }
+  };
+}

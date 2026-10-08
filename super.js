@@ -3,7 +3,7 @@ import { onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordRe
 import {
   doc, getDoc, setDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp, where
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { APP_VERSION, readPublishedVersion, reloadFresh, startUpdateWatcher, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-10-09n";
+import { APP_VERSION, SERVER_VERSION, RULES_VERSION, readPublishedVersion, reloadFresh, startUpdateWatcher, warmServer, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-10-09u";
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on) => $(id).classList.toggle("hidden", !on);
@@ -53,7 +53,7 @@ function goSV(v) {
   SV = v;
   document.querySelectorAll(".sv").forEach((x) => x.classList.toggle("hidden", x.id !== "sv-" + v));
   document.querySelectorAll("[data-sv]").forEach((x) => x.setAttribute("aria-current", x.dataset.sv === v ? "page" : "false"));
-  if (v === "money") loadPlanCfg();
+  if (v === "money") { loadPlanCfg(); warmServer(); }
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 $("spNav").addEventListener("click", (e) => { const b = e.target.closest("[data-sv]"); if (b) goSV(b.dataset.sv); });
@@ -78,7 +78,7 @@ function start() {
     Z.payments = q.docs.map((d) => d.data()); renderPayments(); render();
   }, () => {}));
   Z.unsubs.push(onSnapshot(query(collection(db, "platformOrders"), where("status", "==", "pending")), (q) => {
-    Z.orders = q.docs.map((d) => ({ id: d.id, ...d.data() })).filter((o) => toMillis(o.expiresAt) > Date.now()); renderOrders(); render();
+    Z.orders = q.docs.map((d) => ({ id: d.id, ...d.data() })).filter((o) => !HIDDEN.has(o.id) && toMillis(o.expiresAt) > Date.now()); renderOrders(); render();
   }, () => {}));
   Z.unsubs.push(onSnapshot(doc(db, "platform", "public"), (s) => { $("botUser").value = s.data()?.telegramBot || ""; }, () => {}));
   Z.unsubs.push(onSnapshot(doc(db, "platform", "telegram"), (s) => { $("tgSuperState").textContent = s.data()?.super ? "Conectado ✓" : "Sin conectar"; }, () => {}));
@@ -237,23 +237,31 @@ function renderOrders() {
     <div class="flex shrink-0 flex-col gap-1.5"><button class="act t-ok" data-approve="${o.id}">Aprobar</button><button class="act t-late" data-reject="${o.id}">Rechazar</button></div></div>`).join("")
     : `<div class="sp-card soft text-sm">No hay pagos Bre-B esperando. Cuando un dueño genere uno, aparece aquí y se activa solo al llegar el aviso de Nequi.</div>`;
 }
+// la lista se actualiza al instante; si el servidor falla, la orden vuelve a aparecer
+const HIDDEN = new Set();
+function hideOrder(id) { HIDDEN.add(id); Z.orders = Z.orders.filter((x) => x.id !== id); renderOrders(); render(); }
+function unhideOrder(o) { HIDDEN.delete(o.id); if (!Z.orders.some((x) => x.id === o.id)) Z.orders.push(o); renderOrders(); render(); }
 $("orders").addEventListener("click", async (e) => {
   const rj = e.target.closest("[data-reject]");
   if (rj) {
     const o = Z.orders.find((x) => x.id === rj.dataset.reject); if (!o) return;
+    warmServer(); // mientras escribes el motivo, el servidor se despierta
     const reason = await uiPrompt("Rechazar este pago", `No te llegaron los ${cop(o.amountCOP)} de ${o.businessName}. La orden se cierra y a la tienda le avisamos por Telegram.`, "No recibimos el pago", { okText: "Rechazar", danger: true });
     if (reason === null) return;
-    setBusy(rj, true, "…");
-    try { await api("superRejectOrder", { orderId: o.id, reason }); toast("Pago rechazado. La tienda ya fue avisada."); }
-    catch (err) { toast(err.message, "error"); setBusy(rj, false); }
+    hideOrder(o.id); toast("Pago rechazado. Estamos avisando a la tienda…");
+    api("superRejectOrder", { orderId: o.id, reason })
+      .then(() => toast("✓ Listo: la tienda ya fue avisada por Telegram."))
+      .catch((err) => { unhideOrder(o); toast("No se pudo rechazar: " + err.message, "error"); });
     return;
   }
   const b = e.target.closest("[data-approve]"); if (!b) return;
   const o = Z.orders.find((x) => x.id === b.dataset.approve);
+  warmServer();
   if (!(await uiConfirm("¿Aprobar este pago?", `Úsalo solo si ya ves en tu Nequi los ${cop(o.amountCOP)} de ${o.businessName}. Se activan ${o.months} mes(es).`, { okText: "Aprobar pago" }))) return;
-  setBusy(b, true, "Aprobando…");
-  try { const r = await api("superApproveOrder", { orderId: o.id }); toast(`Pago aprobado.${r.paidUntil ? " Activo hasta el " + fechaLarga(r.paidUntil) + "." : ""}`); }
-  catch (err) { toast(err.message, "error"); setBusy(b, false); }
+  hideOrder(o.id); toast("Aprobando el pago…");
+  api("superApproveOrder", { orderId: o.id })
+    .then((r) => toast(`✓ Pago aprobado.${r.paidUntil ? " Activo hasta el " + fechaLarga(r.paidUntil) + "." : ""}`))
+    .catch((err) => { unhideOrder(o); toast("No se pudo aprobar: " + err.message, "error"); });
 });
 $("search").oninput = (e) => { Z.q = e.target.value; renderBiz(); };
 
@@ -512,19 +520,32 @@ $("btnTgSuper").onclick = async () => {
 // ================= Versión de la página =================
 $("btnCheckVersion").onclick = async () => {
   const btn = $("btnCheckVersion"), box = $("versionResult");
-  setBusy(btn, true, "Comprobando…");
-  try {
-    const pub = await readPublishedVersion();
-    const nueva = !!pub && pub > APP_VERSION;
-    box.classList.remove("hidden");
-    box.innerHTML = nueva
-      ? `<div class="flex items-center gap-2 rounded-xl border border-sky-300 bg-sky-50 p-2.5 text-xs text-sky-900"><span class="flex-grow">Hay una versión nueva (${esc(pub)}). Actualiza para verla.</span><button type="button" id="btnReloadFresh" class="rounded-lg bg-sky-600 px-2.5 py-1 font-bold text-white">Actualizar</button></div>`
-      : `<div class="rounded-xl border border-emerald-300 bg-emerald-50 p-2.5 text-xs text-emerald-900">✓ Tienes la versión más reciente${pub ? " (" + esc(pub) + ")" : ""}.</div>`;
-    if (nueva) $("btnReloadFresh").onclick = reloadFresh;
-  } catch (err) {
-    box.classList.remove("hidden");
-    box.innerHTML = `<div class="rounded-xl border border-rose-300 bg-rose-50 p-2.5 text-xs text-rose-900">${esc(err.message)}</div>`;
-  } finally { setBusy(btn, false); }
+  setBusy(btn, true, "Comprobando todo…");
+  box.classList.remove("hidden");
+  const row = (ok, title, detail, fix) => `<div class="flex items-start gap-3 rounded-xl p-3" style="background:${ok === null ? "#f2f5f8" : ok ? "#ecfdf3" : "#fff4e5"}">
+      <span class="text-lg leading-none">${ok === null ? "⏳" : ok ? "✅" : "⚠️"}</span>
+      <div class="min-w-0 flex-1 text-sm"><b>${title}</b><br><span class="soft text-xs">${detail}</span>${fix ? `<p class="mt-1 text-xs font-semibold" style="color:#9a5a00">${fix}</p>` : ""}</div></div>`;
+  box.innerHTML = `<div class="space-y-2">${row(null, "Página", "Revisando…")}${row(null, "Servidor (Apps Script)", "Revisando…")}${row(null, "Reglas de Firebase", "Revisando…")}</div>`;
+  const [pub, srv, rules] = await Promise.all([
+    readPublishedVersion().catch(() => null),
+    api("superHealth", {}).catch((e) => ({ error: e.message })),
+    getDoc(doc(db, "rulesCheck", RULES_VERSION)).then(() => true).catch((e) => (String(e.code || e.message).includes("permission") ? false : null))
+  ]);
+  const pageOk = !(pub && pub > APP_VERSION);
+  const srvOk = !srv.error && srv.version === SERVER_VERSION;
+  const srvOld = !srv.error && srv.version && srv.version < SERVER_VERSION;
+  let html = row(pageOk, "Página (GitHub)", `Esta: ${esc(APP_VERSION)}${pub ? ` · publicada: ${esc(pub)}` : ""}`, pageOk ? "" : `Hay una versión más nueva publicada. <button type="button" id="btnReloadFresh" class="underline">Actualizar ahora</button>`);
+  html += row(srvOk, "Servidor (Apps Script)",
+    srv.error ? esc(srv.error) : `Versión del servidor: ${esc(srv.version || "sin número (antigua)")}`,
+    srv.error ? "No responde: revisa que esté implementado y que la dirección del servidor en config.js sea la correcta."
+      : srvOk ? "" : srvOld || !srv.version ? `Pega el último Agendador-servidor.txt en Code.gs y haz Implementar > Gestionar implementaciones > ✏️ > Nueva versión.` : "El servidor es más nuevo que la página: sube también la página.");
+  html += row(rules, "Reglas de Firebase", rules ? `Publicadas (${esc(RULES_VERSION)})` : rules === false ? "No están al día" : "No se pudo comprobar",
+    rules === false ? "Copia el último Reglas-firestore.txt en Firebase > Firestore > Reglas y toca Publicar." : "");
+  if (!srv.error && srv.checks?.length) html += `<p class="mb-1 mt-3 text-sm font-bold">Revisión del servidor</p>` + srv.checks.map((c) => row(c.ok, esc(c.name), esc(c.detail))).join("");
+  const all = pageOk && srvOk && rules === true && !(srv.checks || []).some((c) => !c.ok);
+  box.innerHTML = `${all ? `<div class="mb-2 rounded-xl p-3 text-center text-sm font-extrabold" style="background:#ecfdf3;color:#16774b">🎉 Todo está al día y funcionando</div>` : ""}<div class="space-y-2">${html}</div>`;
+  if ($("btnReloadFresh")) $("btnReloadFresh").onclick = reloadFresh;
+  setBusy(btn, false);
 };
 startUpdateWatcher();
 

@@ -11,9 +11,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Archivo+Narrow:wght@500;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="theme.js?v=2026-10-09n"></script>
+  <script src="theme.js?v=2026-10-09u"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="styles.css?v=2026-10-09n">
+  <link rel="stylesheet" href="styles.css?v=2026-10-09u">
 </head>
 <body class="bg-paper text-ink font-sans antialiased">
 
@@ -111,8 +111,9 @@
     </p>
 
     <!-- Estado del equipo -->
-    <section aria-label="Equipo" class="mb-6 flex items-start justify-between gap-2">
-      <div id="staffStatus" class="flex min-w-0 flex-wrap gap-2"></div>
+    <section id="liveStatus" class="mb-5 hidden" aria-label="Disponibilidad en este momento">
+      <p class="mb-1.5 text-[11px] font-extrabold uppercase tracking-wider text-ink/50">Ahora mismo</p>
+      <div id="staffStatus" class="flex flex-wrap gap-2"></div>
     </section>
 
     <!-- Paso 1: día y horario -->
@@ -127,7 +128,7 @@
           <div class="border-b border-line p-4 md:order-2 md:border-b-0 md:border-l">
             <p id="slotsTitle" class="mb-1 font-semibold"></p>
             <p id="slotsHint" class="mb-3 text-sm text-ink/70"></p>
-            <div id="slots" class="grid grid-cols-3 gap-2"></div>
+            <div id="slots" class="grid grid-cols-3 gap-2 lg:grid-cols-4"></div>
             <div id="noSlots" class="hidden rounded-xl border border-dashed border-line bg-paper p-4 text-center">
               <p id="noSlotsText" class="font-semibold"></p>
               <p class="mt-1 text-sm text-ink/70">Elige otra fecha en el calendario.</p>
@@ -152,6 +153,7 @@
       </div>
     </section>
 
+    <div class="book-grid">
     <!-- Paso 2: servicio (aparece al elegir hora) -->
     <section id="servSection" class="mb-10 hidden" aria-labelledby="h-serv">
       <h2 id="h-serv" class="step-title"><span class="step-num">2</span>¿Qué te vas a hacer?</h2>
@@ -168,6 +170,7 @@
       <div id="summary" class="mb-3 min-w-0 text-sm"></div>
       <button id="btnBook" class="btn-primary w-full py-3 text-base" disabled>Apartar cupo</button>
     </section>
+    </div>
     </div>
     <!-- Probar gratis: para dueños de negocios que ven la página -->
     <section id="trialCta" class="mx-auto mt-6 hidden max-w-md rounded-2xl border border-dashed border-line bg-white p-4 text-center">
@@ -301,6 +304,6 @@
     </div>
   </div>
 
-  <script type="module" src="app.js?v=2026-10-09n"></script>
+  <script type="module" src="app.js?v=2026-10-09u"></script>
 </body>
 </html>

@@ -408,3 +408,28 @@ header.has-photo .logo-ring .logo-in { border-color:rgba(15,22,32,.9); }
 /* el asistente usa la altura real visible (sin quedar debajo de la barra del navegador) */
 .wizard { height:100dvh; bottom:auto; padding-bottom:calc(16px + env(safe-area-inset-bottom, 0px)); }
 .wz-skip { margin:0 auto 8px; }
+
+/* ===================== COMPUTADOR ===================== */
+@media (min-width:1024px) {
+  /* Página de citas: servicios a la izquierda y el resumen fijo a la derecha */
+  .book-grid { display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:24px; align-items:start; }
+  .book-grid #bookBar { position:sticky; top:20px; }
+  .book-grid #servSection.hidden + #bookBar { grid-column:1 / -1; }
+  #mainServices .choice:hover, #extraServices .choice:hover { box-shadow:0 8px 22px -14px rgba(23,34,46,.45); }
+  .loc-bar { max-width:680px; }
+  /* Panel: Inicio en dos columnas */
+  .home-grid { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,1fr); gap:20px; align-items:start; }
+  .home-grid .home-col > :first-child { margin-top:0; }
+  /* Asistente: tarjeta centrada sobre el panel, no pantalla completa */
+  body.wiz-on::before { content:""; position:fixed; inset:0; z-index:109; background:rgba(20,33,61,.45); backdrop-filter:blur(3px); }
+  .wizard { inset:auto; left:50%; top:4vh; transform:translateX(-50%); width:600px; height:92vh; border-radius:28px; box-shadow:0 30px 80px -30px rgba(20,33,61,.6); padding-top:16px; }
+  /* Modales un poco más amplios */
+  .modal-card { max-width:560px; }
+  /* Botones: brillo al pasar el mouse */
+  .btn-primary:hover:not(:disabled), .btn-light:hover, .btn-sm:hover { filter:brightness(.97); }
+  .todo:hover { box-shadow:0 8px 22px -16px rgba(20,33,61,.4); }
+}
+@media (min-width:1280px) {
+  .home-grid { gap:28px; }
+}
+@media (min-width:1280px) { body.sp .sp-main { max-width:980px; } }
