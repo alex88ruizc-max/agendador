@@ -48,7 +48,7 @@ onSnapshot(doc(db, "businesses", BIZ_ID), (s) => {
 
 onSnapshot(doc(db, bpath("settings", "general")), (s) => {
   S.settings = s.data() || null;
-  if (!S.date) S.date = firstOpenDay();
+  if (!S.date) { S.date = bogNow().date; S.month = S.date.slice(0, 7); }
   subscribeAvail(); subscribeDay(S.date);
   renderBiz(); renderStaff(); renderAll();
 }, onErr);
@@ -78,7 +78,7 @@ function subscribeAvail() {
   unsubAvail = onSnapshot(query(collection(db, bpath("dayAvailability")), where("date", ">=", from), where("date", "<=", to)), (q) => {
     S.monthAvail = {};
     q.forEach((d) => { S.monthAvail[d.id] = d.data(); });
-    renderDays(); renderCalendar();
+    renderCalendar(); renderSlots();
   }, onErr);
 }
 function subscribeDay(date) {
@@ -215,9 +215,9 @@ function staffThatFit(mainId, minutes) {
   return staffPool().filter((s) => (!mainId || !s.serviceIds?.length || s.serviceIds.includes(mainId)) && freeFrom(s.id, S.time) >= need).map((s) => s.id);
 }
 
-function renderAll() { renderDays(); renderCalendar(); renderSlots(); renderServices(); renderSummary(); }
+function renderAll() { renderCalendar(); renderSlots(); renderServices(); renderSummary(); }
 
-// ---------- Paso 1: días ----------
+// ---------- Calendario del mes ----------
 function dayRatio(date) {
   const staffForCap = S.staffId ? S.staff.filter((s) => s.id === S.staffId) : S.staff;
   const cap = dayCapacityUnits(S.settings, staffForCap, date);
@@ -225,42 +225,24 @@ function dayRatio(date) {
   const booked = S.staffId ? Number(units[S.staffId] || 0) : Object.values(units).reduce((a, n) => a + Number(n || 0), 0);
   return cap ? booked / cap : null;
 }
-function dotFor(date) {
+// ¿Se puede elegir ese día en el calendario?
+function dayBookable(date) {
+  const today = bogNow().date;
+  if (date < today || date > maxDate() || isClosed(date)) return false;
   const r = dayRatio(date);
-  if (r === null) return "bg-slate-300";
-  return r >= 1 ? "bg-pole-red" : r >= 0.7 ? "bg-amber-500" : "bg-emerald-500";
-}
-function renderDays() {
-  if (!S.settings) return;
-  const today = bogNow().date, end = maxDate();
-  let html = "";
-  for (let d = today; d <= end; d = addDays(d, 1)) {
-    const closed = isClosed(d), full = dayRatio(d) >= 1;
-    const [y, m, dd] = d.split("-").map(Number);
-    const wd = new Date(Date.UTC(y, m - 1, dd)).toLocaleDateString("es-CO", { timeZone: "UTC", weekday: "short" }).replace(".", "");
-    html += `<button class="daypill" data-date="${d}" aria-pressed="${S.date === d}" ${closed ? "disabled" : ""} aria-label="${fechaLarga(d)}${closed ? ", cerrado" : full ? ", lleno" : ""}">
-      <span class="text-xs">${d === today ? "hoy" : wd}</span><span class="text-lg font-bold leading-none">${dd}</span><i class="dot ${closed ? "bg-slate-300" : dotFor(d)}"></i></button>`;
+  if (r !== null && r >= 1) return false;
+  if (date === today) { // hoy solo si queda tiempo antes del cierre
+    const now = bogNow().min + Number(S.settings?.minAdvanceMinutes || 0);
+    return hoursOf(date).some((h) => tmin(h.close) - slotLen() >= now);
   }
-  $("dayStrip").innerHTML = html;
-  $("dayLabel").textContent = S.date ? fechaLarga(S.date) : "";
-  $("dayStrip").querySelector('[aria-pressed="true"]')?.scrollIntoView({ block: "nearest", inline: "center" });
+  return true;
 }
-function selectDate(d) {
-  S.date = d; S.time = null;
-  subscribeDay(d); renderAll();
+function nextBookableDay(from) {
+  for (let d = addDays(from, 1); d <= maxDate(); d = addDays(d, 1)) if (dayBookable(d)) return d;
+  return null;
 }
-$("dayStrip").addEventListener("click", (e) => {
-  const b = e.target.closest("[data-date]"); if (!b || b.disabled) return;
-  selectDate(b.dataset.date);
-});
-$("btnMonth").onclick = () => {
-  const box = $("monthBox"); const open = box.classList.toggle("hidden") === false;
-  $("btnMonth").textContent = open ? "Ocultar mes" : "Ver mes";
-  if (open) { S.month = (S.date || bogNow().date).slice(0, 7); renderCalendar(); }
-};
-
 function renderCalendar() {
-  if (!S.settings || $("monthBox").classList.contains("hidden")) return;
+  if (!S.settings) return;
   const [y, m] = S.month.split("-").map(Number);
   const first = `${S.month}-01`;
   const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
@@ -268,22 +250,23 @@ function renderCalendar() {
   $("monthLabel").textContent = new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString("es-CO", { timeZone: "UTC", month: "long", year: "numeric" });
   $("prevMonth").disabled = S.month <= today.slice(0, 7);
   $("nextMonth").disabled = S.month >= end.slice(0, 7);
-  let html = "<span></span>".repeat((dow(first) + 6) % 7);
+  let html = "<span></span>".repeat(dow(first)); // la semana empieza en domingo
   for (let d = 1; d <= daysInMonth; d++) {
     const date = `${S.month}-${String(d).padStart(2, "0")}`;
-    let dot = dotFor(date), disabled = false;
-    if (date < today || date > end) { disabled = true; dot = ""; }
-    else if (isClosed(date)) { disabled = true; dot = "bg-slate-300"; }
-    else if (dayRatio(date) >= 1) disabled = true;
-    html += `<button class="day ${disabled ? "" : "bg-paper"}" data-date="${date}" ${disabled ? "disabled" : ""} aria-pressed="${S.date === date}" aria-label="${fechaLarga(date)}">
-      ${d}${dot ? `<i class="dot ${dot}"></i>` : ""}</button>`;
+    const ok = dayBookable(date);
+    html += `<button class="cday" data-date="${date}" ${ok || date === today ? "" : "disabled"} aria-pressed="${S.date === date}" aria-label="${fechaLarga(date)}${ok ? "" : ", sin horarios"}">
+      ${d}${date === today ? `<span class="hoy">HOY</span>` : ""}</button>`;
   }
   $("calendar").innerHTML = html;
+}
+function selectDate(d) {
+  S.date = d; S.time = null; S.month = d.slice(0, 7);
+  subscribeDay(d); renderAll();
 }
 $("calendar").addEventListener("click", (e) => {
   const b = e.target.closest("[data-date]"); if (!b || b.disabled) return;
   selectDate(b.dataset.date);
-  $("monthBox").classList.add("hidden"); $("btnMonth").textContent = "Ver mes";
+  if (window.innerWidth < 768) setTimeout(() => $("slotsTitle").scrollIntoView({ behavior: "smooth", block: "start" }), 50);
 });
 function shiftMonth(n) {
   const [y, m] = S.month.split("-").map(Number);
@@ -293,20 +276,34 @@ function shiftMonth(n) {
 $("prevMonth").onclick = () => shiftMonth(-1);
 $("nextMonth").onclick = () => shiftMonth(1);
 
-// ---------- Paso 1: horas ----------
+// ---------- Horarios del día elegido (solo los libres) ----------
 function renderSlots() {
-  const box = $("slots"), hint = $("slotsHint");
-  if (!S.settings || !S.date) { box.innerHTML = ""; hint.textContent = ""; return; }
-  if (isClosed(S.date)) { box.innerHTML = ""; hint.textContent = "Ese día el local está cerrado. Elige otro día."; return; }
-  const grid = dayGrid();
-  const free = grid.filter((g) => g.free.length).length;
-  if (S.time && !grid.some((g) => g.time === S.time && g.free.length)) S.time = null;
-  hint.textContent = !grid.length ? "Ya no quedan horas para este día. Elige otro día."
-    : free ? `Cupos de ${slotLen()} min. ${free} libre(s). Toca una hora.` : "Este día ya está lleno. Elige otro día.";
-  box.innerHTML = grid.map((g) => `<button class="slot" data-time="${g.time}" ${g.free.length ? "" : "disabled"} aria-pressed="${S.time === g.time}" aria-label="${hora12(g.time)}, ${g.free.length ? "libre" : "ocupado"}">${hora12(g.time)}</button>`).join("");
+  const box = $("slots"), hint = $("slotsHint"), none = $("noSlots");
+  if (!S.settings || !S.date) { box.innerHTML = ""; return; }
+  const today = bogNow().date;
+  const isToday = S.date === today;
+  $("slotsTitle").innerHTML = isToday ? "Horarios disponibles hoy" : `Horarios disponibles el <span class="capitalize">${fechaLarga(S.date)}</span>`;
+  const free = isClosed(S.date) ? [] : dayGrid().filter((g) => g.free.length);
+  if (S.time && !free.some((g) => g.time === S.time)) S.time = null;
+  if (!free.length) {
+    box.innerHTML = ""; hint.textContent = "";
+    $("noSlotsText").textContent = isClosed(S.date)
+      ? (isToday ? "Hoy no atendemos." : "Ese día no atendemos.")
+      : (isToday ? "Hoy ya no quedan horarios disponibles." : "Ese día ya no quedan horarios disponibles.");
+    const next = nextBookableDay(S.date);
+    $("btnNextDay").classList.toggle("hidden", !next);
+    $("btnNextDay").textContent = next ? `Ver ${fechaCorta(next)}` : "";
+    $("btnNextDay").dataset.date = next || "";
+    none.classList.remove("hidden");
+    return;
+  }
+  none.classList.add("hidden");
+  hint.textContent = `Cada cupo es de ${slotLen() < 60 ? slotLen() + " minutos" : slotLen() === 60 ? "1 hora" : slotLen() / 60 + " horas"}. Toca el que prefieras.`;
+  box.innerHTML = free.map((g) => `<button class="tpill" data-time="${g.time}" aria-pressed="${S.time === g.time}">${hora12(g.time)}</button>`).join("");
 }
+$("btnNextDay").onclick = () => { const d = $("btnNextDay").dataset.date; if (d) selectDate(d); };
 $("slots").addEventListener("click", (e) => {
-  const b = e.target.closest("[data-time]"); if (!b || b.disabled) return;
+  const b = e.target.closest("[data-time]"); if (!b) return;
   S.time = b.dataset.time;
   renderSlots(); renderServices(); renderSummary();
   setTimeout(() => $("servSection").scrollIntoView({ behavior: "smooth", block: "start" }), 50);
@@ -619,6 +616,7 @@ function showTicket(apt) {
   $("ticket").innerHTML = `
     <article class="ticket">
       <div class="ticket-head">
+        ${apt.status === "confirmed" ? `<div class="ticket-ok" aria-hidden="true">✓</div><p class="mb-2 text-center font-narrow text-xl font-bold uppercase tracking-wide">Tu turno fue confirmado</p>` : ""}
         <p class="text-sm text-white/70">${esc(st.businessName || "Tu reserva")}</p>
         <p class="ticket-code mt-1">${esc(apt.code)}</p>
         <p class="mt-3">${statusBadge(apt.status)}</p>

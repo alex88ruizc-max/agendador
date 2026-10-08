@@ -69,3 +69,16 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .slot:disabled { background:transparent; color:#a6aeab; text-decoration:line-through; border-style:dashed; cursor:default; }
 .choice:disabled { opacity:.55; cursor:not-allowed; }
 .choice:disabled:hover { border-color:var(--line); }
+
+/* Calendario estilo agenda */
+.cday { position:relative; margin:0 auto; width:2.6rem; height:2.6rem; border-radius:999px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:1rem; line-height:1; }
+.cday:not(:disabled):hover { background:#EAF0F7; }
+.cday:disabled { color:#b9c0bd; cursor:default; }
+.cday .hoy { position:absolute; bottom:2px; font-size:8px; font-weight:700; color:var(--blue); letter-spacing:.05em; }
+.cday[aria-pressed="true"] { background:var(--blue); color:#fff; font-size:1.15rem; font-weight:600; }
+.cday[aria-pressed="true"] .hoy { color:#fff; }
+.tpill { border:1.5px solid var(--blue); color:var(--blue); background:#fff; border-radius:999px; padding:.55rem .2rem; font-size:.85rem; font-weight:600; }
+.tpill:not(:disabled):hover { background:#EAF0F7; }
+.tpill[aria-pressed="true"] { background:var(--blue); color:#fff; font-size:.95rem; }
+.tpill:disabled { border-color:#dfe4e2; color:#b9c0bd; cursor:default; }
+.ticket-ok { width:3.5rem; height:3.5rem; border-radius:999px; background:#fff; color:var(--blue); display:grid; place-items:center; margin:0 auto .5rem; font-size:1.8rem; font-weight:800; border:3px solid var(--blue); }
