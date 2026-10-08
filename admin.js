@@ -5,9 +5,9 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   startUpdateWatcher, applyBrandColors, uiConfirm, uiPrompt, setDialogBrand, viewImage, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, hora12, fechaLarga, fechaCorta, toMillis, cop, esc, normalizePhone,
-  waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, DEFAULT_WA_RESCHEDULE, computeSlots, staffHours, onColor, darken,
+  waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, DEFAULT_WA_RESCHEDULE, computeSlots, staffHours, mapLinks, onColor, darken,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-10-08w";
+} from "./common.js?v=2026-10-08y";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -106,6 +106,7 @@ function start() {
     A.settings = s.data() || {};
     setDialogBrand(A.settings.businessName || A.biz?.name, A.settings.appearance?.logo);
     applyPanelBrand(); if (A.me) renderTabs();
+    if (!A.geoAsked && isOwner() && !A.me?.isSuper && !A.settings.geo) { A.geoAsked = true; setTimeout(() => requestGeo(false), 2500); }
     renderAgenda(); renderStaffTab(); if (typeof renderHome === "function" && A.tab === "home") renderHome();
   }, onErr));
   A.unsubs.push(onSnapshot(collection(db, bpath("services")), (q) => {
@@ -986,6 +987,12 @@ function renderSettings() {
         ${txt("stPhone", "WhatsApp del negocio", s.whatsapp, 'placeholder="300 123 4567"')}
         ${txt("stAddress", "Dirección", s.address)}
         ${txt("stCity", "Ciudad", s.city)}
+        <div id="geoBox" class="rounded-xl p-3 md:col-span-2" style="background:var(--canvas)">
+          <p class="text-sm font-bold">Cómo llegar (Waze y Google Maps)</p>
+          <p class="soft mb-2 text-xs">${s.geo ? "✓ El punto exacto de tu local está guardado. Tus clientes llegan directo." : "Ahora se usa tu dirección. Para que lleguen exacto, toca el botón estando dentro de tu local."}</p>
+          <div class="flex flex-wrap gap-2"><button type="button" id="geoSet" class="btn-sm"><i class="fa-solid fa-location-crosshairs"></i> ${s.geo ? "Actualizar" : "Guardar"} la ubicación de mi local</button>
+            ${mapLinks(s) ? `<a class="btn-sm" href="${mapLinks(s).waze}" target="_blank" rel="noopener"><i class="fa-brands fa-waze"></i> Probar en Waze</a>` : ""}</div>
+        </div>
         <label class="field"><span>Tipo de negocio</span><select id="stType">
           ${[["barberia", "Barbería"], ["salon", "Salón de belleza"], ["unas", "Uñas"], ["spa", "Spa / estética"], ["otro", "Otro"]].map(([k, v]) => `<option value="${k}" ${(s.businessType || "barberia") === k ? "selected" : ""}>${v}</option>`).join("")}</select></label>
         ${txt("stStaffLabel", "Cómo se llama tu equipo en la página", s.staffLabel || "", 'placeholder="Barbero, Estilista, Manicurista…"')}
@@ -1071,6 +1078,7 @@ function renderSettings() {
   $("pmAdd").onclick = () => { readPM(); A.pmDraft.push({ label: "", account: "", holder: "" }); renderPM(); };
   $("pmList").onclick = (e) => { const b = e.target.closest("[data-rmpm]"); if (b) { readPM(); A.pmDraft.splice(Number(b.dataset.rmpm), 1); renderPM(); } };
   $("tgOwner").onclick = () => tgLink("owner");
+  $("geoSet").onclick = () => requestGeo(true);
   $("setForm").onsubmit = saveSettings;
 }
 function renderClosed() {
@@ -2156,6 +2164,8 @@ function guideSteps() {
     { id: "services", ic: "fa-scissors", t: "Servicios y precios", d: "Revisa los servicios de ejemplo: cambia precios y duración, y oculta los que no haces.",
       ok: guideDone().includes("services"), tab: "services", manual: true,
       tip: "Toca Editar en cada servicio para poner tu precio y duración." },
+    { id: "geo", ic: "fa-location-dot", t: "Ubicación para Waze", d: "Guardamos el punto exacto de tu local para que tus clientes lleguen con Waze o Google Maps.",
+      ok: !!s.geo, guide: "geo" },
     { id: "pay", ic: "fa-qrcode", t: "Cómo te pagan el abono", d: "Tu Nequi, Daviplata o llave Bre-B con su QR, y cuánto cobras para apartar el cupo.",
       ok: (s.paymentMethods || []).length > 0, tab: "settings", focus: "pmList",
       tip: "Toca “Agregar medio de pago”, escribe tu número o llave y sube el QR. Revisa el valor del abono arriba y toca Guardar." },
@@ -2205,6 +2215,7 @@ function goStep(id) {
   closeM();
   if (x.guide === "telegram") return openTelegramGuide();
   if (x.guide === "share") return openShareGuide();
+  if (x.guide === "geo") return requestGeo(true);
   if (x.tab) switchTab(x.tab);
   // espera a que la sección se dibuje y resalta el lugar exacto
   setTimeout(() => {
@@ -2378,3 +2389,40 @@ function renderActivity() {
       <p class="soft mt-2 text-xs">Cada visita es una persona que abrió tu enlace. Si muchos llegan a ver horarios pero pocos reservan, revisa precios, abono o tus huecos libres.</p></div>`;
 }
 $("tab-activity").addEventListener("click", (e) => { const b = e.target.closest("[data-arec]"); if (b) buildRecs()[Number(b.dataset.arec)]?.fn?.(); });
+
+// =====================================================================
+//  UBICACIÓN DEL LOCAL: el panel la pide solo con el GPS del celular o PC
+// =====================================================================
+const geoSkipKey = () => "geoSkip_" + bpath().split("/")[1];
+function requestGeo(manual) {
+  if (!navigator.geolocation) { if (manual) toast("Este dispositivo no permite leer la ubicación.", "error"); return; }
+  if (!manual) { try { if (Number(localStorage.getItem(geoSkipKey()) || 0) > Date.now()) return; } catch { /* sin almacenamiento */ } }
+  if (manual) toast("Buscando tu ubicación…");
+  navigator.geolocation.getCurrentPosition((p) => {
+    const lat = Math.round(p.coords.latitude * 1e6) / 1e6, lng = Math.round(p.coords.longitude * 1e6) / 1e6, acc = Math.round(p.coords.accuracy);
+    const rough = acc > 150;
+    const box = `${lng - 0.004},${lat - 0.0025},${lng + 0.004},${lat + 0.0025}`;
+    openM("¿Estás en tu local?", `
+      <p class="soft -mt-2 mb-3 text-sm">Encontramos esta ubicación. Si es la de tu local, la guardamos para que tus clientes lleguen directo con <b>Waze</b> o <b>Google Maps</b>.</p>
+      <iframe title="Mapa de tu ubicación" class="mb-2 h-56 w-full rounded-2xl border border-line" loading="lazy" src="https://www.openstreetmap.org/export/embed.html?bbox=${box}&layer=mapnik&marker=${lat},${lng}"></iframe>
+      <p class="mb-3 text-xs ${rough ? "font-semibold text-amber-800" : "soft"}">${rough ? `⚠️ Precisión aproximada de ${acc} m. En computador la ubicación es menos exacta: si puedes, hazlo desde el celular estando en el local.` : `Precisión de ${acc} m.`}</p>
+      <button id="geoYes" class="btn-primary w-full py-3">Sí, estoy en mi local: guardar</button>
+      <div class="mt-2 grid grid-cols-2 gap-2"><button id="geoRetry" class="btn-light text-sm">Volver a buscar</button><button id="geoNo" class="btn-light text-sm">No estoy en el local</button></div>`);
+    $("geoYes").onclick = async () => {
+      const btn = $("geoYes"); setBusy(btn, true, "Guardando…");
+      try {
+        await updateDoc(doc(db, bpath("settings", "general")), { geo: { lat, lng, acc } });
+        closeM(); toast("¡Listo! Tus clientes ya ven el botón para llegar con Waze.");
+        if (A.tab === "settings") renderSettings();
+      } catch (err) { toast(err.message, "error"); setBusy(btn, false); }
+    };
+    $("geoRetry").onclick = () => { closeM(); requestGeo(true); };
+    $("geoNo").onclick = () => {
+      try { localStorage.setItem(geoSkipKey(), String(Date.now() + 2 * 86400000)); } catch { /* nada */ }
+      closeM(); toast("Te lo volvemos a pedir otro día. También está en la Guía de configuración.");
+    };
+  }, (err) => {
+    try { localStorage.setItem(geoSkipKey(), String(Date.now() + 3 * 86400000)); } catch { /* nada */ }
+    if (manual || err.code === 1) toast(err.code === 1 ? "Para guardar la ubicación, permite el acceso a tu ubicación en el navegador (el ícono del candado junto a la dirección)." : "No se pudo leer la ubicación. Intenta de nuevo.", "error");
+  }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+}

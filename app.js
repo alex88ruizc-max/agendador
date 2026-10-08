@@ -7,9 +7,9 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   startUpdateWatcher, applyBrandColors, warmServer, uiConfirm, setDialogBrand, viewImage, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, dow, hora12, fechaLarga, fechaCorta, toMillis, cop, esc,
-  normalizePhone, waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, computeSlots, dayCapacityUnits, staffHours,
+  normalizePhone, waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, computeSlots, dayCapacityUnits, staffHours, mapLinks,
   toast, openModal, closeModal, setBusy, copyText, tmin, mstr, UNIT
-} from "./common.js?v=2026-10-08w";
+} from "./common.js?v=2026-10-08y";
 
 const $ = (id) => document.getElementById(id);
 const S = {
@@ -153,7 +153,9 @@ function renderBiz() {
   $("promoBar").classList.toggle("hidden", !promoOn);
   if (promoOn) $("promoBar").textContent = "🔥 " + s.promo.text;
   $("bizName").textContent = s.businessName || "Reserva tu cita";
-  $("bizAddress").textContent = [s.address, s.city].filter(Boolean).join(", ");
+  const ml = mapLinks(s);
+  $("bizAddress").innerHTML = esc([s.address, s.city].filter(Boolean).join(", "))
+    + (ml ? ` <a class="ml-1 inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 font-bold text-white" href="${ml.waze}" target="_blank" rel="noopener" aria-label="Cómo llegar con Waze"><i class="fa-brands fa-waze"></i> Waze</a>` : "");
   $("bizSlogan").textContent = ap.slogan || "";
   $("bizSlogan").classList.toggle("hidden", !ap.slogan);
   const logo = $("bizLogo");
@@ -769,6 +771,9 @@ function showTicket(apt) {
       <div class="px-5 py-4 text-sm text-ink/75">
         <p class="font-semibold text-ink">${note}</p>
         <p class="mt-1">Tolerancia de espera: ${Number(st.toleranceMinutes || 10)} minutos. ${[st.address, st.city].filter(Boolean).map(esc).join(", ")}</p>
+        ${mapLinks(st) ? `<div class="mt-3 grid grid-cols-2 gap-2">
+          <a class="btn-light text-center text-sm" style="background:#33ccff;border-color:#33ccff;color:#0b2540" href="${mapLinks(st).waze}" target="_blank" rel="noopener"><i class="fa-brands fa-waze"></i> Ir con Waze</a>
+          <a class="btn-light text-center text-sm" href="${mapLinks(st).gmaps}" target="_blank" rel="noopener"><i class="fa-solid fa-map-location-dot"></i> Google Maps</a></div>` : ""}
       </div>
     </article>`;
   $("tkCopy").onclick = () => copyText(apt.code);

@@ -2,7 +2,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js?v=2026-10-08w";
+import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js?v=2026-10-08y";
 
 export const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
@@ -16,7 +16,7 @@ export function businessFromUrl() {
 export const bpath = (...parts) => ["businesses", BID, ...parts].join("/");
 
 // Versión de la página: cámbiala en cada actualización para comprobar que se publicó
-export const APP_VERSION = '2026-10-08w';
+export const APP_VERSION = '2026-10-08y';
 
 export const UNIT = 15;          // unidad interna de bloqueo (minutos)
 const TZ = "America/Bogota";     // Colombia no usa horario de verano
@@ -107,13 +107,26 @@ Tu cita en {negocio} quedó registrada con éxito.
 • Servicio: {servicio}
 • Valor: {valor} (abono {abono}, saldo {saldo})
 📍 Dirección: {direccion}
+🚗 Cómo llegar: {waze}
 Si necesitas cancelar o reprogramar, avísanos con al menos 2 horas de anticipación. ¡Te esperamos!`;
 
 export const DEFAULT_WA_RESCHEDULE =
 `Hola {nombre}, te escribimos de {negocio}. Por un imprevisto no podremos atenderte el {fecha} a las {hora}. ¿Te sirve otra hora? Tu abono queda guardado para la nueva cita. Reserva: {codigo}`;
 
+// Botones para llegar al negocio: con el punto exacto (si se guardó) o con la dirección
+export function mapLinks(st = {}) {
+  const g = st.geo && Number.isFinite(st.geo.lat) && Number.isFinite(st.geo.lng) ? `${st.geo.lat},${st.geo.lng}` : "";
+  const addr = [st.address, st.city, "Colombia"].filter(Boolean).join(", ");
+  if (!g && !st.address) return null;
+  return {
+    waze: g ? `https://waze.com/ul?ll=${g}&navigate=yes` : `https://waze.com/ul?q=${encodeURIComponent(addr)}&navigate=yes`,
+    gmaps: `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(g || addr)}`
+  };
+}
 export function fillTemplate(tpl, apt, settings) {
+  const ml = mapLinks(settings || {});
   const map = {
+    waze: ml?.waze || "", mapa: ml?.gmaps || "",
     nombre: apt.customer?.firstName || "",
     negocio: settings?.businessName || "la barbería",
     codigo: apt.code,
