@@ -3,7 +3,7 @@ import { onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordRe
 import {
   doc, getDoc, setDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { APP_VERSION, readPublishedVersion, reloadFresh, startUpdateWatcher, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-10-08o";
+import { APP_VERSION, readPublishedVersion, reloadFresh, startUpdateWatcher, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-10-08p";
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on) => $(id).classList.toggle("hidden", !on);
@@ -41,7 +41,20 @@ $("btnForgot").onclick = async () => {
 };
 $("btnLogout").onclick = () => signOut(auth);
 
+// Menú de secciones (igual al del panel de las tiendas)
+const SUPER_TABS = [["biz", "Tiendas", "fa-store", "#2563eb"], ["pay", "Pagos", "fa-money-bill-wave", "#059669"], ["tg", "Telegram", "fa-paper-plane", "#0891b2"], ["ver", "Versión", "fa-rotate", "#7c3aed"]];
+let superTab = "biz";
+function renderSuperTabs() {
+  $("tabs").innerHTML = SUPER_TABS.map(([id, t, ic, col]) => `<button class="admin-tab" data-stab="${id}" aria-current="${superTab === id ? "page" : "false"}"><i class="fa-solid ${ic}" style="color:${col}"></i><span>${t}</span></button>`).join("");
+}
+$("tabs").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-stab]"); if (!b) return;
+  superTab = b.dataset.stab;
+  document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("hidden", p.id !== "sec-" + superTab));
+  renderSuperTabs();
+});
 function start() {
+  renderSuperTabs();
   Z.unsubs.push(onSnapshot(collection(db, "businesses"), (q) => {
     Z.list = q.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
     Z.list.forEach((b) => {
@@ -80,35 +93,32 @@ function render() {
   const due = Z.list.filter((b) => { const bl = Z.billing[b.id]; const d = daysLeft(bl); return bl?.mode === "monthly" && d !== null && d <= 7; }).length;
   const month = bogNow().date.slice(0, 7);
   const income = Z.payments.filter((p) => new Date(toMillis(p.at)).toISOString().slice(0, 7) === month).reduce((s, p) => s + Number(p.amountCOP || 0), 0);
-  const stat = (n, t) => `<div class="rounded-xl border border-line bg-white p-4"><p class="font-narrow text-3xl font-bold">${n}</p><p class="text-sm text-ink/70">${t}</p></div>`;
-  $("stats").innerHTML = stat(Z.list.length, "barberías") + stat(active, "activas") + stat(Z.list.length - active, "suspendidas")
+  const stat = (n, t) => `<div class="rounded-xl border border-line bg-white px-3 py-2.5"><p class="font-narrow text-2xl font-bold leading-tight">${n}</p><p class="text-xs text-ink/70">${t}</p></div>`;
+  $("stats").innerHTML = stat(Z.list.length, "tiendas") + stat(active, "activas") + stat(Z.list.length - active, "suspendidas")
     + stat(due, "vencen en 7 días o ya vencieron") + stat(cop(income), "cobrado este mes");
   $("list").innerHTML = list.map((b) => {
     const bl = Z.billing[b.id];
     const d = daysLeft(bl);
     const warn = bl?.mode === "monthly" && d !== null && d <= 7;
     const st = Z.stats[b.id];
-    return `<article class="rounded-xl border ${warn ? "border-amber-400" : "border-line"} bg-white p-4">
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <p class="font-narrow text-2xl font-bold">${esc(b.name)}</p>
-        <span class="rounded-full px-2.5 py-0.5 text-xs font-semibold ${b.status === "active" ? "bg-emerald-100 text-emerald-900" : "bg-rose-100 text-rose-900"}">${b.status === "active" ? "Activa" : "Suspendida"}</span>
+    return `<article class="rounded-xl border ${warn ? "border-amber-400" : "border-line"} bg-white p-3">
+      <div class="flex items-start justify-between gap-2">
+        <div class="min-w-0">
+          <p class="truncate font-narrow text-xl font-bold leading-tight">${esc(b.name)}</p>
+          <p class="truncate text-xs text-ink/60">${esc(b.id)}${bl?.ownerEmail ? " · " + esc(bl.ownerEmail) : ""}</p>
+        </div>
+        <span class="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${b.status === "active" ? "bg-emerald-100 text-emerald-900" : "bg-rose-100 text-rose-900"}">${b.status === "active" ? "Activa" : "Suspendida"}</span>
       </div>
-      <p class="text-sm text-ink/60">${esc(b.id)}${bl?.ownerEmail ? ", dueño " + esc(bl.ownerEmail) : ""}</p>
-      ${b.status !== "active" && b.suspendReason ? `<p class="text-sm text-rose-800">Motivo: ${esc(b.suspendReason)}</p>` : ""}
-      <p class="mt-2 text-sm ${warn ? "font-semibold text-amber-900" : ""}">${planLine(bl)}</p>
-      ${bl?.notes ? `<p class="text-sm text-ink/60">${esc(bl.notes)}</p>` : ""}
-      ${st ? `<p class="mt-1 text-sm text-ink/70">${st.error ? "Sin estadísticas" : `${st.monthAppointments} cita(s) este mes, ${st.customers} cliente(s)`}</p>` : ""}
-      <div class="mt-3 flex flex-wrap gap-2">
-        <button class="btn-sm !border-emerald-600 text-emerald-800" data-a="pay" data-id="${b.id}">Registrar pago</button>
-        <button class="btn-sm" data-a="edit" data-id="${b.id}">Editar plan</button>
-        ${b.status === "active" ? `<button class="btn-sm" data-a="suspend" data-id="${b.id}">Suspender</button>` : `<button class="btn-sm !border-emerald-600" data-a="activate" data-id="${b.id}">Activar</button>`}
-        <a class="btn-sm" href="${adminUrl(b.id)}" target="_blank" rel="noopener">Abrir su panel</a>
-        <a class="btn-sm" href="${publicUrl(b.id)}" target="_blank" rel="noopener">Ver página</a>
-        <button class="btn-sm" data-copy="${publicUrl(b.id)}">Copiar enlace para clientes</button>
-        <button class="btn-sm" data-a="pass" data-id="${b.id}">Nueva contraseña del dueño</button>
+      <p class="mt-1.5 text-xs ${warn ? "font-semibold text-amber-900" : "text-ink/70"}">${planLine(bl)}</p>
+      ${b.status !== "active" && b.suspendReason ? `<p class="text-xs text-rose-800">Motivo: ${esc(b.suspendReason)}</p>` : ""}
+      ${st ? `<p class="text-xs text-ink/60">${st.error ? "Sin estadísticas" : `${st.monthAppointments} cita(s) este mes · ${st.customers} cliente(s)`}</p>` : ""}
+      <div class="mt-2.5 flex gap-1.5">
+        <a class="btn-sm flex-1 text-center" href="${adminUrl(b.id)}" target="_blank" rel="noopener"><i class="fa-solid fa-gauge"></i> Panel</a>
+        <button class="btn-sm flex-1 !border-emerald-600 text-emerald-800" data-a="pay" data-id="${b.id}"><i class="fa-solid fa-money-bill-wave"></i> Pago</button>
+        <button class="btn-sm px-3" data-a="more" data-id="${b.id}" aria-label="Más opciones de ${esc(b.name)}"><i class="fa-solid fa-ellipsis-vertical"></i></button>
       </div>
     </article>`;
-  }).join("") || `<p class="text-sm text-ink/60">${Z.list.length ? "No hay coincidencias." : "Aún no has creado barberías. Toca “+ Nueva barbería” para vender la primera."}</p>`;
+  }).join("") || `<p class="text-sm text-ink/60">${Z.list.length ? "No hay coincidencias." : "Aún no has creado tiendas. Toca “+ Nueva tienda” para vender la primera."}</p>`;
 }
 function renderPayments() {
   $("payments").innerHTML = Z.payments.length ? `<ul class="divide-y divide-line">${Z.payments.slice(0, 15).map((p) => `
@@ -207,11 +217,40 @@ $("btnNew").onclick = () => {
 };
 
 // ================= Acciones por barbería =================
-$("list").addEventListener("click", async (e) => {
+$("list").addEventListener("click", (e) => {
   const b = e.target.closest("[data-a]"); if (!b) return;
   const biz = Z.list.find((x) => x.id === b.dataset.id); if (!biz) return;
+  if (b.dataset.a === "more") return openMore(biz);
+  handleAct(b.dataset.a, biz, b);
+});
+// Menú completo de una tienda
+function openMore(biz) {
+  const item = (a, ic, t, extra = "") => `<button class="menu-item" data-ma="${a}" ${extra}><i class="fa-solid ${ic}"></i>${t}</button>`;
+  openM(biz.name, `
+    <p class="-mt-2 mb-3 text-xs text-ink/60">${esc(biz.id)} · ${biz.status === "active" ? "Activa" : "Suspendida"}</p>
+    <div class="grid gap-0.5">
+      <a class="menu-item" href="${adminUrl(biz.id)}" target="_blank" rel="noopener"><i class="fa-solid fa-gauge"></i>Abrir su panel</a>
+      ${item("pay", "fa-money-bill-wave", "Registrar pago")}
+      ${item("edit", "fa-pen", "Editar nombre y plan")}
+      ${biz.status === "active" ? item("suspend", "fa-circle-pause", "Suspender") : item("activate", "fa-circle-play", "Activar")}
+      <div class="my-1 border-t border-line"></div>
+      <a class="menu-item" href="${publicUrl(biz.id)}" target="_blank" rel="noopener"><i class="fa-regular fa-eye"></i>Ver la página de clientes</a>
+      <button class="menu-item" data-copy="${publicUrl(biz.id)}"><i class="fa-regular fa-copy"></i>Copiar enlace para clientes</button>
+      ${item("pass", "fa-key", "Nueva contraseña del dueño")}
+      <div class="my-1 border-t border-line"></div>
+      <button class="menu-item text-pole-red" data-ma="delete"><i class="fa-regular fa-trash-can"></i>Eliminar tienda</button>
+    </div>`);
+  $("modalBody").onclick = (e) => {
+    const m = e.target.closest("[data-ma]"); if (!m) return;
+    $("modalBody").onclick = null;
+    closeModal("modal");
+    handleAct(m.dataset.ma, biz, null);
+  };
+}
+async function handleAct(act, biz, b) {
+  b = b || document.createElement("button"); // cuando viene del menú no hay botón que marcar
   const bl = Z.billing[biz.id] || {};
-  const act = b.dataset.a;
+  if (act === "delete") return deleteBusiness(biz);
 
   if (act === "edit") {
     openM("Editar " + biz.name, `<label class="field mb-4"><span>Nombre del negocio</span><input id="eName" value="${esc(biz.name)}"></label>${planForm(bl)}
@@ -277,7 +316,21 @@ $("list").addEventListener("click", async (e) => {
       openM("Contraseña nueva", `<pre class="mb-4 whitespace-pre-wrap rounded-lg bg-paper p-3 text-sm">${esc(msg)}</pre><button class="btn-primary" data-copy="${esc(msg)}">Copiar</button>`);
     } catch (err) { toast(err.message, "error"); }
   }
-});
+}
+
+// Eliminar tienda (pide escribir el identificador para evitar errores)
+async function deleteBusiness(biz) {
+  const typed = await uiPrompt(`Eliminar ${biz.name}`,
+    `Se borran para siempre su configuración, servicios, equipo, citas, clientes y accesos al panel. Esto no se puede deshacer. Para confirmar escribe: ${biz.id}`,
+    "", { okText: "Eliminar para siempre", danger: true });
+  if (typed === null) return;
+  if (typed.trim().toLowerCase() !== biz.id) return toast("El identificador no coincide. No se eliminó nada.", "error");
+  toast("Eliminando " + biz.name + "…");
+  try {
+    const r = await api("superDeleteBusiness", { businessId: biz.id, confirm: typed.trim().toLowerCase() });
+    toast(`${biz.name} fue eliminada (${r.deleted} registro(s) borrados).`);
+  } catch (err) { toast(err.message, "error"); }
+}
 
 $("btnOverview").onclick = async () => {
   const btn = $("btnOverview"); setBusy(btn, true, "Contando…");

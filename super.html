@@ -9,15 +9,16 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Archivo+Narrow:wght@500;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="theme.js?v=2026-10-08o"></script>
-  <link rel="stylesheet" href="styles.css?v=2026-10-08o">
+  <script src="theme.js?v=2026-10-08p"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="styles.css?v=2026-10-08p">
 </head>
 <body class="bg-paper text-ink font-sans antialiased">
 
   <header class="pole-top bg-ink text-white">
     <div class="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-4">
       <div>
-        <h1 class="font-narrow text-2xl font-bold leading-tight">Tus barberías</h1>
+        <h1 class="font-narrow text-2xl font-bold leading-tight">Tus tiendas</h1>
         <p id="who" class="text-sm text-white/70"></p>
       </div>
       <button id="btnLogout" class="btn-ghost hidden text-sm text-white/80">Salir</button>
@@ -38,42 +39,53 @@
     <p class="rounded-2xl bg-white p-6">Esta cuenta no es de superusuario. Si eres dueño de una barbería, entra por <a class="underline" href="admin.html">el panel de tu barbería</a>.</p>
   </section>
 
-  <div id="appView" class="mx-auto hidden max-w-6xl px-4 pb-24 pt-6">
-    <div id="stats" class="mb-6 grid grid-cols-2 gap-3 md:grid-cols-5"></div>
-    <div class="mb-4 flex flex-wrap items-center gap-2">
-      <button id="btnNew" class="btn-primary">+ Nueva barbería</button>
-      <button id="btnOverview" class="btn-light">Ver citas y clientes de cada una</button>
-      <input id="search" placeholder="Buscar barbería" class="ml-auto min-w-0 rounded-lg border border-line px-3 py-2">
+  <div id="appView" class="mx-auto hidden max-w-6xl px-4 pb-24 pt-4 lg:grid lg:grid-cols-[230px_minmax(0,1fr)] lg:items-start lg:gap-6">
+    <nav class="mb-5 rounded-2xl border border-line bg-white/60 p-2 lg:sticky lg:top-6 lg:mb-0" aria-label="Secciones">
+      <div class="hidden px-2 pb-2 pt-1 lg:block"><span class="text-[10px] font-bold uppercase tracking-wider text-ink/50">Superusuario</span></div>
+      <div id="tabs" class="grid grid-cols-4 gap-1.5 lg:grid-cols-1"></div>
+    </nav>
+    <div class="min-w-0">
+      <section id="sec-biz" class="tab-panel">
+        <div id="stats" class="mb-4 grid grid-cols-2 gap-2 md:grid-cols-5"></div>
+        <div class="mb-3 flex flex-wrap items-center gap-2">
+          <button id="btnNew" class="btn-primary text-sm">+ Nueva tienda</button>
+          <button id="btnOverview" class="btn-light text-sm">Ver citas y clientes</button>
+          <input id="search" placeholder="Buscar tienda" class="min-w-0 flex-1 rounded-lg border border-line px-3 py-2">
+        </div>
+        <div id="list" class="grid gap-2 md:grid-cols-2"></div>
+      </section>
+      <section id="sec-pay" class="tab-panel hidden">
+        <div class="rounded-xl border border-line bg-white p-4">
+          <h2 class="mb-2 font-narrow text-xl font-bold">Últimos pagos recibidos</h2>
+          <div id="payments" class="text-sm"></div>
+        </div>
+      </section>
+      <section id="sec-tg" class="tab-panel hidden">
+        <div class="rounded-xl border border-line bg-white p-4">
+          <h2 class="mb-2 font-narrow text-xl font-bold">Telegram de la plataforma</h2>
+          <p class="mb-3 text-sm text-ink/70">Un solo bot sirve a todas las tiendas. Aquí recibes los avisos de vencimientos, suspensiones y tiendas nuevas.</p>
+          <div class="mb-3 flex gap-2">
+            <input id="botUser" placeholder="Usuario del bot, sin @" class="min-w-0 flex-1 rounded-lg border border-line px-3 py-2">
+            <button id="btnSaveBot" class="btn-dark">Guardar</button>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <button id="btnTgSuper" class="btn-light">Conectar mi Telegram</button>
+            <span id="tgSuperState" class="text-sm text-ink/70"></span>
+          </div>
+        </div>
+      </section>
+      <section id="sec-ver" class="tab-panel hidden">
+        <div class="rounded-xl border border-line bg-white p-4">
+          <h2 class="mb-1 font-narrow text-xl font-bold">Actualizaciones de la página</h2>
+          <p class="mb-3 text-sm text-ink/70">Después de subir archivos a GitHub, comprueba aquí que la página nueva ya quedó publicada.</p>
+          <div class="flex flex-wrap items-center gap-2">
+            <button id="btnCheckVersion" type="button" class="btn-light text-sm">↻ Comprobar actualizaciones de la página</button>
+            <span id="txtVersion" class="text-[11px] text-ink/50"></span>
+          </div>
+          <div id="versionResult" class="mt-2 hidden"></div>
+        </div>
+      </section>
     </div>
-    <div id="list" class="grid gap-3 md:grid-cols-2"></div>
-
-    <section class="mt-10 grid gap-4 md:grid-cols-2">
-      <div class="rounded-xl border border-line bg-white p-4 md:col-span-2">
-        <h2 class="mb-1 font-narrow text-xl font-bold">Actualizaciones de la página</h2>
-        <p class="mb-3 text-sm text-ink/70">Después de subir archivos a GitHub, comprueba aquí que la página nueva ya quedó publicada.</p>
-        <div class="flex flex-wrap items-center gap-2">
-          <button id="btnCheckVersion" type="button" class="btn-light text-sm">↻ Comprobar actualizaciones de la página</button>
-          <span id="txtVersion" class="text-[11px] text-ink/50"></span>
-        </div>
-        <div id="versionResult" class="mt-2 hidden"></div>
-      </div>
-      <div class="rounded-xl border border-line bg-white p-4">
-        <h2 class="mb-2 font-narrow text-xl font-bold">Telegram de la plataforma</h2>
-        <p class="mb-3 text-sm text-ink/70">Un solo bot sirve a todas las barberías. Aquí recibes los avisos de vencimientos, suspensiones y barberías nuevas.</p>
-        <div class="mb-3 flex gap-2">
-          <input id="botUser" placeholder="Usuario del bot, sin @" class="min-w-0 flex-1 rounded-lg border border-line px-3 py-2">
-          <button id="btnSaveBot" class="btn-dark">Guardar</button>
-        </div>
-        <div class="flex flex-wrap items-center gap-2">
-          <button id="btnTgSuper" class="btn-light">Conectar mi Telegram</button>
-          <span id="tgSuperState" class="text-sm text-ink/70"></span>
-        </div>
-      </div>
-      <div class="rounded-xl border border-line bg-white p-4">
-        <h2 class="mb-2 font-narrow text-xl font-bold">Últimos pagos recibidos</h2>
-        <div id="payments" class="text-sm"></div>
-      </div>
-    </section>
   </div>
 
   <div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
@@ -86,6 +98,6 @@
     </div>
   </div>
 
-  <script type="module" src="super.js?v=2026-10-08o"></script>
+  <script type="module" src="super.js?v=2026-10-08p"></script>
 </body>
 </html>
