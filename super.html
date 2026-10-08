@@ -7,132 +7,235 @@
   <title>Superusuario · Agendador</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Archivo+Narrow:wght@500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Archivo+Narrow:wght@500;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="theme.js?v=2026-10-08r"></script>
+  <script src="theme.js?v=2026-10-08t"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="styles.css?v=2026-10-08r">
+  <link rel="stylesheet" href="styles.css?v=2026-10-08t">
+  <style>
+    /* ===== Panel del superusuario: claro, frío, con un solo elemento protagonista (el carril de cobros) ===== */
+    .sp { --canvas:#F2F5F8; --paperw:#FFFFFF; --sink:#14213D; --soft:#5B6782; --hair:#DDE3EA; --sblue:#2B59C3; --sred:#D7263D; --mint:#1E9E63; --sky:#3F8FD6; --amber:#C77700;
+      background:var(--canvas); color:var(--sink); font-family:Figtree, system-ui, sans-serif; }
+    .sp .disp { font-family:"Bricolage Grotesque", system-ui, sans-serif; letter-spacing:-.01em; }
+    .sp .soft { color:var(--soft); }
+    .sp .btn-primary { background:var(--sink); color:#fff; }
+    .sp .btn-primary:hover { background:#0e1830; }
+    .sp .field span { color:var(--soft); }
+    .sp .sp-card { background:var(--paperw); border-radius:22px; padding:16px; }
+    .sp .sp-h { display:flex; justify-content:space-between; align-items:baseline; gap:.5rem; margin:22px 2px 8px; }
+    .sp .sp-h h2 { font-family:"Bricolage Grotesque", system-ui, sans-serif; font-size:18px; font-weight:700; }
+    .sp .sp-h span { font-size:12.5px; color:var(--soft); }
+
+    /* Navegación: barra inferior en el celular, columna lateral en el computador */
+    .sp-nav { position:fixed; left:12px; right:12px; bottom:calc(12px + env(safe-area-inset-bottom, 0px)); z-index:50; background:var(--sink); border-radius:22px;
+      display:flex; align-items:center; justify-content:space-around; padding:9px 6px; box-shadow:0 14px 34px -14px rgba(20,33,61,.6); }
+    .sp-nav .nv { display:flex; flex-direction:column; align-items:center; gap:3px; font-size:10.5px; font-weight:600; color:#9fb0cf; padding:2px 8px; border-radius:12px; }
+    .sp-nav .nv i { font-size:18px; }
+    .sp-nav .nv[aria-current="page"] { color:#fff; }
+    .sp-nav .nv-plus { width:46px; height:46px; border-radius:15px; background:#fff; color:var(--sink); display:grid; place-items:center; font-size:22px; font-weight:700; }
+    .sp-nav .nv-brand { display:none; }
+    @media (min-width:1024px) {
+      .sp-shell { display:grid; grid-template-columns:232px minmax(0,1fr); gap:28px; max-width:1180px; margin:0 auto; padding:24px; }
+      .sp-nav { position:sticky; top:24px; left:auto; right:auto; bottom:auto; flex-direction:column; align-items:stretch; justify-content:flex-start; gap:4px; padding:16px 12px; height:max-content; border-radius:24px; }
+      .sp-nav .nv { flex-direction:row; gap:12px; font-size:14px; padding:11px 12px; }
+      .sp-nav .nv[aria-current="page"] { background:rgba(255,255,255,.1); }
+      .sp-nav .nv-plus { width:auto; height:auto; padding:11px 12px; border-radius:12px; font-size:14px; justify-content:flex-start; display:flex; gap:12px; margin-top:8px; }
+      .sp-nav .nv-brand { display:block; color:#fff; padding:4px 12px 14px; }
+      .sp-main { padding-bottom:40px !important; }
+    }
+
+    /* Carril de cobros */
+    .ruler { position:relative; height:124px; margin-top:12px; }
+    .ruler .zone { position:absolute; top:0; bottom:24px; left:0; border-radius:12px 0 0 12px; background:repeating-linear-gradient(-45deg, rgba(215,38,61,.09) 0 6px, transparent 6px 12px); }
+    .ruler .axis { position:absolute; left:0; right:0; bottom:24px; height:2px; background:var(--hair); }
+    .ruler .tick { position:absolute; bottom:18px; width:1px; height:8px; background:#c4ccd6; }
+    .ruler .tl { position:absolute; bottom:0; font-size:10.5px; color:var(--soft); transform:translateX(-50%); white-space:nowrap; }
+    .ruler .today { position:absolute; top:-2px; bottom:24px; width:2px; background:var(--sink); }
+    .ruler .today span { position:absolute; top:-3px; left:6px; font-size:11px; font-weight:700; white-space:nowrap; }
+    .ruler .pin { position:absolute; transform:translateX(-50%); display:flex; flex-direction:column; align-items:center; bottom:24px; }
+    .ruler .pin b { width:34px; height:34px; border-radius:50%; display:grid; place-items:center; font-size:11px; font-weight:800; border:3px solid #fff; box-shadow:0 0 0 1.5px currentColor; overflow:hidden; }
+    .ruler .pin b img { width:100%; height:100%; object-fit:cover; }
+    .ruler .pin i { width:2px; flex:1; background:currentColor; opacity:.35; }
+    .ruler .pin:focus-visible b { outline:3px solid var(--sblue); outline-offset:2px; }
+    .legend { display:flex; flex-wrap:wrap; gap:6px 14px; margin-top:10px; font-size:11.5px; color:var(--soft); }
+
+    /* Tareas */
+    .todo { background:var(--paperw); border-radius:18px; padding:12px 13px; display:flex; gap:12px; align-items:center; margin-top:8px; }
+    .todo .ic { width:36px; height:36px; border-radius:12px; display:grid; place-items:center; flex-shrink:0; font-size:15px; }
+    .todo .act { font-size:12.5px; font-weight:700; border-radius:999px; padding:8px 13px; white-space:nowrap; flex-shrink:0; }
+
+    /* Lista de tiendas */
+    .srow { display:flex; align-items:center; gap:12px; padding:12px 14px; width:100%; text-align:left; }
+    .srow + .srow { border-top:1px solid var(--hair); }
+    .srow:hover { background:#f7f9fb; }
+    .srow .av { width:40px; height:40px; border-radius:13px; display:grid; place-items:center; font-weight:800; font-size:13px; flex-shrink:0; overflow:hidden; }
+    .srow .av img { width:100%; height:100%; object-fit:cover; }
+    .tag { font-size:11px; font-weight:700; border-radius:999px; padding:3px 9px; white-space:nowrap; }
+    .fchip { border:1px solid var(--hair); background:var(--paperw); border-radius:999px; padding:7px 12px; font-size:12.5px; font-weight:600; white-space:nowrap; }
+    .fchip[aria-pressed="true"] { background:var(--sink); color:#fff; border-color:var(--sink); }
+    .seg { display:grid; grid-auto-flow:column; grid-auto-columns:1fr; background:#e6ebf1; border-radius:14px; padding:4px; gap:4px; }
+    .seg button { border-radius:10px; padding:8px; font-size:13px; font-weight:600; color:var(--soft); }
+    .seg button[aria-pressed="true"] { background:var(--paperw); color:var(--sink); box-shadow:0 1px 2px rgba(20,33,61,.12); }
+
+    /* Tonos por estado */
+    .t-ok { background:#e2f5ec; color:#16774b; } .t-trial { background:#e3f0fc; color:#1f6fb3; }
+    .t-due { background:#fff3dc; color:#9a5a00; } .t-late { background:#fde8eb; color:#b81d33; } .t-off { background:#eceff3; color:#5b6782; }
+    @media (prefers-reduced-motion: no-preference) { .ruler .pin { transition:transform .15s; } .ruler .pin:hover { transform:translateX(-50%) translateY(-3px); } }
+  </style>
 </head>
-<body class="bg-paper text-ink font-sans antialiased">
+<body class="sp antialiased">
 
-  <header class="pole-top bg-ink text-white">
-    <div class="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-4">
-      <div>
-        <h1 class="font-narrow text-2xl font-bold leading-tight">Tus tiendas</h1>
-        <p id="who" class="text-sm text-white/70"></p>
-      </div>
-      <button id="btnLogout" class="btn-ghost hidden text-sm text-white/80">Salir</button>
-    </div>
-  </header>
-
-  <section id="loginView" class="mx-auto mt-12 hidden max-w-sm px-4">
-    <form id="loginForm" class="space-y-3 rounded-2xl bg-white p-6">
-      <h2 class="font-narrow text-2xl font-bold">Ingreso del superusuario</h2>
-      <label class="field"><span>Correo</span><input name="email" type="email" required autocomplete="email"></label>
-      <label class="field"><span>Contraseña</span><input name="password" type="password" required autocomplete="current-password"></label>
-      <button class="btn-primary w-full" type="submit">Ingresar</button>
-      <button id="btnForgot" type="button" class="w-full text-center text-sm text-pole-blue underline">Olvidé mi contraseña</button>
-    </form>
-  </section>
-
-  <section id="deniedView" class="mx-auto mt-12 hidden max-w-md px-4 text-center">
-    <p class="rounded-2xl bg-white p-6">Esta cuenta no es de superusuario. Si eres dueño de una barbería, entra por <a class="underline" href="admin.html">el panel de tu barbería</a>.</p>
-  </section>
-
-  <div id="appView" class="mx-auto hidden max-w-6xl px-4 pb-24 pt-4 lg:grid lg:grid-cols-[230px_minmax(0,1fr)] lg:items-start lg:gap-6">
-    <nav class="mb-5 rounded-2xl border border-line bg-white/60 p-2 lg:sticky lg:top-6 lg:mb-0" aria-label="Secciones">
-      <div class="hidden px-2 pb-2 pt-1 lg:block"><span class="text-[10px] font-bold uppercase tracking-wider text-ink/50">Superusuario</span></div>
-      <div id="tabs" class="grid grid-cols-3 gap-1.5 lg:grid-cols-1"></div>
+  <div class="sp-shell">
+    <nav id="spNav" class="sp-nav hidden" aria-label="Secciones">
+      <div class="nv-brand"><p class="disp text-xl font-extrabold">Agendador</p><p class="text-xs text-white/50">Panel de la plataforma</p></div>
+      <button class="nv" data-sv="home" aria-current="page"><i class="fa-solid fa-house"></i><span>Inicio</span></button>
+      <button class="nv" data-sv="biz"><i class="fa-solid fa-store"></i><span>Tiendas</span></button>
+      <button id="btnNew" class="nv-plus" aria-label="Crear tienda"><i class="fa-solid fa-plus"></i><span class="hidden lg:inline">Crear tienda</span></button>
+      <button class="nv" data-sv="money"><i class="fa-solid fa-wallet"></i><span>Cobros</span></button>
+      <button class="nv" data-sv="more"><i class="fa-solid fa-sliders"></i><span>Ajustes</span></button>
     </nav>
-    <div class="min-w-0">
-      <section id="sec-biz" class="tab-panel">
-        <div id="stats" class="mb-4 grid grid-cols-2 gap-2 md:grid-cols-5"></div>
-        <div class="mb-3 flex flex-wrap items-center gap-2">
-          <button id="btnNew" class="btn-primary text-sm">+ Nueva tienda</button>
-          <button id="btnOverview" class="btn-light text-sm">Ver citas y clientes</button>
-          <input id="search" placeholder="Buscar tienda" class="min-w-0 flex-1 rounded-lg border border-line px-3 py-2">
+
+    <main class="sp-main mx-auto w-full max-w-3xl px-4 pb-32 pt-6 lg:px-0 lg:pt-2">
+      <header class="mb-2 flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <h1 id="hello" class="disp text-[30px] font-extrabold leading-none">Panel de la plataforma</h1>
+          <p id="helloSub" class="soft mt-2 text-sm"></p>
         </div>
-        <div id="list" class="grid gap-2 md:grid-cols-2"></div>
-      </section>
-      <section id="sec-pay" class="tab-panel hidden">
-        <div class="rounded-xl border border-line bg-white p-4">
-          <h2 class="mb-2 font-narrow text-xl font-bold">Últimos pagos recibidos</h2>
-          <div id="payments" class="text-sm"></div>
+        <div class="relative">
+          <button id="btnAvatar" class="hidden h-10 w-10 shrink-0 rounded-full text-base font-bold text-white" style="background:var(--sblue)" aria-haspopup="true" aria-label="Mi cuenta"></button>
+          <div id="avatarMenu" class="hdr-menu hidden" role="menu">
+            <p id="who" class="truncate text-sm font-semibold"></p>
+            <p class="text-xs text-ink/60">Superusuario</p>
+            <div class="mt-3 border-t border-line pt-2"><button id="btnLogout" class="menu-item text-pole-red"><i class="fa-solid fa-right-from-bracket"></i>Cerrar sesión</button></div>
+          </div>
         </div>
+      </header>
+
+      <section id="loginView" class="mt-10 hidden">
+        <form id="loginForm" class="sp-card mx-auto max-w-sm space-y-3">
+          <h2 class="disp text-2xl font-bold">Ingresa a tu plataforma</h2>
+          <label class="field"><span>Correo</span><input name="email" type="email" required autocomplete="email"></label>
+          <label class="field"><span>Contraseña</span><input name="password" type="password" required autocomplete="current-password"></label>
+          <button class="btn-primary w-full" type="submit">Ingresar</button>
+          <button id="btnForgot" type="button" class="w-full text-center text-sm underline" style="color:var(--sblue)">Olvidé mi contraseña</button>
+        </form>
       </section>
-      <section id="sec-plan" class="tab-panel hidden">
-        <div class="space-y-3">
-          <div class="rounded-xl border border-line bg-white p-4">
-            <h2 class="mb-1 font-narrow text-xl font-bold">Plan y prueba gratis</h2>
-            <p class="mb-3 text-sm text-ink/70">Lo que ven los dueños en “Mi plan” y lo que se usa cuando alguien crea su tienda con “Probar gratis”.</p>
-            <div class="grid gap-3 sm:grid-cols-3">
-              <label class="field"><span>Nombre del plan</span><input id="plName" placeholder="Plan mensual"></label>
-              <label class="field"><span>Mensualidad (COP)</span><input id="plPrice" type="number" min="0" step="1000"></label>
-              <label class="field"><span>Días gratis</span><input id="plDays" type="number" min="1" max="90"></label>
+
+      <section id="deniedView" class="mt-10 hidden">
+        <p class="sp-card mx-auto max-w-md text-center">Esta cuenta no es de superusuario. Si tienes una tienda, entra por <a class="underline" href="admin.html">el panel de tu tienda</a>.</p>
+      </section>
+
+      <div id="appView" class="hidden">
+        <!-- ===== Inicio ===== -->
+        <section id="sv-home" class="sv">
+          <div class="sp-card mt-4">
+            <div class="flex items-baseline justify-between gap-2">
+              <h2 class="disp text-[18px] font-bold">Quién paga y cuándo</h2>
+              <span class="soft text-xs">próximos 30 días</span>
             </div>
-            <label class="mt-3 flex items-center gap-2 text-sm"><input id="plTrial" type="checkbox" class="h-4 w-4"> Mostrar “Probar gratis” en las páginas de las tiendas</label>
-            <p class="mt-1 text-xs text-ink/60">El precio aplica a las tiendas nuevas. Para cambiar el de una tienda existente usa “Editar nombre y plan” en su menú.</p>
+            <div id="lane" class="ruler" role="list" aria-label="Vencimientos de las tiendas"></div>
+            <div class="legend"><span><span style="color:var(--mint)">●</span> al día</span><span><span style="color:var(--sky)">●</span> en prueba</span><span><span style="color:var(--amber)">●</span> vence pronto</span><span><span style="color:var(--sred)">●</span> vencida</span><span id="laneOff"></span></div>
           </div>
-          <div class="rounded-xl border-2 border-emerald-500 bg-white p-4">
-            <h2 class="mb-1 font-narrow text-xl font-bold">⚡ Pago automático Bre-B</h2>
-            <p class="mb-3 text-sm text-ink/70">Como en Epic Channels: cada pago lleva un monto único (ej. $50.037) y el servidor lee en tu Gmail los avisos de Nequi y activa el plan solo.</p>
-            <label class="mb-3 flex items-center gap-2 text-sm"><input id="bbOn" type="checkbox" class="h-4 w-4"> Activar pago automático en “Mi plan” de las tiendas</label>
-            <div class="grid gap-3 sm:grid-cols-2">
-              <label class="field"><span>Tu llave Bre-B</span><input id="bbKey" placeholder="@tullave o número"></label>
-              <label class="field"><span>Titular</span><input id="bbHolder"></label>
-              <label class="field"><span>Remitente de los correos de aviso</span><input id="bbSender" placeholder="nequi"></label>
-              <div class="flex items-end gap-2"><img id="bbQrImg" class="hidden h-12 w-12 rounded border border-line bg-white object-contain" alt="QR">
-                <label class="btn-sm cursor-pointer">Subir QR (opcional)<input id="bbQr" type="file" accept="image/*" class="hidden"></label></div>
+          <div class="sp-h"><h2>Para hoy</h2><span id="todoCount"></span></div>
+          <div id="todo"></div>
+          <div id="month" class="sp-card mt-4"></div>
+        </section>
+
+        <!-- ===== Tiendas ===== -->
+        <section id="sv-biz" class="sv hidden">
+          <div class="sp-h"><h2>Tiendas</h2><button id="btnOverview" class="text-sm font-semibold" style="color:var(--sblue)">Contar citas y clientes</button></div>
+          <input id="search" type="search" placeholder="Buscar por nombre, enlace o correo" class="w-full rounded-2xl border border-line bg-white px-4 py-3 text-sm">
+          <div id="bizFilters" class="mt-3 flex gap-2 overflow-x-auto pb-1"></div>
+          <div id="list" class="sp-card mt-3 overflow-hidden !p-0"></div>
+        </section>
+
+        <!-- ===== Cobros ===== -->
+        <section id="sv-money" class="sv hidden">
+          <div class="seg mt-4" role="group" aria-label="Cobros">
+            <button data-mseg="plan" aria-pressed="true">Plan y precios</button>
+            <button data-mseg="orders">Bre-B <span id="ordersBadge"></span></button>
+            <button data-mseg="pay">Pagos</button>
+          </div>
+          <div id="m-plan" class="mseg mt-4 space-y-3">
+            <div class="sp-card">
+              <h2 class="disp mb-1 text-[18px] font-bold">Plan y prueba gratis</h2>
+              <p class="soft mb-3 text-sm">Lo que ven los dueños en “Mi plan” y lo que recibe quien crea su tienda con “Probar gratis”.</p>
+              <div class="grid gap-3 sm:grid-cols-3">
+                <label class="field"><span>Nombre del plan</span><input id="plName" placeholder="Plan mensual"></label>
+                <label class="field"><span>Mensualidad (COP)</span><input id="plPrice" type="number" min="0" step="1000"></label>
+                <label class="field"><span>Días gratis</span><input id="plDays" type="number" min="1" max="90"></label>
+              </div>
+              <label class="mt-3 flex items-center gap-2 text-sm"><input id="plTrial" type="checkbox" class="h-4 w-4"> Mostrar “Probar gratis” en las páginas de las tiendas</label>
+              <p class="soft mt-1 text-xs">El precio aplica a las tiendas nuevas. Para cambiar el de una tienda existente, ábrela en Tiendas.</p>
             </div>
-            <p class="mt-2 text-xs text-ink/60">Requiere ejecutar una vez <b>activarPagosBreb</b> en Apps Script y que los avisos de Nequi lleguen al Gmail dueño del script.</p>
+            <div class="sp-card">
+              <h2 class="disp mb-1 text-[18px] font-bold">Pago automático por Bre-B</h2>
+              <p class="soft mb-3 text-sm">Cada pago lleva un valor único (por ejemplo $50.037) y el sistema lee en tu Gmail los avisos de Nequi para activar el plan solo.</p>
+              <label class="mb-3 flex items-center gap-2 text-sm"><input id="bbOn" type="checkbox" class="h-4 w-4"> Ofrecer el pago automático en “Mi plan”</label>
+              <div class="grid gap-3 sm:grid-cols-2">
+                <label class="field"><span>Tu llave Bre-B</span><input id="bbKey" placeholder="@tullave o número"></label>
+                <label class="field"><span>Titular</span><input id="bbHolder"></label>
+                <label class="field"><span>Remitente de los avisos</span><input id="bbSender" placeholder="nequi"></label>
+                <div class="flex items-end gap-2"><img id="bbQrImg" class="hidden h-12 w-12 rounded border border-line bg-white object-contain" alt="QR de Bre-B">
+                  <label class="btn-sm cursor-pointer">Subir QR<input id="bbQr" type="file" accept="image/*" class="hidden"></label></div>
+              </div>
+              <p class="soft mt-2 text-xs">Requiere ejecutar una vez <b>activarPagosBreb</b> en Apps Script, con los avisos de Nequi llegando al Gmail dueño del script.</p>
+            </div>
+            <div class="sp-card">
+              <h2 class="disp mb-1 text-[18px] font-bold">Otros medios de pago</h2>
+              <p class="soft mb-3 text-sm">Pagos con comprobante que apruebas desde Telegram.</p>
+              <div id="plMethods" class="space-y-2"></div>
+              <button id="plAdd" type="button" class="btn-sm mt-2">Agregar medio de pago</button>
+            </div>
+            <button id="plSave" class="btn-primary w-full py-3">Guardar plan y medios de pago</button>
           </div>
-          <div class="rounded-xl border border-line bg-white p-4">
-            <h2 class="mb-2 font-narrow text-xl font-bold">Otros medios de pago (manual con comprobante)</h2>
-            <p class="mb-3 text-sm text-ink/70">Donde los dueños te pagan la mensualidad. Pueden ver el QR en grande.</p>
-            <div id="plMethods" class="space-y-2"></div>
-            <button id="plAdd" type="button" class="btn-sm mt-2">+ Agregar medio de pago</button>
+          <div id="m-orders" class="mseg mt-4 hidden"><div id="orders"></div></div>
+          <div id="m-pay" class="mseg mt-4 hidden"><div class="sp-card"><div id="payments" class="text-sm"></div></div></div>
+        </section>
+
+        <!-- ===== Ajustes ===== -->
+        <section id="sv-more" class="sv hidden space-y-3">
+          <div class="sp-card mt-4">
+            <h2 class="disp mb-1 text-[18px] font-bold">Mensaje a todos los dueños</h2>
+            <p class="soft mb-3 text-sm">Les llega por Telegram a los dueños que lo conectaron. Úsalo para novedades o mantenimientos.</p>
+            <textarea id="newsText" rows="3" maxlength="800" class="w-full rounded-xl border border-line px-3 py-2" placeholder="Ej. Ya puedes cobrar con Bre-B desde Mi plan."></textarea>
+            <button id="newsSend" class="btn-primary mt-2">Enviar a los dueños</button>
           </div>
-          <button id="plSave" class="btn-primary w-full">Guardar</button>
-        </div>
-      </section>
-      <section id="sec-tg" class="tab-panel hidden">
-        <div class="rounded-xl border border-line bg-white p-4">
-          <h2 class="mb-2 font-narrow text-xl font-bold">Telegram de la plataforma</h2>
-          <p class="mb-3 text-sm text-ink/70">Un solo bot sirve a todas las tiendas. Aquí recibes los avisos de vencimientos, suspensiones y tiendas nuevas.</p>
-          <div class="mb-3 flex gap-2">
-            <input id="botUser" placeholder="Usuario del bot, sin @" class="min-w-0 flex-1 rounded-lg border border-line px-3 py-2">
-            <button id="btnSaveBot" class="btn-dark">Guardar</button>
+          <div class="sp-card">
+            <h2 class="disp mb-1 text-[18px] font-bold">Meta del mes</h2>
+            <p class="soft mb-3 text-sm">Se muestra en Inicio para ver cuánto te falta.</p>
+            <div class="flex gap-2"><input id="goalInput" type="number" min="0" step="10000" class="min-w-0 flex-1 rounded-xl border border-line px-3 py-2" placeholder="500000"><button id="goalSave" class="btn-light">Guardar</button></div>
           </div>
-          <div class="flex flex-wrap items-center gap-2">
-            <button id="btnTgSuper" class="btn-light">Conectar mi Telegram</button>
-            <span id="tgSuperState" class="text-sm text-ink/70"></span>
+          <div class="sp-card">
+            <h2 class="disp mb-1 text-[18px] font-bold">Telegram</h2>
+            <p class="soft mb-3 text-sm">Un solo bot sirve a todas las tiendas. A tu Telegram llegan pagos, tiendas nuevas y vencimientos.</p>
+            <div class="mb-3 flex gap-2">
+              <input id="botUser" placeholder="Usuario del bot, sin @" class="min-w-0 flex-1 rounded-xl border border-line px-3 py-2">
+              <button id="btnSaveBot" class="btn-light">Guardar</button>
+            </div>
+            <div class="flex flex-wrap items-center gap-2"><button id="btnTgSuper" class="btn-light">Conectar mi Telegram</button><span id="tgSuperState" class="soft text-sm"></span></div>
           </div>
-        </div>
-      </section>
-      <section id="sec-ver" class="tab-panel hidden">
-        <div class="rounded-xl border border-line bg-white p-4">
-          <h2 class="mb-1 font-narrow text-xl font-bold">Actualizaciones de la página</h2>
-          <p class="mb-3 text-sm text-ink/70">Después de subir archivos a GitHub, comprueba aquí que la página nueva ya quedó publicada.</p>
-          <div class="flex flex-wrap items-center gap-2">
-            <button id="btnCheckVersion" type="button" class="btn-light text-sm">↻ Comprobar actualizaciones de la página</button>
-            <span id="txtVersion" class="text-[11px] text-ink/50"></span>
+          <div class="sp-card">
+            <h2 class="disp mb-1 text-[18px] font-bold">Versión de la página</h2>
+            <p class="soft mb-3 text-sm">Después de subir archivos a GitHub, comprueba que la versión nueva quedó publicada.</p>
+            <div class="flex flex-wrap items-center gap-2"><button id="btnCheckVersion" type="button" class="btn-light text-sm">Comprobar actualizaciones</button><span id="txtVersion" class="soft text-xs"></span></div>
+            <div id="versionResult" class="mt-2 hidden"></div>
           </div>
-          <div id="versionResult" class="mt-2 hidden"></div>
-        </div>
-      </section>
-    </div>
+        </section>
+      </div>
+    </main>
   </div>
 
   <div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal-card max-w-xl">
       <div class="mb-4 flex items-start justify-between gap-3">
-        <h3 id="modalTitle" class="font-narrow text-2xl font-bold"></h3>
+        <h3 id="modalTitle" class="disp text-2xl font-bold"></h3>
         <button class="btn-ghost" data-close="modal" aria-label="Cerrar">✕</button>
       </div>
       <div id="modalBody"></div>
     </div>
   </div>
 
-  <script type="module" src="super.js?v=2026-10-08r"></script>
+  <script type="module" src="super.js?v=2026-10-08t"></script>
 </body>
 </html>

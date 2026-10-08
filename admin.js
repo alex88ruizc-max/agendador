@@ -1,19 +1,19 @@
 // Panel de administración: agenda, pagos, descansos, clientes, servicios y configuración
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
-  doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, query, where, onSnapshot, serverTimestamp
+  doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, collection, query, where, onSnapshot, serverTimestamp, Timestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   startUpdateWatcher, applyBrandColors, uiConfirm, uiPrompt, setDialogBrand, viewImage, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, hora12, fechaLarga, fechaCorta, toMillis, cop, esc, normalizePhone,
-  waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, DEFAULT_WA_RESCHEDULE, computeSlots, onColor, darken,
+  waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, DEFAULT_WA_RESCHEDULE, computeSlots, staffHours, onColor, darken,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-10-08r";
+} from "./common.js?v=2026-10-08t";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
 const A = {
   me: null, settings: {}, services: [], staff: [], tg: {}, date: bogNow().date,
-  dayApts: [], pending: [], index: {}, users: [], clientQ: "", tab: "agenda", unsubs: [], unsubDay: null, m: null
+  dayApts: [], pending: [], index: {}, users: [], clientQ: "", tab: "home", unsubs: [], unsubDay: null, m: null
 };
 const isOwner = () => A.me?.role === "owner";
 const show = (id, on) => $(id).classList.toggle("hidden", !on);
@@ -23,7 +23,7 @@ const onErr = (e) => { console.error(e); toast("Error leyendo datos: " + (e.code
 onAuthStateChanged(auth, async (u) => {
   A.unsubs.forEach((f) => f()); A.unsubs = []; A.unsubDay?.();
   show("loginView", !u);
-  if (!u) { $("linkCard").classList.add("hidden"); $("btnAccount").classList.add("hidden"); $("hdrTitle").textContent = "Panel de tu negocio"; }
+  if (!u) { $("linkCard").classList.add("hidden"); $("btnAccount").classList.add("hidden"); $("hdrTitle").textContent = "Panel de tu negocio"; $("hdrSub").textContent = ""; show("spNav", false); }
   if (!u) { show("appView", false); show("deniedView", false); $("who").textContent = ""; return; }
   const [sup, snap] = await Promise.all([
     getDoc(doc(db, "superusers", u.uid)).catch(() => null),
@@ -50,8 +50,8 @@ onAuthStateChanged(auth, async (u) => {
   A.biz = bizSnap?.data() || { name: bid, status: "active" };
   setDialogBrand(A.biz.name);
   $("who").textContent = `${A.biz.name} · ${u.email} (${isSuper ? "superusuario" : isOwner() ? "dueño" : "equipo"})`;
-  $("hdrTitle").textContent = TABS[A.tab][0];
-  show("deniedView", false); show("appView", true);
+  $("hdrTitle").textContent = A.biz.name;
+  show("deniedView", false); show("appView", true); show("spNav", true); $("btnQuickSide").classList.remove("hidden");
   renderPlanBanner();
   start();
 });
@@ -74,7 +74,8 @@ function toggleMenu(btn, menu) {
 $("btnAccount").onclick = (e) => { e.stopPropagation(); toggleMenu("btnAccount", "acctMenu"); };
 document.addEventListener("click", (e) => { if (!e.target.closest(".hdr-menu")) closeMenus(); });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeMenus(); });
-$("linkCard").addEventListener("click", async (e) => {
+document.addEventListener("click", async (e) => {
+  if (!e.target.closest("[data-link]")) return;
   const b = e.target.closest("[data-link]"); if (!b) return;
   const url = $("linkUrl").textContent, name = A.settings?.businessName || A.biz?.name || "";
   const msg = (panelPrefs().shareMsg || PANEL_DEFAULT.shareMsg).replace(/\{negocio\}/g, name).replace(/\{link\}/g, url);
@@ -123,6 +124,7 @@ function start() {
     A.unsubs.push(onSnapshot(doc(db, bpath("private", "telegram")), (s) => { A.tg = s.data() || {}; renderStaffTab(); }, onErr));
   }
   subscribeDay();
+  startHome();
   setInterval(renderStaffTab, 60000);
 }
 
@@ -156,15 +158,16 @@ function subscribeDay() {
 // ================= Pestañas =================
 // Secciones del menú: [nombre, ícono, color del ícono]
 const TABS = {
+  home: ["Inicio", "fa-house", "#2B59C3"], marketing: ["Marketing", "fa-bullhorn", "#D7263D"],
   agenda: ["Agenda", "fa-calendar-days", "#2563eb"], staff: ["Equipo y descansos", "fa-users", "#7c3aed"],
   clients: ["Clientes", "fa-address-book", "#db2777"], services: ["Servicios", "fa-scissors", "#ea580c"],
   appearance: ["Apariencia", "fa-palette", "#c026d3"], images: ["Imágenes", "fa-image", "#0891b2"], plan: ["Mi plan", "fa-crown", "#ca8a04"],
   settings: ["Configuración", "fa-gear", "#475569"]
 };
-const TRIAL_LOCKED = ["clients", "appearance", "images"]; // funciones Pro
+const TRIAL_LOCKED = ["clients", "appearance", "images", "marketing"]; // funciones Pro
 const isTrial = () => !!A.biz?.trial && !A.me?.isSuper;
 const TRIAL_DAYS_AHEAD = 5;
-function goTab(id) { const b = document.querySelector(`[data-tab="${id}"]`); if (b) b.click(); }
+function goTab(id) { switchTab(id); }
 function lockCard(id) {
   $("tab-" + id).innerHTML = `<div class="rounded-2xl border border-line bg-white p-6 text-center">
     <p class="text-4xl">🔒</p><p class="mt-2 font-narrow text-2xl font-bold">${TABS[id][0]} es una función Pro</p>
@@ -172,8 +175,8 @@ function lockCard(id) {
     <button class="btn-primary mt-4" data-goplan="1">👑 Activar mi plan</button></div>`;
 }
 document.addEventListener("click", (e) => { if (e.target.closest("[data-goplan]")) { e.preventDefault(); goTab("plan"); } });
-const ALL_TABS = ["agenda", "staff", "clients", "services", "appearance", "images", "plan", "settings"];
-const LOCKED_TABS = ["appearance", "settings", "plan"]; // siempre visibles para poder deshacer cambios
+const ALL_TABS = ["home", "agenda", "staff", "clients", "services", "marketing", "appearance", "images", "plan", "settings"];
+const LOCKED_TABS = ["home", "appearance", "settings", "plan"]; // siempre visibles para poder deshacer cambios
 const PANEL_DEFAULT = { useBrand: true, linkLabel: "Link clientes", shareMsg: "Agenda tu cita en {negocio} aquí: {link}", columns: 3, style: "cards", colorIcons: true, order: ALL_TABS, hidden: [] };
 function panelPrefs() {
   const p = { ...PANEL_DEFAULT, ...(A.settings?.panel || {}) };
@@ -183,7 +186,7 @@ function panelPrefs() {
 }
 function renderTabs() {
   const P = panelPrefs();
-  const allowed = ["agenda", "staff"].concat(isOwner() ? ["clients", "services", "appearance", "images", "plan", "settings"] : []);
+  const allowed = ["home", "agenda", "staff"].concat(isOwner() ? ["clients", "services", "marketing", "appearance", "images", "plan", "settings"] : []);
   const ids = P.order.filter((id) => allowed.includes(id) && (!P.hidden.includes(id) || A.tab === id));
   const t = $("tabs");
   t.className = `grid gap-1.5 lg:grid-cols-1 ${({ 2: "grid-cols-2", 3: "grid-cols-3", 4: "grid-cols-4" })[P.columns] || "grid-cols-3"} ${P.style === "list" ? "tabs-list" : ""} ${P.colorIcons ? "" : "tabs-mono"}`;
@@ -195,19 +198,27 @@ function renderTabs() {
 function applyPanelBrand() {
   const P = panelPrefs(), ap = A.settings?.appearance || {};
   applyBrandColors(P.useBrand ? ap : {});
-  const logo = $("hdrLogo"), show = P.useBrand && (ap.logo || (ap.colors && ap.colors.header));
-  logo.classList.toggle("hidden", !show); logo.classList.toggle("grid", !!show);
+  const logo = $("hdrLogo");
+  logo.classList.remove("hidden"); logo.classList.add("grid");
+  logo.style.background = (P.useBrand && ap.colors?.primary) || "var(--sink)";
   const name = A.settings?.businessName || A.biz?.name || "";
+  if (name) $("hdrTitle").textContent = name;
   logo.innerHTML = ap.logo ? `<img src="${ap.logo}" alt="" class="h-full w-full object-cover">` : esc(name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase());
 }
 $("tabs").addEventListener("click", (e) => {
   const b = e.target.closest("[data-tab]"); if (!b) return;
-  A.tab = b.dataset.tab;
+  switchTab(b.dataset.tab);
+});
+function switchTab(id) {
+  if (!TABS[id]) return;
+  A.tab = id;
+  document.body.classList.remove("show-more");
   document.querySelectorAll(".tab-panel").forEach((p) => p.classList.add("hidden"));
   show("tab-" + A.tab, true);
-  renderTabs();
-  $("hdrTitle").textContent = TABS[A.tab][0];
-  if (window.innerWidth < 1024) $("adminContent").scrollIntoView({ behavior: "smooth", block: "start" });
+  renderTabs(); syncBottomNav();
+  if (A.tab !== "home") $("hdrSub").textContent = TABS[A.tab][0];
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  if (A.tab === "home") renderHome();
   if (isTrial() && TRIAL_LOCKED.includes(A.tab)) return lockCard(A.tab);
   if (A.tab === "clients") loadUsers();
   if (A.tab === "settings") renderSettings();
@@ -215,7 +226,8 @@ $("tabs").addEventListener("click", (e) => {
   if (A.tab === "appearance") renderAppearance();
   if (A.tab === "images") renderImages();
   if (A.tab === "plan") renderPlan();
-});
+  if (A.tab === "marketing") renderMarketing();
+}
 
 // ================= Modal genérico =================
 function openM(title, html) { $("modalTitle").textContent = title; $("modalBody").innerHTML = html; openModal("modal"); }
@@ -1660,4 +1672,432 @@ function renderPlan() {
       catch (err) { toast(err.message, "error"); setBusy(btn, false); }
     };
   }
+}
+
+// =====================================================================
+//  INICIO: en vivo, hoy en la silla, pendientes, estados y huecos libres
+// =====================================================================
+const H = { today: "", apts: [], locks: [], live: [], stories: [], unsubs: [] };
+const STAGE_TXT = {
+  visit: "está viendo tu página", register: "se está registrando", hours: "mira los horarios",
+  service: "eligió hora y escoge el servicio", pay: "está pagando el abono", done: "acaba de reservar"
+};
+const myStaff = () => A.staff.filter((s) => s.active !== false && (isOwner() || s.id === A.me?.staffId));
+function syncBottomNav() {
+  const cur = document.body.classList.contains("show-more") ? "more" : A.tab;
+  document.querySelectorAll("#spNav [data-go]").forEach((b) => b.setAttribute("aria-current", b.dataset.go === cur ? "page" : "false"));
+}
+$("spNav").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-go]"); if (!b) return;
+  if (b.dataset.go === "more") {
+    document.body.classList.add("show-more"); $("hdrSub").textContent = "Todas las secciones"; syncBottomNav();
+    window.scrollTo({ top: 0, behavior: "smooth" }); return;
+  }
+  if (b.dataset.go === "clients" && !isOwner()) return toast("Solo el dueño ve los clientes.", "error");
+  switchTab(b.dataset.go);
+});
+$("btnQuick").onclick = () => openQuick();
+$("btnQuickSide").onclick = () => openQuick();
+
+function startHome() {
+  H.unsubs.forEach((f) => f()); H.unsubs = [];
+  H.today = bogNow().date;
+  H.unsubs.push(onSnapshot(query(collection(db, bpath("appointments")), where("date", "==", H.today)), (q) => { H.apts = q.docs.map((d) => d.data()); renderHome(); }, onErr));
+  H.unsubs.push(onSnapshot(query(collection(db, bpath("slotLocks")), where("date", "==", H.today)), (q) => { H.locks = q.docs.map((d) => d.data()); renderHome(); }, onErr));
+  H.unsubs.push(onSnapshot(collection(db, bpath("stories")), (q) => { H.stories = q.docs.map((d) => ({ id: d.id, ...d.data() })).filter((x) => toMillis(x.expiresAt) > Date.now()).sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt)); renderHome(); if (A.tab === "marketing") renderMarketing(); }, () => {}));
+  subscribeLive();
+  A.unsubs.push(() => H.unsubs.forEach((f) => f()));
+  clearInterval(H.timer);
+  H.timer = setInterval(() => { if (bogNow().date !== H.today) startHome(); else renderHome(); }, 30000);
+  renderHome();
+}
+function subscribeLive() {
+  H.unsubLive?.();
+  H.unsubLive = onSnapshot(query(collection(db, bpath("presence")), where("at", ">", Timestamp.fromMillis(Date.now() - 15 * 60000))), (q) => {
+    H.live = q.docs.map((d) => ({ id: d.id, ...d.data() })); renderHome();
+  }, () => {});
+  H.unsubs.push(() => H.unsubLive?.());
+  clearTimeout(H.liveT); H.liveT = setTimeout(subscribeLive, 10 * 60000);
+}
+const liveNow = () => H.live.filter((p) => p.stage !== "left" && Date.now() - toMillis(p.at) < 75000)
+  .sort((a, b) => ["pay", "service", "hours", "register", "done", "visit"].indexOf(a.stage) - ["pay", "service", "hours", "register", "done", "visit"].indexOf(b.stage));
+// horas libres del día para todo el equipo visible (o solo para mí)
+function freeTimes(date, locks, minutes) {
+  if (!A.settings) return [];
+  return computeSlots({ settings: A.settings, staffList: myStaff(), locks, date, totalMinutes: minutes || Number(A.settings.slotDurationMinutes || 30), forAdmin: true });
+}
+const firstName = (a) => (a.customer?.firstName || "Cliente").split(/\s+/)[0];
+
+function renderHome() {
+  if (!A.me || !$("tab-home")) return;
+  const el = $("tab-home");
+  const live = liveNow();
+  const visible = H.apts.filter((a) => ["confirmed", "pending_verification", "pending_payment", "attended"].includes(a.status) && (isOwner() || a.staffId === A.me.staffId));
+  const free = freeTimes(H.today, H.locks);
+  const nowMin = (() => { const n = bogNow(); return n.min; })();
+  const freeLater = free.filter((f) => { const [h, m] = f.time.split(":").map(Number); return h * 60 + m > nowMin; });
+  const pendingMine = A.pending.filter((a) => isOwner() || a.staffId === A.me.staffId);
+  if (A.tab === "home") $("hdrSub").textContent = `Hoy tienes ${visible.length} cita${visible.length === 1 ? "" : "s"}${pendingMine.length ? ` y ${pendingMine.length} abono${pendingMine.length === 1 ? "" : "s"} por revisar` : ""}.`;
+
+  // --- en vivo
+  const liveHtml = `<div class="live-bar ${live.length ? "" : "off"}"><span class="live-dot" style="${live.length ? "" : "background:#9aa6b8;box-shadow:none;animation:none"}"></span>
+      <b>${live.length ? `${live.length} persona${live.length === 1 ? "" : "s"} en tu página ahora` : "Nadie en tu página en este momento"}</b></div>
+    ${live.length ? `<div class="sp-card mt-2 !py-1">${live.slice(0, 6).map((p) => {
+      const ini = p.name ? p.name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase() : "?";
+      const tone = p.stage === "pay" ? "t-due" : p.stage === "done" ? "t-ok" : p.name ? "t-trial" : "t-off";
+      const ago = Math.max(0, Math.round((Date.now() - toMillis(p.at)) / 60000));
+      return `<div class="who-row"><span class="who-av ${tone}">${esc(ini)}</span><span class="min-w-0 flex-1">${p.name ? `<b>${esc(p.name)}</b>` : "Alguien sin cuenta"} ${STAGE_TXT[p.stage] || "está en tu página"}</span><span class="soft text-xs">${ago ? ago + " min" : "ahora"}</span></div>`;
+    }).join("")}</div>` : ""}`;
+
+  // --- hoy en la silla
+  const staffList = myStaff();
+  let open = 24 * 60, close = 0;
+  staffList.forEach((s) => staffHours(A.settings, s, H.today).forEach((h) => { const [oh, om] = h.open.split(":").map(Number), [ch, cm] = h.close.split(":").map(Number); open = Math.min(open, oh * 60 + om); close = Math.max(close, ch * 60 + cm); }));
+  let chair = "";
+  if (close > open) {
+    const span = close - open, pos = (m) => ((m - open) / span) * 100;
+    const toMin = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+    const lanes = staffList.map((s) => {
+      const blocks = visible.filter((a) => a.staffId === s.id).map((a) => {
+        const st = toMin(a.startTime), en = st + Number(a.occupiedMinutes || 30);
+        const tone = a.status === "pending_verification" ? "t-due" : a.status === "pending_payment" ? "t-off" : "t-ok";
+        return `<button class="chair-blk ${tone}" style="left:${pos(st)}%;width:${Math.max(4, pos(en) - pos(st))}%" data-hcode="${a.code}" title="${esc(firstName(a))} ${hora12(a.startTime)}">${esc(firstName(a))}</button>`;
+      }).join("");
+      const now = nowMin >= open && nowMin <= close ? `<span class="chair-now" style="left:${pos(nowMin)}%"></span>` : "";
+      return `<p class="mt-2 text-xs font-bold">${esc(s.name)}</p><div class="chair-lane">${blocks}${now}</div>`;
+    }).join("");
+    const marks = [open, open + span / 3, open + (2 * span) / 3, close].map((m) => `<span>${hora12(String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(Math.round(m % 60 / 15) * 15 % 60).padStart(2, "0")).replace(":00", "")}</span>`).join("");
+    chair = `${lanes}<div class="soft mt-1.5 flex justify-between text-[10.5px]">${marks}</div>`;
+  } else chair = `<p class="soft mt-2 text-sm">Hoy no hay horario de atención.</p>`;
+
+  // --- pendientes
+  const todo = [];
+  pendingMine.slice(0, 4).forEach((a) => todo.push(`<div class="todo"><span class="ic t-due"><i class="fa-solid fa-receipt"></i></span>
+    <p class="min-w-0 flex-1 text-[13.5px] leading-snug"><b>${esc(custName(a))}</b> subió el abono de ${cop(a.payment?.amountCOP || a.depositCOP)} para el ${fechaCorta(a.date)} a las ${hora12(a.startTime)}.</p>
+    <button class="act" style="background:var(--sink);color:#fff" data-happrove="${a.code}">Aprobar</button></div>`));
+  const next = visible.filter((a) => a.status === "confirmed").map((a) => ({ a, m: (() => { const [h, mm] = a.startTime.split(":").map(Number); return h * 60 + mm; })() }))
+    .filter((x) => x.m >= nowMin && x.m - nowMin <= 120).sort((p, q) => p.m - q.m)[0];
+  if (next) todo.push(`<div class="todo"><span class="ic t-trial"><i class="fa-regular fa-clock"></i></span>
+    <p class="min-w-0 flex-1 text-[13.5px] leading-snug"><b>${esc(custName(next.a))}</b> llega a las ${hora12(next.a.startTime)}${staffList.length > 1 ? ` con ${esc(next.a.staffName)}` : ""}.</p>
+    ${next.a.customer?.whatsapp ? `<a class="act t-ok" target="_blank" rel="noopener" href="${waLink(next.a.customer.whatsapp, `Hola ${firstName(next.a)}, te esperamos hoy a las ${hora12(next.a.startTime)} en ${A.settings?.businessName || A.biz?.name}. ¡Nos vemos!`)}">WhatsApp</a>` : ""}</div>`);
+  if (freeLater.length) todo.push(`<div class="todo"><span class="ic t-late"><i class="fa-solid fa-fire"></i></span>
+    <p class="min-w-0 flex-1 text-[13.5px] leading-snug">Quedan <b>${freeLater.length} cupo${freeLater.length === 1 ? "" : "s"}</b> libres hoy.</p>
+    <button class="act t-late" data-hgo="marketing">${isOwner() ? "Promocionar" : "Ver"}</button></div>`);
+
+  // --- estados
+  const stories = isOwner() ? `<div class="sp-h"><h2>Tus estados</h2><span>los ven tus clientes por 24 h</span></div>
+    <div class="flex gap-2 overflow-x-auto pb-1">
+      <button class="story-btn" data-hstory="new"><span class="story-add">${isTrial() ? "🔒" : "+"}</span>Nuevo</button>
+      ${H.stories.map((x) => `<button class="story-btn" data-hstory="${x.id}"><span class="story-ring"><span style="${storyBg(x)}">${x.img ? "" : esc((x.text || "").slice(0, 18))}</span></span><span class="w-full truncate text-center">${esc((x.text || "Estado").split("\n")[0].slice(0, 12))}</span></button>`).join("")}
+    </div>` : "";
+
+  // --- huecos
+  const fill = isOwner() && freeLater.length ? `<div class="sp-card mt-4" style="background:linear-gradient(135deg,var(--sink),var(--sblue));color:#fff">
+      <p class="disp text-lg font-extrabold">Llena tus huecos de hoy</p>
+      <p class="mt-1 text-[13px] opacity-80">${freeLater.slice(0, 6).map((f) => hora12(f.time)).join(", ")}${freeLater.length > 6 ? "…" : ""}</p>
+      <div class="mt-3 grid grid-cols-2 gap-2 text-[13px] font-bold">
+        <button class="rounded-xl bg-white py-2.5" style="color:var(--sink)" data-hfill="story">${isTrial() ? "🔒 " : ""}Publicar como estado</button>
+        <button class="rounded-xl py-2.5" style="background:rgba(255,255,255,.16)" data-hgo="marketing">Más opciones</button>
+      </div></div>` : "";
+
+  el.innerHTML = `${liveHtml}
+    <div class="sp-card mt-3"><div class="flex items-baseline justify-between"><h2 class="disp text-[18px] font-bold">Hoy en la silla</h2><span class="soft text-xs">${freeLater.length} hueco${freeLater.length === 1 ? "" : "s"} libre${freeLater.length === 1 ? "" : "s"}</span></div>${chair}
+      <div class="soft mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px]"><span><span style="color:var(--mint)">●</span> confirmada</span><span><span style="color:var(--amber)">●</span> abono por revisar</span><span><span style="color:#8a94a8">●</span> esperando pago</span><span><span style="color:var(--sred)">|</span> ahora</span></div></div>
+    <div class="sp-h"><h2>Para hoy</h2><span>${todo.length ? todo.length + " pendiente" + (todo.length === 1 ? "" : "s") : ""}</span></div>
+    ${todo.join("") || `<div class="todo"><span class="ic t-ok"><i class="fa-solid fa-check"></i></span><p class="flex-1 text-[13.5px]">Todo al día. Usa <b>Cita rápida</b> para agendar a quien llame o llegue.</p></div>`}
+    ${stories}${fill}`;
+}
+function storyBg(x) { return x.img ? `background-image:url('${x.img}')` : `background:${x.bg || "#14213D"}`; }
+$("tab-home").addEventListener("click", async (e) => {
+  const ap = e.target.closest("[data-happrove]");
+  if (ap) {
+    const a = A.pending.find((x) => x.code === ap.dataset.happrove); if (!a) return;
+    if (a.payment?.proofUrl && !(await uiConfirm("¿Aprobar el abono?", `${custName(a)} subió ${cop(a.payment?.amountCOP || a.depositCOP)}. Revisa el comprobante si aún no lo viste.`, { okText: "Aprobar", cancelText: "Ver comprobante" }))) { window.open(a.payment.proofUrl, "_blank"); return; }
+    setBusy(ap, true, "…");
+    try { await api("reviewPayment", { code: a.code, approve: true }); toast("Abono aprobado. La cita quedó confirmada."); } catch (err) { toast(err.message, "error"); setBusy(ap, false); }
+    return;
+  }
+  const go = e.target.closest("[data-hgo]"); if (go) return switchTab(go.dataset.hgo);
+  const blk = e.target.closest("[data-hcode]"); if (blk) { setAgendaDate(H.today); return switchTab("agenda"); }
+  const st = e.target.closest("[data-hstory]"); if (st) return st.dataset.hstory === "new" ? newStory() : manageStory(st.dataset.hstory);
+  const fl = e.target.closest("[data-hfill]"); if (fl) return fillAsStory(H.today);
+});
+
+// =====================================================================
+//  CITA RÁPIDA: horas libres primero, luego WhatsApp, servicio y listo
+// =====================================================================
+const Q = {};
+function openQuick() {
+  const mains = A.services.filter((s) => s.active !== false && s.type !== "addon");
+  if (!mains.length) return toast("Primero crea tus servicios.", "error");
+  Object.assign(Q, { date: bogNow().date, time: null, staffId: null, mainId: mains[0].id, extras: new Set(), known: null, locks: [], phone: "" });
+  openM("Cita rápida", `
+    <p class="soft -mt-3 mb-3 text-sm">Para quien llamó o llegó sin cuenta. Toca una hora.</p>
+    <div id="qDays" class="mb-3 flex gap-2 overflow-x-auto pb-1"></div>
+    <div class="mb-2 flex items-baseline justify-between"><p id="qSlotsTitle" class="text-sm font-bold"></p><p id="qService" class="soft truncate pl-2 text-xs"></p></div>
+    <div id="qSlots" class="grid grid-cols-3 gap-2"></div>
+    <div id="qAfter" class="mt-4 hidden border-t border-line pt-4">
+      <label class="field"><span>WhatsApp del cliente</span>
+        <div class="flex items-center gap-2 rounded-xl border border-line bg-white px-3"><span class="soft text-sm">🇨🇴 +57</span><input id="qPhone" type="tel" inputmode="numeric" autocomplete="off" placeholder="300 123 4567" class="w-full border-0 py-3 text-[16px] outline-none"></div></label>
+      <p id="qKnown" class="mt-1.5 min-h-[18px] text-xs font-semibold"></p>
+      <label id="qNameWrap" class="field mt-1 hidden"><span>Nombre (opcional)</span><input id="qName" maxlength="40" placeholder="Para saludarlo por su nombre"></label>
+      <p class="mb-1.5 mt-3 text-sm font-bold">Servicio</p><div id="qMains" class="flex flex-wrap gap-2"></div>
+      <div id="qExtrasWrap"><p class="mb-1.5 mt-3 text-sm font-bold">Agregar</p><div id="qExtras" class="flex flex-wrap gap-2"></div></div>
+      <div id="qStaffWrap" class="hidden"><p class="mb-1.5 mt-3 text-sm font-bold">Con quién</p><div id="qStaff" class="flex flex-wrap gap-2"></div></div>
+      <button id="qSave" class="btn-primary mt-4 w-full py-3.5 text-base" disabled>Agendar y enviar por WhatsApp</button>
+    </div>`);
+  renderQDays(); renderQMains(); loadQLocks();
+  $("qDays").onclick = (e) => { const b = e.target.closest("[data-qd]"); if (!b) return; Q.date = b.dataset.qd; Q.time = null; renderQDays(); loadQLocks(); };
+  $("qSlots").onclick = (e) => {
+    const b = e.target.closest("[data-qt]"); if (b) { Q.time = b.dataset.qt; renderQSlots(); $("qAfter").classList.remove("hidden"); $("qAfter").classList.add("q-pop"); setTimeout(() => $("qPhone").focus(), 60); return; }
+    const n = e.target.closest("[data-qnext]"); if (n) { Q.date = n.dataset.qnext; Q.time = null; renderQDays(); loadQLocks(); }
+  };
+  $("qPhone").oninput = (e) => { e.target.value = e.target.value.replace(/[^\d ]/g, ""); lookupPhone(); updQSave(); };
+  $("qMains").onclick = (e) => { const b = e.target.closest("[data-qm]"); if (!b) return; Q.mainId = b.dataset.qm; Q.extras.delete(Q.mainId); renderQMains(); renderQSlots(); };
+  $("qExtras").onclick = (e) => { const b = e.target.closest("[data-qx]"); if (!b) return; const id = b.dataset.qx; Q.extras.has(id) ? Q.extras.delete(id) : Q.extras.add(id); renderQMains(); renderQSlots(); };
+  $("qStaff").onclick = (e) => { const b = e.target.closest("[data-qs]"); if (!b) return; Q.staffId = b.dataset.qs; renderQStaff(); };
+  $("qSave").onclick = saveQuick;
+}
+function renderQDays() {
+  const today = bogNow().date;
+  $("qDays").innerHTML = Array.from({ length: 8 }, (_, i) => addDays(today, i)).map((d, i) => {
+    const [y, m, dd] = d.split("-").map(Number), dt = new Date(Date.UTC(y, m - 1, dd));
+    const top = i === 0 ? "Hoy" : i === 1 ? "Mañana" : dt.toLocaleDateString("es-CO", { timeZone: "UTC", weekday: "short" }).replace(".", "");
+    return `<button class="q-day" data-qd="${d}" aria-pressed="${d === Q.date}"><small>${top}</small><b>${dd}</b></button>`;
+  }).join("");
+}
+function loadQLocks() {
+  Q.unsub?.();
+  $("qSlots").innerHTML = `<p class="soft col-span-3 text-sm">Buscando horas libres…</p>`;
+  const date = Q.date;
+  Q.unsub = onSnapshot(query(collection(db, bpath("slotLocks")), where("date", "==", date)), (q) => { if (Q.date !== date) return; Q.locks = q.docs.map((d) => d.data()); renderQSlots(); }, onErr);
+}
+const qMinutes = () => { const by = Object.fromEntries(A.services.map((s) => [s.id, s])); return [Q.mainId, ...Q.extras].reduce((t, id) => t + Number(by[id]?.minutes || 0), 0); };
+function qSlotsFor(date, locks) {
+  return computeSlots({ settings: A.settings, staffList: myStaff(), locks, date, totalMinutes: qMinutes(), mainId: Q.mainId, forAdmin: true });
+}
+function renderQSlots() {
+  if (!$("qSlots")) return;
+  const slots = qSlotsFor(Q.date, Q.locks);
+  const svc = A.services.find((s) => s.id === Q.mainId);
+  $("qService").textContent = svc ? `${svc.name}, ${qMinutes()} min` : "";
+  const isToday = Q.date === bogNow().date;
+  $("qSlotsTitle").textContent = slots.length ? `${slots.length} hora${slots.length === 1 ? "" : "s"} libre${slots.length === 1 ? "" : "s"} ${isToday ? "hoy" : "este día"}` : "Sin horas libres";
+  const cur = slots.find((s) => s.time === Q.time);
+  if (Q.time && !cur) { Q.time = null; $("qAfter").classList.add("hidden"); }
+  if (cur && !cur.staffIds.includes(Q.staffId)) Q.staffId = cur.staffIds[0];
+  $("qSlots").innerHTML = slots.map((s) => `<button class="q-slot" data-qt="${s.time}" aria-pressed="${s.time === Q.time}">${hora12(s.time)}</button>`).join("")
+    || `<div class="col-span-3 rounded-xl bg-paper p-3 text-sm">No quedan horas para este servicio ${isToday ? "hoy" : "ese día"}. <button class="font-bold underline" data-qnext="${addDays(Q.date, 1)}">Ver el día siguiente</button></div>`;
+  renderQStaff(); updQSave();
+}
+function renderQMains() {
+  const mains = A.services.filter((s) => s.active !== false && s.type !== "addon");
+  $("qMains").innerHTML = mains.map((s) => `<button class="q-chip" data-qm="${s.id}" aria-pressed="${s.id === Q.mainId}">${esc(s.name)} <span class="opacity-60">${cop(s.priceCOP)}</span></button>`).join("");
+  const ex = A.services.filter((s) => s.active !== false && s.type !== "base" && s.id !== Q.mainId);
+  $("qExtrasWrap").classList.toggle("hidden", !ex.length);
+  $("qExtras").innerHTML = ex.map((s) => `<button class="q-chip" data-qx="${s.id}" aria-pressed="${Q.extras.has(s.id)}">+ ${esc(s.name)}</button>`).join("");
+}
+function renderQStaff() {
+  const cur = qSlotsFor(Q.date, Q.locks).find((s) => s.time === Q.time);
+  const ids = cur?.staffIds || [];
+  $("qStaffWrap").classList.toggle("hidden", ids.length < 2);
+  $("qStaff").innerHTML = ids.map((id) => `<button class="q-chip" data-qs="${id}" aria-pressed="${id === Q.staffId}">${esc(A.staff.find((s) => s.id === id)?.name || id)}</button>`).join("");
+}
+let qLookT = null;
+function lookupPhone() {
+  clearTimeout(qLookT);
+  const phone = normalizePhone($("qPhone").value);
+  Q.known = null; Q.phone = phone || "";
+  if (!phone) { $("qKnown").textContent = ""; $("qNameWrap").classList.add("hidden"); return; }
+  $("qKnown").innerHTML = `<span class="soft">Buscando…</span>`;
+  qLookT = setTimeout(async () => {
+    try {
+      const snap = await getDocs(query(collection(db, bpath("appointments")), where("customer.whatsapp", "==", phone)));
+      if (normalizePhone($("qPhone").value) !== phone) return;
+      const list = snap.docs.map((d) => d.data()).sort((a, b) => toMillis(b.startAt) - toMillis(a.startAt));
+      if (list.length) {
+        Q.known = list[0].customer;
+        const visits = list.filter((a) => a.status === "attended").length;
+        const blocked = list.filter((a) => a.status === "no_show").length;
+        $("qKnown").innerHTML = `<span style="color:var(--mint)">✓ ${esc(`${Q.known.firstName} ${Q.known.lastName || ""}`.trim())}</span><span class="soft">${visits ? `, ha venido ${visits} ${visits === 1 ? "vez" : "veces"}` : ", ya tenía reservas"}${blocked ? `, ${blocked} falta${blocked === 1 ? "" : "s"}` : ""}</span>`;
+        $("qNameWrap").classList.add("hidden");
+      } else { $("qKnown").innerHTML = `<span class="soft">Cliente nuevo.</span>`; $("qNameWrap").classList.remove("hidden"); }
+    } catch { $("qKnown").textContent = ""; $("qNameWrap").classList.remove("hidden"); }
+  }, 350);
+}
+function updQSave() { if ($("qSave")) $("qSave").disabled = !(Q.time && normalizePhone($("qPhone")?.value)); }
+async function saveQuick() {
+  const btn = $("qSave"), phone = normalizePhone($("qPhone").value);
+  if (!Q.time || !phone) return;
+  const staffId = Q.staffId || qSlotsFor(Q.date, Q.locks).find((s) => s.time === Q.time)?.staffIds[0];
+  const name = ($("qName").value || "").trim().split(/\s+/);
+  const customer = Q.known ? { firstName: Q.known.firstName, lastName: Q.known.lastName || "", whatsapp: phone, email: Q.known.email || "" }
+    : { firstName: name[0] || "", lastName: name.slice(1).join(" "), whatsapp: phone, email: "" };
+  // la ventana de WhatsApp se abre ya para que el navegador no la bloquee
+  const win = window.open("about:blank", "_blank");
+  setBusy(btn, true, "Agendando…");
+  try {
+    const r = await api("createManualAppointment", { mainId: Q.mainId, extraIds: [...Q.extras], staffId, date: Q.date, time: Q.time, customer, paymentMethod: "local", depositPaidCOP: 0 });
+    const apt = r.appointment;
+    const link = waLink(apt.customer.whatsapp, fillTemplate(A.settings.waConfirmTemplate || DEFAULT_WA_CONFIRM, apt, A.settings));
+    if (win) win.location.href = link;
+    Q.unsub?.();
+    openM("¡Cita agendada!", `
+      <div class="q-pop text-center"><p class="text-5xl">✅</p>
+        <p class="disp mt-2 text-2xl font-extrabold">${esc(apt.customer.firstName)}, ${hora12(apt.startTime)}</p>
+        <p class="soft mt-1 text-sm capitalize">${fechaLarga(apt.date)} con ${esc(apt.staffName)}</p>
+        <p class="ticket-code mx-auto my-4 w-fit">${esc(apt.code)}</p>
+        <a class="btn-primary block w-full py-3" target="_blank" rel="noopener" href="${link}">Enviar confirmación por WhatsApp</a>
+        <button class="btn-light mt-2 w-full" id="qAgain">Agendar otra</button></div>`);
+    $("qAgain").onclick = () => openQuick();
+  } catch (err) { win?.close(); toast(err.message, "error"); setBusy(btn, false); }
+}
+
+// =====================================================================
+//  ESTADOS de 24 horas
+// =====================================================================
+const STORY_BGS = ["#14213D", "#2B59C3", "#D7263D", "#1E9E63", "#7C3AED", "#C77700"];
+function newStory(preset = {}) {
+  if (isTrial()) return lockCard("marketing"), switchTab("marketing");
+  const S2 = { img: "", bg: preset.bg || STORY_BGS[0], text: preset.text || "" };
+  openM("Nuevo estado", `
+    <div id="stPrev" class="relative mx-auto mb-3 grid aspect-[9/14] w-full max-w-[220px] place-items-center overflow-hidden rounded-2xl bg-cover bg-center p-4 text-center text-lg font-extrabold leading-tight text-white" style="text-shadow:0 2px 10px rgba(0,0,0,.45)"></div>
+    <div class="mb-3 flex flex-wrap items-center gap-2">
+      <label class="btn-light cursor-pointer text-sm"><i class="fa-regular fa-image"></i> Foto<input id="stFile" type="file" accept="image/*" class="hidden"></label>
+      ${STORY_BGS.map((c) => `<button type="button" class="h-8 w-8 rounded-full border-2 border-white" style="background:${c};box-shadow:0 0 0 1px #DDE3EA" data-stbg="${c}" aria-label="Fondo"></button>`).join("")}
+    </div>
+    <label class="field mb-3"><span>Texto</span><textarea id="stText" rows="3" maxlength="140" placeholder="Ej. Nuevo corte disponible 🔥">${esc(S2.text)}</textarea></label>
+    <button id="stSave" class="btn-primary w-full py-3">Publicar por 24 horas</button>`);
+  const draw = () => { const p = $("stPrev"); p.style.background = S2.img ? `center/cover url('${S2.img}')` : S2.bg; p.textContent = $("stText").value || (S2.img ? "" : "Tu texto aquí"); };
+  draw();
+  $("stText").oninput = draw;
+  $("modalBody").querySelectorAll("[data-stbg]").forEach((b) => b.onclick = () => { S2.bg = b.dataset.stbg; S2.img = ""; draw(); });
+  $("stFile").onchange = async (e) => { const f = e.target.files[0]; if (!f) return; S2.img = await imgToDataUrl(f, 900, "image/jpeg"); draw(); };
+  $("stSave").onclick = async () => {
+    const text = $("stText").value.trim();
+    if (!text && !S2.img) return toast("Agrega una foto o un texto.", "error");
+    const btn = $("stSave"); setBusy(btn, true, "Publicando…");
+    try {
+      await addDoc(collection(db, bpath("stories")), { img: S2.img, bg: S2.bg, text, createdAt: serverTimestamp(), expiresAt: Timestamp.fromMillis(Date.now() + 86400000) });
+      closeM(); toast("Estado publicado. Tus clientes lo ven arriba en tu página.");
+    } catch (err) { toast("No se pudo publicar: " + err.message, "error"); setBusy(btn, false); }
+  };
+}
+function manageStory(id) {
+  const x = H.stories.find((s) => s.id === id); if (!x) return;
+  const left = Math.max(0, Math.round((toMillis(x.expiresAt) - Date.now()) / 3600000));
+  openM("Estado", `<div class="mx-auto mb-3 grid aspect-[9/14] w-full max-w-[220px] place-items-center overflow-hidden rounded-2xl p-4 text-center text-lg font-extrabold leading-tight text-white" style="${x.img ? `background:center/cover url('${x.img}')` : `background:${x.bg}`};text-shadow:0 2px 10px rgba(0,0,0,.45)">${esc(x.text || "")}</div>
+    <p class="soft mb-3 text-center text-sm">Se quita sola en ${left} hora${left === 1 ? "" : "s"}.</p>
+    <button id="stDel" class="w-full rounded-xl border border-rose-300 py-2.5 text-sm font-semibold text-rose-800">Quitar ahora</button>`);
+  $("stDel").onclick = async () => { try { await deleteDoc(doc(db, bpath("stories", id))); closeM(); toast("Estado quitado."); } catch (err) { toast(err.message, "error"); } };
+}
+function fillAsStory(date) {
+  const free = freeTimes(date, date === H.today ? H.locks : []).filter((f) => date !== H.today || (() => { const [h, m] = f.time.split(":").map(Number); return h * 60 + m > bogNow().min; })());
+  const when = date === H.today ? "hoy" : "mañana";
+  newStory({ bg: "#D7263D", text: `🔥 Cupos libres ${when}\n${free.slice(0, 6).map((f) => hora12(f.time)).join(" · ")}\nAparta el tuyo aquí` });
+}
+
+// =====================================================================
+//  MARKETING: llenar huecos, estados, aviso en la página, clientes que no vuelven
+// =====================================================================
+const MK = { day: "today", lost: null, tLocks: [] };
+function renderMarketing() {
+  if (isTrial()) return lockCard("marketing");
+  const el = $("tab-marketing");
+  const tomorrow = addDays(H.today, 1);
+  const date = MK.day === "today" ? H.today : tomorrow;
+  const locks = MK.day === "today" ? H.locks : MK.tLocks;
+  const free = freeTimes(date, locks).filter((f) => MK.day !== "today" || (() => { const [h, m] = f.time.split(":").map(Number); return h * 60 + m > bogNow().min; })());
+  const promo = A.settings?.promo || {};
+  const promoOn = promo.text && promo.until >= H.today;
+  const msg = `🔥 ¡Quedan cupos ${MK.day === "today" ? "hoy" : "mañana"} en ${A.settings?.businessName || A.biz?.name}!\n${free.slice(0, 8).map((f) => hora12(f.time)).join(" · ")}\nAparta el tuyo aquí 👉 ${$("linkUrl").textContent}`;
+  el.innerHTML = `
+    <div class="sp-card" style="background:linear-gradient(135deg,var(--sink),var(--sblue));color:#fff">
+      <div class="flex items-center justify-between gap-2"><p class="disp text-xl font-extrabold">Llena tus huecos</p>
+        <div class="flex rounded-full bg-white/15 p-1 text-xs font-bold">${[["today", "Hoy"], ["tomorrow", "Mañana"]].map(([k, t]) => `<button class="rounded-full px-3 py-1 ${MK.day === k ? "bg-white" : ""}" style="${MK.day === k ? "color:var(--sink)" : ""}" data-mkday="${k}">${t}</button>`).join("")}</div></div>
+      <p class="mt-2 text-sm opacity-85">${free.length ? `${free.length} hora${free.length === 1 ? "" : "s"} libre${free.length === 1 ? "" : "s"}: ${free.slice(0, 8).map((f) => hora12(f.time)).join(", ")}${free.length > 8 ? "…" : ""}` : "No quedan horas libres. ¡Agenda llena!"}</p>
+      ${free.length ? `<div class="mt-3 grid grid-cols-2 gap-2 text-[13px] font-bold">
+        <button class="rounded-xl bg-white py-2.5" style="color:var(--sink)" data-mk="story">Publicar como estado</button>
+        <a class="rounded-xl py-2.5 text-center" style="background:rgba(255,255,255,.16)" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(msg)}">Enviar por WhatsApp</a>
+        <button class="rounded-xl py-2.5" style="background:rgba(255,255,255,.16)" data-mk="image">Imagen con QR</button>
+        <button class="rounded-xl py-2.5" style="background:rgba(255,255,255,.16)" data-mk="tg">Avisar por Telegram</button>
+      </div>` : ""}
+    </div>
+
+    <div class="sp-h"><h2>Estados en tu página</h2><span>${H.stories.length} activo${H.stories.length === 1 ? "" : "s"}</span></div>
+    <div class="sp-card"><div class="flex gap-2 overflow-x-auto pb-1">
+      <button class="story-btn" data-hstory="new"><span class="story-add">+</span>Nuevo</button>
+      ${H.stories.map((x) => `<button class="story-btn" data-hstory="${x.id}"><span class="story-ring"><span style="${storyBg(x)}">${x.img ? "" : esc((x.text || "").slice(0, 18))}</span></span><span class="w-full truncate text-center">${esc((x.text || "Estado").split("\n")[0].slice(0, 12))}</span></button>`).join("")}
+    </div><p class="soft mt-2 text-xs">Aparecen como círculos arriba en tu página, igual que los estados de WhatsApp. Duran 24 horas.</p></div>
+
+    <div class="sp-h"><h2>Aviso destacado</h2><span>${promoOn ? "visible hasta el " + fechaCorta(promo.until) : "apagado"}</span></div>
+    <div class="sp-card">
+      <p class="soft mb-2 text-sm">Una franja de color arriba de tu página. Ideal para promociones o novedades.</p>
+      <input id="mkPromo" maxlength="90" value="${esc(promo.text || "")}" placeholder="Ej. 20% en cortes de lunes a miércoles" class="w-full rounded-xl border border-line px-3 py-2.5">
+      <div class="mt-2 flex flex-wrap items-center gap-2"><label class="soft text-sm">Hasta <input id="mkPromoUntil" type="date" min="${H.today}" value="${promo.until || addDays(H.today, 7)}" class="rounded-lg border border-line px-2 py-1.5"></label>
+        <button class="btn-primary text-sm" data-mk="promo">Mostrar en mi página</button>${promoOn ? `<button class="btn-light text-sm" data-mk="promoOff">Quitar</button>` : ""}</div>
+    </div>
+
+    <div class="sp-h"><h2>Clientes que no vuelven</h2><span>más de 30 días sin venir</span></div>
+    <div id="mkLost" class="sp-card"><p class="soft text-sm">Buscando…</p></div>
+
+    <div class="sp-h"><h2>Tu enlace</h2><span>compártelo en todas partes</span></div>
+    <div class="sp-card"><p class="mb-2 truncate rounded-lg bg-paper px-2.5 py-2 font-mono text-xs">${esc($("linkUrl").textContent)}</p>
+      <div class="grid grid-cols-5 gap-1.5 text-center text-[10px] font-semibold text-ink/70">
+        <button class="link-act" data-link="copy"><i class="fa-regular fa-copy"></i>Copiar</button><button class="link-act" data-link="share"><i class="fa-solid fa-share-nodes"></i>Compartir</button>
+        <button class="link-act" data-link="wa"><i class="fa-brands fa-whatsapp"></i>WhatsApp</button><button class="link-act" data-link="qr"><i class="fa-solid fa-qrcode"></i>QR</button>
+        <a class="link-act" target="_blank" rel="noopener" href="${$("linkOpen").href}"><i class="fa-regular fa-eye"></i>Ver</a></div></div>`;
+  loadLost();
+}
+$("tab-marketing").addEventListener("click", async (e) => {
+  const d = e.target.closest("[data-mkday]");
+  if (d) {
+    MK.day = d.dataset.mkday;
+    if (MK.day === "tomorrow") { MK.tUnsub?.(); MK.tUnsub = onSnapshot(query(collection(db, bpath("slotLocks")), where("date", "==", addDays(H.today, 1))), (q) => { MK.tLocks = q.docs.map((x) => x.data()); renderMarketing(); }, onErr); }
+    return renderMarketing();
+  }
+  const st = e.target.closest("[data-hstory]"); if (st) return st.dataset.hstory === "new" ? newStory() : manageStory(st.dataset.hstory);
+  const b = e.target.closest("[data-mk]"); if (!b) return;
+  const date = MK.day === "today" ? H.today : addDays(H.today, 1);
+  if (b.dataset.mk === "story") return fillAsStory(date);
+  if (b.dataset.mk === "image") return switchTab("images");
+  if (b.dataset.mk === "tg") {
+    const free = freeTimes(date, MK.day === "today" ? H.locks : MK.tLocks);
+    const text = `Quedan cupos ${MK.day === "today" ? "hoy" : "mañana"}: ${free.slice(0, 8).map((f) => hora12(f.time)).join(", ")}. Aparta el tuyo: ${$("linkUrl").textContent}`;
+    if (!(await uiConfirm("¿Avisar a tus clientes?", `Les llega por Telegram a quienes lo conectaron: “${text}”`, { okText: "Enviar" }))) return;
+    setBusy(b, true, "Enviando…");
+    try { const r = await api("broadcastNews", { text }); toast(`Aviso enviado${r?.sent !== undefined ? " a " + r.sent + " cliente(s)" : ""}.`); } catch (err) { toast(err.message, "error"); } finally { setBusy(b, false); }
+  }
+  if (b.dataset.mk === "promo") {
+    const text = $("mkPromo").value.trim(), until = $("mkPromoUntil").value;
+    if (!text) return toast("Escribe el aviso.", "error");
+    try { await updateDoc(doc(db, bpath("settings", "general")), { promo: { text, until } }); toast("Aviso visible en tu página."); } catch (err) { toast(err.message, "error"); }
+  }
+  if (b.dataset.mk === "promoOff") { try { await updateDoc(doc(db, bpath("settings", "general")), { promo: { text: "", until: "" } }); toast("Aviso quitado."); } catch (err) { toast(err.message, "error"); } }
+});
+async function loadLost() {
+  const box = $("mkLost"); if (!box) return;
+  try {
+    if (!MK.lost || Date.now() - MK.lostAt > 10 * 60000) {
+      const from = addDays(H.today, -180);
+      const snap = await getDocs(query(collection(db, bpath("appointments")), where("date", ">=", from)));
+      const by = {};
+      snap.docs.map((d) => d.data()).forEach((a) => {
+        const ph = a.customer?.whatsapp; if (!ph || !["attended", "confirmed"].includes(a.status)) return;
+        const c = by[ph] || (by[ph] = { name: `${a.customer.firstName} ${a.customer.lastName || ""}`.trim(), phone: ph, last: "", future: false, visits: 0 });
+        if (a.date >= H.today) c.future = true; else { c.visits++; if (a.date > c.last) c.last = a.date; }
+      });
+      MK.lost = Object.values(by).filter((c) => !c.future && c.last && c.last <= addDays(H.today, -30)).sort((a, b) => b.visits - a.visits || b.last.localeCompare(a.last));
+      MK.lostAt = Date.now();
+    }
+    if (!$("mkLost")) return;
+    const name = A.settings?.businessName || A.biz?.name || "";
+    $("mkLost").innerHTML = MK.lost.length ? MK.lost.slice(0, 15).map((c) => {
+      const days = Math.round((Date.parse(H.today) - Date.parse(c.last)) / 86400000);
+      const txt = `Hola ${c.name.split(" ")[0]}, ¡te extrañamos en ${name}! 💈 Hace ${days} días no te vemos. Aparta tu cita aquí: ${$("linkUrl").textContent}`;
+      return `<div class="who-row"><span class="who-av t-trial">${esc(c.name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase())}</span>
+        <span class="min-w-0 flex-1"><b>${esc(c.name)}</b><br><span class="soft text-xs">Hace ${days} días, ${c.visits} visita${c.visits === 1 ? "" : "s"}</span></span>
+        <a class="act t-ok rounded-full px-3 py-2 text-xs font-bold" target="_blank" rel="noopener" href="${waLink(c.phone, txt)}">Invitar</a></div>`;
+    }).join("") : `<p class="soft text-sm">Todos tus clientes han vuelto en el último mes. 👏</p>`;
+  } catch (err) { box.innerHTML = `<p class="soft text-sm">No se pudo calcular: ${esc(err.message)}</p>`; }
 }

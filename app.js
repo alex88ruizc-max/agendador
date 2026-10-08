@@ -3,13 +3,13 @@ import {
   onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
-  doc, getDoc, setDoc, getDocs, updateDoc, collection, query, where, onSnapshot, serverTimestamp
+  doc, getDoc, setDoc, getDocs, updateDoc, collection, query, where, onSnapshot, serverTimestamp, Timestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   startUpdateWatcher, applyBrandColors, warmServer, uiConfirm, setDialogBrand, viewImage, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, dow, hora12, fechaLarga, fechaCorta, toMillis, cop, esc,
   normalizePhone, waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, computeSlots, dayCapacityUnits, staffHours,
   toast, openModal, closeModal, setBusy, copyText, tmin, mstr, UNIT
-} from "./common.js?v=2026-10-08r";
+} from "./common.js?v=2026-10-08t";
 
 const $ = (id) => document.getElementById(id);
 const S = {
@@ -111,6 +111,7 @@ function updateGate() {
   if (S.dead) return;
   if (S.user && S.profile) warmServer();
   const need = S.authReady && (!S.user || !S.profile);
+  if (S.authReady) presence(need ? "register" : (S.time ? "service" : "hours"));
   $("gate").classList.toggle("hidden", !need);
   $("mainContent").classList.toggle("hidden", need || !S.authReady);
   $("bookBar").classList.toggle("hidden", need || !S.authReady);
@@ -148,6 +149,9 @@ const TXT = {
 const T = (k) => ((S.settings?.appearance?.texts || {})[k] || "").trim() || TXT[k];
 function renderBiz() {
   const s = S.settings || {}, ap = s.appearance || {};
+  const promoOn = s.promo?.text && s.promo.until >= bogNow().date;
+  $("promoBar").classList.toggle("hidden", !promoOn);
+  if (promoOn) $("promoBar").textContent = "🔥 " + s.promo.text;
   $("bizName").textContent = s.businessName || "Reserva tu cita";
   $("bizAddress").textContent = [s.address, s.city].filter(Boolean).join(", ");
   $("bizSlogan").textContent = ap.slogan || "";
@@ -350,7 +354,7 @@ function renderSlots() {
 $("btnNextDay").onclick = () => { const d = $("btnNextDay").dataset.date; if (d) selectDate(d); };
 $("slots").addEventListener("click", (e) => {
   const b = e.target.closest("[data-time]"); if (!b) return;
-  S.time = b.dataset.time;
+  S.time = b.dataset.time; presence("service");
   warmServer();
   renderSlots(); renderServices(); renderSummary();
   setTimeout(() => $("servSection").scrollIntoView({ behavior: "smooth", block: "start" }), 50);
@@ -608,7 +612,7 @@ $("btnForgot").onclick = async () => {
 
 // ================= Pago con screenshot =================
 function showPay(apt, keepForm = false) {
-  S.payApt = apt;
+  S.payApt = apt; presence("pay");
   const st = S.settings || {};
   const methods = (st.paymentMethods || []);
   const fullName = `${S.profile?.firstName || ""} ${S.profile?.lastName || ""}`.trim();
@@ -736,6 +740,7 @@ function watchTicket(code) {
   }, () => {});
 }
 function showTicket(apt) {
+  presence("done");
   const st = S.settings || {};
   const note = {
     confirmed: "Cupo confirmado. Presenta este número al llegar.",
@@ -988,3 +993,86 @@ $("trialForm").addEventListener("submit", async (e) => {
   } catch (err) { toast(err.message || "No se pudo crear la agenda.", "error"); }
   finally { setBusy(btn, false); }
 });
+
+// ================= Visitas en vivo: el negocio ve quién está en su página =================
+const PSID = (() => {
+  const mk = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+  try { let v = sessionStorage.getItem("psid"); if (!v) { v = mk(); sessionStorage.setItem("psid", v); } return v; } catch { return mk(); }
+})();
+let PSTAGE = "visit", PLAST = 0;
+function presence(stage) {
+  if (S.dead || !BIZ_ID) return;
+  if (stage) { if (stage === PSTAGE && Date.now() - PLAST < 20000) return; PSTAGE = stage; }
+  PLAST = Date.now();
+  const name = S.profile ? `${S.profile.firstName || ""} ${(S.profile.lastName || "").slice(0, 1)}${S.profile.lastName ? "." : ""}`.trim().slice(0, 40) : "";
+  setDoc(doc(db, bpath("presence", PSID)), { stage: PSTAGE, name, uid: S.user && S.profile ? S.user.uid : "", at: serverTimestamp() }).catch(() => {});
+}
+if (!S.dead) {
+  presence("visit");
+  setInterval(() => { if (document.visibilityState === "visible") presence(); }, 30000);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") presence(); });
+  addEventListener("pagehide", () => { PSTAGE = "left"; presence(); });
+}
+
+// ================= Estados del negocio (24 horas, como en WhatsApp) =================
+let STORIES = [];
+const seenKey = "vistos_" + BIZ_ID;
+const seen = () => { try { return JSON.parse(localStorage.getItem(seenKey) || "[]"); } catch { return []; } };
+if (!S.dead) onSnapshot(collection(db, bpath("stories")), (q) => {
+  STORIES = q.docs.map((d) => ({ id: d.id, ...d.data() })).filter((x) => toMillis(x.expiresAt) > Date.now()).sort((a, b) => toMillis(a.createdAt) - toMillis(b.createdAt));
+  renderStories();
+}, () => {});
+function renderStories() {
+  const bar = $("storiesBar");
+  bar.classList.toggle("hidden", !STORIES.length);
+  if (!STORIES.length) return;
+  const sv = seen(), logo = S.settings?.appearance?.logo;
+  const allSeen = STORIES.every((x) => sv.includes(x.id));
+  bar.innerHTML = `<button class="story-btn" data-story="0"><span class="story-ring ${allSeen ? "seen" : ""}"><span style="${logo ? `background-image:url('${logo}')` : `background:${STORIES[0].bg || "#14213D"}`}">${logo ? "" : esc((S.settings?.businessName || "").slice(0, 2).toUpperCase())}</span></span><span class="w-full truncate text-center">Novedades</span></button>`
+    + STORIES.map((x, i) => `<button class="story-btn" data-story="${i}"><span class="story-ring ${sv.includes(x.id) ? "seen" : ""}"><span style="${x.img ? `background-image:url('${x.img}')` : `background:${x.bg || "#14213D"}`}">${x.img ? "" : esc((x.text || "").slice(0, 16))}</span></span><span class="w-full truncate text-center">${esc((x.text || "Estado").split("\n")[0].slice(0, 12))}</span></button>`).join("");
+}
+$("storiesBar").addEventListener("click", (e) => { const b = e.target.closest("[data-story]"); if (b) openStoryViewer(Number(b.dataset.story)); });
+function openStoryViewer(start) {
+  let i = start, t0 = 0, raf = 0, paused = false;
+  const DUR = 5000;
+  const wrap = document.createElement("div");
+  wrap.className = "story-view"; wrap.setAttribute("role", "dialog"); wrap.setAttribute("aria-modal", "true"); wrap.setAttribute("aria-label", "Estados de " + (S.settings?.businessName || "el negocio"));
+  document.body.appendChild(wrap);
+  const close = () => { cancelAnimationFrame(raf); wrap.remove(); document.removeEventListener("keydown", key); renderStories(); };
+  const key = (e) => { if (e.key === "Escape") close(); if (e.key === "ArrowRight") go(1); if (e.key === "ArrowLeft") go(-1); };
+  document.addEventListener("keydown", key);
+  const markSeen = (id) => { try { const v = seen(); if (!v.includes(id)) { v.push(id); localStorage.setItem(seenKey, JSON.stringify(v.slice(-60))); } } catch { /* sin almacenamiento */ } };
+  function draw() {
+    const x = STORIES[i]; if (!x) return close();
+    markSeen(x.id);
+    const hrs = Math.max(1, Math.round((Date.now() - toMillis(x.createdAt)) / 3600000));
+    wrap.innerHTML = `<div class="story-bars">${STORIES.map((_, k) => `<span><i style="width:${k < i ? 100 : 0}%"></i></span>`).join("")}</div>
+      <div class="flex items-center gap-2 px-3 pb-2"><span class="grid h-8 w-8 place-items-center overflow-hidden rounded-full bg-white/20 text-xs font-bold">${S.settings?.appearance?.logo ? `<img src="${S.settings.appearance.logo}" alt="" class="h-full w-full object-cover">` : esc((S.settings?.businessName || "").slice(0, 2).toUpperCase())}</span>
+        <span class="text-sm font-bold">${esc(S.settings?.businessName || "")}</span><span class="text-xs opacity-70">hace ${hrs} h</span>
+        <button class="ml-auto px-2 text-2xl leading-none" data-sx="close" aria-label="Cerrar">✕</button></div>
+      <div class="story-stage" style="${x.img ? "" : `background:${x.bg || "#14213D"}`}">${x.img ? `<img src="${x.img}" alt="">` : ""}
+        <p class="story-text" style="${x.img ? "" : "position:static;padding:24px;font-size:26px"}">${esc(x.text || "")}</p>
+        <button class="absolute inset-y-0 left-0 w-1/3" data-sx="prev" aria-label="Anterior"></button><button class="absolute inset-y-0 right-0 w-2/3" data-sx="next" aria-label="Siguiente"></button></div>
+      <div class="p-4 pb-[calc(16px+env(safe-area-inset-bottom,0px))]"><button class="w-full rounded-2xl bg-white py-3 font-bold text-ink" data-sx="book">Agendar mi cita</button></div>`;
+    t0 = performance.now(); cancelAnimationFrame(raf); tick();
+  }
+  function tick() {
+    raf = requestAnimationFrame((now) => {
+      if (paused) { t0 = now - (Number(wrap.dataset.el) || 0); return tick(); }
+      const el = now - t0; wrap.dataset.el = el;
+      const bar = wrap.querySelectorAll(".story-bars i")[i]; if (bar) bar.style.width = Math.min(100, (el / DUR) * 100) + "%";
+      if (el >= DUR) go(1); else tick();
+    });
+  }
+  function go(d) { i += d; if (i < 0) i = 0; if (i >= STORIES.length) return close(); draw(); }
+  wrap.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-sx]"); if (!b) return;
+    if (b.dataset.sx === "close") close();
+    if (b.dataset.sx === "prev") go(-1);
+    if (b.dataset.sx === "next") go(1);
+    if (b.dataset.sx === "book") { close(); ($("mainContent").classList.contains("hidden") ? $("gate") : $("slotsBox") || $("mainContent")).scrollIntoView({ behavior: "smooth" }); }
+  });
+  wrap.addEventListener("pointerdown", () => { paused = true; });
+  wrap.addEventListener("pointerup", () => { paused = false; });
+  draw();
+}

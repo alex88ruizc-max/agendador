@@ -7,20 +7,21 @@
   <title>Panel del negocio</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Archivo+Narrow:wght@500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Archivo+Narrow:wght@500;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="theme.js?v=2026-10-08r"></script>
+  <script src="theme.js?v=2026-10-08t"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="styles.css?v=2026-10-08r">
+  <link rel="stylesheet" href="styles.css?v=2026-10-08t">
 </head>
-<body class="bg-paper text-ink font-sans antialiased">
+<body class="sp antialiased">
 
-  <header class="pole-top bg-ink text-white">
-    <div class="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
-      <div id="hdrLogo" class="hidden h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-white/10 font-narrow font-bold"></div>
+  <header class="sp-head">
+    <div class="mx-auto flex max-w-6xl items-center gap-3 px-4 pb-2 pt-5">
+      <div id="hdrLogo" class="hidden h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-[14px] text-sm font-extrabold text-white"></div>
       <div class="min-w-0 flex-1">
-        <h1 id="hdrTitle" class="truncate font-narrow text-xl font-bold leading-tight">Panel de tu negocio</h1>
-        <p id="who" class="truncate text-xs text-white/70"></p>
+        <h1 id="hdrTitle" class="disp truncate text-[24px] font-extrabold leading-none">Panel de tu negocio</h1>
+        <p id="hdrSub" class="soft mt-1 truncate text-[13px]"></p>
+        <p id="who" class="hidden"></p>
       </div>
       <div class="relative">
         <button id="btnAccount" class="hdr-avatar hidden" aria-haspopup="true" aria-expanded="false" aria-label="Mi cuenta"></button>
@@ -53,8 +54,9 @@
   </section>
 
   <!-- Aplicación. Menú como en Epic: cuadrícula en celular, barra lateral en computador -->
-  <div id="appView" class="mx-auto hidden max-w-6xl px-4 pb-24 pt-4 lg:grid lg:grid-cols-[230px_minmax(0,1fr)] lg:items-start lg:gap-6">
-    <div class="mb-5 space-y-3 lg:sticky lg:top-6 lg:mb-0">
+  <div id="appView" class="mx-auto hidden max-w-6xl px-4 pb-32 pt-3 lg:grid lg:grid-cols-[240px_minmax(0,1fr)] lg:items-start lg:gap-6 lg:pb-10">
+    <div id="sideNav" class="mb-5 space-y-3 lg:sticky lg:top-6 lg:mb-0">
+    <button id="btnQuickSide" class="sp-quick-side hidden w-full lg:flex"><i class="fa-solid fa-plus"></i>Cita rápida</button>
     <nav class="rounded-2xl border border-line bg-white/60 p-2" aria-label="Secciones">
       <div class="hidden px-2 pb-2 pt-1 lg:block"><span class="text-[10px] font-bold uppercase tracking-wider text-ink/50">Secciones</span></div>
       <div id="tabs" class="grid grid-cols-3 gap-1.5 lg:grid-cols-1"></div>
@@ -77,7 +79,9 @@
     </div>
     <div id="adminContent" class="min-w-0">
       <div id="planBanner" class="mb-4 hidden space-y-1 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-900"></div>
-      <section id="tab-agenda" class="tab-panel"></section>
+      <section id="tab-home" class="tab-panel"></section>
+      <section id="tab-agenda" class="tab-panel hidden"></section>
+      <section id="tab-marketing" class="tab-panel hidden"></section>
       <section id="tab-staff" class="tab-panel hidden"></section>
       <section id="tab-clients" class="tab-panel hidden"></section>
       <section id="tab-services" class="tab-panel hidden"></section>
@@ -88,17 +92,26 @@
     </div>
   </div>
 
+  <!-- Barra inferior del celular -->
+  <nav id="spNav" class="sp-bnav hidden" aria-label="Navegación principal">
+    <button class="nv" data-go="home" aria-current="page"><i class="fa-solid fa-house"></i><span>Inicio</span></button>
+    <button class="nv" data-go="agenda"><i class="fa-regular fa-calendar"></i><span>Agenda</span></button>
+    <button id="btnQuick" class="nv-quick" aria-label="Cita rápida"><span>+</span><small>Cita rápida</small></button>
+    <button class="nv" data-go="clients"><i class="fa-solid fa-users"></i><span>Clientes</span></button>
+    <button class="nv" data-go="more"><i class="fa-solid fa-grip"></i><span>Más</span></button>
+  </nav>
+
   <!-- Modal genérico: el contenido lo arma admin.js -->
   <div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal-card max-w-xl">
       <div class="mb-4 flex items-start justify-between gap-3">
-        <h3 id="modalTitle" class="font-narrow text-2xl font-bold"></h3>
+        <h3 id="modalTitle" class="disp text-2xl font-bold"></h3>
         <button class="btn-ghost" data-close="modal" aria-label="Cerrar">✕</button>
       </div>
       <div id="modalBody"></div>
     </div>
   </div>
 
-  <script type="module" src="admin.js?v=2026-10-08r"></script>
+  <script type="module" src="admin.js?v=2026-10-08t"></script>
 </body>
 </html>

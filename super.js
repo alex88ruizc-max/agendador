@@ -1,13 +1,13 @@
 // Panel del superusuario: crear y vender barberías, planes, pagos y suspensiones
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
-  doc, getDoc, setDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp
+  doc, getDoc, setDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp, where
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { APP_VERSION, readPublishedVersion, reloadFresh, startUpdateWatcher, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-10-08r";
+import { APP_VERSION, readPublishedVersion, reloadFresh, startUpdateWatcher, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-10-08t";
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on) => $(id).classList.toggle("hidden", !on);
-const Z = { list: [], billing: {}, stats: {}, unsubs: [], q: "", payments: [] };
+const Z = { list: [], billing: {}, stats: {}, unsubs: [], q: "", payments: [], orders: [], goal: 0, filter: "all", settings: {} };
 const base = location.origin + location.pathname.replace(/super\.html$/, "");
 const publicUrl = (slug) => `${base}index.html?b=${slug}`;
 const adminUrl = (slug) => `${base}admin.html?b=${slug}`;
@@ -15,11 +15,15 @@ const adminUrl = (slug) => `${base}admin.html?b=${slug}`;
 // ================= Sesión =================
 onAuthStateChanged(auth, async (u) => {
   Z.unsubs.forEach((f) => f()); Z.unsubs = [];
-  show("loginView", !u); $("btnLogout").classList.toggle("hidden", !u);
-  if (!u) { show("appView", false); show("deniedView", false); $("who").textContent = ""; return; }
+  show("loginView", !u); show("btnAvatar", !!u);
+  if (!u) { show("appView", false); show("deniedView", false); show("spNav", false); $("who").textContent = ""; $("hello").textContent = "Panel de la plataforma"; $("helloSub").textContent = ""; return; }
   const s = await getDoc(doc(db, "superusers", u.uid)).catch(() => null);
   if (!s?.exists()) { show("deniedView", true); show("appView", false); $("who").textContent = u.email; return; }
-  $("who").textContent = u.email + " (superusuario)";
+  $("who").textContent = u.email;
+  const first = (u.email.match(/^[a-záéíóúñ]+/i) || ["Hola"])[0];
+  $("hello").textContent = "Hola, " + first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
+  $("btnAvatar").textContent = first.charAt(0).toUpperCase();
+  show("spNav", true);
   setDialogBrand("Agendador · superusuario");
   $("txtVersion").textContent = "Versión de esta página: " + APP_VERSION;
   show("deniedView", false); show("appView", true);
@@ -40,93 +44,223 @@ $("btnForgot").onclick = async () => {
   catch { toast("No se pudo enviar el correo.", "error"); }
 };
 $("btnLogout").onclick = () => signOut(auth);
+$("btnAvatar").onclick = (e) => { e.stopPropagation(); $("avatarMenu").classList.toggle("hidden"); };
+document.addEventListener("click", (e) => { if (!e.target.closest("#avatarMenu")) $("avatarMenu").classList.add("hidden"); });
 
-// Menú de secciones (igual al del panel de las tiendas)
-const SUPER_TABS = [["biz", "Tiendas", "fa-store", "#2563eb"], ["plan", "Cobro", "fa-crown", "#ca8a04"], ["pay", "Pagos", "fa-money-bill-wave", "#059669"], ["tg", "Telegram", "fa-paper-plane", "#0891b2"], ["ver", "Versión", "fa-rotate", "#7c3aed"]];
-let superTab = "biz";
-function renderSuperTabs() {
-  $("tabs").innerHTML = SUPER_TABS.map(([id, t, ic, col]) => `<button class="admin-tab" data-stab="${id}" aria-current="${superTab === id ? "page" : "false"}"><i class="fa-solid ${ic}" style="color:${col}"></i><span>${t}</span></button>`).join("");
+// ================= Navegación =================
+let SV = "home";
+function goSV(v) {
+  SV = v;
+  document.querySelectorAll(".sv").forEach((x) => x.classList.toggle("hidden", x.id !== "sv-" + v));
+  document.querySelectorAll("[data-sv]").forEach((x) => x.setAttribute("aria-current", x.dataset.sv === v ? "page" : "false"));
+  if (v === "money") loadPlanCfg();
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
-$("tabs").addEventListener("click", (e) => {
-  const b = e.target.closest("[data-stab]"); if (!b) return;
-  superTab = b.dataset.stab;
-  document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("hidden", p.id !== "sec-" + superTab));
-  renderSuperTabs();
-  if (superTab === "plan") loadPlanCfg();
+$("spNav").addEventListener("click", (e) => { const b = e.target.closest("[data-sv]"); if (b) goSV(b.dataset.sv); });
+document.querySelectorAll("[data-mseg]").forEach((b) => b.onclick = () => {
+  document.querySelectorAll("[data-mseg]").forEach((x) => x.setAttribute("aria-pressed", x === b ? "true" : "false"));
+  document.querySelectorAll(".mseg").forEach((x) => x.classList.toggle("hidden", x.id !== "m-" + b.dataset.mseg));
 });
+function goMoney(seg) { goSV("money"); document.querySelector(`[data-mseg="${seg}"]`).click(); }
+
 function start() {
-  renderSuperTabs();
   Z.unsubs.push(onSnapshot(collection(db, "businesses"), (q) => {
     Z.list = q.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
     Z.list.forEach((b) => {
       if (Z.billing[b.id] !== undefined) return;
       Z.billing[b.id] = null;
       Z.unsubs.push(onSnapshot(doc(db, "businesses", b.id, "private", "billing"), (s) => { Z.billing[b.id] = s.data() || {}; render(); }));
+      getDoc(doc(db, "businesses", b.id, "settings", "general")).then((s) => { Z.settings[b.id] = s.data() || {}; render(); }).catch(() => {});
     });
     render();
-  }, (e) => toast("Error leyendo barberías: " + e.message, "error")));
-  Z.unsubs.push(onSnapshot(query(collection(db, "platformPayments"), orderBy("at", "desc"), limit(30)), (q) => {
+  }, (e) => toast("Error leyendo las tiendas: " + e.message, "error")));
+  Z.unsubs.push(onSnapshot(query(collection(db, "platformPayments"), orderBy("at", "desc"), limit(60)), (q) => {
     Z.payments = q.docs.map((d) => d.data()); renderPayments(); render();
+  }, () => {}));
+  Z.unsubs.push(onSnapshot(query(collection(db, "platformOrders"), where("status", "==", "pending")), (q) => {
+    Z.orders = q.docs.map((d) => ({ id: d.id, ...d.data() })).filter((o) => toMillis(o.expiresAt) > Date.now()); renderOrders(); render();
   }, () => {}));
   Z.unsubs.push(onSnapshot(doc(db, "platform", "public"), (s) => { $("botUser").value = s.data()?.telegramBot || ""; }, () => {}));
   Z.unsubs.push(onSnapshot(doc(db, "platform", "telegram"), (s) => { $("tgSuperState").textContent = s.data()?.super ? "Conectado ✓" : "Sin conectar"; }, () => {}));
+  Z.unsubs.push(onSnapshot(doc(db, "platform", "private"), (s) => { Z.goal = Number(s.data()?.goalCOP || 0); $("goalInput").value = Z.goal || ""; render(); }, () => {}));
+  api("superOverview", {}).then((r) => { Z.stats = r || {}; render(); }).catch(() => {});
 }
 
-// ================= Lista =================
+// ================= Estado de cada tienda =================
 function daysLeft(b) {
   if (!b?.paidUntil) return null;
   return Math.round((Date.parse(b.paidUntil + "T00:00:00-05:00") - Date.parse(bogNow().date + "T00:00:00-05:00")) / 86400000);
 }
+// ok · trial · due · late · off
+function stateOf(biz) {
+  const bl = Z.billing[biz.id] || {};
+  if (biz.status !== "active") return "off";
+  const d = daysLeft(bl);
+  if (bl.mode === "monthly" && d !== null && d < 0) return "late";
+  if (biz.trial || bl.trial) return "trial";
+  if (bl.mode === "monthly" && d !== null && d <= 7) return "due";
+  return "ok";
+}
+const STATE_TXT = { ok: "Al día", trial: "Prueba", due: "Vence pronto", late: "Vencida", off: "Pausada" };
+const STATE_COLOR = { ok: "var(--mint)", trial: "var(--sky)", due: "var(--amber)", late: "var(--sred)", off: "#8a94a8" };
+const initials = (n) => (n || "?").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+const logoOf = (id) => Z.settings[id]?.appearance?.logo || "";
 function planLine(b) {
   if (!b) return "Cargando plan…";
   if (b.mode === "monthly") {
     const d = daysLeft(b);
-    const when = d === null ? "sin fecha de vencimiento" : d < 0 ? `venció hace ${-d} día(s)` : d === 0 ? "vence hoy" : `vence en ${d} día(s)`;
-    return `Mensualidad de ${cop(b.priceCOP)}: ${when}${b.paidUntil ? ` (${fechaLarga(b.paidUntil)})` : ""}.${b.autoSuspend ? ` Se suspende sola tras ${b.graceDays || 0} día(s) de gracia.` : " Suspensión manual."}`;
+    if (d === null) return `Mensual de ${cop(b.priceCOP)} sin fecha`;
+    const when = d < 0 ? `venció hace ${-d} día${d === -1 ? "" : "s"}` : d === 0 ? "vence hoy" : `${b.trial ? "prueba hasta" : "vence"} el ${fechaCorta(b.paidUntil)}`;
+    return `${b.trial ? "Prueba gratis" : "Mensual " + cop(b.priceCOP)}, ${when}`;
   }
-  if (b.mode === "one_time") return `Pago único de ${cop(b.priceCOP)}: ${b.paidOnce ? "pagado" : "pendiente de pago"}.`;
-  return "Control manual: tú decides cuándo suspenderla.";
+  if (b.mode === "one_time") return `Pago único ${b.paidOnce ? "pagado" : "pendiente"}`;
+  return "Control manual";
 }
+const phoneOf = (id) => String(Z.billing[id]?.ownerPhone || Z.settings[id]?.whatsapp || "").replace(/\D/g, "");
+function waTo(id, text) {
+  let ph = phoneOf(id);
+  if (!ph) return toast("Esta tienda no tiene WhatsApp guardado.", "error");
+  if (ph.length === 10) ph = "57" + ph;
+  window.open(`https://wa.me/${ph}?text=${encodeURIComponent(text)}`, "_blank");
+}
+function msgFor(kind, biz) {
+  const bl = Z.billing[biz.id] || {};
+  const panel = adminUrl(biz.id);
+  if (kind === "late") return `Hola, el plan de ${biz.name} en la agenda en línea venció el ${fechaLarga(bl.paidUntil)}. Para seguir recibiendo reservas renuévalo desde “Mi plan” en tu panel: ${panel}`;
+  if (kind === "due") return `Hola, el plan de ${biz.name} vence el ${fechaLarga(bl.paidUntil)}. Puedes renovarlo desde “Mi plan” en tu panel: ${panel}`;
+  if (kind === "trial") return `Hola, ¿cómo te va con la agenda de ${biz.name}? Tu prueba gratis termina el ${fechaLarga(bl.paidUntil)}. Si activas tu plan desbloqueas todas las funciones: ${panel}`;
+  return `Hola, te escribo por la agenda en línea de ${biz.name}. Tu panel: ${panel}`;
+}
+
+const dm = (date) => { const [y, m, d] = date.split("-").map(Number); return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("es-CO", { timeZone: "UTC", day: "numeric", month: "short" }).replace(".", ""); };
+// ================= Pintar todo =================
 function render() {
-  const q = Z.q.trim().toLowerCase();
-  const list = Z.list.filter((b) => !q || (b.name + " " + b.id + " " + (Z.billing[b.id]?.ownerEmail || "")).toLowerCase().includes(q));
-  const active = Z.list.filter((b) => b.status === "active").length;
-  const due = Z.list.filter((b) => { const bl = Z.billing[b.id]; const d = daysLeft(bl); return bl?.mode === "monthly" && d !== null && d <= 7; }).length;
+  renderLane(); renderTodo(); renderMonth(); renderBiz();
+  $("ordersBadge").textContent = Z.orders.length ? `(${Z.orders.length})` : "";
+}
+function renderLane() {
+  const lane = $("lane"); if (!lane) return;
+  const PAST = 7, FUT = 30, span = PAST + FUT;
+  const x = (d) => Math.min(97, Math.max(3, ((d + PAST) / span) * 100));
+  const todayX = (PAST / span) * 100;
+  const today = bogNow().date;
+  const ticks = [7, 14, 21, 28].map((d) => `<span class="tick" style="left:${x(d)}%"></span><span class="tl" style="left:${x(d)}%">${dm(addDays(today, d))}</span>`).join("");
+  const onLane = Z.list.map((b) => ({ b, d: daysLeft(Z.billing[b.id]) })).filter((o) => Z.billing[o.b.id]?.mode === "monthly" && o.d !== null && o.d <= FUT).sort((p, q) => p.d - q.d);
+  const lastX = [];
+  const pins = onLane.map((o, i) => {
+    const st = stateOf(o.b), px = x(o.d);
+    let level = 0; while (lastX.some((l) => l.level === level && Math.abs(l.x - px) < 9)) level++;
+    lastX.push({ x: px, level });
+    const top = [6, 40, 22, 56][level % 4];
+    const logo = logoOf(o.b.id);
+    return `<button class="pin" role="listitem" style="left:${px}%;top:${top}px;color:${STATE_COLOR[st]}" data-store="${o.b.id}" aria-label="${esc(o.b.name)}, ${STATE_TXT[st]}, ${planLine(Z.billing[o.b.id])}" title="${esc(o.b.name)}">
+      <b class="t-${st}">${logo ? `<img src="${logo}" alt="">` : esc(initials(o.b.name))}</b><i></i></button>`;
+  }).join("");
+  lane.innerHTML = `<div class="zone" style="width:${todayX}%"></div><div class="axis"></div>${ticks}
+    <span class="tl" style="left:${todayX / 2}%;color:var(--sred);font-weight:700">vencidas</span>
+    <div class="today" style="left:${todayX}%"><span>Hoy</span></div>${pins}`;
+  const off = Z.list.length - onLane.length;
+  $("laneOff").textContent = off > 0 ? `${off} sin vencimiento cercano` : "";
+}
+function tasks() {
+  const out = [];
+  Z.list.forEach((b) => {
+    const bl = Z.billing[b.id]; if (!bl) return;
+    const d = daysLeft(bl), st = stateOf(b);
+    if (bl.pendingProof) out.push({ w: 0, ic: "fa-receipt", tone: "t-trial", txt: `<b>${esc(b.name)}</b> envió un comprobante por ${cop(bl.pendingProof.amountCOP)}. Apruébalo en Telegram o regístralo aquí.`, act: "Registrar", fn: () => handleAct("pay", b, null) });
+    if (st === "off" && b.suspendReason === "Plan vencido") out.push({ w: 1, ic: "fa-circle-pause", tone: "t-late", txt: `<b>${esc(b.name)}</b> está pausada por falta de pago.`, act: "Cobrar", fn: () => waTo(b.id, msgFor("late", b)) });
+    else if (st === "late") {
+      const left = bl.autoSuspend ? Number(bl.graceDays || 0) + d : null;
+      out.push({ w: 1, ic: "fa-triangle-exclamation", tone: "t-late", txt: `<b>${esc(b.name)}</b> venció hace ${-d} día${d === -1 ? "" : "s"}${left !== null ? (left > 0 ? ` y se pausa en ${left} día${left === 1 ? "" : "s"}` : " y se pausa hoy") : ""}.`, act: "Cobrar", fn: () => waTo(b.id, msgFor("late", b)) });
+    } else if (st === "trial" && d !== null && d <= 5) {
+      const n = Z.stats[b.id]?.monthAppointments;
+      out.push({ w: 3, ic: "fa-wand-magic-sparkles", tone: "t-trial", txt: `<b>${esc(b.name)}</b> termina su prueba ${d === 0 ? "hoy" : `en ${d} día${d === 1 ? "" : "s"}`}${n ? ` y lleva ${n} citas este mes` : ""}. Buen momento para ofrecerle el plan.`, act: "Escribir", fn: () => waTo(b.id, msgFor("trial", b)) });
+    } else if (st === "due" && d <= 3) out.push({ w: 2, ic: "fa-clock", tone: "t-due", txt: `<b>${esc(b.name)}</b> vence ${d === 0 ? "hoy" : d === 1 ? "mañana" : `en ${d} días`}.`, act: "Recordar", fn: () => waTo(b.id, msgFor("due", b)) });
+  });
+  Z.orders.forEach((o) => out.push({ w: 0, ic: "fa-bolt", tone: "t-trial", txt: `<b>${esc(o.businessName)}</b> generó un pago Bre-B de ${cop(o.amountCOP)}. Si ya te llegó y no se activó solo, apruébalo.`, act: "Revisar", fn: () => goMoney("orders") }));
+  return out.sort((a, b) => a.w - b.w);
+}
+let TASKS = [];
+function renderTodo() {
+  TASKS = tasks();
+  const n = TASKS.length;
+  $("helloSub").textContent = !Z.list.length ? "Crea tu primera tienda con el botón +." : n === 0 ? "Todo al día. Nada pendiente por hoy." : `${n === 1 ? "Una tienda necesita" : n + " cosas necesitan"} algo de ti hoy.`;
+  $("todoCount").textContent = n ? `${n} pendiente${n === 1 ? "" : "s"}` : "";
+  $("todo").innerHTML = TASKS.slice(0, 8).map((t, i) => `<div class="todo"><span class="ic ${t.tone}"><i class="fa-solid ${t.ic}"></i></span>
+    <p class="min-w-0 flex-1 text-[13.5px] leading-snug">${t.txt}</p><button class="act ${t.tone}" data-task="${i}">${t.act}</button></div>`).join("")
+    || `<div class="todo"><span class="ic t-ok"><i class="fa-solid fa-check"></i></span><p class="flex-1 text-[13.5px]">No hay cobros vencidos, pruebas por terminar ni pagos por revisar.</p></div>`;
+}
+$("todo").addEventListener("click", (e) => { const b = e.target.closest("[data-task]"); if (b) TASKS[Number(b.dataset.task)]?.fn(); });
+function renderMonth() {
   const month = bogNow().date.slice(0, 7);
-  const income = Z.payments.filter((p) => new Date(toMillis(p.at)).toISOString().slice(0, 7) === month).reduce((s, p) => s + Number(p.amountCOP || 0), 0);
-  const stat = (n, t) => `<div class="rounded-xl border border-line bg-white px-3 py-2.5"><p class="font-narrow text-2xl font-bold leading-tight">${n}</p><p class="text-xs text-ink/70">${t}</p></div>`;
-  $("stats").innerHTML = stat(Z.list.length, "tiendas") + stat(active, "activas") + stat(Z.list.length - active, "suspendidas")
-    + stat(due, "vencen en 7 días o ya vencieron") + stat(cop(income), "cobrado este mes");
+  const monthName = new Date(month + "-15T12:00:00").toLocaleDateString("es-CO", { month: "long" });
+  const income = Z.payments.filter((p) => new Date(toMillis(p.at) - 5 * 3600000).toISOString().slice(0, 7) === month).reduce((s, p) => s + Number(p.amountCOP || 0), 0);
+  const pend = Z.list.filter((b) => ["late", "due"].includes(stateOf(b)) || (stateOf(b) === "off" && b.suspendReason === "Plan vencido"));
+  const pendSum = pend.reduce((s, b) => s + Number(Z.billing[b.id]?.priceCOP || 0), 0);
+  const pct = Z.goal ? Math.min(100, Math.round((income / Z.goal) * 100)) : 0;
+  const names = pend.slice(0, 2).map((b) => b.name).join(" y ");
+  $("month").innerHTML = `
+    <div class="flex items-baseline justify-between"><span class="soft text-sm capitalize">${monthName}</span><span class="soft text-xs">${Z.goal ? "meta " + cop(Z.goal) : `<button class="underline" data-gomore="1">Definir meta</button>`}</span></div>
+    <p class="disp mt-1 text-[32px] font-extrabold leading-none">${cop(income)}</p>
+    ${Z.goal ? `<div class="mt-3 flex gap-[3px]" role="img" aria-label="${pct}% de la meta"><span style="flex:${pct};height:8px;background:var(--sblue);border-radius:8px 2px 2px 8px"></span><span style="flex:${100 - pct};height:8px;background:var(--hair);border-radius:2px 8px 8px 2px"></span></div>` : ""}
+    <p class="soft mt-2 text-xs">${pend.length ? `Si cobras a ${esc(names)}${pend.length > 2 ? ` y ${pend.length - 2} más` : ""} sumas ${cop(pendSum)}.` : `${Z.payments.filter((p) => new Date(toMillis(p.at) - 5 * 3600000).toISOString().slice(0, 7) === month).length} pago(s) recibidos este mes.`}</p>`;
+}
+$("month").addEventListener("click", (e) => { if (e.target.closest("[data-gomore]")) goSV("more"); });
+$("lane").addEventListener("click", (e) => { const b = e.target.closest("[data-store]"); if (b) openStore(Z.list.find((x) => x.id === b.dataset.store)); });
+
+const FILTERS = [["all", "Todas"], ["trial", "En prueba"], ["due", "Por vencer"], ["late", "Vencidas"], ["off", "Pausadas"]];
+function renderBiz() {
+  const counts = {}; Z.list.forEach((b) => { const s = stateOf(b); counts[s] = (counts[s] || 0) + 1; });
+  $("bizFilters").innerHTML = FILTERS.map(([k, t]) => `<button class="fchip" data-f="${k}" aria-pressed="${Z.filter === k}">${t}${k === "all" ? ` ${Z.list.length}` : counts[k] ? ` ${counts[k]}` : ""}</button>`).join("");
+  const q = Z.q.trim().toLowerCase();
+  const list = Z.list.filter((b) => (Z.filter === "all" || stateOf(b) === Z.filter)
+    && (!q || (b.name + " " + b.id + " " + (Z.billing[b.id]?.ownerEmail || "")).toLowerCase().includes(q)));
   $("list").innerHTML = list.map((b) => {
-    const bl = Z.billing[b.id];
-    const d = daysLeft(bl);
-    const warn = bl?.mode === "monthly" && d !== null && d <= 7;
-    const st = Z.stats[b.id];
-    return `<article class="rounded-xl border ${warn ? "border-amber-400" : "border-line"} bg-white p-3">
-      <div class="flex items-start justify-between gap-2">
-        <div class="min-w-0">
-          <p class="truncate font-narrow text-xl font-bold leading-tight">${esc(b.name)}</p>
-          <p class="truncate text-xs text-ink/60">${esc(b.id)}${bl?.ownerEmail ? " · " + esc(bl.ownerEmail) : ""}</p>
-        </div>
-        <span class="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${b.status === "active" ? "bg-emerald-100 text-emerald-900" : "bg-rose-100 text-rose-900"}">${b.status === "active" ? "Activa" : "Suspendida"}</span>
-      </div>
-      <p class="mt-1.5 text-xs ${warn ? "font-semibold text-amber-900" : "text-ink/70"}">${planLine(bl)}</p>
-      ${b.status !== "active" && b.suspendReason ? `<p class="text-xs text-rose-800">Motivo: ${esc(b.suspendReason)}</p>` : ""}
-      ${st ? `<p class="text-xs text-ink/60">${st.error ? "Sin estadísticas" : `${st.monthAppointments} cita(s) este mes · ${st.customers} cliente(s)`}</p>` : ""}
-      <div class="mt-2.5 flex gap-1.5">
-        <a class="btn-sm flex-1 text-center" href="${adminUrl(b.id)}" target="_blank" rel="noopener"><i class="fa-solid fa-gauge"></i> Panel</a>
-        <button class="btn-sm flex-1 !border-emerald-600 text-emerald-800" data-a="pay" data-id="${b.id}"><i class="fa-solid fa-money-bill-wave"></i> Pago</button>
-        <button class="btn-sm px-3" data-a="more" data-id="${b.id}" aria-label="Más opciones de ${esc(b.name)}"><i class="fa-solid fa-ellipsis-vertical"></i></button>
-      </div>
-    </article>`;
-  }).join("") || `<p class="text-sm text-ink/60">${Z.list.length ? "No hay coincidencias." : "Aún no has creado tiendas. Toca “+ Nueva tienda” para vender la primera."}</p>`;
+    const st = stateOf(b), logo = logoOf(b.id), sx = Z.stats[b.id];
+    return `<button class="srow" data-store="${b.id}">
+      <span class="av t-${st}">${logo ? `<img src="${logo}" alt="">` : esc(initials(b.name))}</span>
+      <span class="min-w-0 flex-1"><span class="block truncate text-[15px] font-bold">${esc(b.name)}</span>
+        <span class="soft block truncate text-xs">${planLine(Z.billing[b.id])}${sx && !sx.error ? `, ${sx.monthAppointments} citas este mes` : ""}</span></span>
+      <span class="tag t-${st}">${STATE_TXT[st]}</span><i class="fa-solid fa-chevron-right soft text-xs"></i></button>`;
+  }).join("") || `<p class="soft p-5 text-center text-sm">${Z.list.length ? "Ninguna tienda coincide." : "Aún no tienes tiendas. Toca + para crear la primera."}</p>`;
 }
+$("bizFilters").addEventListener("click", (e) => { const b = e.target.closest("[data-f]"); if (b) { Z.filter = b.dataset.f; renderBiz(); } });
+$("list").addEventListener("click", (e) => { const b = e.target.closest("[data-store]"); if (b) openStore(Z.list.find((x) => x.id === b.dataset.store)); });
 function renderPayments() {
-  $("payments").innerHTML = Z.payments.length ? `<ul class="divide-y divide-line">${Z.payments.slice(0, 15).map((p) => `
-    <li class="flex justify-between gap-2 py-2"><span><b>${esc(p.businessName || p.businessId)}</b><br><span class="text-ink/60">${new Date(toMillis(p.at)).toLocaleDateString("es-CO", { timeZone: "America/Bogota" })}${p.months ? `, ${p.months} mes(es)` : ""}${p.note ? ", " + esc(p.note) : ""}</span></span>
-    <span class="font-semibold">${cop(p.amountCOP)}</span></li>`).join("")}</ul>` : `<p class="text-ink/60">Todavía no hay pagos registrados.</p>`;
+  $("payments").innerHTML = Z.payments.length ? `<ul class="divide-y divide-line">${Z.payments.slice(0, 40).map((p) => `
+    <li class="flex justify-between gap-3 py-2.5"><span class="min-w-0"><b>${esc(p.businessName || p.businessId)}</b><br><span class="soft text-xs">${new Date(toMillis(p.at)).toLocaleDateString("es-CO", { timeZone: "America/Bogota", day: "numeric", month: "short" })}${p.months ? `, ${p.months} mes(es)` : ""}${p.note ? ", " + esc(p.note) : ""}</span></span>
+    <span class="shrink-0 font-semibold">${cop(p.amountCOP)}</span></li>`).join("")}</ul>` : `<p class="soft">Todavía no hay pagos registrados.</p>`;
 }
-$("search").oninput = (e) => { Z.q = e.target.value; render(); };
+function renderOrders() {
+  $("orders").innerHTML = Z.orders.length ? Z.orders.map((o) => `<div class="todo"><span class="ic t-trial"><i class="fa-solid fa-bolt"></i></span>
+    <div class="min-w-0 flex-1 text-[13.5px] leading-snug"><b>${esc(o.businessName)}</b> debe enviar <b>${cop(o.amountCOP)}</b><br><span class="soft text-xs">${o.months} mes(es), creada ${new Date(toMillis(o.createdAt)).toLocaleString("es-CO", { timeZone: "America/Bogota", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}</span></div>
+    <button class="act t-ok" data-approve="${o.id}">Aprobar</button></div>`).join("")
+    : `<div class="sp-card soft text-sm">No hay pagos Bre-B esperando. Cuando un dueño genere uno, aparece aquí y se activa solo al llegar el aviso de Nequi.</div>`;
+}
+$("orders").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-approve]"); if (!b) return;
+  const o = Z.orders.find((x) => x.id === b.dataset.approve);
+  if (!(await uiConfirm("¿Aprobar este pago?", `Úsalo solo si ya ves en tu Nequi los ${cop(o.amountCOP)} de ${o.businessName}. Se activan ${o.months} mes(es).`, { okText: "Aprobar pago" }))) return;
+  setBusy(b, true, "Aprobando…");
+  try { const r = await api("superApproveOrder", { orderId: o.id }); toast(`Pago aprobado.${r.paidUntil ? " Activo hasta el " + fechaLarga(r.paidUntil) + "." : ""}`); }
+  catch (err) { toast(err.message, "error"); setBusy(b, false); }
+});
+$("search").oninput = (e) => { Z.q = e.target.value; renderBiz(); };
+
+// ================= Ajustes: mensaje a dueños y meta =================
+$("newsSend").onclick = async () => {
+  const text = $("newsText").value.trim();
+  if (text.length < 5) return toast("Escribe el mensaje.", "error");
+  if (!(await uiConfirm("¿Enviar a todos los dueños?", "Les llega por Telegram a quienes lo conectaron.", { okText: "Enviar" }))) return;
+  const btn = $("newsSend"); setBusy(btn, true, "Enviando…");
+  try { const r = await api("superBroadcast", { text }); $("newsText").value = ""; toast(`Enviado a ${r.sent} dueño(s).${r.skipped ? ` ${r.skipped} no tienen Telegram conectado.` : ""}`); }
+  catch (err) { toast(err.message, "error"); }
+  finally { setBusy(btn, false); }
+};
+$("goalSave").onclick = async () => {
+  try { await setDoc(doc(db, "platform", "private"), { goalCOP: Math.max(0, Number($("goalInput").value || 0)) }, { merge: true }); toast("Meta guardada."); }
+  catch (err) { toast(err.message, "error"); }
+};
 
 // ================= Modal =================
 function openM(title, html) { $("modalTitle").textContent = title; $("modalBody").innerHTML = html; openModal("modal"); }
@@ -183,7 +317,7 @@ const slugify = (t) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowe
 
 // ================= Nueva barbería =================
 $("btnNew").onclick = () => {
-  openM("Nueva barbería", `
+  openM("Crear tienda", `
     <label class="field mb-3"><span>Nombre del negocio</span><input id="nName" placeholder="Barbería Don Carlos"></label>
     <label class="field mb-1"><span>Identificador para el enlace</span><input id="nSlug" placeholder="don-carlos"></label>
     <p id="nLink" class="mb-3 break-all text-xs text-ink/60"></p>
@@ -192,7 +326,7 @@ $("btnNew").onclick = () => {
       <label class="field"><span>Correo del dueño</span><input id="nOwnerEmail" type="email"></label>
     </div>
     ${planForm({})}
-    <button id="nSave" class="btn-primary w-full">Crear barbería</button>`);
+    <button id="nSave" class="btn-primary w-full">Crear tienda</button>`);
   wirePlanForm();
   let touched = false;
   const upd = () => { $("nLink").textContent = $("nSlug").value ? "Enlace para clientes: " + publicUrl($("nSlug").value) : ""; };
@@ -203,12 +337,12 @@ $("btnNew").onclick = () => {
     const name = $("nName").value.trim(), slug = $("nSlug").value.trim(), email = $("nOwnerEmail").value.trim();
     if (!name || slug.length < 2) return toast("Escribe el nombre y el identificador.", "error");
     if (!/^\S+@\S+\.\S+$/.test(email)) return toast("Escribe el correo del dueño.", "error");
-    setBusy(btn, true, "Creando barbería…");
+    setBusy(btn, true, "Creando tienda…");
     try {
       const r = await api("superCreateBusiness", { name, slug, ownerEmail: email, ownerName: $("nOwnerName").value.trim(), billing: readPlan() });
       const msg = `¡Hola! Tu agenda en línea de ${name} ya está lista.\n\nEnlace para tus clientes:\n${publicUrl(r.slug)}\n\nTu panel de administración:\n${adminUrl(r.slug)}\nCorreo: ${r.ownerEmail}\n` +
         (r.tempPassword ? `Contraseña temporal: ${r.tempPassword}\n(Cámbiala con "Olvidé mi contraseña")` : "Entra con la contraseña que ya tienes.");
-      openM("Barbería creada", `
+      openM("Tienda creada", `
         <p class="mb-3">Envíale este mensaje al dueño:</p>
         <pre class="mb-4 whitespace-pre-wrap rounded-lg bg-paper p-3 text-sm">${esc(msg)}</pre>
         <div class="flex flex-wrap gap-2"><button class="btn-primary" data-copy="${esc(msg)}">Copiar mensaje</button>
@@ -218,33 +352,38 @@ $("btnNew").onclick = () => {
 };
 
 // ================= Acciones por barbería =================
-$("list").addEventListener("click", (e) => {
-  const b = e.target.closest("[data-a]"); if (!b) return;
-  const biz = Z.list.find((x) => x.id === b.dataset.id); if (!biz) return;
-  if (b.dataset.a === "more") return openMore(biz);
-  handleAct(b.dataset.a, biz, b);
-});
-// Menú completo de una tienda
-function openMore(biz) {
-  const item = (a, ic, t, extra = "") => `<button class="menu-item" data-ma="${a}" ${extra}><i class="fa-solid ${ic}"></i>${t}</button>`;
+// Ficha de una tienda: todo lo que puedes hacer con ella
+function openStore(biz) {
+  if (!biz) return;
+  const bl = Z.billing[biz.id] || {}, st = stateOf(biz), sx = Z.stats[biz.id], ph = phoneOf(biz.id);
+  const item = (a, ic, t, cls = "") => `<button class="menu-item ${cls}" data-ma="${a}"><i class="fa-solid ${ic}"></i>${t}</button>`;
   openM(biz.name, `
-    <p class="-mt-2 mb-3 text-xs text-ink/60">${esc(biz.id)} · ${biz.status === "active" ? "Activa" : "Suspendida"}</p>
-    <div class="grid gap-0.5">
-      <a class="menu-item" href="${adminUrl(biz.id)}" target="_blank" rel="noopener"><i class="fa-solid fa-gauge"></i>Abrir su panel</a>
-      ${item("pay", "fa-money-bill-wave", "Registrar pago")}
+    <div class="-mt-2 mb-4 flex flex-wrap items-center gap-2"><span class="tag t-${st}">${STATE_TXT[st]}</span><span class="soft text-sm">${esc(biz.id)}</span></div>
+    <dl class="mb-4 grid grid-cols-2 gap-3 rounded-2xl p-3 text-sm" style="background:var(--canvas)">
+      <div class="col-span-2"><dt class="soft text-xs">Plan</dt><dd class="font-semibold">${planLine(bl)}</dd></div>
+      <div><dt class="soft text-xs">Dueño</dt><dd class="truncate font-semibold">${esc(bl.ownerEmail || "Sin correo")}</dd></div>
+      <div><dt class="soft text-xs">WhatsApp</dt><dd class="font-semibold">${ph ? esc(ph) : "Sin número"}</dd></div>
+      ${sx && !sx.error ? `<div><dt class="soft text-xs">Citas este mes</dt><dd class="font-semibold">${sx.monthAppointments}</dd></div><div><dt class="soft text-xs">Clientes</dt><dd class="font-semibold">${sx.customers}</dd></div>` : ""}
+      ${biz.status !== "active" && biz.suspendReason ? `<div class="col-span-2"><dt class="soft text-xs">Motivo de la pausa</dt><dd class="font-semibold">${esc(biz.suspendReason)}</dd></div>` : ""}
+    </dl>
+    <a class="btn-primary mb-2 block w-full py-3 text-center" href="${adminUrl(biz.id)}">Gestionar todo en su panel</a>
+    <div class="mb-3 grid grid-cols-2 gap-2">
+      <button class="btn-light text-sm" data-ma="pay">Registrar pago</button>
+      <button class="btn-light text-sm" data-ma="wa">Escribir por WhatsApp</button>
+    </div>
+    <div class="grid gap-0.5 border-t border-line pt-2">
       ${item("edit", "fa-pen", "Editar nombre y plan")}
-      ${biz.status === "active" ? item("suspend", "fa-circle-pause", "Suspender") : item("activate", "fa-circle-play", "Activar")}
-      <div class="my-1 border-t border-line"></div>
+      ${biz.status === "active" ? item("suspend", "fa-circle-pause", "Pausar la tienda") : item("activate", "fa-circle-play", "Activar la tienda")}
       <a class="menu-item" href="${publicUrl(biz.id)}" target="_blank" rel="noopener"><i class="fa-regular fa-eye"></i>Ver la página de clientes</a>
       <button class="menu-item" data-copy="${publicUrl(biz.id)}"><i class="fa-regular fa-copy"></i>Copiar enlace para clientes</button>
       ${item("pass", "fa-key", "Nueva contraseña del dueño")}
-      <div class="my-1 border-t border-line"></div>
-      <button class="menu-item text-pole-red" data-ma="delete"><i class="fa-regular fa-trash-can"></i>Eliminar tienda</button>
+      ${item("delete", "fa-trash-can", "Eliminar tienda", "text-pole-red")}
     </div>`);
   $("modalBody").onclick = (e) => {
     const m = e.target.closest("[data-ma]"); if (!m) return;
     $("modalBody").onclick = null;
     closeModal("modal");
+    if (m.dataset.ma === "wa") return waTo(biz.id, msgFor(st, biz));
     handleAct(m.dataset.ma, biz, null);
   };
 }
