@@ -7,7 +7,7 @@ import {
   startUpdateWatcher, applyBrandColors, uiConfirm, uiPrompt, setDialogBrand, viewImage, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, hora12, fechaLarga, fechaCorta, toMillis, cop, esc, normalizePhone,
   waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, DEFAULT_WA_RESCHEDULE, computeSlots, onColor, darken,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-10-08j";
+} from "./common.js?v=2026-10-08m";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -468,6 +468,17 @@ function renderStaffTab() {
     ${isOwner() ? `<div class="mb-4 flex flex-wrap items-center justify-between gap-2">
       <p class="text-sm text-ink/70">${ownerTg ? "Tu Telegram de dueño está conectado." : "Conecta tu Telegram de dueño en Configuración para recibir todos los avisos."}</p>
       <button class="btn-primary" data-sact="new">+ Agregar al equipo</button></div>` : ""}
+    <section class="mb-4 rounded-xl border border-line bg-white p-4">
+      <div class="mb-2 flex items-center gap-2"><i class="fa-regular fa-clock text-pole-blue"></i><h3 class="font-narrow text-xl font-bold">Disponibilidad ${list.length > 1 ? "del equipo" : ""}</h3></div>
+      <p class="mb-3 text-xs text-ink/60">${list.length > 1
+        ? "Cada persona puede tener su propio horario y sus días libres. Si alguien usa el horario del negocio, atiende igual que el local. El cliente ve los cupos de todos juntos o puede elegir con quién."
+        : "Define en qué días y horas atiendes y tus días libres. Si usas el horario del negocio, se toma el de Configuración."}</p>
+      <div class="space-y-2">${list.filter((x) => x.active !== false).map((x) => `
+        <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line p-2.5">
+          <div class="min-w-0"><p class="font-semibold">${esc(x.name)}</p><p class="text-xs text-ink/60">${esc(hoursSummary(x))}</p></div>
+          <button class="btn-sm" data-sact="hours" data-id="${x.id}"><i class="fa-regular fa-calendar"></i> Editar horario</button>
+        </div>`).join("")}</div>
+    </section>
     <div class="grid gap-3 md:grid-cols-2">
     ${list.map((s) => {
       const busy = isBusy(s);
@@ -504,6 +515,7 @@ $("tab-staff").addEventListener("click", async (e) => {
   }
   if (act === "edit" || act === "new") openStaffEdit(s);
   if (act === "mysvc") openMyServices(s);
+  if (act === "hours") openStaffHours(s);
   if (act === "tg") tgLink(s.id);
 });
 
@@ -1138,7 +1150,7 @@ const TEXT_FIELDS = [
   ["welcome", "Mensaje de bienvenida", "(vacío: no se muestra)"], ["calendarTitle", "Título del calendario", "Selecciona día y horario"],
   ["bookButton", "Botón principal", "Apartar cupo"], ["registerTitle", "Título del registro", "Crea tu cuenta"],
   ["registerSub", "Texto del registro", "Regístrate una sola vez para ver la agenda y apartar tus citas."],
-  ["payNote", "Aviso en la pantalla de pago", "Escribe tu número de reserva en el mensaje o concepto de la transferencia."],
+  ["payNote", "Aviso en la pantalla de pago", "En el mensaje de la transferencia escribe tu nombre. Tu número de reserva te llega al confirmar el pago."],
   ["confirmedTitle", "Título al confirmar", "Tu turno fue confirmado"]
 ];
 async function imgToDataUrl(file, max, type) {
@@ -1427,3 +1439,72 @@ async function drawImage() {
 
 // Tocar cualquier imagen marcada para verla en grande
 document.addEventListener("click", (e) => { const i = e.target.closest("img[data-zoomsrc]"); if (i) viewImage(i.src); });
+
+// ================= Horario de cada profesional =================
+const DAY_SHORT = { 1: "Lun", 2: "Mar", 3: "Mié", 4: "Jue", 5: "Vie", 6: "Sáb", 0: "Dom" };
+const h12s = (t) => hora12(t).replace(":00", "").replace(" a. m.", "am").replace(" p. m.", "pm");
+function hoursSummary(x) {
+  const today = bogNow().date;
+  const off = (x.offDates || []).filter((d) => d >= today).sort();
+  const offTxt = off.length ? ` · Días libres: ${off.slice(0, 3).map((d) => fechaCorta(d)).join(", ")}${off.length > 3 ? "…" : ""}` : "";
+  if (!x.ownHours) return "Horario del negocio" + offTxt;
+  const parts = [1, 2, 3, 4, 5, 6, 0].map((d) => { const iv = (x.hours || {})[String(d)] || []; return iv.length ? `${DAY_SHORT[d]} ${iv.map((h) => h12s(h.open) + "-" + h12s(h.close)).join(" y ")}` : null; }).filter(Boolean);
+  return (parts.length ? "Horario propio: " + parts.join(" · ") : "Horario propio: sin días de atención") + offTxt;
+}
+function openStaffHours(x) {
+  const base = x.ownHours && x.hours ? x.hours : (A.settings.businessHours || {});
+  A.sh = { own: !!x.ownHours, off: [...(x.offDates || [])].filter((d) => d >= bogNow().date).sort() };
+  openM("Horario de " + x.name, `
+    <div class="mb-3 grid grid-cols-2 rounded-lg bg-paper p-1 text-sm font-semibold">
+      <button type="button" class="tab ${A.sh.own ? "" : "tab-on"}" data-shmode="biz">Horario del negocio</button>
+      <button type="button" class="tab ${A.sh.own ? "tab-on" : ""}" data-shmode="own">Horario propio</button>
+    </div>
+    <p id="shBizNote" class="mb-3 text-sm text-ink/70 ${A.sh.own ? "hidden" : ""}">Atiende en el mismo horario del local (lo cambias en Configuración).</p>
+    <div id="shDays" class="mb-4 space-y-2 ${A.sh.own ? "" : "hidden"}">${DAYS.map(([d, name]) => {
+      const h = base[String(d)] || [];
+      return `<div class="grid grid-cols-[6.5rem_1fr] items-center gap-2 border-t border-line pt-2" data-shdow="${d}">
+        <label class="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" class="h-4 w-4 shOn" ${h.length ? "checked" : ""}> ${name}</label>
+        <div class="flex flex-wrap items-center gap-1 text-sm">
+          <input type="time" step="900" class="sh1o rounded border border-line px-1" value="${h[0]?.open || "09:00"}"> a <input type="time" step="900" class="sh1c rounded border border-line px-1" value="${h[0]?.close || "19:00"}">
+          <span class="mx-1 text-ink/50">y</span>
+          <input type="time" step="900" class="sh2o rounded border border-line px-1" value="${h[1]?.open || ""}"> a <input type="time" step="900" class="sh2c rounded border border-line px-1" value="${h[1]?.close || ""}">
+        </div></div>`;
+    }).join("")}</div>
+    <p class="mb-1 text-sm font-semibold">Días libres (vacaciones, permisos)</p>
+    <div class="mb-2 flex flex-wrap items-center gap-2"><input id="shOffNew" type="date" min="${bogNow().date}" class="rounded border border-line px-2 py-1"><button type="button" id="shOffAdd" class="btn-sm">Agregar</button></div>
+    <div id="shOffList" class="mb-4 flex flex-wrap gap-2"></div>
+    <p class="mb-3 text-xs text-ink/60">Las citas que ya estén agendadas no se cancelan; revisa la Agenda si cambias días con citas.</p>
+    <button id="shSave" class="btn-primary w-full">Guardar horario</button>`);
+  const renderOff = () => { $("shOffList").innerHTML = A.sh.off.map((d) => `<span class="chip flex items-center gap-2"><span class="capitalize">${fechaCorta(d)}</span><button type="button" data-shrm="${d}" aria-label="Quitar">✕</button></span>`).join("") || `<span class="text-sm text-ink/60">Ninguno.</span>`; };
+  renderOff();
+  $("modalBody").querySelectorAll("[data-shmode]").forEach((b) => b.onclick = () => {
+    A.sh.own = b.dataset.shmode === "own";
+    $("modalBody").querySelectorAll("[data-shmode]").forEach((x2) => x2.classList.toggle("tab-on", x2 === b));
+    $("shDays").classList.toggle("hidden", !A.sh.own); $("shBizNote").classList.toggle("hidden", A.sh.own);
+  });
+  $("shOffAdd").onclick = () => { const v = $("shOffNew").value; if (!v) return; if (!A.sh.off.includes(v)) A.sh.off.push(v); A.sh.off.sort(); renderOff(); };
+  $("shOffList").onclick = (e) => { const b = e.target.closest("[data-shrm]"); if (b) { A.sh.off = A.sh.off.filter((d) => d !== b.dataset.shrm); renderOff(); } };
+  $("shSave").onclick = async () => {
+    const hours = {};
+    if (A.sh.own) {
+      for (const row of document.querySelectorAll("[data-shdow]")) {
+        const d = row.dataset.shdow, iv = [];
+        if (row.querySelector(".shOn").checked) {
+          const o1 = row.querySelector(".sh1o").value, c1 = row.querySelector(".sh1c").value, o2 = row.querySelector(".sh2o").value, c2 = row.querySelector(".sh2c").value;
+          for (const v of [o1, c1, o2, c2]) if (v && Number(v.split(":")[1]) % 15 !== 0) return toast("Usa horas en punto, :15, :30 o :45.", "error");
+          if (!o1 || !c1 || c1 <= o1) return toast("Revisa el horario: el cierre debe ser después de la apertura.", "error");
+          iv.push({ open: o1, close: c1 });
+          if (o2 && c2) { if (c2 <= o2 || o2 < c1) return toast("El segundo turno debe empezar después del primero.", "error"); iv.push({ open: o2, close: c2 }); }
+        }
+        hours[d] = iv;
+      }
+    }
+    const btn = $("shSave"); setBusy(btn, true, "Guardando…");
+    try {
+      const data = { ownHours: A.sh.own, offDates: A.sh.off };
+      if (A.sh.own) data.hours = hours;
+      await updateDoc(doc(db, bpath("staff", x.id)), data);
+      closeM(); toast("Horario guardado. La página de clientes ya muestra los cupos nuevos.");
+    } catch (err) { toast("No se pudo guardar: " + err.message, "error"); setBusy(btn, false); }
+  };
+}

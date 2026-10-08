@@ -7,9 +7,9 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   startUpdateWatcher, applyBrandColors, warmServer, uiConfirm, setDialogBrand, viewImage, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, dow, hora12, fechaLarga, fechaCorta, toMillis, cop, esc,
-  normalizePhone, waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, computeSlots, dayCapacityUnits,
+  normalizePhone, waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, computeSlots, dayCapacityUnits, staffHours,
   toast, openModal, closeModal, setBusy, copyText, tmin, mstr, UNIT
-} from "./common.js?v=2026-10-08j";
+} from "./common.js?v=2026-10-08m";
 
 const $ = (id) => document.getElementById(id);
 const S = {
@@ -143,7 +143,7 @@ function subscribeMine() {
 const TXT = {
   calendarTitle: "Selecciona día y horario", bookButton: "Apartar cupo", welcome: "",
   registerTitle: "Crea tu cuenta", registerSub: "Regístrate una sola vez para ver la agenda y apartar tus citas.",
-  payNote: "Escribe tu número de reserva en el mensaje o concepto de la transferencia.", confirmedTitle: "Tu turno fue confirmado"
+  payNote: "En el mensaje de la transferencia escribe tu nombre. Tu número de reserva te llega al confirmar el pago.", confirmedTitle: "Tu turno fue confirmado"
 };
 const T = (k) => ((S.settings?.appearance?.texts || {})[k] || "").trim() || TXT[k];
 function renderBiz() {
@@ -212,8 +212,9 @@ $("staffPick").addEventListener("click", (e) => {
 const slotLen = () => Number(S.settings?.slotDurationMinutes || 30);
 const maxDate = () => addDays(bogNow().date, Math.min(90, Number(S.settings?.bookingWindowDays || 30)));
 const staffPool = () => S.staff.filter((s) => !S.staffId || s.id === S.staffId);
-const hoursOf = (date) => (S.settings?.businessHours || {})[String(dow(date))] || [];
-const isClosed = (date) => !hoursOf(date).length || (S.settings?.closedDates || []).includes(date);
+const hoursOfStaff = (s, date) => staffHours(S.settings, s, date);
+// Cerrado si ningún profesional (del filtro) atiende ese día
+const isClosed = (date) => !S.settings || (S.settings.closedDates || []).includes(date) || !staffPool().some((s) => hoursOfStaff(s, date).length);
 function firstOpenDay() {
   const today = bogNow().date, end = maxDate();
   for (let d = today; d <= end; d = addDays(d, 1)) if (!isClosed(d)) return d;
@@ -226,21 +227,25 @@ function dayGrid() {
   const now = bogNow(); if (S.date < now.date) return [];
   const slot = slotLen(), taken = takenSet();
   const minStart = S.date === now.date ? now.min + Number(S.settings.minAdvanceMinutes || 0) : -1;
-  const out = [];
-  for (const h of hoursOf(S.date)) {
-    const o = tmin(h.open), c = tmin(h.close);
-    for (let t = o; t + slot <= c; t += slot) {
-      if (t < minStart) continue;
-      const free = staffPool().filter((s) => { for (let u = t; u < t + slot; u += UNIT) if (taken.has(`${s.id}_${mstr(u)}`)) return false; return true; }).map((s) => s.id);
-      out.push({ time: mstr(t), free });
+  const map = new Map();
+  for (const s of staffPool()) {
+    for (const h of hoursOfStaff(s, S.date)) {
+      const o = tmin(h.open), c = tmin(h.close);
+      for (let t = o; t + slot <= c; t += slot) {
+        if (t < minStart) continue;
+        let ok = true; for (let u = t; u < t + slot; u += UNIT) if (taken.has(`${s.id}_${mstr(u)}`)) { ok = false; break; }
+        if (!map.has(t)) map.set(t, []);
+        if (ok) map.get(t).push(s.id);
+      }
     }
   }
-  return out;
+  return [...map.entries()].sort((a, b) => a[0] - b[0]).map(([t, free]) => ({ time: mstr(t), free }));
 }
 // Minutos seguidos libres de un profesional desde una hora
 function freeFrom(staffId, time) {
   const t = tmin(time), taken = takenSet();
-  const iv = hoursOf(S.date).map((h) => [tmin(h.open), tmin(h.close)]).find(([o, c]) => t >= o && t < c);
+  const s = S.staff.find((x) => x.id === staffId);
+  const iv = hoursOfStaff(s, S.date).map((h) => [tmin(h.open), tmin(h.close)]).find(([o, c]) => t >= o && t < c);
   if (!iv) return 0;
   let u = t; while (u < iv[1] && !taken.has(`${staffId}_${mstr(u)}`)) u += UNIT;
   return u - t;
@@ -271,7 +276,7 @@ function dayBookable(date) {
   if (r !== null && r >= 1) return false;
   if (date === today) { // hoy solo si queda tiempo antes del cierre
     const now = bogNow().min + Number(S.settings?.minAdvanceMinutes || 0);
-    return hoursOf(date).some((h) => tmin(h.close) - slotLen() >= now);
+    return staffPool().some((s) => hoursOfStaff(s, date).some((h) => tmin(h.close) - slotLen() >= now));
   }
   return true;
 }
@@ -396,6 +401,8 @@ $("mainServices").addEventListener("click", (e) => {
   const b = e.target.closest("[data-main]"); if (!b || b.disabled) return;
   S.mainId = b.dataset.main; S.extras.delete(S.mainId);
   renderServices(); renderSummary();
+  // lleva al cliente a los agregados (si hay) o directo al botón de apartar
+  setTimeout(() => (($("extrasWrap").classList.contains("hidden") ? $("bookBar") : $("extrasWrap"))).scrollIntoView({ behavior: "smooth", block: "center" }), 60);
 });
 $("extraServices").addEventListener("click", (e) => {
   const b = e.target.closest("[data-extra]"); if (!b || b.disabled) return;
@@ -599,44 +606,34 @@ $("btnForgot").onclick = async () => {
 // ================= Pago con screenshot =================
 function showPay(apt, keepForm = false) {
   S.payApt = apt;
-  const waiting = !apt.code;
   const st = S.settings || {};
   const methods = (st.paymentMethods || []);
-  const methodBox = (m, i) => `
-    <div class="rounded-xl border border-line bg-white p-3">
-      <div class="flex items-center justify-between gap-2">
-        <div class="min-w-0">
-          <span class="block text-[10px] font-bold uppercase tracking-wider text-ink/60">${esc(m.label)}</span>
-          <span class="select-all break-all font-mono text-base font-bold">${esc(m.account)}</span>
-          ${m.holder ? `<span class="block text-xs text-ink/60">${esc(m.holder)}</span>` : ""}
-        </div>
-        <div class="flex shrink-0 flex-col gap-1">
-          <button type="button" data-copy="${esc(m.account)}" class="rounded-lg bg-pole-blue px-2.5 py-1 text-xs font-bold text-white">Copiar</button>
-          ${m.qr ? `<button type="button" data-qr="${i}" class="btn-sm text-xs">Ver QR</button>` : ""}
-        </div>
-      </div>
-      ${m.qr ? `<div id="qr${i}" class="mt-3 hidden flex-col items-center"><img src="${m.qr}" data-zoom="${i}" alt="Código QR de ${esc(m.label)}" class="h-44 w-44 cursor-zoom-in rounded-lg border border-line object-contain">
-        <p class="mt-2 text-xs text-ink/60">Toca el código para verlo en grande. Escanéalo desde tu app bancaria y envía el valor exacto.</p></div>` : ""}
-    </div>`;
+  const fullName = `${S.profile?.firstName || ""} ${S.profile?.lastName || ""}`.trim();
+  // El número de reserva se entrega después de pagar: en la transferencia basta con el nombre
+  let note = (st.paymentInstructions || "").trim();
+  if (!note || /n[uú]mero de reserva/i.test(note)) note = T("payNote");
   $("payBody").innerHTML = `
-    <div class="rounded-2xl border border-line bg-paper p-4">
-      <div class="mb-2 flex items-center justify-between gap-2">
-        <p class="text-xs font-bold uppercase tracking-wider text-ink/60">Reserva <span class="font-mono text-ink">${waiting ? `<span class="spin"></span> apartando tu cupo…` : esc(apt.code)}</span></p>
-        ${waiting ? "" : `<button type="button" data-copy="${esc(apt.code)}" class="btn-sm text-xs">Copiar</button>`}
-      </div>
-      <p class="text-center text-xs text-ink/60">Envía exactamente</p>
-      <div class="my-1 text-center"><span class="font-narrow text-4xl font-bold">${cop(apt.depositCOP)}</span></div>
-      <p class="text-center text-xs capitalize text-ink/70">${fechaCorta(apt.date)} · ${hora12(apt.startTime)} · ${(apt.items || []).map((i) => esc(i.name)).join(" + ")}</p>
-      <p class="mb-3 text-center text-xs text-ink/60">Total ${cop(apt.totalCOP)} · Saldo en el local ${cop(apt.balanceDueCOP)}</p>
-      <button type="button" data-copy="${Number(apt.depositCOP || 0)}" class="btn-sm mx-auto mb-3 block text-xs">Copiar monto</button>
-      <div class="space-y-2">${methods.length ? methods.map(methodBox).join("") : `<p class="rounded-xl border border-line bg-white p-3 text-center text-sm text-ink/60">El negocio aún no ha configurado sus medios de pago. Escríbele por WhatsApp.</p>`}</div>
-      <p id="payCountdown" class="mt-3 text-center text-sm font-bold text-amber-700"></p>
-      <p class="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs leading-snug text-amber-900">⚠️ ${esc(st.paymentInstructions || T("payNote"))} El pago queda confirmado cuando el negocio lo verifique.</p>
-    </div>`;
+    <p class="mb-2 text-xs capitalize text-ink/70">${(apt.items || []).map((i) => esc(i.name)).join(" + ")} · ${fechaCorta(apt.date)} · ${hora12(apt.startTime)}</p>
+    <div class="pay-amount mb-2">
+      <div><p class="text-[11px] font-semibold uppercase tracking-wider text-ink/60">Envía exactamente</p>
+        <p class="font-narrow text-3xl font-bold leading-none">${cop(apt.depositCOP)}</p>
+        <p class="mt-1 text-[11px] text-ink/60">Total ${cop(apt.totalCOP)} · Saldo en el local ${cop(apt.balanceDueCOP)}</p></div>
+      <button type="button" class="pay-ibtn" data-copy="${Number(apt.depositCOP || 0)}" aria-label="Copiar monto"><i class="fa-regular fa-copy"></i></button>
+    </div>
+    <div class="space-y-1.5">${methods.length ? methods.map((m, i) => `
+      <div class="pay-row">
+        <div class="min-w-0 flex-1">
+          <p class="text-[10px] font-bold uppercase tracking-wider text-ink/55">${esc(m.label)}${m.holder ? ` · <span class="normal-case tracking-normal">${esc(m.holder)}</span>` : ""}</p>
+          <p class="truncate font-mono text-[15px] font-bold">${esc(m.account)}</p>
+        </div>
+        ${m.qr ? `<button type="button" class="pay-ibtn" data-qrview="${i}" aria-label="Ver código QR"><i class="fa-solid fa-qrcode"></i></button>` : ""}
+        <button type="button" class="pay-ibtn main" data-copy="${esc(m.account)}" aria-label="Copiar ${esc(m.label)}"><i class="fa-regular fa-copy"></i></button>
+      </div>`).join("") : `<p class="rounded-lg border border-line p-3 text-center text-sm text-ink/60">El negocio aún no ha configurado sus medios de pago.</p>`}</div>
+    <p class="mt-2 text-xs leading-snug text-ink/65">💬 ${esc(note)}${fullName ? ` <button type="button" class="font-semibold text-pole-blue underline" data-copy="${esc(fullName)}">Copiar mi nombre</button>` : ""}</p>`;
   if (!keepForm) {
     $("proofForm").reset(); S.proofData = null;
     $("proofPreview").classList.add("hidden");
-    $("proofLabel").innerHTML = `<b>Sube el screenshot del pago</b><br>Toca aquí para elegir la imagen`;
+    $("proofLabel").innerHTML = `<b>Sube el comprobante</b><br><span class="text-xs text-ink/60">Toca para elegir la captura del pago</span>`;
   }
   closeModal("mineModal");
   openModal("payModal");
@@ -646,16 +643,20 @@ function showPay(apt, keepForm = false) {
     const el = $("payCountdown"); if (!el) return;
     const submit = $("proofForm").querySelector("button[type=submit]");
     if (left <= 0) {
-      el.textContent = "El tiempo para pagar venció. Aparta el cupo de nuevo.";
+      el.textContent = "Tiempo vencido";
       submit.disabled = true; clearInterval(S.payTimer); return;
     }
-    submit.disabled = !S.payApt?.code; // espera a que el servidor dé el número de reserva
+    const ready = !!S.payApt?.code; // el servidor ya apartó el cupo
+    submit.disabled = !ready;
+    if (!submit.dataset.label) submit.textContent = ready ? "Ya pagué" : "Apartando tu cupo…";
     const m = Math.floor(left / 60000), s = Math.floor((left % 60000) / 1000);
-    el.textContent = `⏱ Tu cupo queda apartado ${m}:${String(s).padStart(2, "0")}`;
+    el.textContent = `⏱ ${m}:${String(s).padStart(2, "0")}`;
   };
   tick(); S.payTimer = setInterval(tick, 1000);
 }
 $("payBody").addEventListener("click", (e) => {
+  const qv = e.target.closest("[data-qrview]");
+  if (qv) { const m = (S.settings?.paymentMethods || [])[Number(qv.dataset.qrview)]; if (m) viewImage(m.qr, `${m.label}: ${m.account}${m.holder ? " · " + m.holder : ""}`); return; }
   const z = e.target.closest("[data-zoom]");
   if (z) { const m = (S.settings?.paymentMethods || [])[Number(z.dataset.zoom)]; viewImage(z.src, m ? `${m.label}: ${m.account}${m.holder ? " · " + m.holder : ""}` : ""); return; }
   const q = e.target.closest("[data-qr]"); if (!q) return;
@@ -683,7 +684,7 @@ document.addEventListener("keydown", (e) => {
 $("proofFile").addEventListener("change", (e) => {
   const file = e.target.files[0]; if (!file) return;
   const img = $("proofPreview"); img.src = URL.createObjectURL(file); img.classList.remove("hidden");
-  $("proofLabel").innerHTML = `<b class="text-emerald-700">✓ Imagen lista</b><br>Toca para cambiarla`;
+  $("proofLabel").innerHTML = `<b class="text-emerald-700">✓ Comprobante listo</b><br><span class="text-xs text-ink/60">Toca para cambiarlo</span>`;
   S.proofData = compressImage(file); // se prepara de una vez para que "Ya pagué" sea inmediato
 });
 

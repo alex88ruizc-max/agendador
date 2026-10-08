@@ -2,7 +2,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js?v=2026-10-08j";
+import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js?v=2026-10-08m";
 
 export const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
@@ -16,7 +16,7 @@ export function businessFromUrl() {
 export const bpath = (...parts) => ["businesses", BID, ...parts].join("/");
 
 // Versión de la página: cámbiala en cada actualización para comprobar que se publicó
-export const APP_VERSION = '2026-10-08j';
+export const APP_VERSION = '2026-10-08m';
 
 export const UNIT = 15;          // unidad interna de bloqueo (minutos)
 const TZ = "America/Bogota";     // Colombia no usa horario de verano
@@ -131,6 +131,14 @@ export function fillTemplate(tpl, apt, settings) {
 
 // ---------- Disponibilidad ----------
 // Devuelve [{time:"HH:mm", staffIds:[...]}] con las horas en que cabe el servicio.
+// Horario de un profesional en una fecha: su horario propio o el del negocio, sin sus días libres
+export function staffHours(settings, staff, date) {
+  if (!settings || (settings.closedDates || []).includes(date)) return [];
+  if (staff && (staff.offDates || []).includes(date)) return [];
+  const d = String(dow(date));
+  if (staff && staff.ownHours && staff.hours) return staff.hours[d] || [];
+  return (settings.businessHours || {})[d] || [];
+}
 export function computeSlots({ settings, staffList, locks, date, totalMinutes, occupied, mainId, staffFilter, ignoreAptCode, forAdmin = false, ignoreBreaks = false }) {
   if (!settings || !date) return [];
   const now = bogNow();
@@ -139,7 +147,6 @@ export function computeSlots({ settings, staffList, locks, date, totalMinutes, o
   if (!forAdmin && date > addDays(now.date, Number(settings.bookingWindowDays || 30))) return [];
   const slot = Number(settings.slotDurationMinutes || 30);
   const occ = occupied || Math.max(slot, Math.ceil(totalMinutes / slot) * slot);
-  const hours = (settings.businessHours || {})[String(dow(date))] || [];
   const minStart = date === now.date ? now.min + (forAdmin ? 0 : Number(settings.minAdvanceMinutes || 0)) : -1;
   const taken = new Set(
     locks.filter((l) => !(ignoreAptCode && l.appointmentId === ignoreAptCode) && !(ignoreBreaks && l.state === "break"))
@@ -149,11 +156,11 @@ export function computeSlots({ settings, staffList, locks, date, totalMinutes, o
     && (!mainId || !s.serviceIds?.length || s.serviceIds.includes(mainId))
     && (!staffFilter || s.id === staffFilter));
   const result = new Map();
-  for (const h of hours) {
-    const o = tmin(h.open), c = tmin(h.close);
-    for (let t = o; t + occ <= c; t += slot) {
-      if (t < minStart) continue;
-      for (const s of capable) {
+  for (const s of capable) {
+    for (const h of staffHours(settings, s, date)) {
+      const o = tmin(h.open), c = tmin(h.close);
+      for (let t = o; t + occ <= c; t += slot) {
+        if (t < minStart) continue;
         let free = true;
         for (let u = t; u < t + occ; u += UNIT) { if (taken.has(`${s.id}_${mstr(u)}`)) { free = false; break; } }
         if (free) { if (!result.has(t)) result.set(t, []); result.get(t).push(s.id); }
@@ -165,10 +172,8 @@ export function computeSlots({ settings, staffList, locks, date, totalMinutes, o
 
 // Capacidad total del día en unidades de 15 min (para colorear el calendario mensual)
 export function dayCapacityUnits(settings, staffList, date) {
-  if (!settings || (settings.closedDates || []).includes(date)) return 0;
-  const hours = (settings.businessHours || {})[String(dow(date))] || [];
-  const perStaff = hours.reduce((a, h) => a + Math.max(0, (tmin(h.close) - tmin(h.open)) / UNIT), 0);
-  return perStaff * staffList.filter((s) => s.active !== false).length;
+  return staffList.filter((s) => s.active !== false).reduce((sum, s) =>
+    sum + staffHours(settings, s, date).reduce((a, h) => a + Math.max(0, (tmin(h.close) - tmin(h.open)) / UNIT), 0), 0);
 }
 
 // ---------- Interfaz ----------

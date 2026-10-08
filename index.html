@@ -11,9 +11,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Archivo+Narrow:wght@500;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="theme.js?v=2026-10-08j"></script>
+  <script src="theme.js?v=2026-10-08m"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="styles.css?v=2026-10-08j">
+  <link rel="stylesheet" href="styles.css?v=2026-10-08m">
 </head>
 <body class="bg-paper text-ink font-sans antialiased">
 
@@ -32,7 +32,7 @@
     </div>
   </header>
 
-  <main class="mx-auto max-w-5xl px-4 pb-40 pt-6">
+  <main class="mx-auto max-w-5xl px-4 pb-16 pt-6">
     <section id="unavailable" class="mx-auto mt-10 hidden max-w-md rounded-2xl bg-white p-6 text-center">
       <h2 id="unTitle" class="font-narrow text-2xl font-bold"></h2><p id="unText" class="mt-2 text-ink/70"></p>
     </section>
@@ -136,15 +136,16 @@
         <div id="extraServices" class="grid gap-2 sm:grid-cols-2"></div>
       </div>
     </section>
+
+    <!-- Resumen y botón: dentro de la página (no tapado por la barra del navegador) -->
+    <section id="bookBar" class="hidden mb-10 rounded-2xl border border-line bg-white p-4" aria-label="Resumen de tu cita">
+      <div id="summary" class="mb-3 min-w-0 text-sm"></div>
+      <button id="btnBook" class="btn-primary w-full py-3 text-base" disabled>Apartar cupo</button>
+    </section>
     </div>
   </main>
 
   <!-- Barra inferior de resumen -->
-  <div id="bookBar" class="hidden fixed inset-x-0 bottom-0 z-40 border-t border-line bg-white/95 backdrop-blur" style="padding-bottom: env(safe-area-inset-bottom, 0px)">
-    <div class="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
-      <div id="summary" class="min-w-0 text-sm"></div>
-      <button id="btnBook" class="btn-primary shrink-0" disabled>Apartar cupo</button>
-    </div>
   </div>
 
   <!-- Modal: autorización de datos para esta barbería -->
@@ -159,25 +160,28 @@
     </div>
   </div>
 
-  <!-- Modal: pago (sistema de Epic, manual con comprobante) -->
+  <!-- Modal: pago (compacto; el número de reserva se entrega después de pagar) -->
   <div id="payModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="payTitle">
-    <div class="modal-card relative">
-      <button class="btn-ghost absolute right-3 top-3" data-close="payModal" aria-label="Cerrar">✕</button>
-      <h3 id="payTitle" class="font-narrow text-2xl font-bold">Paga tu abono</h3>
-      <p class="mb-4 text-sm text-ink/70">Tu cupo quedó apartado. Transfiere el abono y sube el comprobante para confirmarlo.</p>
+    <div class="modal-card relative max-w-md !p-4">
+      <div class="mb-3 flex items-center justify-between gap-2">
+        <h3 id="payTitle" class="font-narrow text-xl font-bold">Paga tu abono</h3>
+        <div class="flex items-center gap-1">
+          <span id="payCountdown" class="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800"></span>
+          <button class="btn-ghost" data-close="payModal" aria-label="Cerrar">✕</button>
+        </div>
+      </div>
       <div id="payBody"></div>
-      <form id="proofForm" class="mt-3 space-y-3">
-        <label class="drop" for="proofFile">
-          <i class="fa-solid fa-cloud-arrow-up text-xl text-pole-blue"></i>
-          <span id="proofLabel"><b>Sube el screenshot del pago</b><br>Toca aquí para elegir la imagen</span>
-          <img id="proofPreview" class="hidden max-h-40 rounded-lg" alt="Vista previa del comprobante">
+      <form id="proofForm" class="mt-3 space-y-2">
+        <label class="pay-drop" for="proofFile">
+          <span class="pay-drop-ico"><i class="fa-solid fa-camera"></i></span>
+          <span id="proofLabel" class="min-w-0 flex-1 text-left text-sm"><b>Sube el comprobante</b><br><span class="text-xs text-ink/60">Toca para elegir la captura del pago</span></span>
+          <img id="proofPreview" class="hidden h-12 w-12 shrink-0 rounded-md object-cover" alt="Vista previa del comprobante">
         </label>
         <input id="proofFile" name="proof" type="file" accept="image/*" class="hidden">
-        <label class="field"><span>Número de la transacción (opcional)</span><input name="reference" maxlength="80" placeholder="Ej. M12345678"></label>
-        <div class="grid grid-cols-2 gap-2">
-          <button class="btn-primary" type="submit">Ya pagué</button>
-          <button id="btnCancelHold" class="btn-light" type="button">Cancelar reserva</button>
-        </div>
+        <details class="text-sm"><summary class="cursor-pointer text-xs text-ink/60">Agregar número de la transacción (opcional)</summary>
+          <input name="reference" maxlength="80" placeholder="Ej. M12345678" class="mt-2 w-full rounded-lg border border-line px-3 py-2"></details>
+        <button class="btn-primary w-full py-3 text-base" type="submit">Ya pagué</button>
+        <button id="btnCancelHold" class="w-full py-1 text-center text-xs text-ink/50 underline" type="button">Cancelar reserva</button>
       </form>
     </div>
   </div>
@@ -239,6 +243,6 @@
     </div>
   </div>
 
-  <script type="module" src="app.js?v=2026-10-08j"></script>
+  <script type="module" src="app.js?v=2026-10-08m"></script>
 </body>
 </html>
