@@ -3,7 +3,7 @@ import { onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordRe
 import {
   doc, getDoc, setDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js";
+import { APP_VERSION, readPublishedVersion, reloadFresh, startUpdateWatcher, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js";
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on) => $(id).classList.toggle("hidden", !on);
@@ -20,6 +20,8 @@ onAuthStateChanged(auth, async (u) => {
   const s = await getDoc(doc(db, "superusers", u.uid)).catch(() => null);
   if (!s?.exists()) { show("deniedView", true); show("appView", false); $("who").textContent = u.email; return; }
   $("who").textContent = u.email + " (superusuario)";
+  setDialogBrand("Agendador · superusuario");
+  $("txtVersion").textContent = "Versión de esta página: " + APP_VERSION;
   show("deniedView", false); show("appView", true);
   start();
 });
@@ -254,7 +256,7 @@ $("list").addEventListener("click", async (e) => {
   }
 
   if (act === "suspend") {
-    const reason = prompt(`¿Por qué suspendes ${biz.name}? (el dueño recibe un aviso)`, "Falta de pago");
+    const reason = await uiPrompt(`Suspender ${biz.name}`, "¿Por qué la suspendes? El dueño recibe un aviso.", "Falta de pago", { okText: "Suspender", danger: true });
     if (reason === null) return;
     setBusy(b, true, "Suspendiendo…");
     try { await api("superSetStatus", { businessId: biz.id, status: "suspended", reason }); toast(biz.name + " quedó suspendida."); }
@@ -268,7 +270,7 @@ $("list").addEventListener("click", async (e) => {
   }
 
   if (act === "pass") {
-    if (!confirm(`¿Generar una contraseña nueva para el dueño de ${biz.name}? La anterior deja de funcionar.`)) return;
+    if (!(await uiConfirm("¿Contraseña nueva?", `Se genera una contraseña nueva para el dueño de ${biz.name}. La anterior deja de funcionar.`, { okText: "Generar" }))) return;
     try {
       const r = await api("superResetPassword", { businessId: biz.id });
       const msg = `Panel: ${adminUrl(biz.id)}\nCorreo: ${r.ownerEmail}\nContraseña temporal: ${r.tempPassword}`;
@@ -301,3 +303,22 @@ $("btnTgSuper").onclick = async () => {
     <p class="mb-4 break-all rounded-lg bg-paper p-3 text-sm">${link}</p>
     <a class="btn-primary inline-block" href="${link}" target="_blank" rel="noopener">Abrir Telegram</a>`);
 };
+
+// ================= Versión de la página =================
+$("btnCheckVersion").onclick = async () => {
+  const btn = $("btnCheckVersion"), box = $("versionResult");
+  setBusy(btn, true, "Comprobando…");
+  try {
+    const pub = await readPublishedVersion();
+    const nueva = !!pub && pub > APP_VERSION;
+    box.classList.remove("hidden");
+    box.innerHTML = nueva
+      ? `<div class="flex items-center gap-2 rounded-xl border border-sky-300 bg-sky-50 p-2.5 text-xs text-sky-900"><span class="flex-grow">Hay una versión nueva (${esc(pub)}). Actualiza para verla.</span><button type="button" id="btnReloadFresh" class="rounded-lg bg-sky-600 px-2.5 py-1 font-bold text-white">Actualizar</button></div>`
+      : `<div class="rounded-xl border border-emerald-300 bg-emerald-50 p-2.5 text-xs text-emerald-900">✓ Tienes la versión más reciente${pub ? " (" + esc(pub) + ")" : ""}.</div>`;
+    if (nueva) $("btnReloadFresh").onclick = reloadFresh;
+  } catch (err) {
+    box.classList.remove("hidden");
+    box.innerHTML = `<div class="rounded-xl border border-rose-300 bg-rose-50 p-2.5 text-xs text-rose-900">${esc(err.message)}</div>`;
+  } finally { setBusy(btn, false); }
+};
+startUpdateWatcher();

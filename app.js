@@ -3,10 +3,10 @@ import {
   onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
-  doc, getDoc, setDoc, getDocs, collection, query, where, onSnapshot, serverTimestamp
+  doc, getDoc, setDoc, getDocs, updateDoc, collection, query, where, onSnapshot, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
-  db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, dow, hora12, fechaLarga, fechaCorta, toMillis, cop, esc,
+  startUpdateWatcher, applyBrandColors, warmServer, uiConfirm, setDialogBrand, viewImage, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, dow, hora12, fechaLarga, fechaCorta, toMillis, cop, esc,
   normalizePhone, waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, computeSlots, dayCapacityUnits,
   toast, openModal, closeModal, setBusy, copyText, tmin, mstr, UNIT
 } from "./common.js";
@@ -109,6 +109,7 @@ onAuthStateChanged(auth, async (u) => {
 // Registro previo: sin cuenta (o sin datos completos) se muestra el registro en lugar de la agenda
 function updateGate() {
   if (S.dead) return;
+  if (S.user && S.profile) warmServer();
   const need = S.authReady && (!S.user || !S.profile);
   $("gate").classList.toggle("hidden", !need);
   $("mainContent").classList.toggle("hidden", need || !S.authReady);
@@ -138,12 +139,33 @@ function subscribeMine() {
 }
 
 // ================= Render =================
+// Textos que el dueño puede cambiar en Apariencia (si los deja vacíos se usan estos)
+const TXT = {
+  calendarTitle: "Selecciona día y horario", bookButton: "Apartar cupo", welcome: "",
+  registerTitle: "Crea tu cuenta", registerSub: "Regístrate una sola vez para ver la agenda y apartar tus citas.",
+  payNote: "Escribe tu número de reserva en el mensaje o concepto de la transferencia.", confirmedTitle: "Tu turno fue confirmado"
+};
+const T = (k) => ((S.settings?.appearance?.texts || {})[k] || "").trim() || TXT[k];
 function renderBiz() {
-  const s = S.settings || {};
+  const s = S.settings || {}, ap = s.appearance || {};
   $("bizName").textContent = s.businessName || "Reserva tu cita";
   $("bizAddress").textContent = [s.address, s.city].filter(Boolean).join(", ");
+  $("bizSlogan").textContent = ap.slogan || "";
+  $("bizSlogan").classList.toggle("hidden", !ap.slogan);
+  const logo = $("bizLogo");
+  logo.classList.toggle("hidden", !ap.logo && !ap.colors);
+  logo.classList.toggle("grid", !!(ap.logo || ap.colors));
+  logo.innerHTML = ap.logo ? `<img src="${ap.logo}" alt="Logo de ${esc(s.businessName || "")}" class="h-full w-full object-cover">`
+    : esc((s.businessName || "").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase());
   document.title = (s.businessName ? s.businessName + " · " : "") + "Reserva tu cita";
   if (s.habeasDataText) $("habeasText").textContent = s.habeasDataText;
+  applyBrandColors(ap);
+  setDialogBrand(s.businessName, ap.logo);
+  $("h-day").textContent = T("calendarTitle");
+  if (!$("btnBook").dataset.label) $("btnBook").textContent = T("bookButton");
+  $("welcomeMsg").textContent = T("welcome"); $("welcomeMsg").classList.toggle("hidden", !T("welcome"));
+  $("authSub").textContent = T("registerSub");
+  if (!$("registerForm").classList.contains("hidden") && !(S.user && !S.profile)) $("authTitle").textContent = T("registerTitle");
 }
 
 function renderNav() {
@@ -151,9 +173,9 @@ function renderNav() {
   if (S.user) {
     const active = S.mine.filter((a) => ["pending_payment", "pending_verification", "confirmed"].includes(a.status)).length;
     nav.innerHTML = `
-      <button id="btnMine" class="btn-light text-sm">Mis cupos${active ? ` <span class="ml-1 rounded-full bg-pole-red px-1.5 text-xs text-white">${active}</span>` : ""}</button>
+      <button id="btnMine" class="btn-light text-sm">Mi cuenta${active ? ` <span class="ml-1 rounded-full bg-pole-red px-1.5 text-xs text-white">${active}</span>` : ""}</button>
       <button id="btnLogout" class="btn-ghost text-sm text-white/80">Salir</button>`;
-    $("btnMine").onclick = () => { renderMine(); openModal("mineModal"); };
+    $("btnMine").onclick = () => openAccount("citas");
     $("btnLogout").onclick = () => signOut(auth);
   } else {
     nav.innerHTML = `
@@ -321,6 +343,7 @@ $("btnNextDay").onclick = () => { const d = $("btnNextDay").dataset.date; if (d)
 $("slots").addEventListener("click", (e) => {
   const b = e.target.closest("[data-time]"); if (!b) return;
   S.time = b.dataset.time;
+  warmServer();
   renderSlots(); renderServices(); renderSummary();
   setTimeout(() => $("servSection").scrollIntoView({ behavior: "smooth", block: "start" }), 50);
 });
@@ -418,15 +441,27 @@ $("btnConsent").onclick = () => { S.consentOk = true; closeModal("consentModal")
 async function doHold() {
   const btn = $("btnBook");
   setBusy(btn, true, "Apartando…");
+  const { items, totalCOP } = selection();
+  const dep = expectedDeposit(totalCOP);
+  // Si hay que pagar abono, la pantalla de pago se abre de una vez (sin esperar al servidor)
+  const draft = dep > 0 ? {
+    code: "", depositCOP: dep, totalCOP, balanceDueCOP: totalCOP - dep, date: S.date, startTime: S.time,
+    items: items.map((i) => ({ name: i.name })), holdExpiresAt: Date.now() + Number(S.settings?.holdMinutes || 30) * 60000
+  } : null;
+  if (draft) showPay(draft);
   try {
     const staffId = bookingStaff();
     if (!staffId) throw new Error("Ese horario ya no alcanza para este servicio. Elige otra hora.");
     const r = await api("createHold", { mainId: S.mainId, extraIds: [...S.extras], staffId, date: S.date, time: S.time, consent: S.consentOk || !!S.cust });
     S.time = null;
-    if (r.appointment.status === "confirmed") { toast("¡Cupo confirmado!"); showTicket(r.appointment); }
-    else showPay(r.appointment);
-  } catch (e) { toast(e.message, "error"); }
-  finally { setBusy(btn, false); delete btn.dataset.label; renderSlots(); renderServices(); renderSummary(); }
+    if (r.appointment.status === "confirmed") { clearInterval(S.payTimer); closeModal("payModal"); toast("¡Cupo confirmado!"); showTicket(r.appointment); watchTicket(r.appointment.code); }
+    else if (!$("payModal").classList.contains("hidden") || !draft) showPay(r.appointment, true);
+    else toast(`Cupo apartado: ${r.appointment.code}. Lo encuentras en "Mi cuenta" para pagarlo.`);
+  } catch (e) {
+    if (draft) { clearInterval(S.payTimer); closeModal("payModal"); }
+    toast(e.message, "error");
+  }
+  finally { setBusy(btn, false); delete btn.dataset.label; renderBiz(); renderSlots(); renderServices(); renderSummary(); }
 }
 
 // ================= Registro / ingreso =================
@@ -437,7 +472,7 @@ function setAuthTab(mode) {
   $("loginForm").classList.toggle("hidden", reg);
   $("tabRegister").classList.toggle("tab-on", reg);
   $("tabLogin").classList.toggle("tab-on", !reg);
-  $("authTitle").textContent = reg ? "Crea tu cuenta" : "Ingresa a tu cuenta";
+  $("authTitle").textContent = reg ? T("registerTitle") : "Ingresa a tu cuenta";
 }
 $("tabRegister").onclick = () => setAuthTab("register");
 $("tabLogin").onclick = () => setAuthTab("login");
@@ -562,8 +597,9 @@ $("btnForgot").onclick = async () => {
 };
 
 // ================= Pago con screenshot =================
-function showPay(apt) {
+function showPay(apt, keepForm = false) {
   S.payApt = apt;
+  const waiting = !apt.code;
   const st = S.settings || {};
   const methods = (st.paymentMethods || []);
   const methodBox = (m, i) => `
@@ -579,14 +615,14 @@ function showPay(apt) {
           ${m.qr ? `<button type="button" data-qr="${i}" class="btn-sm text-xs">Ver QR</button>` : ""}
         </div>
       </div>
-      ${m.qr ? `<div id="qr${i}" class="mt-3 hidden flex-col items-center"><img src="${m.qr}" alt="Código QR de ${esc(m.label)}" class="h-44 w-44 rounded-lg border border-line object-contain">
-        <p class="mt-2 text-xs text-ink/60">Abre tu app bancaria, escanea el código y envía el valor exacto.</p></div>` : ""}
+      ${m.qr ? `<div id="qr${i}" class="mt-3 hidden flex-col items-center"><img src="${m.qr}" data-zoom="${i}" alt="Código QR de ${esc(m.label)}" class="h-44 w-44 cursor-zoom-in rounded-lg border border-line object-contain">
+        <p class="mt-2 text-xs text-ink/60">Toca el código para verlo en grande. Escanéalo desde tu app bancaria y envía el valor exacto.</p></div>` : ""}
     </div>`;
   $("payBody").innerHTML = `
     <div class="rounded-2xl border border-line bg-paper p-4">
       <div class="mb-2 flex items-center justify-between gap-2">
-        <p class="text-xs font-bold uppercase tracking-wider text-ink/60">Reserva <span class="font-mono text-ink">${esc(apt.code)}</span></p>
-        <button type="button" data-copy="${esc(apt.code)}" class="btn-sm text-xs">Copiar</button>
+        <p class="text-xs font-bold uppercase tracking-wider text-ink/60">Reserva <span class="font-mono text-ink">${waiting ? `<span class="spin"></span> apartando tu cupo…` : esc(apt.code)}</span></p>
+        ${waiting ? "" : `<button type="button" data-copy="${esc(apt.code)}" class="btn-sm text-xs">Copiar</button>`}
       </div>
       <p class="text-center text-xs text-ink/60">Envía exactamente</p>
       <div class="my-1 text-center"><span class="font-narrow text-4xl font-bold">${cop(apt.depositCOP)}</span></div>
@@ -595,11 +631,13 @@ function showPay(apt) {
       <button type="button" data-copy="${Number(apt.depositCOP || 0)}" class="btn-sm mx-auto mb-3 block text-xs">Copiar monto</button>
       <div class="space-y-2">${methods.length ? methods.map(methodBox).join("") : `<p class="rounded-xl border border-line bg-white p-3 text-center text-sm text-ink/60">El negocio aún no ha configurado sus medios de pago. Escríbele por WhatsApp.</p>`}</div>
       <p id="payCountdown" class="mt-3 text-center text-sm font-bold text-amber-700"></p>
-      <p class="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs leading-snug text-amber-900">⚠️ ${st.paymentInstructions ? esc(st.paymentInstructions) : "Escribe tu número de reserva en el mensaje o concepto de la transferencia."} El pago queda confirmado cuando el negocio lo verifique.</p>
+      <p class="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs leading-snug text-amber-900">⚠️ ${esc(st.paymentInstructions || T("payNote"))} El pago queda confirmado cuando el negocio lo verifique.</p>
     </div>`;
-  $("proofForm").reset();
-  $("proofPreview").classList.add("hidden");
-  $("proofLabel").innerHTML = `<b>Sube el screenshot del pago</b><br>Toca aquí para elegir la imagen`;
+  if (!keepForm) {
+    $("proofForm").reset(); S.proofData = null;
+    $("proofPreview").classList.add("hidden");
+    $("proofLabel").innerHTML = `<b>Sube el screenshot del pago</b><br>Toca aquí para elegir la imagen`;
+  }
   closeModal("mineModal");
   openModal("payModal");
   clearInterval(S.payTimer);
@@ -611,13 +649,15 @@ function showPay(apt) {
       el.textContent = "El tiempo para pagar venció. Aparta el cupo de nuevo.";
       submit.disabled = true; clearInterval(S.payTimer); return;
     }
-    submit.disabled = false;
+    submit.disabled = !S.payApt?.code; // espera a que el servidor dé el número de reserva
     const m = Math.floor(left / 60000), s = Math.floor((left % 60000) / 1000);
     el.textContent = `⏱ Tu cupo queda apartado ${m}:${String(s).padStart(2, "0")}`;
   };
   tick(); S.payTimer = setInterval(tick, 1000);
 }
 $("payBody").addEventListener("click", (e) => {
+  const z = e.target.closest("[data-zoom]");
+  if (z) { const m = (S.settings?.paymentMethods || [])[Number(z.dataset.zoom)]; viewImage(z.src, m ? `${m.label}: ${m.account}${m.holder ? " · " + m.holder : ""}` : ""); return; }
   const q = e.target.closest("[data-qr]"); if (!q) return;
   const box = $("qr" + q.dataset.qr); if (!box) return;
   const open = box.classList.toggle("hidden") === false;
@@ -626,7 +666,7 @@ $("payBody").addEventListener("click", (e) => {
 });
 $("btnCancelHold").onclick = async () => {
   const apt = S.payApt; if (!apt) return;
-  if (!confirm(`¿Cancelar la reserva ${apt.code}? El horario quedará libre para otra persona.`)) return;
+  if (!(await uiConfirm("¿Cancelar la reserva?", `La reserva ${apt.code} se cancela y el horario queda libre para otra persona.`, { okText: "Sí, cancelar", cancelText: "No", danger: true }))) return;
   const btn = $("btnCancelHold"); setBusy(btn, true, "Cancelando…");
   try { await api("cancelAppointment", { code: apt.code, reason: "Cancelada por el cliente antes de pagar" }); clearInterval(S.payTimer); closeModal("payModal"); toast("Reserva cancelada."); }
   catch (err) { toast(err.message, "error"); }
@@ -644,6 +684,7 @@ $("proofFile").addEventListener("change", (e) => {
   const file = e.target.files[0]; if (!file) return;
   const img = $("proofPreview"); img.src = URL.createObjectURL(file); img.classList.remove("hidden");
   $("proofLabel").innerHTML = `<b class="text-emerald-700">✓ Imagen lista</b><br>Toca para cambiarla`;
+  S.proofData = compressImage(file); // se prepara de una vez para que "Ya pagué" sea inmediato
 });
 
 async function compressImage(file) {
@@ -665,7 +706,8 @@ $("proofForm").addEventListener("submit", async (e) => {
   const btn = f.querySelector("button[type=submit]");
   setBusy(btn, true, "Enviando comprobante…");
   try {
-    const image = await compressImage(file);
+    if (!S.payApt?.code) throw new Error("Espera un segundo, estamos apartando tu cupo.");
+    const image = await (S.proofData || compressImage(file));
     const r = await api("submitProof", { code: S.payApt.code, image, reference: f.reference.value });
     clearInterval(S.payTimer);
     closeModal("payModal");
@@ -700,7 +742,7 @@ function showTicket(apt) {
   $("ticket").innerHTML = `
     <article class="ticket">
       <div class="ticket-head">
-        ${apt.status === "confirmed" ? `<div class="ticket-ok" aria-hidden="true">✓</div><p class="mb-2 text-center font-narrow text-xl font-bold uppercase tracking-wide">Tu turno fue confirmado</p>` : ""}
+        ${apt.status === "confirmed" ? `<div class="ticket-ok" aria-hidden="true">✓</div><p class="mb-2 text-center font-narrow text-xl font-bold uppercase tracking-wide">${esc(T("confirmedTitle"))}</p>` : ""}
         <p class="text-sm text-white/70">${esc(st.businessName || "Tu reserva")}</p>
         <p class="ticket-code mt-1">${esc(apt.code)}</p>
         <p class="mt-3">${statusBadge(apt.status)}</p>
@@ -732,30 +774,103 @@ function canChange(apt) {
   const minH = Number(S.settings?.rescheduleMinHours ?? 2);
   return toMillis(apt.startAt) - Date.now() >= minH * 3600000;
 }
+function apptCard(a) {
+  const maxR = Number(S.settings?.maxReschedules ?? 2);
+  const acts = [];
+  if (a.status === "pending_payment") {
+    acts.push(`<button class="btn-dark text-sm" data-act="pay" data-code="${a.code}">Pagar abono</button>`);
+    acts.push(`<button class="btn-sm" data-act="cancel" data-code="${a.code}">Cancelar</button>`);
+  } else if (["confirmed", "pending_verification"].includes(a.status)) {
+    acts.push(`<button class="btn-dark text-sm" data-act="ticket" data-code="${a.code}">Ver ticket</button>`);
+    if (canChange(a) && (a.rescheduleCount || 0) < maxR) acts.push(`<button class="btn-sm" data-act="resched" data-code="${a.code}">Cambiar hora</button>`);
+    if (canChange(a)) acts.push(`<button class="btn-sm" data-act="cancel" data-code="${a.code}">Cancelar</button>`);
+    if (!canChange(a) && S.settings?.whatsapp) acts.push(`<a class="btn-sm" target="_blank" rel="noopener" href="${waLink(S.settings.whatsapp, "Hola, necesito ayuda con mi reserva " + a.code)}">Escribir por WhatsApp</a>`);
+  } else acts.push(`<button class="btn-sm" data-act="ticket" data-code="${a.code}">Ver detalle</button>`);
+  return `<article class="rounded-xl border border-line p-3">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <p class="font-mono text-base font-bold">${esc(a.code)}</p>${statusBadge(a.status)}
+    </div>
+    <p class="mt-1 text-sm capitalize">${fechaLarga(a.date)} · ${hora12(a.startTime)} · ${esc(a.staffName)}</p>
+    <p class="text-sm text-ink/70">${(a.items || []).map((i) => esc(i.name)).join(" + ")} · ${cop(a.totalCOP)}</p>
+    <div class="mt-2 flex flex-wrap gap-2">${acts.join("")}</div>
+  </article>`;
+}
 function renderMine() {
   const box = $("mineList");
-  if (!S.mine.length) { box.innerHTML = `<p class="text-sm text-ink/70">Aún no tienes cupos. Elige un servicio, un día y una hora para apartar el primero.</p>`; return; }
-  const maxR = Number(S.settings?.maxReschedules ?? 2);
-  box.innerHTML = S.mine.map((a) => {
-    const acts = [];
-    if (a.status === "pending_payment") {
-      acts.push(`<button class="btn-dark text-sm" data-act="pay" data-code="${a.code}">Pagar abono</button>`);
-      acts.push(`<button class="btn-sm" data-act="cancel" data-code="${a.code}">Cancelar</button>`);
-    } else if (["confirmed", "pending_verification"].includes(a.status)) {
-      acts.push(`<button class="btn-dark text-sm" data-act="ticket" data-code="${a.code}">Ver ticket</button>`);
-      if (canChange(a) && (a.rescheduleCount || 0) < maxR) acts.push(`<button class="btn-sm" data-act="resched" data-code="${a.code}">Cambiar hora</button>`);
-      if (canChange(a)) acts.push(`<button class="btn-sm" data-act="cancel" data-code="${a.code}">Cancelar</button>`);
-      if (!canChange(a) && S.settings?.whatsapp) acts.push(`<a class="btn-sm" target="_blank" rel="noopener" href="${waLink(S.settings.whatsapp, "Hola, necesito ayuda con mi reserva " + a.code)}">Escribir por WhatsApp</a>`);
-    } else acts.push(`<button class="btn-sm" data-act="ticket" data-code="${a.code}">Ver detalle</button>`);
-    return `<article class="rounded-xl border border-line p-4">
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <p class="font-narrow text-xl font-bold tracking-wide">${esc(a.code)}</p>${statusBadge(a.status)}
-      </div>
-      <p class="mt-1 text-sm capitalize">${fechaLarga(a.date)} · ${hora12(a.startTime)} · ${esc(a.staffName)}</p>
-      <p class="text-sm text-ink/70">${(a.items || []).map((i) => esc(i.name)).join(" + ")} · ${cop(a.totalCOP)}</p>
-      <div class="mt-3 flex flex-wrap gap-2">${acts.join("")}</div>
-    </article>`;
-  }).join("");
+  if (!S.mine.length) { box.innerHTML = `<p class="text-sm text-ink/70">Aún no tienes citas. Elige un día y una hora para apartar la primera.</p>`; return; }
+  const live = ["pending_payment", "pending_verification", "confirmed"];
+  const next = S.mine.filter((a) => live.includes(a.status)).sort((a, b) => toMillis(a.startAt) - toMillis(b.startAt));
+  const past = S.mine.filter((a) => !live.includes(a.status));
+  const done = past.filter((a) => a.status === "attended");
+  box.innerHTML = `
+    <p class="text-xs font-bold uppercase tracking-wider text-ink/60">Próximas (${next.length})</p>
+    ${next.map(apptCard).join("") || `<p class="text-sm text-ink/60">No tienes citas próximas.</p>`}
+    <p class="pt-2 text-xs font-bold uppercase tracking-wider text-ink/60">Historial (${past.length})</p>
+    ${past.length ? `<p class="text-xs text-ink/60">${done.length} visita(s) · ${cop(done.reduce((t, a) => t + Number(a.totalCOP || 0), 0))} en servicios</p>` + past.map(apptCard).join("") : `<p class="text-sm text-ink/60">Aquí verás tus citas pasadas.</p>`}`;
+}
+function openAccount(tab) {
+  const p = S.profile || {};
+  $("acctAvatar").textContent = ((p.firstName || "?")[0] + (p.lastName || "")[0] || "").toUpperCase();
+  $("mineTitle").textContent = `${p.firstName || ""} ${p.lastName || ""}`.trim() || "Mi cuenta";
+  $("acctEmail").textContent = p.email || S.user?.email || "";
+  const f = $("profileForm");
+  f.firstName.value = p.firstName || ""; f.lastName.value = p.lastName || ""; f.whatsapp.value = p.whatsapp || ""; f.email.value = p.email || S.user?.email || "";
+  renderMine(); renderTg(); setAcctTab(tab || "citas");
+  openModal("mineModal");
+}
+function setAcctTab(t) {
+  document.querySelectorAll("[data-acct]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.acct === t));
+  ["citas", "perfil", "tg"].forEach((k) => $("acct-" + k).classList.toggle("hidden", k !== t));
+}
+document.querySelectorAll("[data-acct]").forEach((b) => b.addEventListener("click", () => setAcctTab(b.dataset.acct)));
+$("profileForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = e.target, btn = f.querySelector("button[type=submit]");
+  const phone = normalizePhone(f.whatsapp.value);
+  if (!f.firstName.value.trim()) return toast("Escribe tu nombre.", "error");
+  if (!phone) return toast("WhatsApp inválido. Escríbelo con el indicativo, por ejemplo +57 300 123 4567.", "error");
+  setBusy(btn, true, "Guardando…");
+  try {
+    const data = { firstName: f.firstName.value.trim(), lastName: f.lastName.value.trim(), whatsapp: phone, updatedAt: serverTimestamp() };
+    await updateDoc(doc(db, "users", S.user.uid), data);
+    Object.assign(S.profile, data);
+    toast("Perfil actualizado. Tus próximas reservas usarán estos datos.");
+  } catch (err) { toast(err.message, "error"); }
+  finally { setBusy(btn, false); }
+});
+// ---- Telegram del cliente: avisos de sus citas y novedades del negocio
+function renderTg() {
+  const on = !!S.profile?.telegramChatId;
+  $("tgBox").innerHTML = on ? `
+    <div class="rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900">
+      <p class="font-semibold">✓ Tu Telegram está conectado</p>
+      <p class="mt-1">Te llegan los avisos de tus citas (confirmación, cambios y recordatorio) y las novedades de ${esc(S.settings?.businessName || "este negocio")}.</p>
+    </div>
+    <button id="btnTgOff" class="btn-light mt-3 text-sm">Desconectar Telegram</button>` : `
+    <p class="mb-3 text-sm text-ink/75">Conecta tu Telegram y recibe ahí la confirmación de tus citas, los cambios de horario, un recordatorio antes de cada cita y las novedades de ${esc(S.settings?.businessName || "este negocio")}.</p>
+    <button id="btnTgOn" class="btn-primary text-sm">Conectar mi Telegram</button>
+    <p id="tgHint" class="mt-2 text-xs text-ink/60"></p>`;
+  if ($("btnTgOn")) $("btnTgOn").onclick = connectTg;
+  if ($("btnTgOff")) $("btnTgOff").onclick = async () => {
+    try { await updateDoc(doc(db, "users", S.user.uid), { telegramChatId: "" }); S.profile.telegramChatId = ""; renderTg(); toast("Telegram desconectado."); }
+    catch (err) { toast(err.message, "error"); }
+  };
+}
+async function connectTg() {
+  let bot = "";
+  try { bot = ((await getDoc(doc(db, "platform", "public"))).data()?.telegramBot || "").replace(/^@/, ""); } catch { /* sin bot */ }
+  if (!bot) return toast("Los avisos por Telegram aún no están disponibles.", "error");
+  const code = Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4);
+  try { await setDoc(doc(db, "telegramLinks", code), { target: "client", uid: S.user.uid, businessId: BIZ_ID, createdAt: serverTimestamp() }); }
+  catch (err) { return toast("No se pudo crear el enlace: " + err.message, "error"); }
+  window.open(`https://t.me/${bot}?start=${code}`, "_blank");
+  $("tgHint").textContent = "Se abrió Telegram: toca “Iniciar”. Vuelve aquí y verás tu Telegram conectado.";
+  // revisa cada 3 segundos durante 2 minutos si ya quedó conectado
+  let n = 0; clearInterval(S.tgPoll);
+  S.tgPoll = setInterval(async () => {
+    n++; if (n > 40) return clearInterval(S.tgPoll);
+    try { const u = (await getDoc(doc(db, "users", S.user.uid))).data(); if (u?.telegramChatId) { S.profile.telegramChatId = u.telegramChatId; clearInterval(S.tgPoll); renderTg(); toast("¡Telegram conectado!"); } } catch { /* reintenta */ }
+  }, 3000);
 }
 $("mineList").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-act]"); if (!b) return;
@@ -765,7 +880,7 @@ $("mineList").addEventListener("click", async (e) => {
   if (act === "ticket") { closeModal("mineModal"); showTicket(apt); watchTicket(apt.code); }
   if (act === "resched") openResched(apt);
   if (act === "cancel") {
-    if (!confirm(`¿Cancelar la reserva ${apt.code}?`)) return;
+    if (!(await uiConfirm("¿Cancelar la reserva?", `La reserva ${apt.code} se cancela y el horario queda libre.`, { okText: "Sí, cancelar", cancelText: "No", danger: true }))) return;
     setBusy(b, true, "Cancelando…");
     try { await api("cancelAppointment", { code: apt.code, reason: "Cancelada por el cliente" }); toast("Reserva cancelada."); }
     catch (err) { toast(err.message, "error"); setBusy(b, false); }
@@ -815,3 +930,4 @@ $("btnResched").onclick = async () => {
 
 renderNav(); renderSummary();
 if (/^[a-z0-9][a-z0-9-]{1,29}$/.test(BIZ_ID)) boot(); // arranca cuando todo está definido
+startUpdateWatcher();

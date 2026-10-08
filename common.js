@@ -15,6 +15,9 @@ export function businessFromUrl() {
 }
 export const bpath = (...parts) => ["businesses", BID, ...parts].join("/");
 
+// Versión de la página: cámbiala en cada actualización para comprobar que se publicó
+export const APP_VERSION = '2026-10-08f';
+
 export const UNIT = 15;          // unidad interna de bloqueo (minutos)
 const TZ = "America/Bogota";     // Colombia no usa horario de verano
 
@@ -177,6 +180,119 @@ export function toast(msg, type = "ok") {
   document.body.appendChild(el);
   setTimeout(() => el.remove(), type === "error" ? 6000 : 3500);
 }
+// ---------- Colores de la marca de cada tienda ----------
+function hexRgb(h) { h = String(h || "").replace("#", ""); if (h.length === 3) h = h.split("").map((c) => c + c).join(""); const n = parseInt(h || "000000", 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+function lum(h) { const [r, g, b] = hexRgb(h).map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; }
+export const onColor = (h) => (lum(h) > 0.45 ? "#111111" : "#ffffff");
+export function darken(h, f) { return "#" + hexRgb(h).map((v) => Math.round(v * (1 - f)).toString(16).padStart(2, "0")).join(""); }
+// Aplica los colores de la tienda (si los configuró) como variables CSS
+export function applyBrandColors(ap) {
+  const c = (ap && ap.colors) || {};
+  const on = !!(c.header || c.primary || c.bg);
+  document.body.classList.toggle("branded", on);
+  if (!on) return;
+  const header = c.header || "#17222E", primary = c.primary || "#24508A", bg = c.bg || "#EEF1EF";
+  const st = document.body.style;
+  st.setProperty("--b-header", header); st.setProperty("--b-on-header", onColor(header));
+  st.setProperty("--b-primary", primary); st.setProperty("--b-on-primary", onColor(primary));
+  st.setProperty("--b-primary-text", lum(primary) > 0.35 ? darken(primary, 0.45) : primary);
+  st.setProperty("--b-bg", bg);
+}
+// Despierta el servidor (Apps Script) antes de que el cliente aparte, para que responda más rápido
+let warmAt = 0;
+export function warmServer() {
+  if (Date.now() - warmAt < 120000) return;
+  warmAt = Date.now();
+  fetch(API_URL, { mode: "no-cors", cache: "no-store" }).catch(() => {});
+}
+
+// ---------- Versión de la página (como en Epic) ----------
+// Lee la versión publicada en GitHub, sin usar la copia guardada del navegador
+export async function readPublishedVersion() {
+  const r = await fetch(new URL("common.js", location.href).href + "?comprobar=" + Date.now(), { cache: "no-store" });
+  if (!r.ok) throw new Error("No se pudo revisar (" + r.status + ").");
+  const m = (await r.text()).match(/APP_VERSION = '([^']+)'/);
+  return m ? m[1] : null;
+}
+// Recarga sin usar la copia guardada (conserva ?b= del negocio)
+export function reloadFresh() {
+  const u = new URL(location.href); u.searchParams.set("v", Date.now()); location.replace(u.href);
+}
+// Al abrir y cada 30 minutos: si hay una versión nueva publicada, muestra el aviso para actualizar
+export function startUpdateWatcher() {
+  const check = async () => {
+    try {
+      const pub = await readPublishedVersion();
+      if (!pub || !(pub > APP_VERSION) || document.getElementById("avisoVersionNueva")) return;
+      const el = document.createElement("div");
+      el.id = "avisoVersionNueva";
+      el.className = "fixed bottom-24 left-1/2 z-[95] w-[calc(100%-1.5rem)] max-w-md -translate-x-1/2";
+      el.innerHTML = `<div class="flex items-center gap-3 rounded-2xl bg-sky-600 p-3 text-white shadow-2xl">
+        <p class="min-w-0 flex-grow text-xs font-bold leading-snug">Hay una versión nueva de la página con mejoras.</p>
+        <button type="button" class="shrink-0 rounded-xl bg-white px-3 py-1.5 text-xs font-bold text-sky-700">Actualizar</button>
+        <button type="button" aria-label="Cerrar" class="shrink-0 px-1 text-white/80">✕</button></div>`;
+      el.querySelectorAll("button")[0].onclick = reloadFresh;
+      el.querySelectorAll("button")[1].onclick = () => el.remove();
+      document.body.appendChild(el);
+    } catch { /* sin conexión: se revisa después */ }
+  };
+  setTimeout(check, 4000);
+  setInterval(check, 30 * 60000);
+}
+// ---------- Ventanas propias (reemplazan los avisos del navegador) ----------
+let BRAND = { name: "", logo: "" };
+export function setDialogBrand(name, logo) { BRAND = { name: name || "", logo: logo || "" }; }
+function brandRow() {
+  if (!BRAND.name) return "";
+  const ini = BRAND.name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+  return `<div class="mb-3 flex items-center gap-2 border-b border-line pb-3">
+    <span class="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-lg bg-ink text-xs font-bold text-white">${BRAND.logo ? `<img src="${BRAND.logo}" alt="" class="h-full w-full object-cover">` : esc(ini)}</span>
+    <span class="truncate text-sm font-semibold text-ink/70">${esc(BRAND.name)}</span></div>`;
+}
+function dialog({ title, message, input, okText = "Aceptar", cancelText = "Cancelar", danger = false, alertOnly = false }) {
+  return new Promise((resolve) => {
+    const wrap = document.createElement("div");
+    wrap.className = "modal flex";
+    wrap.style.zIndex = "120";
+    wrap.setAttribute("role", "dialog"); wrap.setAttribute("aria-modal", "true");
+    wrap.innerHTML = `<div class="modal-card max-w-sm">
+      ${brandRow()}
+      ${title ? `<h3 class="mb-1 font-narrow text-xl font-bold">${esc(title)}</h3>` : ""}
+      ${message ? `<p class="text-sm text-ink/75">${esc(message)}</p>` : ""}
+      ${input !== undefined ? `<input class="dlg-in mt-3 w-full rounded-lg border border-line px-3 py-2.5" value="${esc(input)}">` : ""}
+      <div class="mt-5 flex justify-end gap-2">
+        ${alertOnly ? "" : `<button type="button" class="dlg-no btn-light text-sm">${esc(cancelText)}</button>`}
+        <button type="button" class="dlg-ok ${danger ? "btn-primary !bg-pole-red" : "btn-primary"} text-sm">${esc(okText)}</button>
+      </div></div>`;
+    const inp = wrap.querySelector(".dlg-in");
+    const done = (v) => { wrap.remove(); document.removeEventListener("keydown", key); resolve(v); };
+    const key = (e) => { if (e.key === "Escape") done(input !== undefined ? null : false); if (e.key === "Enter" && inp) done(inp.value.trim()); };
+    wrap.querySelector(".dlg-ok").onclick = () => done(input !== undefined ? inp.value.trim() : true);
+    const no = wrap.querySelector(".dlg-no"); if (no) no.onclick = () => done(input !== undefined ? null : false);
+    wrap.addEventListener("click", (e) => { if (e.target === wrap) done(input !== undefined ? null : false); });
+    document.addEventListener("keydown", key);
+    document.body.appendChild(wrap);
+    (inp || wrap.querySelector(".dlg-ok")).focus();
+    if (inp) inp.select();
+  });
+}
+export const uiConfirm = (title, message, opts = {}) => dialog({ title, message, ...opts });
+export const uiPrompt = (title, message, value = "", opts = {}) => dialog({ title, message, input: value, ...opts });
+export const uiAlert = (title, message) => dialog({ title, message, alertOnly: true, okText: "Entendido" });
+
+// Visor a pantalla completa (QR, comprobantes, logos): tocar para cerrar
+export function viewImage(src, caption) {
+  const wrap = document.createElement("div");
+  wrap.className = "fixed inset-0 z-[130] flex flex-col items-center justify-center bg-black/90 p-4";
+  wrap.innerHTML = `<button type="button" class="absolute right-4 top-4 rounded-full bg-white/15 px-3 py-1.5 text-lg text-white" aria-label="Cerrar">✕</button>
+    <img src="${src}" alt="${esc(caption || "Imagen")}" class="max-h-[85vh] max-w-full rounded-xl bg-white object-contain p-2">
+    ${caption ? `<p class="mt-3 text-center text-sm text-white/80">${esc(caption)}</p>` : ""}`;
+  const close = () => { wrap.remove(); document.removeEventListener("keydown", key); };
+  const key = (e) => { if (e.key === "Escape") close(); };
+  wrap.onclick = close; document.addEventListener("keydown", key);
+  document.body.appendChild(wrap);
+}
+
 export function openModal(id) { const m = document.getElementById(id); m.classList.remove("hidden"); m.classList.add("flex"); }
 export function closeModal(id) { const m = document.getElementById(id); m.classList.add("hidden"); m.classList.remove("flex"); }
 export function setBusy(btn, busy, text) {
@@ -186,5 +302,5 @@ export function setBusy(btn, busy, text) {
 }
 export async function copyText(text) {
   try { await navigator.clipboard.writeText(text); toast("Copiado: " + text); }
-  catch { prompt("Copia este texto:", text); }
+  catch { uiPrompt("Copia este texto", "Mantén presionado el texto para copiarlo.", text, { okText: "Listo", cancelText: "Cerrar" }); }
 }

@@ -171,3 +171,37 @@ body.epic .bg-amber-50 { background:rgba(245,158,11,.1) !important; color:#fcd34
 @media (max-width:1023px) { .navitem:hover { background:var(--paper); } }
 .navitem[aria-current="page"] { background:var(--ink); color:#fff; }
 .navitem[aria-current="page"] i { color:#fff; }
+
+/* Menú del panel como Epic: cuadros con ícono arriba en celular, lista lateral en computador */
+.admin-tab { position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.4rem; padding:.75rem .35rem; border-radius:.9rem; border:1px solid var(--line); background:#fff; color:rgba(23,34,46,.7); font-size:11px; font-weight:700; line-height:1.15; text-align:center; transition:color .15s, border-color .15s, background-color .15s; }
+.admin-tab i { font-size:1.05rem; }
+.admin-tab:hover { color:var(--ink); border-color:rgba(23,34,46,.3); }
+.admin-tab[aria-current="page"] { background:rgba(16,185,129,.1); border-color:rgba(16,185,129,.45); color:#047857; }
+.admin-tab[aria-current="page"] i { color:#059669 !important; }
+@media (min-width:1024px) {
+  .admin-tab { flex-direction:row; justify-content:flex-start; gap:.7rem; padding:.7rem .85rem; font-size:13px; text-align:left; }
+  .admin-tab i { width:1.1rem; text-align:center; font-size:.95rem; }
+}
+
+/* Colores propios de cada tienda (Apariencia) */
+body.branded { background:var(--b-bg) !important; }
+body.branded header.pole-top { background:var(--b-header) !important; color:var(--b-on-header) !important; }
+body.branded header.pole-top .text-white\/70, body.branded header.pole-top .text-white\/80 { color:var(--b-on-header) !important; opacity:.75; }
+body.branded .pole-top::after { background:var(--b-primary); }
+body.branded .bg-pole-blue { background:var(--b-primary) !important; }
+body.branded .bg-pole-blue h2 { color:var(--b-on-primary) !important; }
+body.branded .btn-primary { background:var(--b-primary); color:var(--b-on-primary); }
+body.branded .tpill { border-color:var(--b-primary); color:var(--b-primary-text); }
+body.branded .tpill[aria-pressed="true"], body.branded .cday[aria-pressed="true"] { background:var(--b-primary); color:var(--b-on-primary); border-color:var(--b-primary); }
+body.branded .cday .hoy { color:var(--b-primary-text); }
+body.branded .cday[aria-pressed="true"] .hoy { color:var(--b-on-primary); }
+body.branded .chip[aria-pressed="true"] { background:var(--b-header); color:var(--b-on-header); border-color:var(--b-header); }
+body.branded .choice[aria-pressed="true"] { border-color:var(--b-primary); box-shadow:inset 0 0 0 1px var(--b-primary); background:#fff; }
+body.branded .tab-on { color:var(--b-primary-text); }
+body.branded .ticket-head { background:var(--b-header); color:var(--b-on-header); }
+body.branded .ticket-head::after { background:var(--b-primary); }
+body.branded .ticket-ok { color:var(--b-primary-text); border-color:var(--b-primary); }
+body.branded .text-pole-blue { color:var(--b-primary-text) !important; }
+body.branded .bg-pole-blue.text-white, body.branded button.bg-pole-blue { color:var(--b-on-primary) !important; }
+.acct-tab { border-radius:.4rem; padding:.45rem; color:rgba(23,34,46,.65); }
+.acct-tab[aria-pressed="true"] { background:#fff; color:var(--ink); box-shadow:0 1px 2px rgba(23,34,46,.12); }
