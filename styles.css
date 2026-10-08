@@ -433,3 +433,17 @@ header.has-photo .logo-ring .logo-in { border-color:rgba(15,22,32,.9); }
   .home-grid { gap:28px; }
 }
 @media (min-width:1280px) { body.sp .sp-main { max-width:980px; } }
+
+/* campana de novedades */
+.bell-btn { position:relative; display:grid; place-items:center; width:40px; height:40px; border-radius:9999px; background:#fff; color:var(--sink, #14213D); font-size:17px; flex-shrink:0; box-shadow:0 1px 0 var(--hair, #DDE3EA); }
+.bell-btn.hidden { display:none; }
+.bell-badge { position:absolute; top:-3px; right:-3px; min-width:19px; height:19px; padding:0 5px; border-radius:999px; background:#D7263D; color:#fff; font-size:10.5px; font-weight:800; display:grid; place-items:center; border:2px solid var(--canvas, #F2F5F8); }
+@media (prefers-reduced-motion: no-preference) { .bell-badge { animation:bellBeat 1.6s ease-in-out infinite; } }
+@keyframes bellBeat { 50% { transform:scale(1.15); } }
+
+/* la franja de barbería (poste rojo/azul) solo para barberías; los demás negocios llevan una línea de su color */
+header.pole-top.no-pole::after { background: var(--b-primary, #24508A); height:5px; bottom:-5px; }
+
+/* Paso de pago del registro: solo se ve "Mi plan" hasta que pague o elija Gratis */
+body.plan-gate #sideNav, body.plan-gate .sp-bnav, body.plan-gate #planBanner, body.plan-gate #tabs, body.plan-gate #btnBell, body.plan-gate #myStatus { display:none !important; }
+body.plan-gate .tab-panel:not(#tab-plan) { display:none !important; }

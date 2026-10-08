@@ -11,9 +11,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Archivo+Narrow:wght@500;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="theme.js?v=2026-10-09u"></script>
+  <script src="theme.js?v=2026-10-09z"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="styles.css?v=2026-10-09u">
+  <link rel="stylesheet" href="styles.css?v=2026-10-09z">
 </head>
 <body class="bg-paper text-ink font-sans antialiased">
 
@@ -190,9 +190,12 @@
         <div><h3 id="trialTitle" class="font-narrow text-2xl font-bold">Crea tu agenda gratis</h3><p id="trialSub" class="text-sm text-ink/70"></p></div>
         <button class="btn-ghost" data-close="trialModal" aria-label="Cerrar">✕</button>
       </div>
+      <div id="trialPlans"></div>
       <form id="trialForm" class="space-y-3" novalidate>
+        <div id="trialPlanLine" class="flex items-center justify-between gap-2 rounded-xl bg-paper px-3 py-2 text-sm"></div>
         <label class="field"><span>Nombre de tu negocio</span><input name="name" required maxlength="60" placeholder="Ej. Barbería El Barbas"></label>
-        <label class="field"><span>Tipo de negocio</span><select name="type"><option value="barberia">Barbería</option><option value="salon">Salón de belleza</option><option value="unas">Uñas</option><option value="spa">Spa / estética</option><option value="otro">Otro</option></select></label>
+        <label class="field"><span>Tipo de negocio</span><select name="type"></select></label>
+        <label id="trialTypeOther" class="field hidden"><span>¿Qué tipo de negocio es?</span><input name="typeLabel" maxlength="40" placeholder="Ej. Centro de bronceado, Barbería móvil…"></label>
         <div class="grid grid-cols-2 gap-3">
           <label class="field"><span>Tu nombre</span><input name="ownerName" required maxlength="60"></label>
           <label class="field"><span>Tu WhatsApp</span><input name="whatsapp" type="tel" inputmode="tel" placeholder="300 123 4567"></label>
@@ -203,7 +206,7 @@
         </div>
         <p id="trialLogged" class="hidden rounded-lg bg-paper p-2.5 text-xs text-ink/70"></p>
         <button class="btn-primary w-full py-3" type="submit">Crear mi agenda</button>
-        <p class="text-center text-[11px] text-ink/50">Al terminar la prueba pagas una mensualidad para seguir. Puedes cancelar cuando quieras.</p>
+        <p id="trialFoot" class="text-center text-[11px] text-ink/50">Puedes cambiar de plan cuando quieras.</p>
       </form>
       <div id="trialDone" class="hidden text-center"></div>
     </div>
@@ -304,6 +307,6 @@
     </div>
   </div>
 
-  <script type="module" src="app.js?v=2026-10-09u"></script>
+  <script type="module" src="app.js?v=2026-10-09z"></script>
 </body>
 </html>

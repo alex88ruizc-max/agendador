@@ -2,7 +2,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js?v=2026-10-09u";
+import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js?v=2026-10-09z";
 
 export const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
@@ -16,10 +16,10 @@ export function businessFromUrl() {
 export const bpath = (...parts) => ["businesses", BID, ...parts].join("/");
 
 // Versión de la página: cámbiala en cada actualización para comprobar que se publicó
-export const APP_VERSION = '2026-10-09u';
+export const APP_VERSION = '2026-10-09z';
 // Versiones que esta página espera del servidor y de las reglas de Firebase
-export const SERVER_VERSION = '2026-10-09t';
-export const RULES_VERSION = '2026-10-09t';
+export const SERVER_VERSION = '2026-10-09z';
+export const RULES_VERSION = '2026-10-09v';
 
 export const UNIT = 15;          // unidad interna de bloqueo (minutos)
 const TZ = "America/Bogota";     // Colombia no usa horario de verano
@@ -128,7 +128,8 @@ export function headerBgCss(headerColor, hb) {
   const grad = hb.style === "brand"
     ? `linear-gradient(180deg, ${rgba(end)} 0%, ${rgba(mid)} 62%, ${rgba(0.96)} 100%)`
     : `linear-gradient(90deg, ${rgba(0.95)} 0%, ${rgba(mid)} 48%, ${rgba(end)} 100%)`;
-  return `${grad}, center / cover no-repeat url('${hb.img}')`;
+  const posY = Math.min(100, Math.max(0, Number(hb.posY ?? 50)));
+  return `${grad}, center ${posY}% / cover no-repeat url('${hb.img}')`;
 }
 // Botones para llegar al negocio: con el punto exacto (si se guardó) o con la dirección
 export function mapLinks(st = {}) {
@@ -307,13 +308,17 @@ function dialog({ title, message, input, okText = "Aceptar", cancelText = "Cance
         <button type="button" class="dlg-ok ${danger ? "btn-primary !bg-pole-red" : "btn-primary"} text-sm">${esc(okText)}</button>
       </div></div>`;
     const inp = wrap.querySelector(".dlg-in");
-    const done = (v) => { wrap.remove(); document.removeEventListener("keydown", key); resolve(v); };
+    const okey = "dlg" + Date.now() + Math.random();
+    let closed = false;
+    const finish = (v) => { if (closed) return; closed = true; wrap.remove(); document.removeEventListener("keydown", key); resolve(v); };
+    const done = (v) => { finish(v); dropOverlay(okey); };
     const key = (e) => { if (e.key === "Escape") done(input !== undefined ? null : false); if (e.key === "Enter" && inp) done(inp.value.trim()); };
     wrap.querySelector(".dlg-ok").onclick = () => done(input !== undefined ? inp.value.trim() : true);
     const no = wrap.querySelector(".dlg-no"); if (no) no.onclick = () => done(input !== undefined ? null : false);
     wrap.addEventListener("click", (e) => { if (e.target === wrap) done(input !== undefined ? null : false); });
     document.addEventListener("keydown", key);
     document.body.appendChild(wrap);
+    pushOverlay(okey, () => finish(input !== undefined ? null : false)); // atrás = cancelar
     (inp || wrap.querySelector(".dlg-ok")).focus();
     if (inp) inp.select();
   });
@@ -329,14 +334,51 @@ export function viewImage(src, caption) {
   wrap.innerHTML = `<button type="button" class="absolute right-4 top-4 rounded-full bg-white/15 px-3 py-1.5 text-lg text-white" aria-label="Cerrar">✕</button>
     <img src="${src}" alt="${esc(caption || "Imagen")}" class="max-h-[85vh] max-w-full rounded-xl bg-white object-contain p-2">
     ${caption ? `<p class="mt-3 text-center text-sm text-white/80">${esc(caption)}</p>` : ""}`;
-  const close = () => { wrap.remove(); document.removeEventListener("keydown", key); };
+  const vkey = "img" + Date.now();
+  let gone = false;
+  const hide = () => { if (gone) return; gone = true; wrap.remove(); document.removeEventListener("keydown", key); };
+  const close = () => { hide(); dropOverlay(vkey); };
   const key = (e) => { if (e.key === "Escape") close(); };
   wrap.onclick = close; document.addEventListener("keydown", key);
   document.body.appendChild(wrap);
+  pushOverlay(vkey, hide);
 }
 
-export function openModal(id) { const m = document.getElementById(id); m.classList.remove("hidden"); m.classList.add("flex"); }
-export function closeModal(id) { const m = document.getElementById(id); m.classList.add("hidden"); m.classList.remove("flex"); }
+// ---------- Botón "atrás": cada ventana abierta es un paso del historial ----------
+// Atrás (del celular o del navegador) cierra la ventana de encima; si no hay ventanas, vuelve a la sección anterior.
+const OVERLAYS = [];
+let skipPops = 0, navHandler = null;
+export function pushOverlay(key, close) {
+  OVERLAYS.push({ key, close });
+  try { history.pushState({ ...(history.state || {}), ov: key, n: OVERLAYS.length }, ""); } catch { /* sin historial */ }
+}
+export function dropOverlay(key) {
+  for (let i = OVERLAYS.length - 1; i >= 0; i--) {
+    if (OVERLAYS[i].key === key) { OVERLAYS.splice(i, 1); skipPops++; try { history.back(); } catch { skipPops--; } return; }
+  }
+}
+export function setNavHandler(fn) { navHandler = fn; }
+export function pushNav(state) { try { history.pushState(state, ""); } catch { /* sin historial */ } }
+export function replaceNav(state) { try { history.replaceState(state, ""); } catch { /* sin historial */ } }
+addEventListener("popstate", (e) => {
+  if (skipPops > 0) { skipPops--; return; }
+  const top = OVERLAYS.pop();
+  if (top) { try { top.close(); } catch { /* nada */ } return; }
+  if (navHandler) navHandler(e.state || {});
+});
+function hideModal(id) { const m = document.getElementById(id); if (!m) return; m.classList.add("hidden"); m.classList.remove("flex"); }
+export function openModal(id) {
+  const m = document.getElementById(id); if (!m) return;
+  const wasOpen = !m.classList.contains("hidden");
+  m.classList.remove("hidden"); m.classList.add("flex");
+  if (!wasOpen) pushOverlay("modal:" + id, () => hideModal(id));
+}
+export function closeModal(id) {
+  const m = document.getElementById(id); if (!m) return;
+  const wasOpen = !m.classList.contains("hidden");
+  hideModal(id);
+  if (wasOpen) dropOverlay("modal:" + id);
+}
 export function setBusy(btn, busy, text) {
   if (!btn) return;
   if (busy) { btn.dataset.label = btn.textContent; btn.textContent = text || "Procesando…"; btn.disabled = true; }
@@ -346,3 +388,71 @@ export async function copyText(text) {
   try { await navigator.clipboard.writeText(text); toast("Copiado: " + text); }
   catch { uiPrompt("Copia este texto", "Mantén presionado el texto para copiarlo.", text, { okText: "Listo", cancelText: "Cerrar" }); }
 }
+
+// Número de cuenta de pago: Nequi, Daviplata, Bancolombia… solo números; la llave Bre-B sí admite letras
+export const isKeyMethod = (label) => /bre-?b|llave/i.test(String(label || ""));
+export function payAccountInput(input, label) {
+  if (!input) return;
+  const key = isKeyMethod(label);
+  input.setAttribute("inputmode", key ? "text" : "numeric");
+  input.setAttribute("autocomplete", "off");
+  input.placeholder = key ? "@tullave, correo, cédula o celular" : "Solo números, ej. 3001234567";
+  if (!key) { const d = input.value.replace(/\D/g, ""); if (d !== input.value) input.value = d; }
+}
+
+// Tipos de negocio (y cómo se llama su equipo). "otro" deja escribir el nombre propio.
+export const BIZ_TYPES = [
+  ["barberia", "Barbería", "Barbero", "💈"], ["peluqueria", "Peluquería", "Estilista", "✂️"], ["salon", "Salón de belleza", "Estilista", "💇"],
+  ["unas", "Uñas", "Manicurista", "💅"], ["pestanas", "Cejas y pestañas", "Especialista", "👁️"], ["estetica", "Estética / facial", "Esteticista", "🧴"],
+  ["spa", "Spa", "Terapeuta", "🧖"], ["masajes", "Masajes", "Masajista", "💆"], ["maquillaje", "Maquillaje", "Maquillador(a)", "💄"],
+  ["tatuajes", "Tatuajes y piercing", "Tatuador(a)", "🖋️"], ["mascotas", "Peluquería de mascotas", "Groomer", "🐶"], ["otro", "Otro (escríbelo)", "Profesional", "➕"]
+];
+export const bizTypeName = (st = {}) => st.businessType === "otro" ? (st.businessTypeLabel || "Otro") : ((BIZ_TYPES.find((t) => t[0] === st.businessType) || BIZ_TYPES[0])[1]);
+export const staffWord = (type) => (BIZ_TYPES.find((t) => t[0] === type) || BIZ_TYPES[0])[2];
+// Guardar sin hacer esperar: si en medio segundo no ha respondido, sigue y avisa solo si falla
+export function fastSave(promise, onLateError) {
+  let failed = null, moved = false;
+  Promise.resolve(promise).catch((e) => { failed = e; if (moved) onLateError?.(e); });
+  return new Promise((resolve, reject) => {
+    Promise.resolve(promise).then(resolve, reject);              // si responde rápido, se usa su respuesta
+    setTimeout(() => { if (failed) return reject(failed); moved = true; resolve(); }, 500); // si tarda, se sigue y solo avisa si falla
+  });
+}
+
+// ---------- Planes (Gratis, Básico, Gold): los define el superusuario en su panel ----------
+export const PLAN_KEYS = ["free", "basic", "gold"];
+export const PLAN_FEATURES = [
+  ["telegram", "Avisos en Telegram (reservas, abonos y recordatorios)"],
+  ["appearance", "Portada, colores y apariencia de la página"],
+  ["clients", "Clientes: historial, preferenciales y bloqueos"],
+  ["images", "Imágenes con horarios para estados"],
+  ["marketing", "Marketing: llenar huecos, estados en el logo y avisos"],
+  ["activity", "Actividad de la página y recomendaciones"]
+];
+export const DEFAULT_PLANS = {
+  free: { name: "Gratis", priceCOP: 0, days: 30, daysAhead: 5, maxStaff: 1, features: [], tagline: "Para empezar a recibir citas", tgEvents: [], tgChoose: false },
+  basic: { name: "Básico", priceCOP: 20000, daysAhead: 30, maxStaff: 3, features: ["telegram", "appearance", "clients", "images"], tagline: "Tu marca y tus clientes", tgEvents: ["newBooking"], tgChoose: false },
+  gold: { name: "Gold", priceCOP: 35000, daysAhead: 90, maxStaff: 0, features: ["telegram", "appearance", "clients", "images", "marketing", "activity"], tagline: "Todo para llenar tu agenda", tgEvents: ["newBooking", "proof", "cancel", "reschedule", "reminder", "panelApt", "breaks", "noShow"], tgChoose: true }
+};
+export function plansOf(plat = {}) {
+  const out = {};
+  PLAN_KEYS.forEach((k) => { out[k] = { ...DEFAULT_PLANS[k], ...((plat.plans || {})[k] || {}) }; });
+  if (!plat.plans && plat.trialDays) out.free.days = Number(plat.trialDays);
+  return out;
+}
+// tiendas antiguas sin plan: en prueba = Gratis; las que ya pagaban = Gold
+export const planOfBiz = (biz = {}) => (PLAN_KEYS.includes(biz.plan) ? biz.plan : biz.trial ? "free" : "gold");
+export function planPriceOf(plat, plan, months) {
+  const price = Number(plansOf(plat)[plan].priceCOP || 0), base = price * months;
+  let off = Number((plat.planDiscounts || {})[months] || 0);
+  if (!off && plat.planBundles?.[months] && plat.planPriceCOP) off = Math.max(0, Math.round((1 - plat.planBundles[months] / (plat.planPriceCOP * months)) * 100));
+  return months === 1 || !off ? base : Math.round((base * (1 - off / 100)) / 100) * 100;
+}
+export const DEFAULT_PAY_WARNING = "Ni un peso más ni uno menos. Así tu pago se reconoce solo y tu plan se activa de inmediato. Si envías otro valor, tendremos que revisarlo a mano y puede tardar.";
+
+// Categorías de avisos de Telegram (qué trae cada plan lo decide el superusuario)
+export const TG_EVENTS = [
+  ["newBooking", "📅", "Nueva reserva"], ["proof", "💳", "Abono por revisar (con botón Aprobar)"], ["cancel", "🚫", "Cancelaciones"],
+  ["reschedule", "🔁", "Cambios de hora"], ["reminder", "⏰", "Recordatorio antes de cada cita"], ["panelApt", "📝", "Citas agendadas desde el panel"],
+  ["breaks", "☕", "Descansos del equipo"], ["noShow", "⚠️", "Clientes que no llegan"]
+];

@@ -6,8 +6,10 @@ import {
 import {
   startUpdateWatcher, applyBrandColors, uiConfirm, uiPrompt, setDialogBrand, viewImage, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, hora12, fechaLarga, fechaCorta, toMillis, cop, esc, normalizePhone,
   waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, DEFAULT_WA_RESCHEDULE, computeSlots, staffHours, mapLinks, headerBgCss, onColor, darken,
+  pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
+  PLAN_KEYS, plansOf, planOfBiz, planPriceOf, DEFAULT_PAY_WARNING, TG_EVENTS,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-10-09u";
+} from "./common.js?v=2026-10-09z";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -108,7 +110,7 @@ function start() {
     applyPanelBrand(); if (A.me) renderTabs();
     // recién creada desde "Probar gratis": abre la guía de primeros pasos
     // asistente de inicio: la primera vez (o al llegar desde "Probar gratis")
-    if (!A.wizAuto && isOwner() && !A.me?.isSuper && (!A.settings.setupDone || new URLSearchParams(location.search).get("guia") === "1")) {
+    if (!A.wizAuto && isOwner() && !A.me?.isSuper && !document.body.classList.contains("plan-gate") && !A.bill?.planWanted && (!A.settings.setupDone || new URLSearchParams(location.search).get("guia") === "1")) {
       A.wizAuto = true; A.geoAsked = true;
       setTimeout(() => { if (new URLSearchParams(location.search).get("guia")) history.replaceState(null, "", location.pathname + "?b=" + encodeURIComponent(bpath().split("/")[1])); openWizard(); }, 700);
     } else if (!A.geoAsked && isOwner() && !A.me?.isSuper && !A.settings.geo) { A.geoAsked = true; setTimeout(() => requestGeo(false), 2500); }
@@ -131,6 +133,7 @@ function start() {
   }
   subscribeDay();
   startHome();
+  startNews();
   setInterval(renderStaffTab, 60000);
 }
 
@@ -139,7 +142,7 @@ async function renderPlanBanner() {
   const msgs = [];
   if (A.me.isSuper) msgs.push(`Estás viendo el panel de ${esc(A.biz.name)} como superusuario. <a class="underline" href="super.html">Volver a mis negocios</a>`);
   if (A.biz.status !== "active") msgs.push("⛔ Tu agenda en línea está suspendida: tus clientes no pueden reservar desde la página. Comunícate con soporte para reactivarla.");
-  if (isTrial()) msgs.push(`🎁 Estás en prueba gratis: tus clientes agendan hasta ${trialDays()} días adelante y algunas funciones están bloqueadas 🔒. <a href="#" class="underline" data-goplan="1">Activar mi plan</a>`);
+  if (isTrial()) msgs.push(`🎁 Estás en el plan ${esc(planInfo().name)}: tus clientes agendan hasta ${trialDays()} días adelante y algunas funciones están bloqueadas 🔒. <a href="#" class="underline" data-goplan="1">Ver planes</a>`);
   if (isOwner()) {
     try {
       const b = (await getDoc(doc(db, bpath("private", "billing")))).data();
@@ -170,21 +173,37 @@ const TABS = {
   appearance: ["Apariencia", "fa-palette", "#c026d3"], images: ["Imágenes", "fa-image", "#0891b2"], plan: ["Mi plan", "fa-crown", "#ca8a04"],
   settings: ["Configuración", "fa-gear", "#475569"]
 };
-// Lo que se bloquea en la prueba gratis lo define el superusuario en su panel (Cobros)
-const TRIAL_DEFAULT = { daysAhead: 5, locked: ["clients", "marketing", "appearance", "images", "team"] };
-const trialRules = () => ({ ...TRIAL_DEFAULT, ...(A.plat?.trialRules || {}) });
-const trialLocked = () => trialRules().locked || [];
-const trialDays = () => Math.max(1, Number(trialRules().daysAhead || 5));
-const lockedNow = (f) => isTrial() && trialLocked().includes(f);
-const isTrial = () => !!A.biz?.trial && !A.me?.isSuper;
+// Qué trae cada plan (Gratis, Básico, Gold) lo define el superusuario en su panel (Cobros)
+const PLANS = () => plansOf(A.plat || {});
+const myPlan = () => planOfBiz(A.biz || {});
+const planInfo = () => PLANS()[myPlan()];
+const isTrial = () => myPlan() === "free" && !A.me?.isSuper;
+const trialDays = () => Math.max(1, Number(planInfo().daysAhead || 30));
+const TAB_FEATURE = { clients: "clients", marketing: "marketing", appearance: "appearance", images: "images", activity: "activity" };
+// el plan pagado más barato que tiene una función
+const planFor = (f) => ["basic", "gold"].find((k) => (PLANS()[k].features || []).includes(f)) || "gold";
+function lockedNow(f) {
+  if (A.me?.isSuper) return false;
+  const feat = TAB_FEATURE[f] || f;
+  if (feat === "team") { const max = Number(planInfo().maxStaff || 0); return !!max && A.staff.filter((x) => x.active !== false).length >= max; }
+  if (!PLAN_FEATURES_KEYS.includes(feat)) return false;
+  return !(planInfo().features || []).includes(feat);
+}
+const PLAN_FEATURES_KEYS = ["telegram", "appearance", "clients", "images", "marketing", "activity"];
 function goTab(id) { switchTab(id); }
 function lockCard(id) {
+  const need = planFor(TAB_FEATURE[id] || id), P = PLANS()[need];
   $("tab-" + id).innerHTML = `<div class="rounded-2xl border border-line bg-white p-6 text-center">
-    <p class="text-4xl">🔒</p><p class="mt-2 font-narrow text-2xl font-bold">${TABS[id][0]} es una función Pro</p>
-    <p class="mx-auto mt-1 max-w-sm text-sm text-ink/70">Durante la prueba gratis está bloqueada. Activa tu plan y se desbloquea al instante, junto con agendar más de ${trialDays()} días adelante, varios profesionales y avisos por Telegram al equipo.</p>
-    <button class="btn-primary mt-4" data-goplan="1">👑 Activar mi plan</button></div>`;
+    <p class="text-4xl">🔒</p><p class="mt-2 font-narrow text-2xl font-bold">${TABS[id][0]} es del plan ${esc(P.name)}</p>
+    <p class="mx-auto mt-1 max-w-sm text-sm text-ink/70">Tu plan ${esc(planInfo().name)} no lo incluye. Activa ${esc(P.name)} (${cop(P.priceCOP)}/mes) y se desbloquea al instante.</p>
+    <button class="btn-primary mt-4" data-goplan="${need}">${need === "gold" ? "👑 " : ""}Activar ${esc(P.name)}</button></div>`;
 }
-document.addEventListener("click", (e) => { if (e.target.closest("[data-goplan]")) { e.preventDefault(); goTab("plan"); } });
+document.addEventListener("click", (e) => {
+  const g = e.target.closest("[data-goplan]"); if (!g) return;
+  e.preventDefault();
+  if (PLAN_KEYS.includes(g.dataset.goplan)) A.planPick = g.dataset.goplan;
+  goTab("plan");
+});
 const ALL_TABS = ["home", "activity", "referrals", "agenda", "staff", "clients", "services", "marketing", "appearance", "images", "plan", "settings"];
 const LOCKED_TABS = ["home", "appearance", "settings", "plan"]; // siempre visibles para poder deshacer cambios
 const PANEL_DEFAULT = { useBrand: true, linkLabel: "Link clientes", shareMsg: "Agenda tu cita en {negocio} aquí: {link}", columns: 3, style: "cards", colorIcons: true, order: ALL_TABS, hidden: [] };
@@ -219,8 +238,9 @@ $("tabs").addEventListener("click", (e) => {
   const b = e.target.closest("[data-tab]"); if (!b) return;
   switchTab(b.dataset.tab);
 });
-function switchTab(id) {
+function switchTab(id, opts = {}) {
   if (!TABS[id]) return;
+  if (!opts.fromPop && (A.tab !== id || document.body.classList.contains("show-more"))) pushNav({ tab: id });
   A.tab = id;
   document.body.classList.remove("show-more");
   document.querySelectorAll(".tab-panel").forEach((p) => p.classList.add("hidden"));
@@ -506,7 +526,7 @@ function renderStaffTab() {
   el.innerHTML = `
     ${isOwner() ? `<div class="mb-4 flex flex-wrap items-center justify-between gap-2">
       <p class="text-sm text-ink/70">${ownerTg ? "Tu Telegram de dueño está conectado." : "Conecta tu Telegram de dueño en Configuración para recibir todos los avisos."}</p>
-      ${lockedNow("team") ? `<button class="btn-light" data-goplan="1">🔒 Agregar al equipo (Pro)</button>` : `<button class="btn-primary" data-sact="new">+ Agregar al equipo</button>`}</div>` : ""}
+      ${lockedNow("team") ? `<button class="btn-light" data-goplan="${PLANS().basic.maxStaff > (planInfo().maxStaff || 0) || !PLANS().basic.maxStaff ? "basic" : "gold"}">🔒 Agregar al equipo (sube de plan)</button>` : `<button class="btn-primary" data-sact="new">+ Agregar al equipo</button>`}</div>` : ""}
     <section class="mb-4 rounded-xl border border-line bg-white p-4">
       <div class="mb-2 flex items-center gap-2"><i class="fa-regular fa-clock text-pole-blue"></i><h3 class="font-narrow text-xl font-bold">Disponibilidad ${list.length > 1 ? "del equipo" : ""}</h3></div>
       <p class="mb-3 text-xs text-ink/60">${list.length > 1
@@ -993,6 +1013,14 @@ function renderSettings() {
         ${txt("stPhone", "WhatsApp del negocio", s.whatsapp, 'placeholder="300 123 4567"')}
         ${txt("stAddress", "Dirección", s.address)}
         ${txt("stCity", "Ciudad", s.city)}
+        <div class="rounded-xl p-3 md:col-span-2" style="background:var(--canvas)">
+          <p class="text-sm font-bold">👀 ¿Quién puede ver tu agenda?</p>
+          <p class="mb-2 text-xs text-ink/65">Con registro, el cliente crea su cuenta antes de ver los horarios (sabes quién entra). Sin registro, ve los horarios de una vez y solo se registra al apartar (más fácil, más reservas).</p>
+          <div class="grid gap-2 sm:grid-cols-2">
+            <label class="flex cursor-pointer items-center gap-2 rounded-lg border border-line bg-white p-2.5 text-sm"><input type="radio" name="stAgenda" value="login" ${s.agendaMode !== "open" ? "checked" : ""}> <span><b>Con registro</b><br><span class="text-xs text-ink/60">Primero se registran</span></span></label>
+            <label class="flex cursor-pointer items-center gap-2 rounded-lg border border-line bg-white p-2.5 text-sm"><input type="radio" name="stAgenda" value="open" ${s.agendaMode === "open" ? "checked" : ""}> <span><b>Sin registro</b><br><span class="text-xs text-ink/60">Ven la agenda y se registran al apartar</span></span></label>
+          </div>
+        </div>
         <label class="flex cursor-pointer items-start gap-3 rounded-xl p-3 md:col-span-2" style="background:var(--canvas)">
           <span class="min-w-0 flex-1"><span class="block text-sm font-bold">📡 Estado en vivo en tu página</span>
             <span class="block text-xs text-ink/65">Tus clientes ven <b>en este momento</b> quién está libre y a qué hora queda libre el que está ocupado. Sirve para que alguien cercano sepa si puede llegar ya. Apagado, solo ven los horarios para reservar.</span></span>
@@ -1005,7 +1033,8 @@ function renderSettings() {
             ${mapLinks(s) ? `<a class="btn-sm" href="${mapLinks(s).waze}" target="_blank" rel="noopener"><i class="fa-brands fa-waze"></i> Probar en Waze</a>` : ""}</div>
         </div>
         <label class="field"><span>Tipo de negocio</span><select id="stType">
-          ${[["barberia", "Barbería"], ["salon", "Salón de belleza"], ["unas", "Uñas"], ["spa", "Spa / estética"], ["otro", "Otro"]].map(([k, v]) => `<option value="${k}" ${(s.businessType || "barberia") === k ? "selected" : ""}>${v}</option>`).join("")}</select></label>
+          ${BIZ_TYPES.map(([k, v, , e]) => `<option value="${k}" ${(s.businessType || "barberia") === k ? "selected" : ""}>${e} ${v}</option>`).join("")}</select></label>
+        <label id="stTypeOther" class="field ${s.businessType === "otro" ? "" : "hidden"}"><span>Escribe tu tipo de negocio</span><input id="stTypeLabel" maxlength="40" value="${esc(s.businessTypeLabel || "")}" placeholder="Ej. Centro de bronceado"></label>
         ${txt("stStaffLabel", "Cómo se llama tu equipo en la página", s.staffLabel || "", 'placeholder="Barbero, Estilista, Manicurista…"')}
       </div>
     </fieldset>
@@ -1017,7 +1046,7 @@ function renderSettings() {
           <input id="stSlotCustom" type="number" min="15" step="15" class="mt-2 ${[15, 30, 45, 60, 90, 120].includes(Number(s.slotDurationMinutes || 30)) ? "hidden" : ""}" value="${Number(s.slotDurationMinutes || 30)}" placeholder="Minutos (múltiplo de 15)"></label>
         ${num("stDeposit", "Abono para apartar (COP)", s.depositAmountCOP, 'min="0" step="1000"')}
         ${num("stHold", "Minutos para subir el comprobante", s.holdMinutes ?? 30, 'min="5"')}
-        ${num("stWindow", isTrial() ? `Días hacia adelante (máx. ${trialDays()} en prueba gratis)` : "Días hacia adelante que se puede reservar", isTrial() ? Math.min(trialDays(), s.bookingWindowDays ?? trialDays()) : (s.bookingWindowDays ?? 30), isTrial() ? `min="1" max="${trialDays()}"` : 'min="1"')}
+        ${num("stWindow", `Días hacia adelante que se puede reservar (máx. ${trialDays()} en tu plan)`, Math.min(trialDays(), s.bookingWindowDays ?? 30), `min="1" max="${trialDays()}"`)}
         ${num("stAdvance", "Anticipación mínima (minutos)", s.minAdvanceMinutes ?? 60, 'min="0"')}
         ${num("stTolerance", "Tolerancia de espera (minutos)", s.toleranceMinutes ?? 10, 'min="0"')}
       </div>
@@ -1063,6 +1092,7 @@ function renderSettings() {
         <button type="button" id="tgOwner" class="btn-dark">${A.tg?.owner ? "Reconectar mi Telegram de dueño" : "Conectar mi Telegram de dueño"}</button>
         <span class="text-sm text-ink/70">${A.tg?.owner ? "Conectado ✓" : "Sin conectar"}</span>
       </div>
+      <div id="tgPrefsBox" class="mt-4"></div>
     </fieldset>
 
     <fieldset class="rounded-xl border border-line bg-white p-4"><legend class="px-1 font-narrow text-xl font-bold">Mensajes</legend>
@@ -1077,8 +1107,10 @@ function renderSettings() {
   renderClosed(); renderPM();
   $("stSlot").onchange = (e) => $("stSlotCustom").classList.toggle("hidden", e.target.value !== "custom");
   $("stType").onchange = (e) => {
-    const lbl = { barberia: "Barbero", salon: "Estilista", unas: "Manicurista", spa: "Profesional", otro: "Profesional" }[e.target.value];
-    if (!$("stStaffLabel").value.trim()) $("stStaffLabel").value = lbl;
+    const was = BIZ_TYPES.map((t) => t[2]);
+    if (!$("stStaffLabel").value.trim() || was.includes($("stStaffLabel").value.trim())) $("stStaffLabel").value = staffWord(e.target.value);
+    $("stTypeOther").classList.toggle("hidden", e.target.value !== "otro");
+    if (e.target.value === "otro") $("stTypeLabel").focus();
   };
   $("stClosedAdd").onclick = () => {
     const v = $("stClosedNew").value; if (!v) return;
@@ -1089,6 +1121,7 @@ function renderSettings() {
   $("pmAdd").onclick = () => { readPM(); A.pmDraft.push({ label: "", account: "", holder: "" }); renderPM(); };
   $("pmList").onclick = (e) => { const b = e.target.closest("[data-rmpm]"); if (b) { readPM(); A.pmDraft.splice(Number(b.dataset.rmpm), 1); renderPM(); } };
   $("tgOwner").onclick = () => tgLink("owner");
+  renderTgPrefs();
   $("geoSet").onclick = () => requestGeo(true);
   $("setForm").onsubmit = saveSettings;
 }
@@ -1100,7 +1133,7 @@ function renderClosed() {
 function renderPM() {
   $("pmList").innerHTML = A.pmDraft.map((m, i) => `<div class="grid gap-2 rounded-lg bg-paper p-2 sm:grid-cols-[1fr_1fr_1fr_auto]" data-pm="${i}">
     <input class="pmLabel rounded border border-line px-2 py-1.5" placeholder="Nequi, Daviplata, Llave Bre-B…" value="${esc(m.label)}">
-    <input class="pmAcc rounded border border-line px-2 py-1.5" placeholder="Número o llave" value="${esc(m.account)}">
+    <input class="pmAcc rounded border border-line px-2 py-1.5" ${isKeyMethod(m.label) ? 'inputmode="text" placeholder="@tullave, correo o cédula"' : 'inputmode="numeric" placeholder="Solo números"'} value="${esc(m.account)}">
     <input class="pmHolder rounded border border-line px-2 py-1.5" placeholder="Titular" value="${esc(m.holder)}">
     <button type="button" class="btn-sm" data-rmpm="${i}">Quitar</button>
     <div class="flex flex-wrap items-center gap-2 sm:col-span-4">
@@ -1108,6 +1141,16 @@ function renderPM() {
       <label class="btn-sm cursor-pointer">${m.qr ? "Cambiar QR" : "Subir imagen del QR (opcional)"}<input type="file" accept="image/*" class="hidden" data-qrpm="${i}"></label>
       ${m.qr ? `<button type="button" class="text-xs text-pole-red underline" data-rmqr="${i}">Quitar QR</button>` : ""}
     </div></div>`).join("") || `<p class="text-sm text-ink/60">Agrega al menos un medio de pago para que tus clientes sepan a dónde transferir.</p>`;
+}
+function pmProblem(list) {
+  for (const m of list) {
+    if (!m.label || !m.account) continue;
+    if (isKeyMethod(m.label)) continue;
+    const d = m.account.replace(/\D/g, "");
+    if (/nequi|daviplata/i.test(m.label) && !/^3\d{9}$/.test(d)) return `El número de ${m.label} debe tener 10 dígitos y empezar por 3.`;
+    if (d.length < 6) return `Revisa el número de ${m.label}: solo números.`;
+  }
+  return "";
 }
 function readPM() {
   A.pmDraft = [...document.querySelectorAll("[data-pm]")].map((r) => ({
@@ -1138,6 +1181,7 @@ async function saveSettings(e) {
   e.preventDefault();
   const btn = e.target.querySelector("button[type=submit]");
   readPM();
+  const pmErr = pmProblem(A.pmDraft); if (pmErr) return toast(pmErr, "error");
   const hours = {};
   for (const row of document.querySelectorAll("[data-dow]")) {
     const d = row.dataset.dow, iv = [];
@@ -1165,8 +1209,8 @@ async function saveSettings(e) {
   const n = (id) => Number($(id).value || 0);
   const data = {
     businessName: $("stName").value.trim(), whatsapp: phone, address: $("stAddress").value.trim(), city: $("stCity").value.trim(),
-    slotDurationMinutes: slotVal, showLiveStatus: $("stLive").checked, businessType: $("stType").value, staffLabel: $("stStaffLabel").value.trim(), depositAmountCOP: n("stDeposit"), holdMinutes: Math.max(5, n("stHold")),
-    bookingWindowDays: isTrial() ? Math.min(trialDays(), Math.max(1, n("stWindow"))) : Math.max(1, n("stWindow")), minAdvanceMinutes: n("stAdvance"), toleranceMinutes: n("stTolerance"),
+    slotDurationMinutes: slotVal, showLiveStatus: $("stLive").checked, agendaMode: document.querySelector('input[name="stAgenda"]:checked')?.value === "open" ? "open" : "login", businessType: $("stType").value, businessTypeLabel: $("stType").value === "otro" ? $("stTypeLabel").value.trim() : "", staffLabel: $("stStaffLabel").value.trim(), depositAmountCOP: n("stDeposit"), holdMinutes: Math.max(5, n("stHold")),
+    bookingWindowDays: A.me?.isSuper ? Math.max(1, n("stWindow")) : Math.min(trialDays(), Math.max(1, n("stWindow"))), minAdvanceMinutes: n("stAdvance"), toleranceMinutes: n("stTolerance"),
     autoConfirmProof: $("stAuto").checked, businessHours: hours, closedDates: A.closedDraft,
     paymentMethods: A.pmDraft.filter((m) => m.label && m.account).map((m) => ({ label: m.label, account: m.account, holder: m.holder || "", qr: m.qr || "" })), paymentInstructions: $("stPayInstr").value.trim(),
     rescheduleMinHours: n("stReschedH"), maxReschedules: n("stMaxResched"), noShowThreshold: Math.max(1, n("stNoShow")),
@@ -1175,7 +1219,8 @@ async function saveSettings(e) {
     updatedAt: serverTimestamp(), updatedBy: A.me.uid
   };
   setBusy(btn, true, "Guardando…");
-  try { await setDoc(doc(db, bpath("settings", "general")), data, { merge: true }); toast("Configuración guardada. La página pública ya se actualizó."); }
+  if (data.businessType === "otro" && !data.businessTypeLabel) return toast("Escribe tu tipo de negocio.", "error");
+  try { await fastSave(setDoc(doc(db, bpath("settings", "general")), data, { merge: true }), (err) => toast("No se pudo guardar: " + err.message, "error")); toast("✓ Configuración guardada."); }
   catch (err) { toast("No se pudo guardar: " + err.message, "error"); }
   finally { setBusy(btn, false); }
 }
@@ -1254,6 +1299,8 @@ function renderAppearance() {
         </div>
         <p class="mb-1.5 text-xs font-semibold text-ink/60">Estilo del degradado</p>
         <div class="mb-3 flex flex-wrap gap-2"><button type="button" class="chip" data-apbg="dark" aria-pressed="${(ap.headerBg?.style || "dark") === "dark"}">Oscuro</button><button type="button" class="chip" data-apbg="brand" aria-pressed="${ap.headerBg?.style === "brand"}">Color de mi marca</button></div>
+        <label class="mb-2 block text-xs font-semibold text-ink/60">Posición de la foto (arriba ↔ abajo)
+          <span class="mt-1 flex items-center gap-2 font-normal">Arriba<input id="apBgPos" type="range" min="0" max="100" step="5" value="${Number(ap.headerBg?.posY ?? 50)}" class="flex-1">Abajo</span></label>
         <label class="block text-xs font-semibold text-ink/60">¿Cuánto se ve la foto?
           <span class="mt-1 flex items-center gap-2 font-normal">Poco<input id="apBgShow" type="range" min="10" max="90" step="5" value="${Number(ap.headerBg?.show ?? 45)}" class="flex-1">Mucho</span></label>
       </div>
@@ -1320,6 +1367,7 @@ function renderAppearance() {
     renderApPreview();
   });
   $("apBgShow").oninput = (e) => { ap.headerBg.show = Number(e.target.value); renderApPreview(); };
+  $("apBgPos").oninput = (e) => { ap.headerBg.posY = Number(e.target.value); renderApPreview(); };
   $("apSave").onclick = async () => {
     sync();
     if (ap.resetColors) { ap.colors = {}; delete ap.resetColors; }
@@ -1382,13 +1430,13 @@ function renderApPreview() {
 function darkenIfLight(h) { return onColor(h) === "#111111" ? darken(h, 0.45) : h; }
 
 // ================= Imágenes para redes con los cupos disponibles =================
-const IMG_STYLES = [["clasico", "Clásico"], ["moderno", "Moderno"], ["neon", "Neón"], ["minimal", "Minimal"]];
+const IMG_STYLES = [["tarjeta", "Tarjeta"], ["claro", "Claro"], ["neon", "Neón"], ["oro", "Dorado"], ["impacto", "Impacto"], ["olas", "Olas"]];
 function loadScript(src) {
   return new Promise((res, rej) => { if (document.querySelector(`script[src="${src}"]`)) return res(); const s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
 }
 const publicUrl = () => new URL("index.html?b=" + encodeURIComponent(bpath().split("/")[1]), location.href).href;
 function renderImages() {
-  A.img = A.img || { style: "clasico", format: "story", kind: "slots", day: bogNow().date, extra: "" };
+  A.img = A.img || { style: "tarjeta", format: "story", kind: "slots", day: bogNow().date, extra: "" };
   const I = A.img, today = bogNow().date;
   const seg = (name, opts, cur) => `<div class="flex flex-wrap gap-2">${opts.map(([v, l]) => `<button type="button" class="chip" data-img-${name}="${v}" aria-pressed="${cur === v}">${l}</button>`).join("")}</div>`;
   $("tab-images").innerHTML = `
@@ -1403,8 +1451,9 @@ function renderImages() {
       <div><p class="mb-1 text-sm font-semibold">Formato</p>${seg("format", [["story", "Estado / historia (vertical)"], ["post", "Publicación (cuadrada)"]], I.format)}</div>
       <label class="field"><span>Texto extra (opcional)</span><input id="imgExtra" maxlength="70" value="${esc(I.extra)}" placeholder="Ej. ¡Hoy 2x1 en arreglo de barba!"></label>
       <div class="grid grid-cols-2 gap-2">
-        <button id="imgShare" class="btn-primary"><i class="fa-solid fa-share-nodes"></i> Compartir</button>
+        <button id="imgShare" class="btn-primary"><i class="fa-brands fa-whatsapp"></i> Compartir</button>
         <button id="imgDown" class="btn-light"><i class="fa-solid fa-download"></i> Descargar</button>
+        <button id="imgStory" class="btn-light col-span-2"><i class="fa-solid fa-circle-play"></i> Publicar como estado en mi página (24 h)</button>
       </div>
       <p class="break-all text-xs text-ink/60">Enlace: ${esc(publicUrl())}</p>
     </div>
@@ -1425,6 +1474,16 @@ function renderImages() {
     if (navigator.canShare?.({ files: [file] })) { try { await navigator.share({ files: [file], text: "Agenda tu cita aquí: " + publicUrl() }); } catch { /* canceló */ } }
     else { $("imgDown").click(); toast("Tu celular no permite compartir directo: la imagen se descargó."); }
   };
+  $("imgStory").onclick = async () => {
+    const btn = $("imgStory"); setBusy(btn, true, "Publicando…");
+    try {
+      const src = $("imgCanvas"), c = document.createElement("canvas"); c.width = 720; c.height = Math.round(720 * src.height / src.width);
+      c.getContext("2d").drawImage(src, 0, 0, c.width, c.height);
+      await addDoc(collection(db, bpath("stories")), { img: c.toDataURL("image/jpeg", 0.82), bg: "#14213D", text: "", createdAt: serverTimestamp(), expiresAt: Timestamp.fromMillis(Date.now() + 86400000) });
+      toast("Publicado: tus clientes lo ven al tocar tu logo en tu página.");
+    } catch (err) { toast("No se pudo publicar: " + err.message, "error"); }
+    finally { setBusy(btn, false); }
+  };
   drawImage();
 }
 async function freeSlotsFor(date) {
@@ -1437,86 +1496,164 @@ function roundRect(x, c, y, w, h, r) { x.beginPath(); x.moveTo(c + r, y); x.arcT
 function fitText(ctx, text, maxW, size, weight, family) {
   let s = size; do { ctx.font = `${weight} ${s}px ${family}`; s -= 2; } while (ctx.measureText(text).width > maxW && s > 20); return s + 2;
 }
+// Generador de imágenes (estilo Epic): diseño por capas, el contenido se acomoda solo y nunca se monta
+function hexRgba(hex, a) { const h = /^#[0-9a-f]{6}$/i.test(hex || "") ? hex : "#24508A"; return `rgba(${parseInt(h.slice(1, 3), 16)},${parseInt(h.slice(3, 5), 16)},${parseInt(h.slice(5, 7), 16)},${a})`; }
+function wrapLines(x, text, maxW) {
+  const words = String(text || "").split(/\s+/).filter(Boolean), lines = []; let cur = "";
+  words.forEach((w) => { const t = cur ? cur + " " + w : w; if (x.measureText(t).width > maxW && cur) { lines.push(cur); cur = w; } else cur = t; });
+  if (cur) lines.push(cur); return lines;
+}
 async function drawImage() {
   const I = A.img, cv = $("imgCanvas"); if (!cv) return;
+  if (!IMG_STYLES.some(([k]) => k === I.style)) I.style = "tarjeta";
   await loadScript("https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js").catch(() => {});
   try { await document.fonts.ready; } catch { /* nada */ }
-  const W = 1080, H = I.format === "story" ? 1920 : 1080;
+  const story = I.format === "story", W = 1080, H = story ? 1920 : 1080;
   cv.width = W; cv.height = H;
   const x = cv.getContext("2d");
-  const ap = A.settings.appearance || {}, col = ap.colors || {};
-  const header = col.header || "#17222E", primary = col.primary || "#24508A", bg = col.bg || "#EEF1EF";
+  const ap = A.settings.appearance || {}, base = (ap.colors || {}).primary || "#2B59C3";
+  const P = { base, dark: darken(base, 0.55), night: darken(base, 0.82), light: hexRgba(base, 0.18) };
   const name = A.settings.businessName || "Tu negocio", slogan = ap.slogan || "";
-  const F = "'Archivo', system-ui, sans-serif", FN = "'Archivo Narrow', 'Archivo', system-ui, sans-serif";
-  const S = {
-    clasico: { bg: bg, card: "#ffffff", head: header, onHead: onColor(header), text: "#17222E", pill: primary, onPill: onColor(primary), accent: primary },
-    moderno: { bg: primary, card: "rgba(255,255,255,.14)", head: primary, onHead: onColor(primary), text: onColor(primary), pill: "#ffffff", onPill: darkenIfLight(primary) === primary ? primary : darken(primary, .45), accent: "#ffffff" },
-    neon: { bg: "#07090f", card: "#11151f", head: "#07090f", onHead: "#ffffff", text: "#ffffff", pill: primary, onPill: onColor(primary), accent: primary, glow: true },
-    minimal: { bg: "#ffffff", card: "#ffffff", head: "#ffffff", onHead: "#17222E", text: "#17222E", pill: "#17222E", onPill: "#ffffff", accent: primary }
-  }[I.style];
-  // Fondo
-  x.fillStyle = S.bg; x.fillRect(0, 0, W, H);
-  if (I.style === "moderno") { x.fillStyle = "rgba(255,255,255,.08)"; x.beginPath(); x.arc(W * 0.9, H * 0.1, 380, 0, Math.PI * 2); x.fill(); x.beginPath(); x.arc(W * 0.05, H * 0.85, 300, 0, Math.PI * 2); x.fill(); }
-  if (I.style === "clasico") { x.fillStyle = S.head; x.fillRect(0, 0, W, H * (I.format === "story" ? 0.27 : 0.33)); x.fillStyle = primary; x.fillRect(0, H * (I.format === "story" ? 0.27 : 0.33), W, 14); }
-  if (I.style === "minimal") { x.strokeStyle = primary; x.lineWidth = 10; x.strokeRect(40, 40, W - 80, H - 80); }
-  // Logo + nombre + eslogan
-  const story = I.format === "story";
-  let y = story ? 120 : 70;
-  const logo = await loadImg(ap.logo);
-  const L = story ? 200 : 150;
-  x.save(); roundRect(x, (W - L) / 2, y, L, L, 36); x.clip();
-  if (logo) { x.fillStyle = "#fff"; x.fillRect((W - L) / 2, y, L, L); x.drawImage(logo, (W - L) / 2, y, L, L); }
-  else { x.fillStyle = S.accent === "#ffffff" ? "rgba(255,255,255,.2)" : S.accent; x.fillRect((W - L) / 2, y, L, L); x.fillStyle = S.accent === "#ffffff" ? "#fff" : onColor(S.accent); x.font = `700 ${L * 0.42}px ${FN}`; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText(name.split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase(), W / 2, y + L / 2); }
-  x.restore();
-  y += L + (story ? 70 : 55);
-  x.textAlign = "center"; x.textBaseline = "alphabetic";
-  const headColor = I.style === "clasico" ? S.onHead : S.text;
-  x.fillStyle = headColor; const ns = fitText(x, name, W - 140, story ? 92 : 76, 700, FN); x.font = `700 ${ns}px ${FN}`;
-  if (S.glow) { x.shadowColor = primary; x.shadowBlur = 30; }
-  x.fillText(name, W / 2, y); x.shadowBlur = 0;
-  if (slogan) { y += story ? 60 : 48; x.globalAlpha = .8; x.font = `500 ${story ? 40 : 34}px ${F}`; x.fillText(slogan, W / 2, y); x.globalAlpha = 1; }
-  y += story ? 150 : 95;
-  // Contenido
-  x.fillStyle = S.text;
-  if (I.kind === "slots") {
-    const times = await freeSlotsFor(I.day);
-    const isToday = I.day === bogNow().date;
-    x.font = `700 ${story ? 74 : 58}px ${FN}`;
-    if (S.glow) { x.shadowColor = primary; x.shadowBlur = 25; }
-    x.fillText(isToday ? "CUPOS DISPONIBLES HOY" : "CUPOS DISPONIBLES", W / 2, y); x.shadowBlur = 0;
-    y += story ? 66 : 52; x.globalAlpha = .75; x.font = `600 ${story ? 42 : 34}px ${F}`;
-    const dl = fechaLarga(I.day); x.fillText(dl.charAt(0).toUpperCase() + dl.slice(1), W / 2, y); x.globalAlpha = 1;
-    y += story ? 70 : 50;
-    const max = story ? 15 : 9, show = times.slice(0, max), cols = 3;
-    const pw = story ? 290 : 280, ph = story ? 96 : 80, gap = 26, x0 = (W - (cols * pw + (cols - 1) * gap)) / 2;
-    if (!show.length) { x.font = `600 ${story ? 48 : 40}px ${F}`; x.fillText("Agenda para otro día en el enlace 👇", W / 2, y + 80); y += 160; }
-    show.forEach((t, i) => {
-      const cx = x0 + (i % cols) * (pw + gap), cy = y + Math.floor(i / cols) * (ph + gap);
-      roundRect(x, cx, cy, pw, ph, ph / 2);
-      if (S.glow) { x.shadowColor = primary; x.shadowBlur = 22; }
-      x.fillStyle = S.pill; x.fill(); x.shadowBlur = 0;
-      x.fillStyle = S.onPill; x.font = `700 ${story ? 44 : 38}px ${F}`; x.textBaseline = "middle"; x.fillText(hora12(t), cx + pw / 2, cy + ph / 2 + 2); x.textBaseline = "alphabetic";
+  const F = "'Segoe UI', Roboto, Arial, sans-serif", FB = "'Arial Black', 'Segoe UI', Impact, sans-serif";
+  const D = I.style, light = D === "claro";
+  const ORO = "#f5c542";
+  const T = light ? "#0f172a" : "#ffffff", SUB = light ? "#475569" : "rgba(255,255,255,.75)";
+  const ACC = D === "oro" ? ORO : D === "claro" ? base : "#ffffff";
+
+  // ---------- fondo ----------
+  if (D === "claro") {
+    const g = x.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#ffffff"); g.addColorStop(1, hexRgba(base, 0.14)); x.fillStyle = g; x.fillRect(0, 0, W, H);
+    x.fillStyle = hexRgba(base, 0.12); x.beginPath(); x.arc(W * 0.92, H * 0.06, W * 0.42, 0, 7); x.fill();
+    if (story) { x.beginPath(); x.arc(W * 0.04, H * 0.97, W * 0.34, 0, 7); x.fill(); }
+  } else if (D === "neon") {
+    x.fillStyle = "#05060a"; x.fillRect(0, 0, W, H);
+    x.strokeStyle = hexRgba(base, 0.09); x.lineWidth = 2;
+    for (let i = 0; i < W; i += 60) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, H); x.stroke(); }
+    for (let j = 0; j < H; j += 60) { x.beginPath(); x.moveTo(0, j); x.lineTo(W, j); x.stroke(); }
+    const rg = x.createRadialGradient(W / 2, H * 0.4, 20, W / 2, H * 0.4, W * 0.8); rg.addColorStop(0, hexRgba(base, 0.28)); rg.addColorStop(1, "rgba(0,0,0,0)"); x.fillStyle = rg; x.fillRect(0, 0, W, H);
+  } else if (D === "oro") {
+    const g = x.createLinearGradient(0, 0, W, H); g.addColorStop(0, "#15110a"); g.addColorStop(1, "#050505"); x.fillStyle = g; x.fillRect(0, 0, W, H);
+    const rg = x.createRadialGradient(W / 2, H * 0.3, 10, W / 2, H * 0.3, W * 0.8); rg.addColorStop(0, "rgba(245,197,66,.22)"); rg.addColorStop(1, "rgba(0,0,0,0)"); x.fillStyle = rg; x.fillRect(0, 0, W, H);
+    x.strokeStyle = "rgba(245,197,66,.75)"; x.lineWidth = 5; x.strokeRect(36, 36, W - 72, H - 72);
+    x.strokeStyle = "rgba(245,197,66,.3)"; x.lineWidth = 2; x.strokeRect(58, 58, W - 116, H - 116);
+  } else if (D === "impacto") {
+    const g = x.createLinearGradient(0, 0, W, H); g.addColorStop(0, base); g.addColorStop(0.55, darken(base, 0.2)); g.addColorStop(1, P.dark); x.fillStyle = g; x.fillRect(0, 0, W, H);
+    x.fillStyle = "rgba(0,0,0,.42)"; x.beginPath(); x.moveTo(0, H * 0.46); x.lineTo(W, H * 0.34); x.lineTo(W, H); x.lineTo(0, H); x.closePath(); x.fill();
+  } else if (D === "olas") {
+    const g = x.createLinearGradient(0, 0, 0, H); g.addColorStop(0, P.night); g.addColorStop(1, "#05060a"); x.fillStyle = g; x.fillRect(0, 0, W, H);
+    [[0.16, P.dark, 0.9], [0.12, base, 0.7], [0.08, hexRgba(base, 0.5), 1]].forEach(([fy, c, al], k) => {
+      x.globalAlpha = al; x.fillStyle = c; x.beginPath(); x.moveTo(0, 0);
+      for (let px = 0; px <= W; px += 10) x.lineTo(px, H * fy + Math.sin(px / (110 + k * 40) + k) * (story ? 30 : 20));
+      x.lineTo(W, 0); x.closePath(); x.fill(); x.globalAlpha = 1;
     });
-    y += Math.ceil(show.length / cols) * (ph + gap) + (times.length > max ? 50 : 10);
-    if (times.length > max) { x.fillStyle = S.text; x.font = `600 ${story ? 38 : 32}px ${F}`; x.fillText(`y ${times.length - max} horario(s) más`, W / 2, y); }
+  } else { // tarjeta
+    const g = x.createLinearGradient(0, 0, W, H); g.addColorStop(0, P.night); g.addColorStop(1, "#05060a"); x.fillStyle = g; x.fillRect(0, 0, W, H);
+    const rg = x.createRadialGradient(W / 2, H * 0.45, 40, W / 2, H * 0.45, W * 0.8); rg.addColorStop(0, hexRgba(base, 0.38)); rg.addColorStop(1, "rgba(0,0,0,0)"); x.fillStyle = rg; x.fillRect(0, 0, W, H);
+  }
+  x.textAlign = "center"; x.textBaseline = "alphabetic";
+  const glow = (on) => { if (D === "neon" && on) { x.shadowColor = base; x.shadowBlur = 40; } else x.shadowBlur = 0; };
+
+  // ---------- encabezado: logo + nombre + eslogan ----------
+  let y = story ? 130 : 56;
+  const L = story ? 180 : 96, logo = await loadImg(ap.logo);
+  x.save(); x.beginPath(); x.arc(W / 2, y + L / 2, L / 2 + 8, 0, 7); x.fillStyle = D === "oro" ? ORO : light ? base : "rgba(255,255,255,.9)"; x.fill(); x.restore();
+  x.save(); x.beginPath(); x.arc(W / 2, y + L / 2, L / 2, 0, 7); x.clip();
+  if (logo) { x.fillStyle = "#fff"; x.fillRect(W / 2 - L / 2, y, L, L); x.drawImage(logo, W / 2 - L / 2, y, L, L); }
+  else { x.fillStyle = base; x.fillRect(W / 2 - L / 2, y, L, L); x.fillStyle = onColor(base); x.font = `900 ${L * 0.4}px ${FB}`; x.textBaseline = "middle"; x.fillText(name.split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase(), W / 2, y + L / 2 + 2); x.textBaseline = "alphabetic"; }
+  x.restore();
+  y += L + (story ? 80 : 52);
+  x.fillStyle = T; glow(true);
+  const ns = fitText(x, name.toUpperCase(), W - 160, story ? 76 : 50, 900, FB); x.font = `900 ${ns}px ${FB}`; x.fillText(name.toUpperCase(), W / 2, y); glow(false);
+  if (slogan) { y += story ? 56 : 36; x.fillStyle = SUB; x.font = `600 ${story ? 36 : 26}px ${F}`; x.fillText(slogan, W / 2, y); }
+
+  // ---------- pie: QR fijo abajo (se reserva su espacio primero) ----------
+  // en vertical el QR va centrado abajo; en cuadrada va en una franja: QR a la izquierda y el texto al lado
+  const qs = story ? 300 : 150, urlY = H - (story ? 80 : 46), qTop = story ? urlY - 64 - qs - 18 : H - 56 - qs;
+  const qLabelY = qTop - 50;
+  const footTop = story ? qLabelY - 70 : qTop - 44;
+
+  // ---------- centro: título + horarios + texto extra ----------
+  const top = y + (story ? 90 : 40), room = footTop - top;
+  let blocks = [];
+  if (I.kind === "slots") {
+    const times = await freeSlotsFor(I.day), isToday = I.day === bogNow().date;
+    const dl = fechaLarga(I.day), dayTxt = isToday ? "HOY" : addDays(bogNow().date, 1) === I.day ? "MAÑANA" : dl.split(",")[0].toUpperCase();
+    const cols = story ? 3 : 4, ph = story ? 92 : 70, gap = story ? 22 : 16, pw = Math.floor((W - (story ? 160 : 140) - gap * (cols - 1)) / cols);
+    const titleH = story ? 210 : 150, gapB0 = story ? 46 : 28, moreH = story ? 70 : 52;
+    x.font = `800 ${story ? 42 : 32}px ${F}`;
+    const extraH = I.extra ? wrapLines(x, I.extra, W - 260).slice(0, 2).length * (story ? 54 : 40) + (story ? 46 : 32) + gapB0 : 0;
+    // cuántas filas caben de verdad (contando título, separaciones, texto extra y la línea "y N más")
+    const fit = (withMore) => Math.floor((room - titleH - gapB0 - extraH - (withMore ? moreH : 0) + gap) / (ph + gap));
+    let maxRows = Math.max(1, fit(false));
+    if (times.length > maxRows * cols) maxRows = Math.max(1, fit(true));
+    const show = times.slice(0, maxRows * cols), more = times.length - show.length;
+    blocks = [{ h: titleH, draw: (yy) => {
+      x.fillStyle = ACC === "#ffffff" ? "#fff" : ACC; glow(true);
+      x.font = `900 ${story ? 82 : 58}px ${FB}`; x.fillText(times.length ? "CUPOS LIBRES" : "AGENDA TU CITA", W / 2, yy + (story ? 76 : 54)); glow(false);
+      const pill = `${dayTxt} · ${dl.charAt(0).toUpperCase() + dl.slice(1)}`;
+      x.font = `800 ${story ? 36 : 28}px ${F}`; const pwid = x.measureText(pill).width + (story ? 70 : 50), phh = story ? 64 : 48;
+      roundRect(x, W / 2 - pwid / 2, yy + (story ? 112 : 78), pwid, phh, phh / 2); x.fillStyle = D === "oro" ? ORO : light ? base : "#ffffff"; x.fill();
+      x.fillStyle = D === "oro" ? "#15110a" : light ? onColor(base) : P.night; x.textBaseline = "middle"; x.fillText(pill, W / 2, yy + (story ? 112 : 78) + phh / 2 + 1); x.textBaseline = "alphabetic";
+    } }];
+    if (show.length) {
+      const rows = Math.ceil(show.length / cols), gh = rows * ph + (rows - 1) * gap + (more ? moreH : 0);
+      blocks.push({ h: gh, draw: (yy) => {
+        const x0 = (W - (cols * pw + (cols - 1) * gap)) / 2;
+        show.forEach((t, i) => {
+          const r = Math.floor(i / cols), inRow = r === rows - 1 ? show.length - r * cols : cols;
+          const rowX = x0 + ((cols - inRow) * (pw + gap)) / 2; // la última fila queda centrada
+          const cx = rowX + (i % cols) * (pw + gap), cy = yy + r * (ph + gap);
+          roundRect(x, cx, cy, pw, ph, ph / 2);
+          if (D === "neon") { x.shadowColor = base; x.shadowBlur = 24; x.strokeStyle = base; x.lineWidth = 4; x.stroke(); x.shadowBlur = 0; x.fillStyle = hexRgba(base, 0.15); x.fill(); }
+          else if (D === "oro") { x.strokeStyle = ORO; x.lineWidth = 3; x.stroke(); x.fillStyle = "rgba(245,197,66,.08)"; x.fill(); }
+          else if (D === "claro") { x.fillStyle = "#ffffff"; x.fill(); x.strokeStyle = base; x.lineWidth = 4; x.stroke(); }
+          else if (D === "impacto") { x.fillStyle = "#ffffff"; x.fill(); }
+          else { x.fillStyle = base; x.fill(); x.strokeStyle = "rgba(255,255,255,.25)"; x.lineWidth = 2; x.stroke(); }
+          x.fillStyle = D === "claro" ? base : D === "impacto" ? P.dark : D === "oro" ? ORO : "#ffffff";
+          x.font = `800 ${story ? 38 : 28}px ${F}`; x.textBaseline = "middle"; x.fillText(hora12(t), cx + pw / 2, cy + ph / 2 + 1); x.textBaseline = "alphabetic";
+        });
+        if (more) { x.fillStyle = SUB; x.font = `700 ${story ? 34 : 26}px ${F}`; x.fillText(`y ${more} horario${more === 1 ? "" : "s"} más en el enlace`, W / 2, yy + rows * ph + (rows - 1) * gap + (story ? 56 : 42)); }
+      } });
+    } else blocks.push({ h: story ? 90 : 60, draw: (yy) => { x.fillStyle = SUB; x.font = `700 ${story ? 40 : 30}px ${F}`; x.fillText("Agenda para otro día en el enlace", W / 2, yy + 50); } });
     $("imgInfo").textContent = `${times.length} horario(s) libre(s) ese día.`;
   } else {
-    x.font = `700 ${story ? 100 : 80}px ${FN}`;
-    if (S.glow) { x.shadowColor = primary; x.shadowBlur = 30; }
-    x.fillText("AGENDA TU CITA", W / 2, y + (story ? 120 : 60)); x.shadowBlur = 0;
-    x.globalAlpha = .8; x.font = `600 ${story ? 46 : 38}px ${F}`; x.fillText("Elige tu hora en línea, sin esperas", W / 2, y + (story ? 200 : 125)); x.globalAlpha = 1;
-    y += story ? 300 : 180;
+    blocks = [{ h: story ? 300 : 200, draw: (yy) => {
+      x.fillStyle = ACC === "#ffffff" ? "#fff" : ACC; glow(true); x.font = `900 ${story ? 104 : 74}px ${FB}`;
+      x.fillText("AGENDA", W / 2, yy + (story ? 100 : 72)); x.fillText("TU CITA", W / 2, yy + (story ? 210 : 150)); glow(false);
+      x.fillStyle = SUB; x.font = `600 ${story ? 40 : 30}px ${F}`; x.fillText("Elige tu hora en línea, sin esperas", W / 2, yy + (story ? 280 : 192));
+    } }];
     $("imgInfo").textContent = "";
   }
-  if (I.extra) { x.fillStyle = S.text; const es = fitText(x, I.extra, W - 140, story ? 50 : 42, 700, F); x.font = `700 ${es}px ${F}`; x.fillText(I.extra, W / 2, Math.min(y + 40, H - (story ? 560 : 330))); }
-  // Pie: "Agenda aquí" + QR + enlace
-  const qs = story ? 340 : 230, qy = H - qs - (story ? 160 : 90);
-  x.fillStyle = S.text; x.font = `700 ${story ? 60 : 46}px ${FN}`;
-  x.fillText("AGENDA AQUÍ 👇", W / 2, qy - (story ? 40 : 28));
-  roundRect(x, (W - qs) / 2 - 20, qy - 20, qs + 40, qs + 40, 28); x.fillStyle = "#ffffff"; x.fill();
-  if (window.QRious) { const q = new window.QRious({ value: publicUrl(), size: qs, level: "M" }); x.drawImage(q.canvas, (W - qs) / 2, qy, qs, qs); }
-  x.fillStyle = S.text; x.globalAlpha = .75; const short = publicUrl().replace(/^https?:\/\//, "");
-  const us = fitText(x, short, W - 120, story ? 34 : 28, 600, F); x.font = `600 ${us}px ${F}`; x.fillText(short, W / 2, H - (story ? 90 : 40)); x.globalAlpha = 1;
+  if (I.extra) {
+    x.font = `800 ${story ? 42 : 32}px ${F}`;
+    const lines = wrapLines(x, I.extra, W - 260).slice(0, 2), lh = story ? 54 : 40, bh = lines.length * lh + (story ? 46 : 32);
+    blocks.push({ h: bh, draw: (yy) => {
+      x.font = `800 ${story ? 42 : 32}px ${F}`;
+      const bw = Math.min(W - 140, Math.max(...lines.map((l) => x.measureText(l).width)) + (story ? 90 : 64));
+      roundRect(x, W / 2 - bw / 2, yy, bw, bh, 26); x.fillStyle = D === "oro" ? ORO : D === "claro" ? base : "#ffffff"; x.fill();
+      x.fillStyle = D === "oro" ? "#15110a" : D === "claro" ? onColor(base) : P.night; x.textBaseline = "middle";
+      lines.forEach((l, i) => x.fillText(l, W / 2, yy + (story ? 23 : 16) + lh * i + lh / 2)); x.textBaseline = "alphabetic";
+    } });
+  }
+  const gapB = story ? 46 : 28, total = blocks.reduce((t, b) => t + b.h, 0) + gapB * (blocks.length - 1);
+  let yy = top + Math.max(0, (room - total) / 2);
+  blocks.forEach((b) => { b.draw(yy); yy += b.h + gapB; });
+
+  // ---------- pie ----------
+  const short = publicUrl().replace(/^https?:\/\//, "");
+  const qx = story ? W / 2 - qs / 2 : 96;
+  roundRect(x, qx - 18, qTop - 18, qs + 36, qs + 36, 24); x.fillStyle = "#ffffff"; x.fill();
+  if (window.QRious) { const q = new window.QRious({ value: publicUrl(), size: qs, level: "M" }); x.drawImage(q.canvas, qx, qTop, qs, qs); }
+  if (story) {
+    x.fillStyle = T; glow(true); x.font = `900 48px ${FB}`; x.fillText("ESCANEA Y AGENDA", W / 2, qLabelY); glow(false);
+    x.fillStyle = SUB; const us = fitText(x, short, W - 140, 32, 700, F); x.font = `700 ${us}px ${F}`; x.fillText(short, W / 2, urlY);
+  } else {
+    const tx = qx + qs + 60; x.textAlign = "left";
+    x.fillStyle = T; glow(true); x.font = `900 40px ${FB}`; x.fillText("ESCANEA Y AGENDA", tx, qTop + 62); glow(false);
+    x.fillStyle = SUB; x.font = `600 26px ${F}`; x.fillText("o entra a este enlace:", tx, qTop + 104);
+    const us = fitText(x, short, W - tx - 70, 26, 700, F); x.font = `700 ${us}px ${F}`; x.fillText(short, tx, qTop + 140);
+    x.textAlign = "center";
+  }
 }
 
 // Tocar cualquier imagen marcada para verla en grande
@@ -1609,187 +1746,143 @@ async function deleteClient(u) {
 }
 
 // ================= Mi plan (lo que la tienda le paga a la plataforma) =================
-let unsubPlan = null;
+// ================= Mi plan: Gratis, Básico y Gold (estilo Netflix) =================
+const PLAN_STYLE = {
+  free: ["linear-gradient(140deg,#5B6782,#2b3446)", "#fff", "🎁"],
+  basic: ["linear-gradient(140deg,#2B59C3,#14213D)", "#fff", "⭐"],
+  gold: ["linear-gradient(140deg,#f5c542,#b8860b)", "#1a1200", "👑"]
+};
+function planPrice(plan, months) { return planPriceOf(A.plat || {}, plan, months); }
+// Paso de pago pendiente (eligió Básico o Gold al registrarse): el panel espera aquí hasta que pague o elija Gratis
+function syncPlanGate() {
+  const trialOver = myPlan() === "free" && A.bill?.paidUntil && A.bill.paidUntil < bogNow().date;
+  const gate = !!(isOwner() && !A.me?.isSuper && myPlan() === "free" && (A.bill?.planWanted || trialOver));
+  const was = document.body.classList.contains("plan-gate");
+  document.body.classList.toggle("plan-gate", gate);
+  if (gate) {
+    if (W.open) closeWizard(false);
+    if (A.tab !== "plan") switchTab("plan", { fromPop: true });
+    else renderPlan();
+  } else if (was) {
+    toast(`🎉 ¡Listo! Tu plan ${PLANS()[myPlan()].name} está activo.`);
+    switchTab("home", { fromPop: true });
+    if (!A.settings?.setupDone) setTimeout(() => openWizard(), 600);
+  }
+}
 function renderPlan() {
   const el = $("tab-plan");
-  el.innerHTML = `<p class="text-sm text-ink/60">Cargando tu plan…</p>`;
-  unsubPlan?.();
-  let pp = {};
-  getDoc(doc(db, "platform", "public")).then((s) => { pp = s.data() || {}; draw(); }).catch(() => {});
-  let bl = null;
-  unsubPlan = onSnapshot(doc(db, bpath("private", "billing")), (s) => {
-    bl = s.data() || {};
-    if (A.biz?.trial && bl.trial === false) { // el pago llegó: se desbloquea todo
-      A.biz.trial = false; renderTabs(); renderPlanBanner();
-      toast("🎉 ¡Pago recibido! Tu plan está activo y todas las funciones quedaron desbloqueadas.");
-    }
-    draw();
-  }, onErr);
-  A.unsubs.push(() => unsubPlan?.());
-  A.planMonths = A.planMonths || 1;
-  // Precio de un paquete de meses: usa el descuento que define el superusuario (Cobros > Paquetes)
-  function planTotal(m) {
-    const price = Number(bl.priceCOP || 0), base = Number(pp.planPriceCOP || 0), pack = Number((pp.planBundles || {})[m] || 0);
-    if (m === 1 || !pack || !base) return price * m;
-    return Math.round((price * m * (pack / (base * m))) / 100) * 100;
-  }
-  const credit = () => Number(bl.creditCOP || 0);
-  const netOf = (m) => Math.max(0, planTotal(m) - credit());
-  function monthsPicker(sel) {
-    const price = Number(bl.priceCOP || 0);
+  const bl = A.bill;
+  if (!bl) { el.innerHTML = `<p class="soft text-sm">Cargando tu plan…</p>`; return; }
+  const P = PLANS(), cur = myPlan(), gate = document.body.classList.contains("plan-gate");
+  const rec = A.plat?.recommendedPlan || "gold";
+  let sel = A.planPick || bl.planWanted || (cur === "free" ? rec : cur);
+  if (!PLAN_KEYS.includes(sel)) sel = "gold";
+  const months = A.planMonths || 1;
+  const today = bogNow().date;
+  const days = bl.paidUntil ? Math.round((Date.parse(bl.paidUntil + "T00:00:00-05:00") - Date.parse(today + "T00:00:00-05:00")) / 86400000) : null;
+  const status = A.biz?.status !== "active" ? ["Pausada", "t-late"] : days !== null && days < 0 ? ["Vencido", "t-late"] : cur === "free" ? ["Prueba", "t-trial"] : ["Activo", "t-ok"];
+  const credit = Number(bl.creditCOP || 0);
+  const featRow = (label, f) => `<tr><td class="py-1.5 pr-1 text-left text-[11.5px] font-semibold text-ink/70">${label}</td>${PLAN_KEYS.map((k) => `<td class="py-1.5 text-center text-[12px] ${k === sel ? "bg-amber-50" : ""}">${f(k)}</td>`).join("")}</tr>`;
+  const yes = (k, key) => ((P[k].features || []).includes(key) ? `<b style="color:var(--mint)">✓</b>` : `<span class="text-ink/30">—</span>`);
+  const over = myPlan() === "free" && bl.paidUntil && bl.paidUntil < today && !bl.planWanted;
+  if (over && sel === "free") sel = rec === "free" ? "gold" : rec;
+  const head = gate && over
+    ? `<p class="text-4xl">⏳</p><h2 class="disp text-[26px] font-extrabold leading-tight">Tu prueba gratis terminó</h2>
+       <p class="soft mb-3 text-sm">Tu agenda está en pausa. Elige tu plan para seguir recibiendo citas; todo lo que configuraste se mantiene.</p>`
+    : gate
+    ? `<p class="text-[11px] font-extrabold tracking-wider text-ink/50">PASO 3 DE 3</p>
+       <h2 class="disp text-[26px] font-extrabold leading-tight">Activa tu plan ${PLAN_STYLE[sel][2]} ${esc(P[sel].name)}</h2>
+       <p class="soft mb-3 text-sm">Tu cuenta ya está creada. Paga y tu plan se activa solo, o empieza con el plan Gratis.</p>`
+    : `<div class="sp-card mb-3"><div class="flex items-center justify-between gap-2"><p class="disp text-[20px] font-extrabold">${PLAN_STYLE[cur][2]} Plan ${esc(P[cur].name)}</p><span class="${status[1]} rounded-full px-2.5 py-0.5 text-xs font-bold">${status[0]}</span></div>
+       <p class="mt-1 text-sm">${bl.paidUntil ? `${cur === "free" ? "Gratis hasta el" : "Pagado hasta el"} ${fechaLarga(bl.paidUntil)}${days > 0 ? ` (faltan ${days} día${days === 1 ? "" : "s"})` : days === 0 ? " (vence hoy)" : ` (venció hace ${-days} día${days === -1 ? "" : "s"})`}` : ""}</p>
+       ${credit ? `<p class="mt-2 rounded-xl px-3 py-2 text-sm font-semibold" style="background:#fff7e0;color:#8a5a00">🎁 Tienes ${cop(credit)} de descuento por referidos.</p>` : ""}</div>
+       <div class="sp-h"><h2>${cur === "free" ? "Elige tu plan" : "Renueva o cambia de plan"}</h2></div>`;
+  const shown = over ? PLAN_KEYS.filter((k) => k !== "free") : PLAN_KEYS;
+  const cards = `<div class="grid ${shown.length === 2 ? "grid-cols-2" : "grid-cols-3"} gap-2">${shown.map((k) => `
+      <button class="relative rounded-2xl px-1.5 py-3 text-center" style="background:${PLAN_STYLE[k][0]};color:${PLAN_STYLE[k][1]};outline:3px solid ${k === sel ? "var(--sink)" : "transparent"};outline-offset:2px" data-psel="${k}" aria-pressed="${k === sel}">
+        ${k === rec ? `<span class="absolute -top-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full px-1.5 text-[8.5px] font-extrabold text-white" style="background:var(--sred)">RECOMENDADO</span>` : ""}
+        ${k === sel ? `<span class="absolute -right-1.5 -top-2 grid h-5 w-5 place-items-center rounded-full text-[11px] font-extrabold text-white" style="background:var(--sink)">✓</span>` : ""}
+        <b class="block text-[14px]">${PLAN_STYLE[k][2]} ${esc(P[k].name)}</b>
+        <span class="block text-[11px] opacity-90">${k === "free" ? `${P.free.days} días` : cop(P[k].priceCOP) + "/mes"}</span>
+        ${k === cur && !gate ? `<span class="mt-1 inline-block rounded-full bg-white/25 px-1.5 text-[9.5px] font-bold">Tu plan</span>` : ""}
+      </button>`).join("")}</div>
+    <table class="mt-2 w-full border-collapse">
+      ${featRow("Agenda y cita rápida", () => `<b style="color:var(--mint)">✓</b>`)}
+      ${featRow("Avisos en Telegram", (k) => !(P[k].features || []).includes("telegram") ? `<span class="text-ink/30">—</span>` : (P[k].tgChoose ? "<b>Eliges</b>" : `<b>${(P[k].tgEvents || []).length === 1 ? "Reservas" : (P[k].tgEvents || []).length}</b>`))}
+      ${featRow("Días para reservar", (k) => `<b>${P[k].daysAhead}</b>`)}
+      ${featRow("Profesionales", (k) => `<b>${P[k].maxStaff ? P[k].maxStaff : "Sin límite"}</b>`)}
+      ${[["appearance", "Portada y colores"], ["clients", "Clientes"], ["images", "Imágenes"], ["marketing", "Marketing y estados"], ["activity", "Actividad"]].map(([key, label]) => featRow(label, (k) => yes(k, key))).join("")}
+    </table>`;
+  let action = "";
+  if (sel === "free") {
+    action = gate ? `<button id="pFree" class="btn-light mt-4 w-full py-3">Empezar con el plan Gratis (${P.free.days} días)</button>`
+      : cur === "free" ? `<p class="soft mt-4 text-center text-sm">Este es tu plan actual.</p>` : `<p class="soft mt-4 text-center text-sm">El plan Gratis es solo para empezar. Elige Básico o Gold para renovar.</p>`;
+  } else {
+    const price = Number(P[sel].priceCOP || 0);
     const chips = [1, 3, 6, 12].map((m) => {
-      const tot = planTotal(m), off = price * m > tot ? Math.round((1 - tot / (price * m)) * 100) : 0;
-      return `<button class="relative rounded-2xl border px-3 py-2 text-left ${sel === m ? "text-white" : "bg-white"}" style="${sel === m ? "background:var(--sink);border-color:var(--sink)" : "border-color:var(--hair)"}" data-pm="${m}" aria-pressed="${sel === m}">
-        ${off ? `<span class="absolute -right-1.5 -top-2 rounded-full px-1.5 py-0.5 text-[10px] font-extrabold text-white" style="background:var(--sred)">-${off}%</span>` : ""}
-        <span class="block text-sm font-bold">${m === 1 ? "1 mes" : m + " meses"}</span><span class="block text-xs ${sel === m ? "text-white/75" : "soft"}">${cop(tot)}</span></button>`;
+      const tot = planPrice(sel, m), off = price * m > tot ? Math.round((1 - tot / (price * m)) * 100) : 0;
+      return `<button class="relative rounded-2xl border px-2 py-2 text-left ${months === m ? "text-white" : "bg-white"}" style="${months === m ? "background:var(--sink);border-color:var(--sink)" : "border-color:var(--hair)"}" data-pm="${m}">
+        ${off ? `<span class="absolute -right-1.5 -top-2 rounded-full px-1.5 text-[10px] font-extrabold text-white" style="background:var(--sred)">-${off}%</span>` : ""}
+        <span class="block text-sm font-bold">${m === 1 ? "1 mes" : m + " meses"}</span><span class="block text-xs ${months === m ? "text-white/75" : "soft"}">${cop(tot)}</span></button>`;
     }).join("");
-    const tot = planTotal(sel), save = price * sel - tot;
-    return `<div class="mb-2 grid grid-cols-4 gap-2">${chips}</div>
-      ${credit() > 0 ? `<p class="mb-2 rounded-xl px-3 py-2 text-sm font-semibold" style="background:#fff7e0;color:#8a5a00">🎁 Descuento por referidos: −${cop(Math.min(credit(), tot))}${netOf(sel) === 0 ? ". ¡Este pago te sale gratis!" : `. Pagas ${cop(netOf(sel))}.`}</p>` : ""}
-      ${save > 0 ? `<p class="q-pop mb-3 rounded-xl px-3 py-2 text-sm font-semibold" style="background:#e9f7f0;color:#16774b">🎉 Ahorras ${cop(save)}: te sale a ${cop(Math.round(tot / sel / 100) * 100)} al mes en vez de ${cop(price)}.</p>` : `<div class="mb-3"></div>`}`;
+    const tot = planPrice(sel, months), save = price * months - tot, net = Math.max(0, tot - credit);
+    const pp = A.plat || {}, o = bl.pendingOrder && bl.pendingOrder.status === "pending" && toMillis(bl.pendingOrder.expiresAt) > Date.now() ? bl.pendingOrder : null;
+    const orderOk = o && o.plan === sel && o.months === months;
+    action = `<div class="mt-4 grid grid-cols-4 gap-2">${chips}</div>
+      ${save > 0 ? `<p class="mt-2 rounded-xl px-3 py-2 text-sm font-semibold" style="background:#e9f7f0;color:#16774b">🎉 Ahorras ${cop(save)}: te sale a ${cop(Math.round(tot / months / 100) * 100)} al mes.</p>` : ""}
+      ${credit ? `<p class="mt-2 rounded-xl px-3 py-2 text-sm font-semibold" style="background:#fff7e0;color:#8a5a00">🎁 Descuento por referidos: −${cop(Math.min(credit, tot))}${net === 0 ? ". ¡Este pago te sale gratis!" : ""}</p>` : ""}
+      ${pp.brebEnabled && pp.brebKey ? (orderOk ? `
+        <div class="sp-card mt-3" style="border:2px solid var(--mint)">
+          <div class="flex items-center justify-between"><p class="text-[11px] font-extrabold uppercase tracking-wider text-ink/60">Envía exactamente</p><span class="rounded-full px-2.5 py-0.5 text-xs font-semibold t-ok">⏱ <span id="brebLeft">--:--</span></span></div>
+          <div class="flex items-center justify-between gap-2"><p class="disp text-[34px] font-extrabold leading-none">${cop(o.amountCOP)}</p><button class="pay-ibtn" data-copy="${o.amountCOP}" aria-label="Copiar monto"><i class="fa-regular fa-copy"></i></button></div>
+          <div class="pay-row mt-2"><div class="min-w-0 flex-1"><p class="text-[10px] font-bold uppercase tracking-wider text-ink/55">Llave Bre-B${pp.brebHolder ? ` · <span class="normal-case tracking-normal">${esc(pp.brebHolder)}</span>` : ""}</p><p class="truncate font-mono text-[15px] font-bold">${esc(pp.brebKey)}</p></div>
+            ${pp.brebQr ? `<button class="pay-ibtn" id="brebQr" aria-label="Ver QR"><i class="fa-solid fa-qrcode"></i></button>` : ""}<button class="pay-ibtn main" data-copy="${esc(pp.brebKey)}" aria-label="Copiar llave"><i class="fa-regular fa-copy"></i></button></div>
+          <div class="mt-3 flex gap-2.5 rounded-2xl p-3" style="border:2px solid #f59e0b;background:#fff7e6" role="alert"><span class="text-xl leading-none">⚠️</span>
+            <p class="text-[12.5px] leading-snug" style="color:#7a4b00"><b style="color:#5c3700">Envía el valor exacto: ${cop(o.amountCOP)}</b><br>${esc(pp.payWarning || DEFAULT_PAY_WARNING)}</p></div>
+          <p class="mt-2 flex items-center gap-2 rounded-xl px-3 py-2 text-[12.5px] font-bold" style="background:#e9f7f0;color:#16774b"><span class="live-dot"></span>Esperando tu pago… se activa solo en 1 a 2 minutos</p>
+          <details class="mt-2"><summary class="cursor-pointer text-sm font-bold">💬 ¿Pagaste otro valor? Sube la captura</summary>
+            <label class="field mt-2"><span>¿Cuánto enviaste?</span><input id="pOtherAmt" type="number" inputmode="numeric" placeholder="Ej. ${tot}"></label>
+            <label class="pay-drop mt-2" for="pOtherFile"><span class="pay-drop-ico"><i class="fa-solid fa-camera"></i></span><span id="pOtherLbl" class="min-w-0 flex-1 text-sm"><b>Adjunta la captura</b></span></label>
+            <input id="pOtherFile" type="file" accept="image/*" class="hidden"><button id="pOtherSend" class="btn-primary mt-2 w-full">Enviar captura</button></details>
+          <button id="brebCancel" class="mt-2 w-full py-1 text-center text-xs text-ink/50 underline">Cancelar este pago</button>
+        </div>` : `<button id="pPay" class="btn-primary mt-3 w-full py-3.5 text-base" style="${sel === "gold" ? "background:linear-gradient(140deg,#d4a017,#b8860b);color:#1a1200" : ""}">${net === 0 ? "🎁 Activar gratis con mis referidos" : `Pagar ${cop(net)} con Bre-B y activar ${esc(P[sel].name)}`}</button>`)
+      : `<p class="soft mt-3 rounded-xl p-3 text-sm" style="background:var(--canvas)">El pago automático no está disponible. Sube el comprobante abajo.</p>`}
+      ${bl.pendingProof ? `<p class="mt-3 rounded-xl p-3 text-sm" style="background:#e3f0fc;color:#1f6fb3"><b>Comprobante en revisión.</b> Te avisamos cuando lo aprobemos.</p>` : ""}
+      ${!orderOk ? `<details class="mt-3"><summary class="cursor-pointer text-sm font-semibold soft">¿Pagaste por otro medio? Sube el comprobante</summary>
+        <label class="pay-drop mt-2" for="pOtherFile"><span class="pay-drop-ico"><i class="fa-solid fa-camera"></i></span><span id="pOtherLbl" class="min-w-0 flex-1 text-sm"><b>Adjunta la captura</b></span></label>
+        <input id="pOtherFile" type="file" accept="image/*" class="hidden"><input id="pOtherAmt" type="hidden" value="0"><button id="pOtherSend" class="btn-light mt-2 w-full">Enviar comprobante</button></details>` : ""}
+      ${gate && !over ? `<button id="pFree2" class="mt-3 w-full py-1 text-center text-sm text-ink/60 underline">Empezar con el plan Gratis (${P.free.days} días)</button>` : ""}`;
   }
-  // Bloque del pago automático por Bre-B (monto único que el sistema reconoce solo)
-  function brebBlock() {
-    const o = bl.pendingOrder && bl.pendingOrder.status === "pending" && toMillis(bl.pendingOrder.expiresAt) > Date.now() ? bl.pendingOrder : null;
-    const months = bl.mode === "monthly" ? A.planMonths : 1;
-    if (!o) return `<section class="rounded-xl border-2 border-emerald-500 bg-white p-4">
-      <div class="mb-1 flex items-center gap-2"><span class="text-xl">⚡</span><h3 class="font-narrow text-xl font-bold">Pago automático Bre-B</h3></div>
-      <p class="mb-3 text-sm text-ink/70">Pagas desde Nequi, Bancolombia o cualquier banco con la llave Bre-B y tu plan se activa solo en pocos minutos. Sin comprobante.</p>
-      ${bl.mode === "monthly" ? monthsPicker(months) : ""}
-      <button id="brebGo" class="btn-primary w-full py-3 !bg-emerald-600">${netOf(months) === 0 ? "🎁 Activar gratis con mis referidos" : `Pagar ${cop(netOf(months))} con Bre-B`}</button></section>`;
-    return `<section class="rounded-xl border-2 border-emerald-500 bg-white p-4">
-      <div class="mb-2 flex items-center justify-between gap-2"><div class="flex items-center gap-2"><span class="text-xl">⚡</span><h3 class="font-narrow text-xl font-bold">Paga con Bre-B</h3></div>
-        <span class="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">⏱ <span id="brebLeft">--:--</span></span></div>
-      <div class="pay-amount mb-2"><div><p class="text-[11px] font-semibold uppercase tracking-wider text-ink/60">Envía exactamente</p>
-        <p class="font-narrow text-3xl font-bold leading-none">${cop(o.amountCOP)}</p>
-        <p class="mt-1 text-[11px] text-ink/60">${o.months} mes(es).${o.amountCOP > o.baseCOP ? ` Incluye ${cop(o.amountCOP - o.baseCOP)} para reconocer tu pago, porque otra tienda está pagando al mismo tiempo.` : " Valor exacto de tu plan, sin recargo."}</p></div>
-        <button type="button" class="pay-ibtn" data-copy="${o.amountCOP}" aria-label="Copiar monto"><i class="fa-regular fa-copy"></i></button></div>
-      <div class="pay-row"><div class="min-w-0 flex-1"><p class="text-[10px] font-bold uppercase tracking-wider text-ink/55">Llave Bre-B${pp.brebHolder ? ` · <span class="normal-case tracking-normal">${esc(pp.brebHolder)}</span>` : ""}</p>
-        <p class="truncate font-mono text-[15px] font-bold">${esc(pp.brebKey)}</p></div>
-        ${pp.brebQr ? `<button type="button" class="pay-ibtn" id="brebQr" aria-label="Ver QR"><i class="fa-solid fa-qrcode"></i></button>` : ""}
-        <button type="button" class="pay-ibtn main" data-copy="${esc(pp.brebKey)}" aria-label="Copiar llave"><i class="fa-regular fa-copy"></i></button></div>
-      <p class="mt-2 text-xs leading-snug text-ink/65">⚠️ Envía <b>exactamente ${cop(o.amountCOP)}</b> antes de que termine el tiempo. Tu plan se activa solo entre 5 y 10 minutos después de pagar; esta pantalla se actualiza sola.</p>
-      <div class="mt-3 rounded-2xl border border-dashed p-3" style="border-color:var(--hair)">
-        <button id="brebOtherBtn" class="w-full text-left text-sm font-bold">💬 ¿Pagaste otro valor?</button>
-        <p class="soft mt-0.5 text-xs">Adjunta la captura de tu pago aquí y te ayudamos. Te avisamos cuando se active tu plan.</p>
-        <div id="brebOther" class="mt-2 hidden space-y-2">
-          <label class="field"><span>¿Cuánto enviaste? (opcional)</span><input id="brebOtherAmt" type="number" inputmode="numeric" min="0" placeholder="Ej. 20000"></label>
-          <label class="pay-drop" for="brebOtherFile"><span class="pay-drop-ico"><i class="fa-solid fa-camera"></i></span>
-            <span id="brebOtherLbl" class="min-w-0 flex-1 text-sm"><b>Adjunta la captura del pago</b><br><span class="soft text-xs">Toca para elegir la imagen</span></span>
-            <img id="brebOtherPrev" class="hidden h-12 w-12 rounded-md object-cover" alt=""></label>
-          <input id="brebOtherFile" type="file" accept="image/*" class="hidden">
-          <button id="brebOtherSend" class="btn-primary w-full">Enviar captura</button>
-        </div>
-      </div>
-      <button id="brebCancel" class="mt-2 w-full py-1 text-center text-xs text-ink/50 underline">Cancelar este pago</button>
-    </section>`;
-  }
-  function draw() {
-    if (!bl) return;
-    const today = bogNow().date;
-    const days = bl.paidUntil ? Math.round((Date.parse(bl.paidUntil + "T00:00:00-05:00") - Date.parse(today + "T00:00:00-05:00")) / 86400000) : null;
-    const suspended = A.biz?.status !== "active";
-    const status = suspended ? ["Pausada", "bg-rose-100 text-rose-900"]
-      : bl.mode === "monthly" && days !== null && days < 0 ? ["Vencido", "bg-rose-100 text-rose-900"]
-      : bl.trial ? ["Prueba gratis", "bg-sky-100 text-sky-900"] : ["Activo", "bg-emerald-100 text-emerald-900"];
-    const price = Number(bl.priceCOP || 0);
-    const planName = pp.planName || "Plan mensual";
-    let duration = "";
-    if (bl.mode === "monthly" && bl.paidUntil) duration = (bl.trial ? "Prueba gratis hasta el " : "Pagado hasta el ") + fechaLarga(bl.paidUntil) +
-      (days > 0 ? ` (faltan ${days} día${days === 1 ? "" : "s"})` : days === 0 ? " (vence hoy)" : ` (venció hace ${-days} día${days === -1 ? "" : "s"}; tienes ${Math.max(0, Number(bl.graceDays || 0) + days)} día(s) de gracia)`);
-    if (bl.mode === "one_time") duration = bl.paidOnce ? "Pago único: pagado. Tu agenda no vence." : "Pago único pendiente.";
-    if (bl.mode === "manual") duration = "Plan acordado directamente con soporte.";
-    const methods = pp.payMethods || [];
-    const canPay = bl.mode === "monthly" || (bl.mode === "one_time" && !bl.paidOnce);
-    const months = bl.mode === "monthly" ? A.planMonths : 1;
-    const total = netOf(months);
-    el.innerHTML = `
-      <div class="space-y-3">
-        <section class="rounded-xl border border-line bg-white p-4">
-          <div class="mb-2 flex items-center justify-between gap-2">
-            <div class="flex items-center gap-2"><i class="fa-solid fa-crown text-amber-500"></i><h3 class="font-narrow text-xl font-bold">${esc(planName)}</h3></div>
-            <span class="rounded-full px-2.5 py-0.5 text-xs font-semibold ${status[1]}">${status[0]}</span>
-          </div>
-          <p class="font-narrow text-3xl font-bold">${cop(price)}<span class="text-base font-semibold text-ink/60"> / mes</span></p>
-          <p class="mt-1 text-sm">${esc(duration)}</p>
-          ${bl.trial ? `<p class="mt-3 rounded-lg bg-sky-50 p-3 text-sm text-sky-900">🎁 Estás en tu periodo gratis. Cuando termine, pagas la mensualidad para seguir recibiendo reservas. El pago es <b>mes vencido</b>: pagas al final de cada mes que usaste.</p>` : ""}
-          ${suspended ? `<p class="mt-3 rounded-lg bg-rose-50 p-3 text-sm text-rose-900">Tu agenda en línea está pausada: tus clientes no pueden reservar. Paga tu plan abajo y se reactiva apenas lo aprobemos.</p>` : ""}
-        </section>
-        ${bl.pendingProof ? `<section class="rounded-xl border border-sky-300 bg-sky-50 p-4 text-sm text-sky-900"><b><span class="spin mr-1"></span> Comprobante en revisión</b><br>Lo enviaste el ${new Date(toMillis(bl.pendingProof.at)).toLocaleDateString("es-CO", { timeZone: "America/Bogota" })} por ${cop(bl.pendingProof.amountCOP)}. Esta pantalla se actualiza sola cuando lo aprobemos.</section>` : ""}
-        ${canPay && pp.brebEnabled && pp.brebKey ? brebBlock() : ""}
-        ${canPay ? `<${pp.brebEnabled && pp.brebKey ? "details" : "section"} class="rounded-xl border border-line bg-white p-4">
-          ${pp.brebEnabled && pp.brebKey ? `<summary class="cursor-pointer font-semibold">¿Pagaste por otro medio? Sube el comprobante</summary><div class="mt-3"></div>` : ""}
-          <h3 class="mb-2 font-narrow text-xl font-bold">${bl.trial ? "Pagar mi plan" : "Renovar mi plan"}</h3>
-          ${bl.mode === "monthly" ? monthsPicker(months) : ""}
-          <div class="pay-amount mb-2"><div><p class="text-[11px] font-semibold uppercase tracking-wider text-ink/60">Envía exactamente</p><p class="font-narrow text-3xl font-bold leading-none">${cop(total)}</p></div>
-            <button type="button" class="pay-ibtn" data-copy="${total}" aria-label="Copiar monto"><i class="fa-regular fa-copy"></i></button></div>
-          <div class="space-y-1.5">${methods.length ? methods.map((m, i) => `
-            <div class="pay-row"><div class="min-w-0 flex-1"><p class="text-[10px] font-bold uppercase tracking-wider text-ink/55">${esc(m.label)}${m.holder ? ` · <span class="normal-case tracking-normal">${esc(m.holder)}</span>` : ""}</p>
-              <p class="truncate font-mono text-[15px] font-bold">${esc(m.account)}</p></div>
-              ${m.qr ? `<button type="button" class="pay-ibtn" data-planqr="${i}" aria-label="Ver QR"><i class="fa-solid fa-qrcode"></i></button>` : ""}
-              <button type="button" class="pay-ibtn main" data-copy="${esc(m.account)}" aria-label="Copiar"><i class="fa-regular fa-copy"></i></button></div>`).join("")
-            : `<p class="rounded-lg border border-line p-3 text-sm text-ink/60">Los medios de pago aún no están configurados. Escríbele a soporte.</p>`}</div>
-          <p class="mt-2 text-xs text-ink/60">💬 En el mensaje de la transferencia escribe <b>${esc(A.biz?.name || "")}</b>.</p>
-          <label class="pay-drop mt-3" for="planFile"><span class="pay-drop-ico"><i class="fa-solid fa-camera"></i></span>
-            <span id="planLabel" class="min-w-0 flex-1 text-sm"><b>Sube el comprobante</b><br><span class="text-xs text-ink/60">Toca para elegir la captura del pago</span></span>
-            <img id="planPrev" class="hidden h-12 w-12 rounded-md object-cover" alt=""></label>
-          <input id="planFile" type="file" accept="image/*" class="hidden">
-          <button id="planSend" class="btn-primary mt-2 w-full py-3">Enviar comprobante</button>
-        </${pp.brebEnabled && pp.brebKey ? "details" : "section"}>` : ""}
-      </div>`;
-    el.querySelectorAll("[data-pm]").forEach((b) => b.onclick = () => { A.planMonths = Number(b.dataset.pm); draw(); });
-    if ($("brebGo")) $("brebGo").onclick = async () => {
-      const btn = $("brebGo"); setBusy(btn, true, "Generando tu pago…");
-      try {
-        const r = await api("createPlanOrder", { months: A.planMonths });
-        if (r?.free) { toast(`🎉 ¡Listo! Tu plan quedó activo${r.paidUntil ? " hasta el " + fechaLarga(r.paidUntil) : ""} gracias a tus referidos.`); setBusy(btn, false); }
-      } catch (err) { toast(err.message, "error"); setBusy(btn, false); }
-    };
-    if ($("brebQr")) $("brebQr").onclick = () => viewImage(pp.brebQr, `Bre-B: ${pp.brebKey}`);
-    if ($("brebOtherBtn")) {
-      $("brebOtherBtn").onclick = () => $("brebOther").classList.toggle("hidden");
-      $("brebOtherFile").onchange = (e) => {
-        const f = e.target.files[0]; if (!f) return;
-        $("brebOtherPrev").src = URL.createObjectURL(f); $("brebOtherPrev").classList.remove("hidden");
-        $("brebOtherLbl").innerHTML = `<b class="text-emerald-700">✓ Captura lista</b><br><span class="soft text-xs">Toca para cambiarla</span>`;
-        A.otherProof = imgToDataUrl(f, 1280, "image/jpeg");
-      };
-      $("brebOtherSend").onclick = async () => {
-        if (!A.otherProof) return toast("Primero adjunta la captura del pago.", "error");
-        const btn = $("brebOtherSend"); setBusy(btn, true, "Enviando…");
-        try {
-          await api("submitPlanProof", { image: await A.otherProof, months: bl.pendingOrder?.months || 1, paidAmount: Number($("brebOtherAmt").value || 0), reference: "Pagó otro valor por Bre-B" });
-          A.otherProof = null;
-          toast("¡Recibido! Revisamos tu pago y te avisamos cuando se active tu plan.");
-        } catch (err) { toast(err.message, "error"); setBusy(btn, false); }
-      };
-    }
-    if ($("brebCancel")) $("brebCancel").onclick = async () => {
-      if (!(await uiConfirm("¿Cancelar este pago?", "Si ya transferiste, no lo canceles: tu plan se activa solo en unos minutos.", { okText: "Sí, cancelar", cancelText: "Volver", danger: true }))) return;
-      try { await api("cancelPlanOrder", {}); toast("Pago cancelado. Puedes generar otro cuando quieras."); } catch (err) { toast(err.message, "error"); }
-    };
-    // reloj del pago: al terminar, vuelve a mostrar el botón para generar otro
-    clearInterval(A.brebTimer);
-    if ($("brebLeft") && bl.pendingOrder) A.brebTimer = setInterval(() => {
-      const left = toMillis(bl.pendingOrder?.expiresAt) - Date.now(), el2 = $("brebLeft");
-      if (!el2) return clearInterval(A.brebTimer);
-      if (left <= 0) { clearInterval(A.brebTimer); return draw(); }
-      el2.textContent = `${Math.floor(left / 60000)}:${String(Math.floor((left % 60000) / 1000)).padStart(2, "0")}`;
-    }, 1000);
-    el.querySelectorAll("[data-planqr]").forEach((b) => b.onclick = () => { const m = methods[Number(b.dataset.planqr)]; viewImage(m.qr, `${m.label}: ${m.account}`); });
-    if ($("planFile")) $("planFile").onchange = (e) => {
-      const f = e.target.files[0]; if (!f) return;
-      $("planPrev").src = URL.createObjectURL(f); $("planPrev").classList.remove("hidden");
-      $("planLabel").innerHTML = `<b class="text-emerald-700">✓ Comprobante listo</b><br><span class="text-xs text-ink/60">Toca para cambiarlo</span>`;
-      A.planProof = imgToDataUrl(f, 1280, "image/jpeg");
-    };
-    if ($("planSend")) $("planSend").onclick = async () => {
-      if (!A.planProof) return toast("Primero sube la captura del pago.", "error");
-      const btn = $("planSend"); setBusy(btn, true, "Enviando…");
-      try { await api("submitPlanProof", { image: await A.planProof, months }); A.planProof = null; toast("¡Recibido! Te avisamos cuando lo aprobemos."); }
-      catch (err) { toast(err.message, "error"); setBusy(btn, false); }
-    };
-  }
+  el.innerHTML = `${head}${cards}${action}`;
+  // ---- acciones
+  el.querySelectorAll("[data-psel]").forEach((b) => b.onclick = () => { A.planPick = b.dataset.psel; renderPlan(); });
+  el.querySelectorAll("[data-pm]").forEach((b) => b.onclick = () => { A.planMonths = Number(b.dataset.pm); renderPlan(); });
+  const free = async () => { try { await api("chooseFreePlan", {}); toast("Listo: empiezas con el plan Gratis."); } catch (err) { toast(err.message, "error"); } };
+  if ($("pFree")) $("pFree").onclick = free;
+  if ($("pFree2")) $("pFree2").onclick = free;
+  if ($("pPay")) $("pPay").onclick = async () => {
+    const btn = $("pPay"); setBusy(btn, true, "Generando tu pago…");
+    try { const r = await api("createPlanOrder", { months, plan: sel }); if (r?.free) toast("🎉 ¡Plan activado con tus referidos!"); } catch (err) { toast(err.message, "error"); setBusy(btn, false); }
+  };
+  if ($("brebQr")) $("brebQr").onclick = () => viewImage(A.plat.brebQr, `Bre-B: ${A.plat.brebKey}`);
+  if ($("brebCancel")) $("brebCancel").onclick = async () => {
+    if (!(await uiConfirm("¿Cancelar este pago?", "Si ya transferiste, no lo canceles: tu plan se activa solo en unos minutos.", { okText: "Sí, cancelar", cancelText: "Volver", danger: true }))) return;
+    try { await api("cancelPlanOrder", {}); } catch (err) { toast(err.message, "error"); }
+  };
+  if ($("pOtherFile")) $("pOtherFile").onchange = (e) => { const f = e.target.files[0]; if (!f) return; A.planProof = imgToDataUrl(f, 1280, "image/jpeg"); $("pOtherLbl").innerHTML = `<b class="text-emerald-700">✓ Captura lista</b>`; };
+  if ($("pOtherSend")) $("pOtherSend").onclick = async () => {
+    if (!A.planProof) return toast("Primero adjunta la captura del pago.", "error");
+    const btn = $("pOtherSend"); setBusy(btn, true, "Enviando…");
+    try { await api("submitPlanProof", { image: await A.planProof, months, plan: sel, paidAmount: Number($("pOtherAmt")?.value || 0), reference: "Comprobante del plan " + PLANS()[sel].name }); A.planProof = null; toast("¡Recibido! Te avisamos cuando lo aprobemos."); }
+    catch (err) { toast(err.message, "error"); setBusy(btn, false); }
+  };
+  clearInterval(A.brebTimer);
+  if ($("brebLeft")) A.brebTimer = setInterval(() => {
+    const left = toMillis(A.bill?.pendingOrder?.expiresAt) - Date.now(), t = $("brebLeft");
+    if (!t) return clearInterval(A.brebTimer);
+    if (left <= 0) { clearInterval(A.brebTimer); return renderPlan(); }
+    t.textContent = `${Math.floor(left / 60000)}:${String(Math.floor((left % 60000) / 1000)).padStart(2, "0")}`;
+  }, 1000);
 }
 
 // =====================================================================
@@ -1808,8 +1901,9 @@ function syncBottomNav() {
 $("spNav").addEventListener("click", (e) => {
   const b = e.target.closest("[data-go]"); if (!b) return;
   if (b.dataset.go === "more") {
-    document.body.classList.add("show-more"); $("hdrSub").textContent = "Todas las secciones"; syncBottomNav();
-    window.scrollTo({ top: 0, behavior: "smooth" }); return;
+    if (!document.body.classList.contains("show-more")) pushNav({ tab: "more" });
+    showMore();
+    return;
   }
   if (b.dataset.go === "clients" && !isOwner()) return toast("Solo el dueño ve los clientes.", "error");
   switchTab(b.dataset.go);
@@ -1819,6 +1913,8 @@ $("btnQuickSide").onclick = () => openQuick();
 
 function startHome() {
   H.unsubs.forEach((f) => f()); H.unsubs = [];
+  H.unsubs.push(onSnapshot(doc(db, "businesses", bpath().split("/")[1]), (d) => { if (d.exists()) { A.biz = { ...A.biz, ...d.data() }; renderTabs(); syncPlanGate(); if (A.tab === "plan") renderPlan(); } }, () => {}));
+  if (isOwner()) H.unsubs.push(onSnapshot(doc(db, bpath("private", "billing")), (d) => { A.bill = d.data() || {}; syncPlanGate(); if (A.tab === "plan") renderPlan(); }, () => {}));
   H.unsubs.push(onSnapshot(doc(db, "platform", "public"), (d) => { A.plat = d.data() || {}; renderTabs(); if (A.tab === "home") renderHome(); }, () => {}));
   H.today = bogNow().date;
   H.unsubs.push(onSnapshot(query(collection(db, bpath("appointments")), where("date", "==", H.today)), (q) => { H.apts = q.docs.map((d) => d.data()); renderHome(); }, onErr));
@@ -2310,7 +2406,7 @@ function guideSteps() {
       ok: (s.paymentMethods || []).length > 0 || (Number(s.depositAmountCOP || 0) === 0 && wizPassed("deposit")), tab: "settings", focus: "pmList",
       tip: "Toca “Agregar medio de pago”, escribe tu número o llave y sube el QR. Revisa el valor del abono arriba y toca Guardar." },
     { id: "telegram", ic: "fa-paper-plane", t: "Avisos en tu Telegram", d: "Te llegan las reservas, los comprobantes con botón para aprobar y los recordatorios.",
-      ok: !!A.tg?.owner, guide: "telegram" },
+      ok: !!A.tg?.owner || lockedNow("telegram"), guide: "telegram" },
     { id: "team", ic: "fa-users", t: "Tu equipo y sus horarios", d: "Agrega a cada barbero, su horario propio y sus días libres. Si trabajas solo, revisa el tuyo.",
       ok: stepDone("team"), tab: "staff", manual: true,
       tip: "En Disponibilidad toca Editar horario. Para agregar personas usa “Agregar al equipo”." },
@@ -2687,7 +2783,8 @@ function wizInit() {
   const team = A.staff.filter((x) => x.active !== false).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   const pm = (s.paymentMethods || [])[0] || {};
   W.d = {
-    name: s.businessName || A.biz?.name || "", type: s.businessType || "barberia", phone: (s.whatsapp || "").replace(/^\+?57/, ""),
+    name: s.businessName || A.biz?.name || "", type: s.businessType || "barberia", typeLabel: s.businessTypeLabel || "",
+    cover: s.appearance?.headerBg?.img || "", coverY: s.appearance?.headerBg?.posY ?? 50, phone: (s.whatsapp || "").replace(/^\+?57/, ""),
     address: s.address || "", city: s.city || "", logo: s.appearance?.logo || "", logoNew: "",
     social: Object.fromEntries(SOCIALS.map(([k]) => [k, socialHandle(s.social?.[k] || "")])),
     count: Math.max(1, team.length), names: team.map((x) => x.name),
@@ -2713,28 +2810,45 @@ const STEPS = [
       <p class="wz-sub">Te hacemos unas preguntas y dejamos todo listo para que tus clientes reserven solos. Puedes cambiar todo después.</p>
       <div class="sp-card text-[14px] leading-8">✓ Tu negocio y tu logo<br>✓ Tus redes sociales<br>✓ Tu equipo, horario y turnos<br>✓ Servicios y abono<br>✓ Ubicación para Waze<br>⭐ <b>Avisos en tu Telegram</b></div>` },
   { id: "biz", essential: true, html: () => {
-      const d = W.d, logo = d.logoNew || d.logo;
+      const d = W.d, logo = d.logoNew || d.logo, cover = d.coverNew || d.cover, cy = Number(d.coverY ?? 50);
+      const hc = A.settings?.appearance?.colors?.header || "#17222E";
       return `<h3 class="wz-h">Tu negocio</h3><p class="wz-sub">Así te verán tus clientes en tu página de citas.</p>
-      <div class="sp-card flex items-center gap-3">
-        <label for="wLogo" class="grid h-20 w-20 shrink-0 cursor-pointer place-items-center overflow-hidden rounded-full border-2 border-dashed text-center text-[11px] font-bold" style="border-color:var(--hair);${logo ? `background:center/cover url('${logo}');border-style:solid` : ""}">${logo ? "" : "📷<br>Logo"}</label>
-        <input id="wLogo" type="file" accept="image/*" class="hidden">
-        <div class="min-w-0 text-[13px]"><b>Tu logo o una foto de tu negocio</b><br><span class="soft">Sale arriba en tu página, en tus estados y en tus imágenes.</span><br><label for="wLogo" class="mt-1 inline-block cursor-pointer font-bold" style="color:var(--sblue)">${logo ? "Cambiar imagen" : "Subir imagen"}</label></div>
+      <div class="sp-card !p-0 overflow-hidden">
+        <div id="wCover" class="relative h-36 select-none" style="background:${cover ? `url('${cover}') center ${cy}% / cover no-repeat` : hc};touch-action:${cover ? "none" : "auto"};cursor:${cover ? "grab" : "default"}">
+          ${cover ? `<span class="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full bg-black/55 px-3 py-1.5 text-xs font-extrabold text-white">↕ Arrastra para acomodar</span>`
+            : `<span class="pointer-events-none absolute inset-x-0 top-8 text-center text-xs font-bold text-white/70">Portada (opcional): si no subes, queda este color</span>`}
+          <label for="wCoverFile" class="absolute bottom-2 right-2 cursor-pointer rounded-full bg-white px-3 py-1.5 text-xs font-extrabold" style="color:var(--sink)">📷 ${cover ? "Cambiar portada" : "Agregar portada"}</label>
+          ${cover ? `<button type="button" data-wcoverdel="1" class="absolute right-2 top-2 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-bold text-white">Quitar</button>` : ""}
+        </div>
+        <div class="flex items-end gap-3 px-3 pb-3" style="margin-top:-38px">
+          <label for="wLogo" class="relative grid h-20 w-20 shrink-0 cursor-pointer place-items-center overflow-hidden rounded-full border-4 border-white text-center text-[11px] font-bold shadow" style="background:${logo ? `center/cover url('${logo}')` : "var(--canvas)"}">${logo ? "" : "📷<br>Logo"}</label>
+          <div class="min-w-0 pb-1 text-[12.5px]"><b>Logo y portada</b><br><span class="soft">Toca el círculo para tu logo y el recuadro para la portada.</span></div>
+        </div>
+        <input id="wLogo" type="file" accept="image/*" class="hidden"><input id="wCoverFile" type="file" accept="image/*" class="hidden">
       </div>
       <label class="field mt-3"><span>Nombre del negocio</span><input id="wName" value="${esc(d.name)}" maxlength="60"></label>
-      <p class="mb-1 mt-3 text-sm font-semibold soft">Tipo</p><div class="flex flex-wrap gap-2">${[["barberia", "Barbería"], ["salon", "Salón"], ["unas", "Uñas"], ["spa", "Spa"], ["otro", "Otro"]].map(([k, t]) => `<button type="button" class="q-chip" data-wtype="${k}" aria-pressed="${d.type === k}">${t}</button>`).join("")}</div>
+      <p class="mb-1 mt-3 text-sm font-semibold soft">¿Qué tipo de negocio es?</p><div class="flex flex-wrap gap-2">${BIZ_TYPES.map(([k, t, , e]) => `<button type="button" class="q-chip" data-wtype="${k}" aria-pressed="${d.type === k}">${e} ${k === "otro" ? "Otro" : t}</button>`).join("")}</div>
+      ${d.type === "otro" ? `<label class="field mt-2"><span>Escribe tu tipo de negocio</span><input id="wTypeLabel" maxlength="40" value="${esc(d.typeLabel || "")}" placeholder="Ej. Centro de bronceado, Barbería móvil…"></label>` : ""}
       <label class="field mt-3"><span>WhatsApp del negocio</span><div class="flex items-center gap-2 rounded-xl border border-line bg-white px-3"><span class="soft text-sm">🇨🇴 +57</span><input id="wPhone" type="tel" inputmode="numeric" value="${esc(d.phone)}" placeholder="300 123 4567" class="w-full border-0 py-2.5 outline-none"></div></label>
       <div class="mt-3 grid grid-cols-[1fr_8rem] gap-2"><label class="field"><span>Dirección</span><input id="wAddr" value="${esc(d.address)}" placeholder="Cra 15A #80-58"></label><label class="field"><span>Ciudad</span><input id="wCity" value="${esc(d.city)}" placeholder="Soledad"></label></div>`;
     },
     save: async () => {
       const d = W.d;
       d.name = $("wName").value.trim(); d.address = $("wAddr").value.trim(); d.city = $("wCity").value.trim();
+      if ($("wTypeLabel")) d.typeLabel = $("wTypeLabel").value.trim();
+      if (d.type === "otro" && !d.typeLabel) throw new Error("Escribe qué tipo de negocio tienes.");
       const phone = normalizePhone($("wPhone").value);
       if (d.name.length < 2) throw new Error("Escribe el nombre de tu negocio.");
       if (!phone) throw new Error("Escribe un WhatsApp válido.");
       d.phone = $("wPhone").value;
       const data = { businessName: d.name, businessType: d.type, whatsapp: phone, address: d.address, city: d.city,
-        staffLabel: { barberia: "Barbero", salon: "Estilista", unas: "Manicurista", spa: "Profesional", otro: "Profesional" }[d.type] };
+        staffLabel: staffWord(d.type), businessTypeLabel: d.type === "otro" ? (d.typeLabel || "") : "" };
       if (d.logoNew) { data.appearance = { logo: d.logoNew }; d.logo = d.logoNew; d.logoNew = ""; }
+      if (d.coverNew || d.coverMoved || d.coverDel) {
+        const hb = A.settings?.appearance?.headerBg || {};
+        data.appearance = { ...(data.appearance || {}), headerBg: d.coverDel && !d.coverNew ? { img: "", style: hb.style || "dark", show: hb.show ?? 45 } : { img: d.coverNew || d.cover, style: hb.style || "dark", show: hb.show ?? 45, posY: Number(d.coverY ?? 50) } };
+        if (d.coverNew) d.cover = d.coverNew; d.coverNew = ""; d.coverMoved = false; d.coverDel = false;
+      }
       await setDoc(doc(db, bpath("settings", "general")), data, { merge: true });
     } },
   { id: "social", html: () => `<h3 class="wz-h">Tus redes sociales</h3><p class="wz-sub">Aparecen como íconos en tu página de citas para que te sigan y vean tus trabajos.</p>
@@ -2830,7 +2944,8 @@ const STEPS = [
       ${d.deposit ? `<p class="mb-1 mt-4 text-sm font-semibold soft">¿Dónde te pagan?</p>
       <div class="flex flex-wrap gap-2">${["Nequi", "Daviplata", "Bre-B", "Bancolombia"].map((t) => `<button type="button" class="q-chip" data-wpml="${t}" aria-pressed="${d.pmLabel === t}">${t}</button>`).join("")}</div>
       <div class="sp-card mt-2 space-y-2">
-        <label class="field"><span>${d.pmLabel === "Bre-B" ? "Tu llave Bre-B" : "Número de " + d.pmLabel}</span><input id="wPmAcc" value="${esc(d.pmAccount)}" placeholder="${d.pmLabel === "Bre-B" ? "@tullave" : "300 123 4567"}"></label>
+        <label class="field"><span>${d.pmLabel === "Bre-B" ? "Tu llave Bre-B" : "Número de " + d.pmLabel}</span><input id="wPmAcc" value="${esc(d.pmLabel === "Bre-B" ? d.pmAccount : String(d.pmAccount || "").replace(/\D/g, ""))}" ${d.pmLabel === "Bre-B" ? 'inputmode="text" placeholder="@tullave, correo, cédula o celular"' : `inputmode="numeric" maxlength="${d.pmLabel === "Bancolombia" ? 11 : 10}" placeholder="Solo números, ej. 3001234567"`}></label>
+        <p class="soft -mt-1 text-[11.5px]">${d.pmLabel === "Bre-B" ? "Aquí sí van letras: tu @llave, correo, cédula o celular." : "Solo números" + (d.pmLabel === "Bancolombia" ? " (número de cuenta)." : ": 10 dígitos.")}</p>
         <label class="field"><span>A nombre de</span><input id="wPmHolder" value="${esc(d.pmHolder)}" placeholder="Nombre del titular"></label>
         <label class="flex cursor-pointer items-center gap-3 rounded-xl p-2" style="background:var(--canvas)"><span class="grid h-12 w-12 place-items-center overflow-hidden rounded-lg bg-white text-xl" style="${d.pmQr ? `background:center/contain no-repeat url('${d.pmQr}') #fff` : ""}">${d.pmQr ? "" : "🔳"}</span>
           <span class="text-sm"><b>${d.pmQr ? "Cambiar QR" : "Subir tu QR de pago"}</b><br><span class="soft text-xs">Opcional: tus clientes lo escanean desde su banco</span></span><input id="wPmQr" type="file" accept="image/*" class="hidden"></label>
@@ -2841,6 +2956,8 @@ const STEPS = [
       if ($("wPmAcc")) { d.pmAccount = $("wPmAcc").value.trim(); d.pmHolder = $("wPmHolder").value.trim(); }
       const data = { depositAmountCOP: d.deposit };
       if (d.deposit && !d.pmAccount) throw new Error("Escribe dónde te pagan el abono, o elige “Sin abono”.");
+      const pmErr = d.deposit ? pmProblem([{ label: d.pmLabel, account: d.pmAccount }]) : "";
+      if (pmErr) throw new Error(pmErr);
       if (d.deposit) {
         const rest = (A.settings.paymentMethods || []).slice(1);
         data.paymentMethods = [{ label: d.pmLabel, account: d.pmAccount, holder: d.pmHolder, qr: d.pmQr || "" }, ...rest];
@@ -2864,6 +2981,9 @@ const STEPS = [
       else if (d.geoMode === "address") await updateDoc(doc(db, bpath("settings", "general")), { geoMode: "address" });
     } },
   { id: "telegram", skipTxt: "Lo conecto después (no recibirás avisos)", html: () => {
+      if (lockedNow("telegram")) return `<p class="text-5xl">📲</p><h3 class="wz-h">Avisos en tu Telegram</h3>
+        <p class="wz-sub">Con el plan ${esc(PLANS()[planFor("telegram")].name)} te llegan al celular las reservas, los abonos con botón para aprobar y los recordatorios.</p>
+        <div class="sp-card text-[14px]">🔒 Tu plan ${esc(planInfo().name)} no incluye avisos por Telegram: las reservas las ves en tu panel. Puedes activarlos cuando quieras en <b>Mi plan</b>.</div>`;
       const on = !!A.tg?.owner;
       return `<span class="inline-block rounded-full px-2.5 py-1 text-[11px] font-extrabold" style="background:#fff3dc;color:#9a5a00">⭐ PASO MÁS IMPORTANTE</span>
       <h3 class="wz-h mt-2">Recibe tus citas en Telegram</h3>
@@ -2910,6 +3030,7 @@ function openWizard(start) {
     el.addEventListener("click", wizClick); el.addEventListener("input", wizInput); el.addEventListener("change", wizChange);
   }
   document.body.classList.add("wiz-on");
+  if (!W.inHistory) { W.inHistory = true; pushOverlay("wizard", () => { W.inHistory = false; closeWizard(false, true); }); }
   drawWizard();
 }
 function drawWizard() {
@@ -2937,7 +3058,7 @@ async function wizClick(e) {
       if (st.id === "done") return closeWizard(true);
       setBusy(x, true, "Guardando…");
       try {
-        if (st.save) await st.save();
+        if (st.save) await fastSave(st.save(), (err) => toast("No se pudo guardar el paso anterior: " + err.message, "error"));
         W.i++;
         updateDoc(doc(db, bpath("settings", "general")), { setupStep: W.i }).catch(() => {});
         drawWizard();
@@ -2945,7 +3066,8 @@ async function wizClick(e) {
       return;
     }
   }
-  const ty = t.closest("[data-wtype]"); if (ty) { d.name = $("wName").value; d.address = $("wAddr").value; d.city = $("wCity").value; d.phone = $("wPhone").value; d.type = ty.dataset.wtype; return drawWizard(); }
+  if (t.closest("[data-wcoverdel]")) { d.name = $("wName").value; d.address = $("wAddr").value; d.city = $("wCity").value; d.phone = $("wPhone").value; d.cover = ""; d.coverNew = ""; d.coverDel = true; return drawWizard(); }
+  const ty = t.closest("[data-wtype]"); if (ty) { d.name = $("wName").value; d.address = $("wAddr").value; d.city = $("wCity").value; d.phone = $("wPhone").value; if ($("wTypeLabel")) d.typeLabel = $("wTypeLabel").value; d.type = ty.dataset.wtype; drawWizard(); if (d.type === "otro") $("wTypeLabel")?.focus(); return; }
   const ct = t.closest("[data-wcount]"); if (ct) { document.querySelectorAll("[data-wname]").forEach((i) => { d.names[Number(i.dataset.wname)] = i.value; }); d.count = Number(ct.dataset.wcount); return drawWizard(); }
   const dy = t.closest("[data-wday]"); if (dy) { const k = Number(dy.dataset.wday); d.days.has(k) ? d.days.delete(k) : d.days.add(k); return drawWizard(); }
   const lu = t.closest("[data-wlunch]"); if (lu) { d.lunch = lu.dataset.wlunch === "1"; return drawWizard(); }
@@ -2992,6 +3114,7 @@ function wizInput(e) {
 }
 async function wizChange(e) {
   const t = e.target, d = W.d;
+  if (t.id === "wCoverFile" && t.files[0]) { d.name = $("wName").value; d.address = $("wAddr").value; d.city = $("wCity").value; d.phone = $("wPhone").value; d.coverNew = await imgToDataUrl(t.files[0], 1100, "image/jpeg"); d.coverY = 50; d.coverDel = false; drawWizard(); return; }
   if (t.id === "wLogo" && t.files[0]) { d.name = $("wName").value; d.address = $("wAddr").value; d.city = $("wCity").value; d.phone = $("wPhone").value; d.logoNew = await imgToDataUrl(t.files[0], 420, "image/jpeg"); drawWizard(); }
   if (t.id === "wPmQr" && t.files[0]) { if ($("wPmAcc")) { d.pmAccount = $("wPmAcc").value; d.pmHolder = $("wPmHolder").value; } d.pmQr = await imgToDataUrl(t.files[0], 480, "image/jpeg"); drawWizard(); }
 }
@@ -3002,7 +3125,8 @@ function wizWatchTg() {
     if (A.tg?.owner) { clearInterval(W.tgT); toast("¡Telegram conectado! Ya te llegarán los avisos."); drawWizard(); }
   }, 1500);
 }
-function closeWizard(done) {
+function closeWizard(done, fromBack) {
+  if (!fromBack && W.inHistory) { W.inHistory = false; dropOverlay("wizard"); }
   W.open = false; clearInterval(W.tgT);
   $("wizard")?.remove(); document.body.classList.remove("wiz-on");
   if (done) updateDoc(doc(db, bpath("settings", "general")), { setupDone: true }).catch(() => {});
@@ -3079,3 +3203,103 @@ function openWalkIn() {
     } catch (err) { toast(err.message, "error"); setBusy(btn, false); }
   };
 }
+
+// =====================================================================
+//  NOVEDADES: lo que publica la plataforma (campana arriba, como en Epic)
+// =====================================================================
+const NEWS = { list: [], seenKey: () => "newsSeen_" + (auth.currentUser?.uid || "") };
+const NEWS_KIND = { novedad: ["✨", "Novedad", "t-trial"], mejora: ["🚀", "Mejora", "t-ok"], aviso: ["⚠️", "Aviso", "t-due"], promo: ["🎁", "Promoción", "t-late"] };
+function startNews() {
+  NEWS.unsub?.();
+  NEWS.unsub = onSnapshot(query(collection(db, "platformNews"), where("published", "==", true)), (q) => {
+    NEWS.list = q.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => toMillis(b.at) - toMillis(a.at)).slice(0, 30);
+    renderBell();
+  }, () => {});
+  A.unsubs.push(() => NEWS.unsub?.());
+}
+function newsUnread() { let seen = 0; try { seen = Number(localStorage.getItem(NEWS.seenKey()) || 0); } catch { /* nada */ } return NEWS.list.filter((n) => toMillis(n.at) > seen).length; }
+function renderBell() {
+  const b = $("btnBell"); if (!b) return;
+  const n = newsUnread();
+  b.classList.remove("hidden");
+  b.innerHTML = `<i class="fa-regular fa-bell"></i>${n ? `<span class="bell-badge">${n > 9 ? "9+" : n}</span>` : ""}`;
+  b.setAttribute("aria-label", n ? `Novedades: ${n} sin leer` : "Novedades");
+}
+function openPlatformNews() {
+  const seen = (() => { try { return Number(localStorage.getItem(NEWS.seenKey()) || 0); } catch { return 0; } })();
+  openM("Novedades", NEWS.list.length ? `<p class="soft -mt-2 mb-3 text-sm">Lo nuevo de la plataforma para tu negocio.</p><div class="space-y-2">${NEWS.list.map((n) => {
+    const k = NEWS_KIND[n.kind] || NEWS_KIND.novedad, fresh = toMillis(n.at) > seen;
+    return `<article class="rounded-2xl p-3.5" style="background:${fresh ? "#eef4ff" : "var(--canvas)"}">
+      <div class="mb-1 flex items-center gap-2"><span class="${k[2]} rounded-full px-2 py-0.5 text-[11px] font-extrabold">${k[0]} ${k[1]}</span>${fresh ? `<span class="rounded-full px-1.5 text-[10px] font-extrabold text-white" style="background:var(--sred)">NUEVO</span>` : ""}
+        <span class="soft ml-auto text-[11px]">${new Date(toMillis(n.at)).toLocaleDateString("es-CO", { timeZone: "America/Bogota", day: "numeric", month: "short" })}</span></div>
+      <p class="text-[15px] font-extrabold leading-snug">${esc(n.title)}</p>
+      <p class="mt-1 whitespace-pre-line text-[13.5px] leading-snug text-ink/75">${esc(n.text || "")}</p>
+    </article>`; }).join("")}</div>` : `<p class="soft py-6 text-center text-sm">Aún no hay novedades. Aquí te contaremos las funciones nuevas.</p>`);
+  try { localStorage.setItem(NEWS.seenKey(), String(Date.now())); } catch { /* nada */ }
+  renderBell();
+}
+$("btnBell").onclick = () => openPlatformNews();
+
+// Medios de pago: el número de Nequi, Daviplata, Bancolombia… no acepta letras (la llave Bre-B sí)
+document.addEventListener("input", (e) => {
+  const t = e.target;
+  if (t.classList?.contains("pmAcc") || t.classList?.contains("pmLabel")) {
+    const row = t.closest("[data-pm]"); if (row) payAccountInput(row.querySelector(".pmAcc"), row.querySelector(".pmLabel")?.value);
+  }
+  if (t.id === "wPmAcc") payAccountInput(t, W.d?.pmLabel);
+});
+
+// Botón atrás: vuelve a la sección anterior (las ventanas abiertas se cierran primero, eso lo maneja common.js)
+function showMore() {
+  document.body.classList.add("show-more"); $("hdrSub").textContent = "Todas las secciones"; syncBottomNav();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+replaceNav({ tab: "home" });
+setNavHandler((st) => {
+  if (st.tab === "more") return showMore();
+  switchTab(st.tab && TABS[st.tab] ? st.tab : "home", { fromPop: true });
+});
+
+// Portada del asistente: se arrastra con el dedo para elegir qué parte de la foto se ve
+document.addEventListener("pointerdown", (e) => {
+  const box = e.target.closest("#wCover"); if (!box || e.target.closest("label,button")) return;
+  const d = W.d; if (!(d.coverNew || d.cover)) return;
+  const startY = e.clientY, startPos = Number(d.coverY ?? 50), h = box.offsetHeight || 140;
+  box.setPointerCapture(e.pointerId); box.style.cursor = "grabbing";
+  const move = (ev) => { d.coverY = Math.min(100, Math.max(0, Math.round(startPos - ((ev.clientY - startY) / h) * 60))); box.style.backgroundPosition = `center ${d.coverY}%`; d.coverMoved = true; };
+  const up = () => { box.removeEventListener("pointermove", move); box.style.cursor = "grab"; };
+  box.addEventListener("pointermove", move); box.addEventListener("pointerup", up, { once: true }); box.addEventListener("pointercancel", up, { once: true });
+});
+
+// ================= Avisos de Telegram por categoría (según el plan) =================
+function tgPlanRules() {
+  const P = planInfo(), plan = myPlan();
+  const list = Array.isArray(P.tgEvents) ? P.tgEvents : plan === "gold" ? TG_EVENTS.map((e) => e[0]) : ["newBooking"];
+  const choose = P.tgChoose !== undefined ? !!P.tgChoose : plan === "gold";
+  return { list: (P.features || []).includes("telegram") ? list : [], choose };
+}
+function renderTgPrefs() {
+  const box = $("tgPrefsBox"); if (!box) return;
+  const { list, choose } = tgPlanRules(), prefs = A.settings?.tgPrefs || {};
+  const goldRules = PLANS().gold;
+  const sw = (on) => `<span class="relative inline-block h-6 w-10 shrink-0 rounded-full transition" style="background:${on ? "var(--mint)" : "#cfd6df"}"><i class="absolute top-[3px] h-[18px] w-[18px] rounded-full bg-white shadow" style="left:${on ? "19px" : "3px"}"></i></span>`;
+  if (!list.length) {
+    box.innerHTML = `<p class="text-sm font-bold">📲 Avisos de Telegram</p><p class="mt-1 rounded-xl p-3 text-sm" style="background:var(--canvas)">🔒 Tu plan ${esc(planInfo().name)} no incluye avisos de citas: las reservas las ves en tu panel. <a href="#" class="font-bold underline" data-goplan="${planFor("telegram")}">Ver planes</a></p>`;
+    return;
+  }
+  box.innerHTML = `<p class="text-sm font-bold">📲 Avisos de Telegram</p><p class="mb-1 text-xs text-ink/60">${choose ? "Elige qué quieres que te llegue al celular." : "Esto es lo que te llega con tu plan."}</p>
+    <div class="divide-y divide-line">${TG_EVENTS.map(([k, ic, t]) => {
+      const inc = list.includes(k), on = inc && (!choose || prefs[k] !== false);
+      if (!inc) return `<div class="flex items-center gap-3 py-2 text-sm opacity-45"><span class="flex-1">${ic} ${t}</span><span>🔒</span></div>`;
+      if (!choose) return `<div class="flex items-center gap-3 py-2 text-sm"><span class="flex-1">${ic} <b>${t}</b></span><span class="text-[11px] font-extrabold" style="color:#16774b">Incluido ✓</span></div>`;
+      return `<button type="button" class="flex w-full items-center gap-3 py-2 text-left text-sm" data-tgpref="${k}" aria-pressed="${on}"><span class="flex-1">${ic} ${t}</span>${sw(on)}</button>`;
+    }).join("")}</div>
+    ${!choose && goldRules.tgChoose !== false ? `<p class="mt-2 rounded-xl p-2.5 text-[12.5px]" style="background:linear-gradient(140deg,#fff6db,#fff);border:1px solid #f5c542">👑 Con <b>${esc(goldRules.name)}</b> eliges todos los avisos que quieras. <a href="#" class="font-extrabold underline" data-goplan="gold">Ver ${esc(goldRules.name)}</a></p>` : ""}`;
+}
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-tgpref]"); if (!b) return;
+  const k = b.dataset.tgpref, prefs = { ...(A.settings?.tgPrefs || {}) };
+  prefs[k] = prefs[k] === false; // alterna
+  A.settings.tgPrefs = prefs; renderTgPrefs();
+  try { await updateDoc(doc(db, bpath("settings", "general")), { tgPrefs: prefs }); } catch (err) { toast("No se pudo guardar: " + err.message, "error"); }
+});

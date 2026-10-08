@@ -1,9 +1,10 @@
 // Panel del superusuario: crear y vender barberías, planes, pagos y suspensiones
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
-  doc, getDoc, setDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp, where
+  doc, getDoc, setDoc, addDoc, deleteDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp, where
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { APP_VERSION, SERVER_VERSION, RULES_VERSION, readPublishedVersion, reloadFresh, startUpdateWatcher, warmServer, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-10-09u";
+import { PLAN_KEYS, PLAN_FEATURES, plansOf, planOfBiz, DEFAULT_PAY_WARNING, TG_EVENTS, BIZ_TYPES } from "./common.js?v=2026-10-09z";
+import { APP_VERSION, SERVER_VERSION, RULES_VERSION, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, readPublishedVersion, reloadFresh, startUpdateWatcher, warmServer, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-10-09z";
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on) => $(id).classList.toggle("hidden", !on);
@@ -49,7 +50,8 @@ document.addEventListener("click", (e) => { if (!e.target.closest("#avatarMenu")
 
 // ================= Navegación =================
 let SV = "home";
-function goSV(v) {
+function goSV(v, fromPop) {
+  if (!fromPop && SV !== v) pushNav({ sv: v });
   SV = v;
   document.querySelectorAll(".sv").forEach((x) => x.classList.toggle("hidden", x.id !== "sv-" + v));
   document.querySelectorAll("[data-sv]").forEach((x) => x.setAttribute("aria-current", x.dataset.sv === v ? "page" : "false"));
@@ -84,6 +86,8 @@ function start() {
   Z.unsubs.push(onSnapshot(doc(db, "platform", "telegram"), (s) => { $("tgSuperState").textContent = s.data()?.super ? "Conectado ✓" : "Sin conectar"; }, () => {}));
   Z.unsubs.push(onSnapshot(doc(db, "platform", "private"), (s) => { Z.goal = Number(s.data()?.goalCOP || 0); $("goalInput").value = Z.goal || ""; render(); }, () => {}));
   api("superOverview", {}).then((r) => { Z.stats = r || {}; render(); }).catch(() => {});
+  Z.unsubs.push(onSnapshot(doc(db, "platform", "public"), (d) => { Z.plat = d.data() || {}; render(); }, () => {}));
+  Z.unsubs.push(onSnapshot(query(collection(db, "platformNews"), orderBy("at", "desc"), limit(20)), (q) => { Z.news = q.docs.map((d) => ({ id: d.id, ...d.data() })); renderNewsAdmin(); }, () => {}));
 }
 
 // ================= Estado de cada tienda =================
@@ -111,7 +115,8 @@ function planLine(b) {
     const d = daysLeft(b);
     if (d === null) return `Mensual de ${cop(b.priceCOP)} sin fecha`;
     const when = d < 0 ? `venció hace ${-d} día${d === -1 ? "" : "s"}` : d === 0 ? "vence hoy" : `${b.trial ? "prueba hasta" : "vence"} el ${fechaCorta(b.paidUntil)}`;
-    return `${b.trial ? "Prueba gratis" : "Mensual " + cop(b.priceCOP)}, ${when}`;
+    const pn = plansOf(Z.plat || {})[PLAN_KEYS.includes(b.plan) ? b.plan : b.trial ? "free" : "gold"].name;
+    return `${b.trial ? pn + " (prueba)" : pn + " " + cop(b.priceCOP)}, ${when}${b.planWanted ? ` · eligió ${plansOf(Z.plat || {})[b.planWanted].name}, falta el pago` : ""}`;
   }
   if (b.mode === "one_time") return `Pago único ${b.paidOnce ? "pagado" : "pendiente"}`;
   return "Control manual";
@@ -413,12 +418,19 @@ async function handleAct(act, biz, b) {
   if (act === "delete") return deleteBusiness(biz);
 
   if (act === "edit") {
-    openM("Editar " + biz.name, `<label class="field mb-4"><span>Nombre del negocio</span><input id="eName" value="${esc(biz.name)}"></label>${planForm(bl)}
+    const PP = plansOf(Z.plat || {}), curPlan = planOfBiz(biz);
+    openM("Editar " + biz.name, `<label class="field mb-4"><span>Nombre del negocio</span><input id="eName" value="${esc(biz.name)}"></label>
+      <p class="mb-1 text-sm font-semibold">Plan de la tienda</p>
+      <div class="mb-4 grid grid-cols-3 gap-2">${PLAN_KEYS.map((k) => `<label class="flex cursor-pointer flex-col items-center rounded-xl border border-line p-2 text-center text-sm"><input type="radio" name="ePlan" value="${k}" ${curPlan === k ? "checked" : ""}><b>${esc(PP[k].name)}</b><span class="soft text-xs">${k === "free" ? "Gratis" : cop(PP[k].priceCOP)}</span></label>`).join("")}</div>
+      <label class="field mb-2"><span>Tipo de negocio</span><select id="eType"><option value="">Sin cambiar</option>${BIZ_TYPES.map(([k, t, , e]) => `<option value="${k}">${e} ${t}</option>`).join("")}</select></label>
+      <label id="eTypeOther" class="field mb-4 hidden"><span>Escribe el tipo de negocio</span><input id="eTypeLabel" maxlength="40"></label>
+      ${planForm(bl)}
       <button id="eSave" class="btn-primary w-full">Guardar</button>`);
     wirePlanForm();
+    $("eType").onchange = (e) => $("eTypeOther").classList.toggle("hidden", e.target.value !== "otro");
     $("eSave").onclick = async () => {
       const btn = $("eSave"); setBusy(btn, true, "Guardando…");
-      try { await api("superUpdateBusiness", { businessId: biz.id, name: $("eName").value.trim(), billing: readPlan() }); closeModal("modal"); toast("Plan actualizado."); }
+      try { await api("superUpdateBusiness", { businessId: biz.id, name: $("eName").value.trim(), billing: readPlan(), plan: document.querySelector('input[name="ePlan"]:checked')?.value, businessType: $("eType").value || undefined, businessTypeLabel: $("eTypeLabel").value.trim() }); closeModal("modal"); toast("Plan actualizado."); }
       catch (err) { toast(err.message, "error"); setBusy(btn, false); }
     };
   }
@@ -560,11 +572,14 @@ const TRIAL_FEATURES = [
 ];
 async function loadPlanCfg() {
   const pp = (await getDoc(doc(db, "platform", "public")).catch(() => null))?.data() || {};
-  $("plName").value = pp.planName || ""; $("plPrice").value = pp.planPriceCOP ?? ""; $("plDays").value = pp.trialDays ?? 30;
   $("plTrial").checked = pp.trialEnabled !== false;
+  PL.plans = plansOf(pp); PL.rec = pp.recommendedPlan || "gold";
+  PL.disc = { 3: 0, 6: 0, 12: 0, ...(pp.planDiscounts || {}) };
+  if (!pp.planDiscounts && pp.planBundles && pp.planPriceCOP) [3, 6, 12].forEach((m) => { if (pp.planBundles[m]) PL.disc[m] = Math.max(0, Math.round((1 - pp.planBundles[m] / (pp.planPriceCOP * m)) * 100)); });
+  $("plWarn").value = pp.payWarning || DEFAULT_PAY_WARNING;
+  renderPlanEditor(); renderDisc();
   PL.methods = (pp.payMethods || []).map((m) => ({ ...m }));
-  const tr = { daysAhead: 5, locked: ["clients", "marketing", "appearance", "images", "team"], ...(pp.trialRules || {}) };
-  $("trDays").value = tr.daysAhead;
+
   const rf = { enabled: true, levels: [20, 10, 8, 6, 4, 2], capMonths: 3, bonusDays: 7, ...(pp.referral || {}) };
   $("rfOn").checked = rf.enabled !== false; $("rfCap").value = rf.capMonths; $("rfBonus").value = rf.bonusDays;
   $("rfLevels").innerHTML = Array.from({ length: 6 }, (_, i) => `<label class="rounded-xl p-2 text-center" style="background:var(--canvas)"><span class="soft block text-[11px] font-semibold">Nivel ${i + 1}</span>
@@ -572,9 +587,7 @@ async function loadPlanCfg() {
   const counts = {}; Z.list.forEach((b) => { if (b.referredBy) counts[b.referredBy] = (counts[b.referredBy] || 0) + 1; });
   const top = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5);
   $("rfTop").innerHTML = top.length ? `<p class="mb-1 text-sm font-semibold">Los que más invitan</p>${top.map(([id, n], i) => `<p class="flex justify-between border-t border-line py-1.5 text-sm"><span>${i + 1}. ${esc(Z.list.find((b) => b.id === id)?.name || id)}</span><b>${n} invitada${n === 1 ? "" : "s"}</b></p>`).join("")}` : `<p class="soft text-xs">Todavía nadie ha invitado tiendas.</p>`;
-  PL.bundles = { ...(pp.planBundles || {}) };
-  renderBundles();
-  $("trLocks").innerHTML = TRIAL_FEATURES.map(([k, t, d]) => `<label class="flex items-start gap-2 rounded-xl p-2.5 text-sm" style="background:var(--canvas)"><input type="checkbox" class="mt-0.5 h-4 w-4" data-trl="${k}" ${tr.locked.includes(k) ? "checked" : ""}><span><b>${t}</b><br><span class="soft text-xs">${d}</span></span></label>`).join("");
+
   $("bbOn").checked = !!pp.brebEnabled; $("bbKey").value = pp.brebKey || ""; $("bbHolder").value = pp.brebHolder || ""; $("bbSender").value = pp.brebSender || "nequi";
   PL.brebQr = pp.brebQr || ""; $("bbQrImg").src = PL.brebQr; $("bbQrImg").classList.toggle("hidden", !PL.brebQr);
   renderPlMethods();
@@ -588,7 +601,7 @@ function readPl() {
 function renderPlMethods() {
   $("plMethods").innerHTML = PL.methods.map((m, i) => `<div class="grid gap-2 rounded-lg bg-paper p-2 sm:grid-cols-3" data-plm="${i}">
     <input class="plL rounded border border-line px-2 py-1.5" placeholder="Nequi, Bre-B, Bancolombia…" value="${esc(m.label)}">
-    <input class="plA rounded border border-line px-2 py-1.5" placeholder="Número o llave" value="${esc(m.account)}">
+    <input class="plA rounded border border-line px-2 py-1.5" ${isKeyMethod(m.label) ? 'inputmode="text" placeholder="@tullave, correo o cédula"' : 'inputmode="numeric" placeholder="Solo números"'} value="${esc(m.account)}">
     <input class="plH rounded border border-line px-2 py-1.5" placeholder="Titular" value="${esc(m.holder || "")}">
     <div class="flex flex-wrap items-center gap-2 sm:col-span-3">
       ${m.qr ? `<img src="${m.qr}" alt="QR" class="h-12 w-12 rounded border border-line bg-white object-contain">` : ""}
@@ -596,23 +609,42 @@ function renderPlMethods() {
       <button type="button" class="btn-sm" data-plrm="${i}">Quitar</button>
     </div></div>`).join("") || `<p class="text-sm text-ink/60">Agrega al menos un medio de pago.</p>`;
 }
-// Paquetes: total por 3, 6 y 12 meses, con el ahorro calculado al instante
-function renderBundles() {
-  const price = Number($("plPrice").value || 0);
-  $("plBundles").innerHTML = [3, 6, 12].map((m) => {
-    const v = Number(PL.bundles?.[m] || 0), full = price * m, save = v && full > v ? full - v : 0;
-    return `<label class="rounded-xl p-2.5" style="background:var(--canvas)"><span class="block text-sm font-bold">${m} meses</span>
-      <input type="number" min="0" step="1000" data-bundle="${m}" value="${v || ""}" placeholder="${full ? full : ""}" class="mt-1 w-full rounded-lg border border-line px-2 py-1.5">
-      <span class="mt-1 block text-xs ${save ? "font-semibold" : "soft"}" style="${save ? "color:#16774b" : ""}">${save ? `Ahorran ${cop(save)} (-${Math.round((save / full) * 100)}%), ${cop(Math.round(v / m / 100) * 100)} al mes` : `Normal: ${cop(full)}`}</span></label>`;
-  }).join("");
+// ---- Editor de planes (Gratis, Básico, Gold)
+const PSTY = { free: ["#5B6782", "🎁"], basic: ["#2B59C3", "⭐"], gold: ["#b8860b", "👑"] };
+function renderPlanEditor() {
+  $("plPlans").innerHTML = PLAN_KEYS.map((k) => { const p = PL.plans[k]; return `<details class="rounded-2xl border border-line" ${k === "free" ? "" : "open"} data-pled="${k}">
+    <summary class="flex cursor-pointer items-center gap-2 rounded-2xl px-3 py-2.5 text-white" style="background:${PSTY[k][0]}"><b class="flex-1">${PSTY[k][1]} ${esc(p.name)}</b><span class="text-sm">${k === "free" ? p.days + " días" : cop(p.priceCOP) + "/mes"}</span></summary>
+    <div class="grid gap-2 p-3 sm:grid-cols-2">
+      <label class="field"><span>Nombre</span><input data-plk="name" value="${esc(p.name)}" maxlength="20"></label>
+      ${k === "free" ? `<label class="field"><span>Días gratis</span><input data-plk="days" type="number" min="1" max="90" value="${p.days}"></label>`
+        : `<label class="field"><span>Precio al mes (COP)</span><input data-plk="priceCOP" type="number" min="0" step="1000" value="${p.priceCOP}"></label>`}
+      <label class="field sm:col-span-2"><span>Frase corta</span><input data-plk="tagline" value="${esc(p.tagline || "")}" maxlength="50"></label>
+      <label class="field"><span>Días que pueden reservar adelante</span><input data-plk="daysAhead" type="number" min="1" max="365" value="${p.daysAhead}"></label>
+      <label class="field"><span>Profesionales (0 = sin límite)</span><input data-plk="maxStaff" type="number" min="0" max="50" value="${p.maxStaff}"></label>
+      <div class="sm:col-span-2"><p class="mb-1 text-sm font-semibold">Funciones incluidas</p>
+        <div class="grid gap-1.5 sm:grid-cols-2">${PLAN_FEATURES.map(([f, t]) => `<label class="flex items-start gap-2 rounded-xl p-2 text-[13px]" style="background:var(--canvas)"><input type="checkbox" class="mt-0.5 h-4 w-4" data-plf="${f}" ${(p.features || []).includes(f) ? "checked" : ""}> ${t}</label>`).join("")}</div></div>
+      <div class="sm:col-span-2"><p class="mb-1 text-sm font-semibold">Avisos de Telegram que trae <span class="soft font-normal">(si tiene la función “Avisos en Telegram”)</span></p>
+        <div class="flex flex-wrap gap-1.5">${TG_EVENTS.map(([e, ic, t]) => `<label class="flex cursor-pointer items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-[12px]"><input type="checkbox" class="h-3.5 w-3.5" data-pltg="${e}" ${(p.tgEvents || []).includes(e) ? "checked" : ""}>${ic} ${t}</label>`).join("")}</div>
+        <label class="mt-2 flex items-center gap-2 text-sm"><input type="checkbox" class="h-4 w-4" data-plk="tgChoose" ${p.tgChoose ? "checked" : ""}> La tienda puede elegir sus avisos (prender y apagar cada uno)</label></div>
+      <label class="flex items-center gap-2 text-sm sm:col-span-2"><input type="radio" name="plRec" value="${k}" ${PL.rec === k ? "checked" : ""}> Marcar como <b>Recomendado</b></label>
+    </div></details>`; }).join("");
 }
-$("plBundles").addEventListener("input", (e) => {
-  const i = e.target.closest("[data-bundle]"); if (!i) return;
-  PL.bundles[i.dataset.bundle] = Number(i.value || 0);
-  const pos = i.selectionStart; renderBundles();
-  const again = document.querySelector(`[data-bundle="${i.dataset.bundle}"]`); again.focus(); try { again.setSelectionRange(pos, pos); } catch { /* number */ }
-});
-$("plPrice").addEventListener("input", renderBundles);
+function readPlanEditor() {
+  document.querySelectorAll("[data-pled]").forEach((box) => {
+    const k = box.dataset.pled, p = PL.plans[k];
+    box.querySelectorAll("[data-plk]").forEach((i) => { const key = i.dataset.plk; p[key] = i.type === "checkbox" ? i.checked : i.type === "number" ? Number(i.value || 0) : i.value.trim(); });
+    p.features = [...box.querySelectorAll("[data-plf]:checked")].map((x) => x.dataset.plf);
+    p.tgEvents = [...box.querySelectorAll("[data-pltg]:checked")].map((x) => x.dataset.pltg);
+  });
+  PL.rec = document.querySelector('input[name="plRec"]:checked')?.value || "gold";
+}
+function renderDisc() {
+  $("plDisc").innerHTML = [3, 6, 12].map((m) => `<label class="rounded-xl p-2.5 text-center" style="background:var(--canvas)"><span class="block text-sm font-bold">${m} meses</span>
+    <span class="flex items-center justify-center gap-0.5"><input type="number" min="0" max="60" data-disc="${m}" value="${Number(PL.disc[m] || 0)}" class="w-14 rounded-lg border border-line px-1 py-1 text-center font-bold">%</span>
+    <span class="soft mt-1 block text-[11px]">Gold: ${cop(Math.round(PL.plans.gold.priceCOP * m * (1 - Number(PL.disc[m] || 0) / 100) / 100) * 100)}</span></label>`).join("");
+}
+$("plDisc").addEventListener("change", (e) => { const i = e.target.closest("[data-disc]"); if (!i) return; PL.disc[i.dataset.disc] = Math.min(60, Math.max(0, Number(i.value || 0))); readPlanEditor(); renderDisc(); });
+$("plPlans").addEventListener("change", () => { readPlanEditor(); renderDisc(); });
 $("plAdd").onclick = () => { readPl(); PL.methods.push({ label: "", account: "", holder: "", qr: "" }); renderPlMethods(); };
 $("plMethods").addEventListener("click", (e) => { const b = e.target.closest("[data-plrm]"); if (b) { readPl(); PL.methods.splice(Number(b.dataset.plrm), 1); renderPlMethods(); } });
 $("plMethods").addEventListener("change", async (e) => {
@@ -641,17 +673,56 @@ $("plSave").onclick = async () => {
   const btn = $("plSave"); setBusy(btn, true, "Guardando…");
   try {
     await setDoc(doc(db, "platform", "public"), {
-      planName: $("plName").value.trim() || "Plan mensual", planPriceCOP: Number($("plPrice").value || 0),
-      trialDays: Math.min(90, Math.max(1, Number($("plDays").value || 30))), trialEnabled: $("plTrial").checked,
+      plans: (readPlanEditor(), PL.plans), recommendedPlan: PL.rec, planDiscounts: PL.disc, payWarning: $("plWarn").value.trim() || DEFAULT_PAY_WARNING,
+      // compatibilidad con versiones anteriores
+      planName: PL.plans.basic.name, planPriceCOP: Number(PL.plans.basic.priceCOP || 0), trialDays: Math.min(90, Math.max(1, Number(PL.plans.free.days || 30))),
+      trialRules: { daysAhead: Math.max(1, Number(PL.plans.free.daysAhead || 5)), locked: [] },
+      trialEnabled: $("plTrial").checked,
       payMethods: PL.methods.filter((m) => m.label && m.account),
       brebEnabled: $("bbOn").checked, brebKey: $("bbKey").value.trim(), brebHolder: $("bbHolder").value.trim(),
       brebSender: $("bbSender").value.trim() || "nequi", brebQr: PL.brebQr || "",
       referral: { enabled: $("rfOn").checked, levels: [...document.querySelectorAll("[data-rfl]")].map((x) => Math.min(50, Math.max(0, Number(x.value || 0)))),
         capMonths: Math.min(12, Math.max(1, Number($("rfCap").value || 3))), bonusDays: Math.min(60, Math.max(0, Number($("rfBonus").value || 0))) },
-      planBundles: { 3: Number(PL.bundles?.[3] || 0), 6: Number(PL.bundles?.[6] || 0), 12: Number(PL.bundles?.[12] || 0) }, // 0 = precio normal
-      trialRules: { daysAhead: Math.min(60, Math.max(1, Number($("trDays").value || 5))), locked: [...document.querySelectorAll("[data-trl]:checked")].map((x) => x.dataset.trl) }
+      planBundles: { 3: 0, 6: 0, 12: 0 } // ahora se usa el % de planDiscounts
     }, { merge: true });
     toast("Guardado. Los dueños ya lo ven en “Mi plan”.");
   } catch (err) { toast(err.message, "error"); }
   finally { setBusy(btn, false); }
 };
+
+// ================= Novedades para las tiendas (campana de su panel) =================
+const NW_KINDS = [["novedad", "✨ Novedad"], ["mejora", "🚀 Mejora"], ["aviso", "⚠️ Aviso"], ["promo", "🎁 Promoción"]];
+let NW_KIND = "novedad";
+function renderNewsKinds() { $("nwKinds").innerHTML = NW_KINDS.map(([k, t]) => `<button type="button" class="fchip" data-nwk="${k}" aria-pressed="${NW_KIND === k}">${t}</button>`).join(""); }
+$("nwKinds").addEventListener("click", (e) => { const b = e.target.closest("[data-nwk]"); if (b) { NW_KIND = b.dataset.nwk; renderNewsKinds(); } });
+renderNewsKinds();
+function renderNewsAdmin() {
+  const list = Z.news || [];
+  $("nwList").innerHTML = list.length ? `<p class="text-sm font-bold">Publicadas</p>` + list.map((n) => `<div class="flex items-start gap-3 rounded-xl p-3" style="background:var(--canvas)">
+      <div class="min-w-0 flex-1"><p class="text-sm font-bold">${esc(n.title)}</p><p class="soft text-xs">${(NW_KINDS.find((k) => k[0] === n.kind) || NW_KINDS[0])[1]} · ${new Date(toMillis(n.at)).toLocaleDateString("es-CO", { timeZone: "America/Bogota", day: "numeric", month: "short" })}</p></div>
+      <button class="btn-sm" data-nwdel="${n.id}" aria-label="Borrar">🗑</button></div>`).join("") : "";
+}
+$("nwList").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-nwdel]"); if (!b) return;
+  if (!(await uiConfirm("¿Borrar esta novedad?", "Deja de verse en la campana de las tiendas.", { okText: "Borrar", danger: true }))) return;
+  try { await deleteDoc(doc(db, "platformNews", b.dataset.nwdel)); toast("Novedad borrada."); } catch (err) { toast(err.message, "error"); }
+});
+$("nwSend").onclick = async () => {
+  const title = $("nwTitle").value.trim(), text = $("nwText").value.trim();
+  if (title.length < 4) return toast("Escribe el título.", "error");
+  const btn = $("nwSend"); setBusy(btn, true, "Publicando…");
+  try {
+    await addDoc(collection(db, "platformNews"), { title, text, kind: NW_KIND, published: true, at: serverTimestamp() });
+    if ($("nwTg").checked) api("superBroadcast", { text: `${title}\n${text}` }).catch(() => {});
+    $("nwTitle").value = ""; $("nwText").value = ""; $("nwTg").checked = false;
+    toast("¡Publicada! Las tiendas la ven en su campana 🔔.");
+  } catch (err) { toast(err.message, "error"); }
+  finally { setBusy(btn, false); }
+};
+replaceNav({ sv: "home" });
+setNavHandler((st) => goSV(st.sv || "home", true));
+// tus medios de pago: el número no acepta letras (la llave sí)
+document.addEventListener("input", (e) => {
+  const t = e.target, row = t.closest?.("[data-plm]");
+  if (row && (t.classList.contains("plA") || t.classList.contains("plL"))) payAccountInput(row.querySelector(".plA"), row.querySelector(".plL").value);
+});

@@ -1,4 +1,5 @@
 // Página pública: ver cupos, registrarse, apartar, pagar con screenshot, mis cupos
+import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz } from "./common.js?v=2026-10-09z";
 import {
   onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -6,10 +7,10 @@ import {
   doc, getDoc, setDoc, getDocs, updateDoc, collection, query, where, onSnapshot, serverTimestamp, Timestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
-  startUpdateWatcher, applyBrandColors, warmServer, uiConfirm, setDialogBrand, viewImage, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, dow, hora12, fechaLarga, fechaCorta, toMillis, cop, esc,
+  startUpdateWatcher, applyBrandColors, warmServer, uiConfirm, setDialogBrand, viewImage, pushOverlay, dropOverlay, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, dow, hora12, fechaLarga, fechaCorta, toMillis, cop, esc,
   normalizePhone, waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, computeSlots, dayCapacityUnits, staffHours, mapLinks, headerBgCss,
   toast, openModal, closeModal, setBusy, copyText, tmin, mstr, UNIT
-} from "./common.js?v=2026-10-09u";
+} from "./common.js?v=2026-10-09z";
 
 const $ = (id) => document.getElementById(id);
 const S = {
@@ -51,7 +52,7 @@ onSnapshot(doc(db, bpath("settings", "general")), (s) => {
   S.settings = s.data() || null;
   if (!S.date) { S.date = bogNow().date; S.month = S.date.slice(0, 7); }
   subscribeAvail(); subscribeDay(S.date);
-  renderBiz(); renderStaff(); renderAll();
+  renderBiz(); renderStaff(); renderAll(); updateGate();
 }, onErr);
 
 onSnapshot(collection(db, bpath("services")), (q) => {
@@ -111,10 +112,14 @@ function updateGate() {
   if (S.dead) return;
   if (S.user && S.profile) warmServer();
   const need = S.authReady && (!S.user || !S.profile);
-  if (S.authReady) presence(need ? "register" : (S.time ? "service" : "hours"));
-  $("gate").classList.toggle("hidden", !need);
-  $("mainContent").classList.toggle("hidden", need || !S.authReady);
-  $("bookBar").classList.toggle("hidden", need || !S.authReady);
+  // agenda abierta: se ve sin registrarse; el registro se pide solo al apartar
+  const open = S.settings?.agendaMode === "open";
+  const showGate = need && (!open || S.wantBook);
+  if (S.authReady) presence(showGate ? "register" : (S.time ? "service" : "hours"));
+  $("gate").classList.toggle("hidden", !showGate);
+  $("mainContent").classList.toggle("hidden", (need && !open) || !S.authReady);
+  $("bookBar").classList.toggle("hidden", (need && !open) || !S.authReady);
+  if (!need && S.wantBook) { S.wantBook = false; setTimeout(() => { $("bookBar").scrollIntoView({ behavior: "smooth", block: "center" }); if (S.mainId && S.time) $("btnBook").click(); }, 500); }
   if (need && S.user && !S.profile) { // tiene cuenta pero le faltan datos
     setAuthTab("register");
     const f = $("registerForm");
@@ -179,6 +184,7 @@ function renderBiz() {
   applyBrandColors(ap);
   // imagen de fondo del encabezado (degradada)
   const hdr = document.querySelector("header"), bgCss = headerBgCss(ap.colors?.header, ap.headerBg);
+  hdr.classList.toggle("no-pole", (s.businessType || "barberia") !== "barberia");
   hdr.style.background = bgCss || ""; hdr.classList.toggle("has-photo", !!bgCss);
   setDialogBrand(s.businessName, ap.logo);
   $("h-day").textContent = T("calendarTitle");
@@ -236,7 +242,7 @@ $("staffPick").addEventListener("click", (e) => {
 // ---------- Cálculo de cupos ----------
 const slotLen = () => Number(S.settings?.slotDurationMinutes || 30);
 // En prueba gratis la tienda solo recibe reservas hasta 5 días adelante
-const maxDate = () => addDays(bogNow().date, Math.min(S.biz?.trial ? Number((PLAT && PLAT.trialRules?.daysAhead) || 5) : 90, Number(S.settings?.bookingWindowDays || 30)));
+const maxDate = () => addDays(bogNow().date, Math.min(Number(plansOf(PLAT || {})[planOfBiz(S.biz || {})].daysAhead || 30), Number(S.settings?.bookingWindowDays || 30)));
 const staffPool = () => S.staff.filter((s) => !S.staffId || s.id === S.staffId);
 const hoursOfStaff = (s, date) => staffHours(S.settings, s, date);
 // Cerrado si ningún profesional (del filtro) atiende ese día
@@ -458,7 +464,13 @@ function renderSummary() {
 // ================= Reservar =================
 $("btnBook").onclick = () => {
   if (!(S.mainId && S.date && S.time)) return;
-  if (!S.user || !S.profile) { updateGate(); return; }
+  if (!S.user || !S.profile) {
+    // con agenda abierta, se registra ahora y su elección queda guardada
+    S.wantBook = true; updateGate();
+    $("gate").scrollIntoView({ behavior: "smooth", block: "start" });
+    toast("Crea tu cuenta en 1 minuto para apartar tu cupo. Tu hora queda guardada.");
+    return;
+  }
   if (!S.cust && !S.consentOk) { openConsent(); return; }
   doHold();
 };
@@ -970,18 +982,53 @@ getDoc(doc(db, "platform", "public")).then((d) => {
   if (S.settings) renderAll();
   const on = PLAT.trialEnabled !== false;
   $("trialCta").classList.toggle("hidden", !on);
-  $("trialDaysTxt").textContent = `${Number(PLAT.trialDays || 30)} días gratis`;
+  $("trialDaysTxt").textContent = `${Number(plansOf(PLAT).free.days || 30)} días gratis`;
 }).catch(() => {});
+const PSTYLE = { free: ["linear-gradient(140deg,#5B6782,#2b3446)", "#fff", "🎁"], basic: ["linear-gradient(140deg,#2B59C3,#14213D)", "#fff", "⭐"], gold: ["linear-gradient(140deg,#f5c542,#b8860b)", "#1a1200", "👑"] };
+let T_PLAN = null;
+function renderTrialPlans() {
+  const P = plansOf(PLAT), rec = PLAT.recommendedPlan || "gold";
+  if (!T_PLAN) T_PLAN = rec;
+  const row = (label, f) => `<tr><td class="py-1.5 pr-1 text-left text-[11.5px] font-semibold text-ink/70">${label}</td>${PLAN_KEYS.map((k) => `<td class="py-1.5 text-center text-[12px] ${k === T_PLAN ? "bg-amber-50" : ""}">${f(k)}</td>`).join("")}</tr>`;
+  const yes = (k, key) => ((P[k].features || []).includes(key) ? `<b class="text-emerald-600">✓</b>` : `<span class="text-ink/30">—</span>`);
+  $("trialPlans").innerHTML = `<p class="text-[11px] font-extrabold tracking-wider text-ink/50">PASO 1 DE ${T_PLAN === "free" ? 2 : 3}</p>
+    <p class="mb-3 font-narrow text-2xl font-bold leading-tight">Elige el plan para tu negocio</p>
+    <div class="grid grid-cols-3 gap-2">${PLAN_KEYS.map((k) => `<button type="button" class="relative rounded-2xl px-1.5 py-3 text-center" style="background:${PSTYLE[k][0]};color:${PSTYLE[k][1]};outline:3px solid ${k === T_PLAN ? "#17222E" : "transparent"};outline-offset:2px" data-tplan="${k}" aria-pressed="${k === T_PLAN}">
+      ${k === rec ? `<span class="absolute -top-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-pole-red px-1.5 text-[8.5px] font-extrabold text-white">RECOMENDADO</span>` : ""}
+      ${k === T_PLAN ? `<span class="absolute -right-1.5 -top-2 grid h-5 w-5 place-items-center rounded-full bg-ink text-[11px] font-extrabold text-white">✓</span>` : ""}
+      <b class="block text-[14px]">${PSTYLE[k][2]} ${esc(P[k].name)}</b><span class="block text-[11px] opacity-90">${k === "free" ? P.free.days + " días" : cop(P[k].priceCOP) + "/mes"}</span></button>`).join("")}</div>
+    <p class="mt-2 text-center text-xs text-ink/60">${esc(P[T_PLAN].tagline || "")}</p>
+    <table class="mt-1 w-full border-collapse">
+      ${row("Agenda y cita rápida", () => `<b class="text-emerald-600">✓</b>`)}
+      ${row("Días para reservar", (k) => `<b>${P[k].daysAhead}</b>`)}
+      ${row("Profesionales", (k) => `<b>${P[k].maxStaff || "Sin límite"}</b>`)}
+      ${[["telegram", "Avisos en Telegram"], ["appearance", "Portada y colores"], ["clients", "Clientes"], ["images", "Imágenes"], ["marketing", "Marketing y estados"], ["activity", "Actividad"]].map(([key, l]) => row(l, (k) => yes(k, key))).join("")}
+    </table>
+    <button type="button" id="trialNext" class="btn-primary mt-3 w-full py-3">Siguiente</button>`;
+  $("trialPlans").querySelectorAll("[data-tplan]").forEach((b) => b.onclick = () => { T_PLAN = b.dataset.tplan; renderTrialPlans(); });
+  $("trialNext").onclick = () => showTrialForm();
+}
+function showTrialForm() {
+  const P = plansOf(PLAT);
+  $("trialPlans").classList.add("hidden"); $("trialForm").classList.remove("hidden");
+  $("trialTitle").textContent = "Tus datos";
+  $("trialSub").textContent = `Paso 2 de ${T_PLAN === "free" ? 2 : 3}`;
+  $("trialPlanLine").innerHTML = `<span>Plan elegido: <b>${PSTYLE[T_PLAN][2]} ${esc(P[T_PLAN].name)}</b> · ${T_PLAN === "free" ? P.free.days + " días gratis" : cop(P[T_PLAN].priceCOP) + "/mes"}</span><button type="button" id="trialChange" class="font-bold underline">Cambiar</button>`;
+  $("trialChange").onclick = () => { $("trialForm").classList.add("hidden"); $("trialPlans").classList.remove("hidden"); $("trialTitle").textContent = "Crea tu agenda"; $("trialSub").textContent = ""; renderTrialPlans(); };
+  $("trialForm").querySelector("button[type=submit]").textContent = T_PLAN === "free" ? "Crear mi agenda gratis" : "Crear mi agenda y pagar";
+  $("trialFoot").textContent = T_PLAN === "free" ? "Al terminar la prueba eliges un plan para seguir." : "En el siguiente paso pagas con Bre-B y tu plan se activa solo.";
+}
 $("btnTrial").onclick = () => {
   const logged = !!auth.currentUser;
-  $("trialTitle").textContent = "Crea tu agenda gratis";
-  $("trialSub").textContent = `Gratis por ${Number(PLAT.trialDays || 30)} días, con reservas hasta ${Number(PLAT.trialRules?.daysAhead || 5)} días adelante y funciones básicas. Activa tu plan cuando quieras (${PLAT.planPriceCOP ? cop(PLAT.planPriceCOP) + " al mes" : "mensualidad"}) para desbloquear todo.`;
+  $("trialTitle").textContent = "Crea tu agenda";
+  $("trialSub").textContent = "";
+  $("trialPlans").classList.remove("hidden"); renderTrialPlans();
   $("trialAccount").classList.toggle("hidden", logged);
   $("trialLogged").classList.toggle("hidden", !logged);
   if (logged) $("trialLogged").textContent = `Se crea con tu cuenta ${auth.currentUser.email}. Con ella entras a tu panel.`;
   const f = $("trialForm");
   if (S.profile) { f.ownerName.value = `${S.profile.firstName || ""} ${S.profile.lastName || ""}`.trim(); f.whatsapp.value = S.profile.whatsapp || ""; }
-  $("trialForm").classList.remove("hidden"); $("trialDone").classList.add("hidden");
+  $("trialForm").classList.add("hidden"); $("trialDone").classList.add("hidden");
   openModal("trialModal");
 };
 $("trialForm").addEventListener("submit", async (e) => {
@@ -1003,9 +1050,12 @@ $("trialForm").addEventListener("submit", async (e) => {
         else throw new Error(authError(err));
       }
     }
-    const r = await api("trialSignup", { name, type: f.type.value, ownerName: f.ownerName.value.trim(), whatsapp: phone, ref: REF_CODE });
+    if (f.type.value === "otro" && !f.typeLabel.value.trim()) throw new Error("Escribe qué tipo de negocio tienes.");
+    const r = await api("trialSignup", { name, type: f.type.value, typeLabel: f.typeLabel.value.trim(), ownerName: f.ownerName.value.trim(), whatsapp: phone, ref: REF_CODE, plan: T_PLAN || "free" });
     const base = location.origin + location.pathname.replace(/index\.html$/, "");
     const panel = `${base}admin.html?b=${r.slug}`, page = `${base}index.html?b=${r.slug}`;
+    // plan pago: paso 3, el pago se hace en su panel (si cierra, al volver a entrar llega ahí mismo)
+    if (r.planWanted) { setBusy(btn, true, "Abriendo el pago…"); location.href = panel; return; }
     $("trialForm").classList.add("hidden");
     $("trialDone").classList.remove("hidden");
     $("trialTitle").textContent = "¡Listo!";
@@ -1084,7 +1134,10 @@ function openStoryViewer(start) {
   const wrap = document.createElement("div");
   wrap.className = "story-view"; wrap.setAttribute("role", "dialog"); wrap.setAttribute("aria-modal", "true"); wrap.setAttribute("aria-label", "Estados de " + (S.settings?.businessName || "el negocio"));
   document.body.appendChild(wrap);
-  const close = () => { cancelAnimationFrame(raf); wrap.remove(); document.removeEventListener("keydown", key); renderStories(); };
+  let gone = false;
+  const hide = () => { if (gone) return; gone = true; cancelAnimationFrame(raf); wrap.remove(); document.removeEventListener("keydown", key); renderStories(); };
+  const close = () => { hide(); dropOverlay("stories"); };
+  pushOverlay("stories", hide);
   const key = (e) => { if (e.key === "Escape") close(); if (e.key === "ArrowRight") go(1); if (e.key === "ArrowLeft") go(-1); };
   document.addEventListener("keydown", key);
   const markSeen = (id) => { try { const v = seen(); if (!v.includes(id)) { v.push(id); localStorage.setItem(seenKey, JSON.stringify(v.slice(-60))); } } catch { /* sin almacenamiento */ } };
@@ -1141,3 +1194,10 @@ if (new URLSearchParams(location.search).get("invita") || new URLSearchParams(lo
     setTimeout(() => $("btnTrial").click(), 600);
   }).catch(() => setTimeout(() => $("btnTrial").click(), 600));
 }
+
+// Probar gratis: lista completa de tipos y casilla para escribir el propio
+(() => {
+  const sel = document.querySelector('#trialForm select[name="type"]'); if (!sel) return;
+  sel.innerHTML = BIZ_TYPES.map(([k, t, , e]) => `<option value="${k}">${e} ${t}</option>`).join("");
+  sel.onchange = () => $("trialTypeOther").classList.toggle("hidden", sel.value !== "otro");
+})();
