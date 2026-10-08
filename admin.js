@@ -844,16 +844,41 @@ function renderClosed() {
 }
 function renderPM() {
   $("pmList").innerHTML = A.pmDraft.map((m, i) => `<div class="grid gap-2 rounded-lg bg-paper p-2 sm:grid-cols-[1fr_1fr_1fr_auto]" data-pm="${i}">
-    <input class="pmLabel rounded border border-line px-2 py-1.5" placeholder="Nequi, Daviplata, Bancolombia…" value="${esc(m.label)}">
+    <input class="pmLabel rounded border border-line px-2 py-1.5" placeholder="Nequi, Daviplata, Llave Bre-B…" value="${esc(m.label)}">
     <input class="pmAcc rounded border border-line px-2 py-1.5" placeholder="Número o llave" value="${esc(m.account)}">
     <input class="pmHolder rounded border border-line px-2 py-1.5" placeholder="Titular" value="${esc(m.holder)}">
-    <button type="button" class="btn-sm" data-rmpm="${i}">Quitar</button></div>`).join("") || `<p class="text-sm text-ink/60">Agrega al menos un medio de pago para que tus clientes sepan a dónde transferir.</p>`;
+    <button type="button" class="btn-sm" data-rmpm="${i}">Quitar</button>
+    <div class="flex flex-wrap items-center gap-2 sm:col-span-4">
+      ${m.qr ? `<img src="${m.qr}" alt="QR" class="h-14 w-14 rounded border border-line bg-white object-contain">` : ""}
+      <label class="btn-sm cursor-pointer">${m.qr ? "Cambiar QR" : "Subir imagen del QR (opcional)"}<input type="file" accept="image/*" class="hidden" data-qrpm="${i}"></label>
+      ${m.qr ? `<button type="button" class="text-xs text-pole-red underline" data-rmqr="${i}">Quitar QR</button>` : ""}
+    </div></div>`).join("") || `<p class="text-sm text-ink/60">Agrega al menos un medio de pago para que tus clientes sepan a dónde transferir.</p>`;
 }
 function readPM() {
   A.pmDraft = [...document.querySelectorAll("[data-pm]")].map((r) => ({
-    label: r.querySelector(".pmLabel").value.trim(), account: r.querySelector(".pmAcc").value.trim(), holder: r.querySelector(".pmHolder").value.trim()
+    label: r.querySelector(".pmLabel").value.trim(), account: r.querySelector(".pmAcc").value.trim(), holder: r.querySelector(".pmHolder").value.trim(),
+    qr: A.pmDraft[Number(r.dataset.pm)]?.qr || ""
   }));
 }
+// Reduce la imagen del QR para guardarla dentro de la configuración
+async function qrToDataUrl(file) {
+  const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = URL.createObjectURL(file); });
+  const max = 480; let w = img.naturalWidth, h = img.naturalHeight;
+  if (Math.max(w, h) > max) { const r = max / Math.max(w, h); w = Math.round(w * r); h = Math.round(h * r); }
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  const ctx = c.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, w, h); ctx.drawImage(img, 0, 0, w, h);
+  return c.toDataURL("image/jpeg", 0.85);
+}
+document.addEventListener("change", async (e) => {
+  const inp = e.target.closest("[data-qrpm]"); if (!inp || !inp.files[0]) return;
+  readPM();
+  try { A.pmDraft[Number(inp.dataset.qrpm)].qr = await qrToDataUrl(inp.files[0]); renderPM(); toast("QR listo. Toca “Guardar configuración” para publicarlo."); }
+  catch { toast("No se pudo leer la imagen.", "error"); }
+});
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-rmqr]"); if (!b) return;
+  readPM(); A.pmDraft[Number(b.dataset.rmqr)].qr = ""; renderPM();
+});
 async function saveSettings(e) {
   e.preventDefault();
   const btn = e.target.querySelector("button[type=submit]");
@@ -888,7 +913,7 @@ async function saveSettings(e) {
     slotDurationMinutes: slotVal, businessType: $("stType").value, staffLabel: $("stStaffLabel").value.trim(), depositAmountCOP: n("stDeposit"), holdMinutes: Math.max(5, n("stHold")),
     bookingWindowDays: Math.max(1, n("stWindow")), minAdvanceMinutes: n("stAdvance"), toleranceMinutes: n("stTolerance"),
     autoConfirmProof: $("stAuto").checked, businessHours: hours, closedDates: A.closedDraft,
-    paymentMethods: A.pmDraft.filter((m) => m.label && m.account), paymentInstructions: $("stPayInstr").value.trim(),
+    paymentMethods: A.pmDraft.filter((m) => m.label && m.account).map((m) => ({ label: m.label, account: m.account, holder: m.holder || "", qr: m.qr || "" })), paymentInstructions: $("stPayInstr").value.trim(),
     rescheduleMinHours: n("stReschedH"), maxReschedules: n("stMaxResched"), noShowThreshold: Math.max(1, n("stNoShow")),
     reminderMinutesBefore: n("stReminder"),
     waConfirmTemplate: $("stWaConf").value, waRescheduleTemplate: $("stWaRes").value, habeasDataText: $("stHabeas").value.trim(),

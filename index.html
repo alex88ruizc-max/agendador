@@ -9,6 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Archivo+Narrow:wght@500;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="theme.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="bg-paper text-ink font-sans antialiased">
@@ -28,7 +29,49 @@
     <section id="unavailable" class="mx-auto mt-10 hidden max-w-md rounded-2xl bg-white p-6 text-center">
       <h2 id="unTitle" class="font-narrow text-2xl font-bold"></h2><p id="unText" class="mt-2 text-ink/70"></p>
     </section>
-    <div id="mainContent">
+    <!-- Registro previo: se muestra antes de la agenda -->
+    <section id="gate" class="mx-auto hidden max-w-md">
+      <div class="rounded-2xl border border-line bg-white p-5">
+        <h2 id="authTitle" class="font-narrow text-2xl font-bold">Crea tu cuenta</h2>
+        <p class="mb-4 text-sm text-ink/70">Regístrate una sola vez para ver la agenda y apartar tus citas.</p>
+        <div class="mb-4 grid grid-cols-2 rounded-lg bg-paper p-1 text-sm font-semibold">
+          <button id="tabRegister" class="tab tab-on">Crear cuenta</button>
+          <button id="tabLogin" class="tab">Ingresar</button>
+        </div>
+        <form id="registerForm" class="space-y-3" novalidate>
+          <label class="field"><span>Nombre</span><input name="fullName" required autocomplete="name" placeholder="Nombre y apellido"></label>
+          <div class="field">
+            <span>WhatsApp</span>
+            <div class="flex gap-2">
+              <select id="phoneCountry" aria-label="Indicativo del país" class="!w-auto shrink-0"></select>
+              <input id="phoneNumber" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="300 123 4567" class="min-w-0 flex-1">
+            </div>
+            <p id="phoneMsg" class="mt-1 text-xs font-normal text-ink/60"></p>
+          </div>
+          <label class="field"><span>Correo</span><input name="email" type="email" required autocomplete="email"></label>
+          <label class="field"><span>Contraseña (mínimo 6 caracteres)</span>
+            <div class="relative"><input name="password" type="password" minlength="6" required autocomplete="new-password" class="pr-10">
+            <button type="button" class="pwEye absolute right-2 top-1/2 -translate-y-1/2 px-1 text-ink/50" aria-label="Mostrar contraseña"><i class="fa-regular fa-eye"></i></button></div>
+          </label>
+          <label class="flex items-start gap-2 text-xs text-ink/75">
+            <input name="consent" type="checkbox" class="mt-0.5 h-4 w-4 accent-pole-blue" required>
+            <span id="habeasText">Autorizo el tratamiento de mis datos personales.</span>
+          </label>
+          <button class="btn-primary w-full" type="submit">Crear cuenta y ver la agenda</button>
+        </form>
+        <form id="loginForm" class="hidden space-y-3" novalidate>
+          <label class="field"><span>Correo</span><input name="email" type="email" required autocomplete="email"></label>
+          <label class="field"><span>Contraseña</span>
+            <div class="relative"><input name="password" type="password" required autocomplete="current-password" class="pr-10">
+            <button type="button" class="pwEye absolute right-2 top-1/2 -translate-y-1/2 px-1 text-ink/50" aria-label="Mostrar contraseña"><i class="fa-regular fa-eye"></i></button></div>
+          </label>
+          <button class="btn-primary w-full" type="submit">Ingresar</button>
+          <button id="btnForgot" type="button" class="w-full text-center text-sm text-pole-blue underline">Olvidé mi contraseña</button>
+        </form>
+      </div>
+    </section>
+
+    <div id="mainContent" class="hidden">
     <p id="closedBanner" class="mb-6 hidden rounded-xl border border-pole-red/40 bg-white p-4 text-sm font-semibold text-pole-red">
       Las reservas en línea de este negocio no están disponibles por ahora. Comunícate directamente con el local.
     </p>
@@ -89,44 +132,10 @@
   </main>
 
   <!-- Barra inferior de resumen -->
-  <div id="bookBar" class="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-white/95 backdrop-blur" style="padding-bottom: env(safe-area-inset-bottom, 0px)">
+  <div id="bookBar" class="hidden fixed inset-x-0 bottom-0 z-40 border-t border-line bg-white/95 backdrop-blur" style="padding-bottom: env(safe-area-inset-bottom, 0px)">
     <div class="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
       <div id="summary" class="min-w-0 text-sm"></div>
       <button id="btnBook" class="btn-primary shrink-0" disabled>Apartar cupo</button>
-    </div>
-  </div>
-
-  <!-- Modal: registro / ingreso -->
-  <div id="authModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="authTitle">
-    <div class="modal-card">
-      <div class="mb-4 flex items-start justify-between">
-        <h3 id="authTitle" class="font-narrow text-2xl font-bold">Regístrate y aparta tus cupos</h3>
-        <button class="btn-ghost" data-close="authModal" aria-label="Cerrar">✕</button>
-      </div>
-      <div class="mb-4 grid grid-cols-2 rounded-lg bg-paper p-1 text-sm font-semibold">
-        <button id="tabRegister" class="tab tab-on">Crear cuenta</button>
-        <button id="tabLogin" class="tab">Ya tengo cuenta</button>
-      </div>
-      <form id="registerForm" class="space-y-3" novalidate>
-        <div class="grid grid-cols-2 gap-3">
-          <label class="field"><span>Nombre</span><input name="firstName" required autocomplete="given-name"></label>
-          <label class="field"><span>Apellido</span><input name="lastName" required autocomplete="family-name"></label>
-        </div>
-        <label class="field"><span>WhatsApp</span><input name="whatsapp" type="tel" inputmode="tel" placeholder="300 123 4567" required autocomplete="tel"></label>
-        <label class="field"><span>Correo</span><input name="email" type="email" required autocomplete="email"></label>
-        <label class="field"><span>Contraseña (mínimo 6 caracteres)</span><input name="password" type="password" minlength="6" required autocomplete="new-password"></label>
-        <label class="flex items-start gap-2 text-xs text-ink/75">
-          <input name="consent" type="checkbox" class="mt-0.5 h-4 w-4 accent-pole-blue" required>
-          <span id="habeasText">Autorizo el tratamiento de mis datos personales.</span>
-        </label>
-        <button class="btn-primary w-full" type="submit">Crear cuenta y continuar</button>
-      </form>
-      <form id="loginForm" class="hidden space-y-3" novalidate>
-        <label class="field"><span>Correo</span><input name="email" type="email" required autocomplete="email"></label>
-        <label class="field"><span>Contraseña</span><input name="password" type="password" required autocomplete="current-password"></label>
-        <button class="btn-primary w-full" type="submit">Ingresar</button>
-        <button id="btnForgot" type="button" class="w-full text-center text-sm text-pole-blue underline">Olvidé mi contraseña</button>
-      </form>
     </div>
   </div>
 
@@ -142,21 +151,25 @@
     </div>
   </div>
 
-  <!-- Modal: pago -->
+  <!-- Modal: pago (sistema de Epic, manual con comprobante) -->
   <div id="payModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="payTitle">
-    <div class="modal-card">
-      <div class="mb-2 flex items-start justify-between">
-        <h3 id="payTitle" class="font-narrow text-2xl font-bold">Paga el abono y asegura tu cupo</h3>
-        <button class="btn-ghost" data-close="payModal" aria-label="Cerrar">✕</button>
-      </div>
+    <div class="modal-card relative">
+      <button class="btn-ghost absolute right-3 top-3" data-close="payModal" aria-label="Cerrar">✕</button>
+      <h3 id="payTitle" class="font-narrow text-2xl font-bold">Paga tu abono</h3>
+      <p class="mb-4 text-sm text-ink/70">Tu cupo quedó apartado. Transfiere el abono y sube el comprobante para confirmarlo.</p>
       <div id="payBody"></div>
-      <form id="proofForm" class="mt-4 space-y-3">
-        <label class="field"><span>Screenshot de la transferencia</span>
-          <input name="proof" type="file" accept="image/*" required class="file:mr-3 file:rounded file:border-0 file:bg-ink file:px-3 file:py-1.5 file:text-white">
+      <form id="proofForm" class="mt-3 space-y-3">
+        <label class="drop" for="proofFile">
+          <i class="fa-solid fa-cloud-arrow-up text-xl text-pole-blue"></i>
+          <span id="proofLabel"><b>Sube el screenshot del pago</b><br>Toca aquí para elegir la imagen</span>
+          <img id="proofPreview" class="hidden max-h-40 rounded-lg" alt="Vista previa del comprobante">
         </label>
-        <img id="proofPreview" class="hidden max-h-48 rounded-lg border border-line" alt="Vista previa del comprobante">
-        <label class="field"><span>Número de la transacción (opcional)</span><input name="reference" maxlength="80"></label>
-        <button class="btn-primary w-full" type="submit">Enviar comprobante</button>
+        <input id="proofFile" name="proof" type="file" accept="image/*" class="hidden">
+        <label class="field"><span>Número de la transacción (opcional)</span><input name="reference" maxlength="80" placeholder="Ej. M12345678"></label>
+        <div class="grid grid-cols-2 gap-2">
+          <button class="btn-primary" type="submit">Ya pagué</button>
+          <button id="btnCancelHold" class="btn-light" type="button">Cancelar reserva</button>
+        </div>
       </form>
     </div>
   </div>

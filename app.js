@@ -24,6 +24,7 @@ const onErr = (e) => { console.error(e); toast("No se pudo cargar la informació
 // ================= Barbería del enlace =================
 const BIZ_ID = businessFromUrl();
 function showUnavailable(title, text) {
+  S.dead = true; $("gate").classList.add("hidden");
   $("unTitle").textContent = title; $("unText").textContent = text;
   $("unavailable").classList.remove("hidden");
   $("mainContent").classList.add("hidden");
@@ -101,8 +102,25 @@ onAuthStateChanged(auth, async (u) => {
   } else {
     S.profile = null; S.cust = null; S.mine = []; unsubMine?.(); unsubCust?.();
   }
-  renderNav(); renderSummary();
+  S.authReady = true;
+  updateGate(); renderNav(); renderSummary();
 });
+
+// Registro previo: sin cuenta (o sin datos completos) se muestra el registro en lugar de la agenda
+function updateGate() {
+  if (S.dead) return;
+  const need = S.authReady && (!S.user || !S.profile);
+  $("gate").classList.toggle("hidden", !need);
+  $("mainContent").classList.toggle("hidden", need || !S.authReady);
+  $("bookBar").classList.toggle("hidden", need || !S.authReady);
+  if (need && S.user && !S.profile) { // tiene cuenta pero le faltan datos
+    setAuthTab("register");
+    const f = $("registerForm");
+    f.email.value = S.user.email || ""; f.email.readOnly = true;
+    f.password.closest("label").classList.add("hidden"); f.password.required = false;
+    $("authTitle").textContent = "Completa tus datos";
+  }
+}
 
 async function loadProfile() {
   try {
@@ -139,9 +157,7 @@ function renderNav() {
     $("btnLogout").onclick = () => signOut(auth);
   } else {
     nav.innerHTML = `
-      <button id="btnReg" class="btn-primary text-sm">Regístrate aquí y aparta tus cupos</button>
       <button id="btnLogin" class="btn-ghost text-sm text-white/80">Ingresar</button>`;
-    $("btnReg").onclick = () => openAuth("register");
     $("btnLogin").onclick = () => openAuth("login");
   }
 }
@@ -386,8 +402,7 @@ function renderSummary() {
 // ================= Reservar =================
 $("btnBook").onclick = () => {
   if (!(S.mainId && S.date && S.time)) return;
-  if (!S.user) { S.pendingBooking = true; openAuth("register"); return; }
-  if (!S.profile) { S.pendingBooking = true; openAuth("register", true); return; }
+  if (!S.user || !S.profile) { updateGate(); return; }
   if (!S.cust && !S.consentOk) { openConsent(); return; }
   doHold();
 };
@@ -415,31 +430,74 @@ async function doHold() {
 }
 
 // ================= Registro / ingreso =================
-function openAuth(mode, completeProfile = false) {
-  setAuthTab(mode);
-  const pw = $("registerForm").password;
-  pw.closest("label").classList.toggle("hidden", completeProfile);
-  pw.required = !completeProfile;
-  if (completeProfile) {
-    $("registerForm").email.value = S.user?.email || "";
-    toast("Completa tus datos para poder reservar.");
-  }
-  openModal("authModal");
-}
+function openAuth(mode) { setAuthTab(mode); $("gate").scrollIntoView({ behavior: "smooth", block: "start" }); }
 function setAuthTab(mode) {
   const reg = mode === "register";
   $("registerForm").classList.toggle("hidden", !reg);
   $("loginForm").classList.toggle("hidden", reg);
   $("tabRegister").classList.toggle("tab-on", reg);
   $("tabLogin").classList.toggle("tab-on", !reg);
-  $("authTitle").textContent = reg ? "Regístrate y aparta tus cupos" : "Ingresa a tu cuenta";
+  $("authTitle").textContent = reg ? "Crea tu cuenta" : "Ingresa a tu cuenta";
 }
 $("tabRegister").onclick = () => setAuthTab("register");
 $("tabLogin").onclick = () => setAuthTab("login");
+document.querySelectorAll(".pwEye").forEach((b) => b.addEventListener("click", () => {
+  const inp = b.parentElement.querySelector("input");
+  const show = inp.type === "password";
+  inp.type = show ? "text" : "password";
+  b.innerHTML = show ? '<i class="fa-regular fa-eye-slash"></i>' : '<i class="fa-regular fa-eye"></i>';
+  b.setAttribute("aria-label", show ? "Ocultar contraseña" : "Mostrar contraseña");
+}));
+
+// ---------- WhatsApp con indicativo de país ----------
+// code = indicativo, len = dígitos del celular, start = con qué empieza, wa = prefijo que usa WhatsApp
+const COUNTRIES = [
+  { id: "CO", flag: "🇨🇴", name: "Colombia", code: "57", len: [10], start: /^3/, startTxt: "3", group: [3, 3, 4] },
+  { id: "VE", flag: "🇻🇪", name: "Venezuela", code: "58", len: [10], start: /^4/, startTxt: "4", group: [3, 3, 4] },
+  { id: "EC", flag: "🇪🇨", name: "Ecuador", code: "593", len: [9], start: /^9/, startTxt: "9", group: [2, 3, 4] },
+  { id: "PE", flag: "🇵🇪", name: "Perú", code: "51", len: [9], start: /^9/, startTxt: "9", group: [3, 3, 3] },
+  { id: "PA", flag: "🇵🇦", name: "Panamá", code: "507", len: [8], start: /^6/, startTxt: "6", group: [4, 4] },
+  { id: "MX", flag: "🇲🇽", name: "México", code: "52", len: [10], start: /^\d/, group: [3, 3, 4] },
+  { id: "CL", flag: "🇨🇱", name: "Chile", code: "56", len: [9], start: /^9/, startTxt: "9", group: [1, 4, 4] },
+  { id: "AR", flag: "🇦🇷", name: "Argentina", code: "54", wa: "549", len: [10], start: /^\d/, group: [2, 4, 4] },
+  { id: "ES", flag: "🇪🇸", name: "España", code: "34", len: [9], start: /^[67]/, startTxt: "6 o 7", group: [3, 3, 3] },
+  { id: "US", flag: "🇺🇸", name: "Estados Unidos", code: "1", len: [10], start: /^[2-9]/, group: [3, 3, 4] }
+];
+$("phoneCountry").innerHTML = COUNTRIES.map((c) => `<option value="${c.id}">${c.flag} +${c.code}</option>`).join("");
+const country = () => COUNTRIES.find((c) => c.id === $("phoneCountry").value) || COUNTRIES[0];
+function groupDigits(d, g) { const out = []; let i = 0; for (const n of g) { if (i >= d.length) break; out.push(d.slice(i, i + n)); i += n; } if (i < d.length) out.push(d.slice(i)); return out.join(" "); }
+// Revisa el número; devuelve el número internacional (+57...) o null con el mensaje del error
+function checkPhone(showOk = true) {
+  const c = country(), inp = $("phoneNumber"), msg = $("phoneMsg");
+  const d = inp.value.replace(/\D/g, "").slice(0, Math.max(...c.len));
+  let err = "";
+  if (!d) err = "Escribe tu número de WhatsApp.";
+  else if (!c.start.test(d)) err = `En ${c.name} el celular debe empezar por ${c.startTxt || "un número válido"}.`;
+  else if (!c.len.includes(d.length)) err = `En ${c.name} el celular tiene ${c.len.join(" o ")} dígitos (llevas ${d.length}).`;
+  inp.classList.toggle("bad", !!err && d.length > 0);
+  inp.classList.toggle("good", !err);
+  msg.className = "mt-1 text-xs font-normal " + (err ? (d.length ? "text-pole-red" : "text-ink/60") : "text-emerald-700");
+  msg.textContent = err ? (d.length ? err : `${c.flag} ${c.name}: ${c.len.join(" o ")} dígitos${c.startTxt ? ", empieza por " + c.startTxt : ""}.`) : (showOk ? "✓ Número válido" : "");
+  return err ? null : "+" + (c.wa || c.code) + d;
+}
+$("phoneNumber").addEventListener("input", () => {
+  const c = country();
+  let d = $("phoneNumber").value.replace(/\D/g, "");
+  if (d.startsWith(c.code) && d.length > Math.max(...c.len)) d = d.slice(c.code.length); // pegó el número con +57
+  d = d.slice(0, Math.max(...c.len));
+  $("phoneNumber").value = groupDigits(d, c.group);
+  checkPhone();
+});
+$("phoneCountry").addEventListener("change", () => {
+  const c = country();
+  $("phoneNumber").placeholder = groupDigits((c.startTxt || "3").slice(0, 1) + "001234567890".slice(0, Math.max(...c.len) - 1), c.group);
+  $("phoneNumber").dispatchEvent(new Event("input"));
+});
+$("phoneCountry").value = "CO"; $("phoneCountry").dispatchEvent(new Event("change"));
 
 function authError(err) {
   const c = err?.code || "";
-  if (c.includes("email-already-in-use")) return "Ese correo ya tiene cuenta. Usa la pestaña “Ya tengo cuenta”.";
+  if (c.includes("email-already-in-use")) return "Ese correo ya tiene cuenta. Usa la pestaña “Ingresar”.";
   if (c.includes("invalid-email")) return "El correo no es válido.";
   if (c.includes("weak-password")) return "La contraseña debe tener al menos 6 caracteres.";
   if (c.includes("invalid-credential") || c.includes("wrong-password") || c.includes("user-not-found")) return "Correo o contraseña incorrectos.";
@@ -451,32 +509,31 @@ function authError(err) {
 $("registerForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.target;
-  const fd = Object.fromEntries(new FormData(f));
-  const phone = normalizePhone(fd.whatsapp);
-  if (!fd.firstName?.trim() || !fd.lastName?.trim()) return toast("Escribe tu nombre y apellido.", "error");
-  if (!phone) return toast("Escribe un número de WhatsApp válido, por ejemplo 300 123 4567.", "error");
-  if (!/^\S+@\S+\.\S+$/.test(fd.email || "")) return toast("Escribe un correo válido.", "error");
+  const fullName = f.fullName.value.trim().replace(/\s+/g, " ");
+  if (fullName.length < 2) { f.fullName.focus(); return toast("Escribe tu nombre.", "error"); }
+  const phone = checkPhone();
+  if (!phone) { $("phoneNumber").focus(); return toast($("phoneMsg").textContent || "Revisa tu número de WhatsApp.", "error"); }
+  const email = (auth.currentUser?.email || f.email.value).trim();
+  if (!/^\S+@\S+\.\S+$/.test(email)) { f.email.focus(); return toast("Escribe un correo válido.", "error"); }
+  if (!auth.currentUser && f.password.value.length < 6) { f.password.focus(); return toast("La contraseña debe tener al menos 6 caracteres.", "error"); }
   if (!f.consent.checked) return toast("Debes aceptar el tratamiento de datos para continuar.", "error");
   const btn = f.querySelector("button[type=submit]");
   setBusy(btn, true, "Creando cuenta…");
   try {
     S.registering = true;
     let uid = auth.currentUser?.uid;
-    if (!uid) {
-      if ((fd.password || "").length < 6) throw { code: "weak-password" };
-      uid = (await createUserWithEmailAndPassword(auth, fd.email.trim(), fd.password)).user.uid;
-    }
-    const profile = {
-      firstName: fd.firstName.trim(), lastName: fd.lastName.trim(),
-      email: (auth.currentUser?.email || fd.email).trim().toLowerCase(), whatsapp: phone,
-      createdAt: serverTimestamp()
-    };
+    if (!uid) uid = (await createUserWithEmailAndPassword(auth, email, f.password.value)).user.uid;
+    const [first, ...rest] = fullName.split(" ");
+    const profile = { firstName: first, lastName: rest.join(" "), email: email.toLowerCase(), whatsapp: phone, createdAt: serverTimestamp() };
     await setDoc(doc(db, "users", uid), profile);
-    S.profile = profile;
-    S.consentOk = true; // aceptó la autorización de esta barbería en el formulario
-    closeModal("authModal"); f.reset();
-    toast("¡Cuenta creada!");
-    renderNav(); renderSummary(); afterAuth();
+    S.user = auth.currentUser; S.profile = profile;
+    S.consentOk = true; // aceptó la autorización de este negocio en el formulario
+    f.reset(); f.email.readOnly = false; f.password.closest("label").classList.remove("hidden");
+    $("phoneCountry").value = "CO"; $("phoneCountry").dispatchEvent(new Event("change"));
+    toast("¡Bienvenido, " + first + "! Ya puedes apartar tu cita.");
+    if (!unsubMine) subscribeMine();
+    updateGate(); renderNav(); renderAll();
+    window.scrollTo({ top: 0, behavior: "smooth" });
   } catch (err) { toast(authError(err), "error"); }
   finally { S.registering = false; setBusy(btn, false); }
 });
@@ -490,15 +547,9 @@ $("loginForm").addEventListener("submit", async (e) => {
     const cred = await signInWithEmailAndPassword(auth, f.email.value.trim(), f.password.value);
     S.user = cred.user;
     await loadProfile();
-    closeModal("authModal"); f.reset();
-    if (!S.profile) { openAuth("register", true); return; }
-    toast("Hola, " + (S.profile.firstName || ""));
-    renderSummary();
-    if (S.pendingBooking && !S.cust && !S.consentOk) {
-      try { const c = await getDoc(doc(db, bpath("customers", cred.user.uid))); S.cust = c.exists() ? c.data() : null; } catch { /* sin datos */ }
-      if (!S.cust) { S.pendingBooking = false; openConsent(); return; }
-    }
-    afterAuth();
+    f.reset();
+    updateGate();
+    if (S.profile) { toast("Hola, " + (S.profile.firstName || "")); renderAll(); window.scrollTo({ top: 0, behavior: "smooth" }); }
   } catch (err) { toast(authError(err), "error"); }
   finally { setBusy(btn, false); }
 });
@@ -510,43 +561,45 @@ $("btnForgot").onclick = async () => {
   catch (err) { toast(authError(err), "error"); }
 };
 
-function afterAuth() {
-  if (S.pendingBooking && S.mainId && S.date && S.time) {
-    S.pendingBooking = false;
-    if (!S.cust && !S.consentOk) openConsent(); else doHold();
-  }
-  else S.pendingBooking = false;
-}
-
 // ================= Pago con screenshot =================
 function showPay(apt) {
   S.payApt = apt;
   const st = S.settings || {};
-  const methods = (st.paymentMethods || []).map((m) => `
-    <li class="rounded-lg border border-line p-3">
-      <p class="font-semibold">${esc(m.label)}</p>
-      <p class="flex items-center justify-between gap-2 text-sm"><span>${esc(m.account)}${m.holder ? " · " + esc(m.holder) : ""}</span>
-        <button type="button" class="btn-sm" data-copy="${esc(m.account)}">Copiar</button></p>
-    </li>`).join("") || `<li class="text-sm text-ink/60">La barbería aún no ha configurado sus medios de pago.</li>`;
-  $("payBody").innerHTML = `
-    <p class="mb-3 text-sm text-ink/75">Tu cupo está apartado por unos minutos. Transfiere el abono y sube el screenshot.</p>
-    <div class="mb-3 rounded-xl bg-paper p-4">
-      <div class="flex items-end justify-between gap-3">
-        <div><p class="text-xs text-ink/60">Número de reservación</p><p class="font-narrow text-3xl font-bold tracking-wider">${esc(apt.code)}</p></div>
-        <button type="button" class="btn-sm" data-copy="${esc(apt.code)}">Copiar</button>
+  const methods = (st.paymentMethods || []);
+  const methodBox = (m, i) => `
+    <div class="rounded-xl border border-line bg-white p-3">
+      <div class="flex items-center justify-between gap-2">
+        <div class="min-w-0">
+          <span class="block text-[10px] font-bold uppercase tracking-wider text-ink/60">${esc(m.label)}</span>
+          <span class="select-all break-all font-mono text-base font-bold">${esc(m.account)}</span>
+          ${m.holder ? `<span class="block text-xs text-ink/60">${esc(m.holder)}</span>` : ""}
+        </div>
+        <div class="flex shrink-0 flex-col gap-1">
+          <button type="button" data-copy="${esc(m.account)}" class="rounded-lg bg-pole-blue px-2.5 py-1 text-xs font-bold text-white">Copiar</button>
+          ${m.qr ? `<button type="button" data-qr="${i}" class="btn-sm text-xs">Ver QR</button>` : ""}
+        </div>
       </div>
-      <p class="mt-2 text-sm">Escríbelo en el concepto o descripción de la transferencia.</p>
-    </div>
-    <dl class="mb-3 text-sm">
-      <div class="ticket-row"><dt>Abono a transferir</dt><dd class="text-lg">${cop(apt.depositCOP)}</dd></div>
-      <div class="ticket-row"><dt>Cita</dt><dd>${fechaCorta(apt.date)} · ${hora12(apt.startTime)}</dd></div>
-      <div class="ticket-row"><dt>Saldo en el local</dt><dd>${cop(apt.balanceDueCOP)}</dd></div>
-    </dl>
-    <ul class="space-y-2">${methods}</ul>
-    ${st.paymentInstructions ? `<p class="mt-3 text-sm text-ink/75">${esc(st.paymentInstructions)}</p>` : ""}
-    <p id="payCountdown" class="mt-3 rounded-lg bg-amber-50 p-2 text-center text-sm font-semibold text-amber-900"></p>`;
+      ${m.qr ? `<div id="qr${i}" class="mt-3 hidden flex-col items-center"><img src="${m.qr}" alt="Código QR de ${esc(m.label)}" class="h-44 w-44 rounded-lg border border-line object-contain">
+        <p class="mt-2 text-xs text-ink/60">Abre tu app bancaria, escanea el código y envía el valor exacto.</p></div>` : ""}
+    </div>`;
+  $("payBody").innerHTML = `
+    <div class="rounded-2xl border border-line bg-paper p-4">
+      <div class="mb-2 flex items-center justify-between gap-2">
+        <p class="text-xs font-bold uppercase tracking-wider text-ink/60">Reserva <span class="font-mono text-ink">${esc(apt.code)}</span></p>
+        <button type="button" data-copy="${esc(apt.code)}" class="btn-sm text-xs">Copiar</button>
+      </div>
+      <p class="text-center text-xs text-ink/60">Envía exactamente</p>
+      <div class="my-1 text-center"><span class="font-narrow text-4xl font-bold">${cop(apt.depositCOP)}</span></div>
+      <p class="text-center text-xs capitalize text-ink/70">${fechaCorta(apt.date)} · ${hora12(apt.startTime)} · ${(apt.items || []).map((i) => esc(i.name)).join(" + ")}</p>
+      <p class="mb-3 text-center text-xs text-ink/60">Total ${cop(apt.totalCOP)} · Saldo en el local ${cop(apt.balanceDueCOP)}</p>
+      <button type="button" data-copy="${Number(apt.depositCOP || 0)}" class="btn-sm mx-auto mb-3 block text-xs">Copiar monto</button>
+      <div class="space-y-2">${methods.length ? methods.map(methodBox).join("") : `<p class="rounded-xl border border-line bg-white p-3 text-center text-sm text-ink/60">El negocio aún no ha configurado sus medios de pago. Escríbele por WhatsApp.</p>`}</div>
+      <p id="payCountdown" class="mt-3 text-center text-sm font-bold text-amber-700"></p>
+      <p class="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs leading-snug text-amber-900">⚠️ ${st.paymentInstructions ? esc(st.paymentInstructions) : "Escribe tu número de reserva en el mensaje o concepto de la transferencia."} El pago queda confirmado cuando el negocio lo verifique.</p>
+    </div>`;
   $("proofForm").reset();
   $("proofPreview").classList.add("hidden");
+  $("proofLabel").innerHTML = `<b>Sube el screenshot del pago</b><br>Toca aquí para elegir la imagen`;
   closeModal("mineModal");
   openModal("payModal");
   clearInterval(S.payTimer);
@@ -560,10 +613,25 @@ function showPay(apt) {
     }
     submit.disabled = false;
     const m = Math.floor(left / 60000), s = Math.floor((left % 60000) / 1000);
-    el.textContent = `Tu cupo queda apartado ${m}:${String(s).padStart(2, "0")} minutos más`;
+    el.textContent = `⏱ Tu cupo queda apartado ${m}:${String(s).padStart(2, "0")}`;
   };
   tick(); S.payTimer = setInterval(tick, 1000);
 }
+$("payBody").addEventListener("click", (e) => {
+  const q = e.target.closest("[data-qr]"); if (!q) return;
+  const box = $("qr" + q.dataset.qr); if (!box) return;
+  const open = box.classList.toggle("hidden") === false;
+  box.classList.toggle("flex", open);
+  q.textContent = open ? "Ocultar QR" : "Ver QR";
+});
+$("btnCancelHold").onclick = async () => {
+  const apt = S.payApt; if (!apt) return;
+  if (!confirm(`¿Cancelar la reserva ${apt.code}? El horario quedará libre para otra persona.`)) return;
+  const btn = $("btnCancelHold"); setBusy(btn, true, "Cancelando…");
+  try { await api("cancelAppointment", { code: apt.code, reason: "Cancelada por el cliente antes de pagar" }); clearInterval(S.payTimer); closeModal("payModal"); toast("Reserva cancelada."); }
+  catch (err) { toast(err.message, "error"); }
+  finally { setBusy(btn, false); }
+};
 document.addEventListener("click", (e) => {
   const c = e.target.closest("[data-copy]"); if (c) copyText(c.dataset.copy);
   const x = e.target.closest("[data-close]"); if (x) { closeModal(x.dataset.close); if (x.dataset.close === "payModal") clearInterval(S.payTimer); }
@@ -572,9 +640,10 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") document.querySelectorAll(".modal.flex").forEach((m) => closeModal(m.id));
 });
 
-$("proofForm").proof.addEventListener("change", (e) => {
+$("proofFile").addEventListener("change", (e) => {
   const file = e.target.files[0]; if (!file) return;
   const img = $("proofPreview"); img.src = URL.createObjectURL(file); img.classList.remove("hidden");
+  $("proofLabel").innerHTML = `<b class="text-emerald-700">✓ Imagen lista</b><br>Toca para cambiarla`;
 });
 
 async function compressImage(file) {
@@ -590,7 +659,7 @@ async function compressImage(file) {
 $("proofForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.target;
-  const file = f.proof.files[0];
+  const file = $("proofFile").files[0];
   if (!file) return toast("Selecciona el screenshot de la transferencia.", "error");
   if (!file.type.startsWith("image/")) return toast("El comprobante debe ser una imagen.", "error");
   const btn = f.querySelector("button[type=submit]");
@@ -601,18 +670,33 @@ $("proofForm").addEventListener("submit", async (e) => {
     clearInterval(S.payTimer);
     closeModal("payModal");
     showTicket(r.appointment);
+    watchTicket(r.appointment.code);
   } catch (err) { toast(err.message || "No se pudo enviar el comprobante.", "error"); }
   finally { setBusy(btn, false); }
 });
 
 // ================= Ticket =================
+// Escucha la reserva: cuando el negocio aprueba el pago (desde Telegram) el ticket cambia solo
+let unsubTicket = null;
+function watchTicket(code) {
+  unsubTicket?.();
+  unsubTicket = onSnapshot(doc(db, bpath("appointments", code)), (s) => {
+    const a = s.data(); if (!a || $("ticketModal").classList.contains("hidden")) return;
+    if (S.ticketStatus && S.ticketStatus !== a.status) {
+      if (a.status === "confirmed") toast("¡Tu pago fue verificado! Turno confirmado.");
+      if (a.status === "rejected") toast("No pudimos verificar tu pago. Revisa tu correo o escríbenos.", "error");
+    }
+    showTicket(a);
+  }, () => {});
+}
 function showTicket(apt) {
   const st = S.settings || {};
   const note = {
     confirmed: "Cupo confirmado. Presenta este número al llegar.",
-    pending_verification: "Recibimos tu comprobante. Te avisamos por correo cuando lo revisemos.",
+    pending_verification: `<span class="spin mr-1"></span> Recibimos tu comprobante. El negocio está verificando el pago; esta pantalla se actualiza sola.`,
     pending_payment: "Falta subir el comprobante del abono."
   }[apt.status] || "";
+  S.ticketStatus = apt.status;
   $("ticket").innerHTML = `
     <article class="ticket">
       <div class="ticket-head">
@@ -678,7 +762,7 @@ $("mineList").addEventListener("click", async (e) => {
   const apt = S.mine.find((a) => a.code === b.dataset.code); if (!apt) return;
   const act = b.dataset.act;
   if (act === "pay") showPay(apt);
-  if (act === "ticket") { closeModal("mineModal"); showTicket(apt); }
+  if (act === "ticket") { closeModal("mineModal"); showTicket(apt); watchTicket(apt.code); }
   if (act === "resched") openResched(apt);
   if (act === "cancel") {
     if (!confirm(`¿Cancelar la reserva ${apt.code}?`)) return;

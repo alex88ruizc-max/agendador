@@ -82,3 +82,79 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .tpill[aria-pressed="true"] { background:var(--blue); color:#fff; font-size:.95rem; }
 .tpill:disabled { border-color:#dfe4e2; color:#b9c0bd; cursor:default; }
 .ticket-ok { width:3.5rem; height:3.5rem; border-radius:999px; background:#fff; color:var(--blue); display:grid; place-items:center; margin:0 auto .5rem; font-size:1.8rem; font-weight:800; border:3px solid var(--blue); }
+
+/* =====================================================================
+   TEMA "EPIC" para la página del cliente (body.epic): oscuro y compacto
+   ===================================================================== */
+body.epic { background:#0b0f19; color:#f3f4f6; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size:14px; }
+body.epic .font-narrow, body.epic .step-title { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; letter-spacing:0; }
+body.epic .pole-top { background:#0b0f19 !important; border-bottom:1px solid #1f2937; }
+body.epic .pole-top::after { display:none; }
+body.epic .bg-white { background:#111827 !important; }
+body.epic .bg-paper { background:#0f172a !important; }
+body.epic .bg-ink { background:#0b0f19 !important; }
+body.epic .text-ink { color:#f3f4f6 !important; }
+body.epic [class*="text-ink/"] { color:#9ca3af !important; }
+body.epic .border-line, body.epic .border-b, body.epic .border-t, body.epic .border-l { border-color:#1f2937 !important; }
+body.epic .bg-pole-blue { background:linear-gradient(135deg,#052e24,#0b3b2e) !important; border-bottom:1px solid rgba(16,185,129,.35); }
+body.epic .text-pole-blue { color:#34d399 !important; }
+body.epic .text-pole-red { color:#f87171 !important; }
+body.epic .step-title { font-size:1.05rem; font-weight:800; }
+body.epic .step-num { background:#10b981; color:#000; width:1.4rem; height:1.4rem; font-size:.75rem; }
+body.epic h2.font-narrow { font-size:1rem !important; letter-spacing:.12em; }
+
+body.epic .btn-primary { background:#10b981; color:#000; font-weight:800; border-radius:.75rem; padding:.6rem 1rem; font-size:.85rem; }
+body.epic .btn-primary:hover:not(:disabled) { background:#34d399; filter:none; }
+body.epic .btn-primary:disabled { background:#1f2937; color:#6b7280; }
+body.epic .btn-dark { background:#1f2937; color:#f3f4f6; border:1px solid #374151; border-radius:.75rem; font-size:.8rem; }
+body.epic .btn-light, body.epic .btn-sm { background:#1f2937; color:#e5e7eb; border:1px solid #374151; border-radius:.75rem; }
+body.epic .btn-sm:hover, body.epic .btn-light:hover { border-color:#10b981; }
+body.epic .btn-ghost:hover { background:rgba(255,255,255,.06); }
+body.epic .field { font-size:.75rem; color:#9ca3af; font-weight:600; }
+body.epic .field input, body.epic .field select, body.epic .field textarea { background:#1f2937; border:1px solid #374151; color:#fff; border-radius:.75rem; padding:.55rem .75rem; font-size:.9rem; }
+body.epic .field input:focus { outline:none; border-color:#10b981; }
+body.epic .tab { color:#9ca3af; }
+body.epic .tab-on { background:#1f2937; color:#fff; box-shadow:none; }
+
+body.epic .chip { background:#1f2937; border:1px solid #374151; color:#d1d5db; font-size:.75rem; padding:.3rem .75rem; }
+body.epic .chip[aria-pressed="true"] { background:#10b981; color:#000; border-color:#10b981; }
+body.epic .choice { background:rgba(31,41,55,.6); border:1px solid #374151; border-radius:.9rem; padding:.65rem .8rem; color:#f3f4f6; }
+body.epic .choice:hover { border-color:#10b981; }
+body.epic .choice[aria-pressed="true"] { border-color:#10b981; background:rgba(16,185,129,.1); box-shadow:inset 0 0 0 1px #10b981; }
+body.epic .choice .text-xs { color:#9ca3af; }
+body.epic .tpill { background:transparent; border:1px solid rgba(16,185,129,.55); color:#6ee7b7; font-size:.8rem; padding:.45rem .2rem; }
+body.epic .tpill:not(:disabled):hover { background:rgba(16,185,129,.12); }
+body.epic .tpill[aria-pressed="true"] { background:#10b981; color:#000; border-color:#10b981; font-weight:800; }
+body.epic .cday { width:2.3rem; height:2.3rem; font-size:.85rem; color:#e5e7eb; }
+body.epic .cday:not(:disabled):hover { background:#1f2937; }
+body.epic .cday:disabled { color:#374151; }
+body.epic .cday .hoy { color:#34d399; }
+body.epic .cday[aria-pressed="true"] { background:#10b981; color:#000; font-size:.95rem; font-weight:800; }
+body.epic .cday[aria-pressed="true"] .hoy { color:#000; }
+
+body.epic .modal { background:rgba(0,0,0,.8); backdrop-filter:blur(4px); }
+body.epic .modal-card { background:#111827; border:1px solid #1f2937; border-radius:1rem; color:#f3f4f6; }
+body.epic .ticket { background:#111827; border:1px solid #1f2937; }
+body.epic .ticket-head { background:#0b0f19; border-bottom:1px solid rgba(16,185,129,.35); }
+body.epic .ticket-head::after { display:none; }
+body.epic .ticket-code { color:#fff; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:2rem; }
+body.epic .ticket-cut { border-top-color:#374151; }
+body.epic .ticket-row dt { color:#9ca3af; } body.epic .ticket-row dd { color:#f3f4f6; }
+body.epic .ticket-ok { background:#10b981; color:#000; border-color:#10b981; }
+body.epic #bookBar { background:rgba(11,15,25,.95) !important; border-color:#1f2937 !important; }
+
+/* Etiquetas de estado sobre fondo oscuro */
+body.epic .bg-amber-100 { background:rgba(245,158,11,.15) !important; color:#fcd34d !important; }
+body.epic .bg-sky-100 { background:rgba(14,165,233,.15) !important; color:#7dd3fc !important; }
+body.epic .bg-emerald-100 { background:rgba(16,185,129,.15) !important; color:#6ee7b7 !important; }
+body.epic .bg-rose-100 { background:rgba(244,63,94,.15) !important; color:#fda4af !important; }
+body.epic .bg-slate-200 { background:#1f2937 !important; color:#9ca3af !important; }
+body.epic .bg-amber-50 { background:rgba(245,158,11,.1) !important; color:#fcd34d !important; }
+
+/* Dropzone del comprobante */
+.drop { display:flex; flex-direction:column; align-items:center; gap:.3rem; padding:1rem; border:1.5px dashed var(--line); border-radius:.9rem; background:var(--paper); color:rgba(23,34,46,.7); font-size:.85rem; text-align:center; cursor:pointer; }
+.drop:hover { border-color:var(--blue); }
+.field input.bad { border-color:var(--red); }
+.field input.good { border-color:#059669; }
+.spin { display:inline-block; width:1rem; height:1rem; border:2px solid rgba(36,80,138,.25); border-top-color:var(--blue); border-radius:999px; animation:spin .8s linear infinite; vertical-align:-3px; }
+@keyframes spin { to { transform:rotate(360deg); } }
