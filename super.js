@@ -3,7 +3,7 @@ import { onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordRe
 import {
   doc, getDoc, setDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { APP_VERSION, readPublishedVersion, reloadFresh, startUpdateWatcher, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-10-08p";
+import { APP_VERSION, readPublishedVersion, reloadFresh, startUpdateWatcher, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-10-08r";
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on) => $(id).classList.toggle("hidden", !on);
@@ -42,7 +42,7 @@ $("btnForgot").onclick = async () => {
 $("btnLogout").onclick = () => signOut(auth);
 
 // Menú de secciones (igual al del panel de las tiendas)
-const SUPER_TABS = [["biz", "Tiendas", "fa-store", "#2563eb"], ["pay", "Pagos", "fa-money-bill-wave", "#059669"], ["tg", "Telegram", "fa-paper-plane", "#0891b2"], ["ver", "Versión", "fa-rotate", "#7c3aed"]];
+const SUPER_TABS = [["biz", "Tiendas", "fa-store", "#2563eb"], ["plan", "Cobro", "fa-crown", "#ca8a04"], ["pay", "Pagos", "fa-money-bill-wave", "#059669"], ["tg", "Telegram", "fa-paper-plane", "#0891b2"], ["ver", "Versión", "fa-rotate", "#7c3aed"]];
 let superTab = "biz";
 function renderSuperTabs() {
   $("tabs").innerHTML = SUPER_TABS.map(([id, t, ic, col]) => `<button class="admin-tab" data-stab="${id}" aria-current="${superTab === id ? "page" : "false"}"><i class="fa-solid ${ic}" style="color:${col}"></i><span>${t}</span></button>`).join("");
@@ -52,6 +52,7 @@ $("tabs").addEventListener("click", (e) => {
   superTab = b.dataset.stab;
   document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("hidden", p.id !== "sec-" + superTab));
   renderSuperTabs();
+  if (superTab === "plan") loadPlanCfg();
 });
 function start() {
   renderSuperTabs();
@@ -375,3 +376,70 @@ $("btnCheckVersion").onclick = async () => {
   } finally { setBusy(btn, false); }
 };
 startUpdateWatcher();
+
+// ================= Cobro: plan, prueba gratis y medios de pago del superusuario =================
+let PL = { methods: [] };
+async function loadPlanCfg() {
+  const pp = (await getDoc(doc(db, "platform", "public")).catch(() => null))?.data() || {};
+  $("plName").value = pp.planName || ""; $("plPrice").value = pp.planPriceCOP ?? ""; $("plDays").value = pp.trialDays ?? 30;
+  $("plTrial").checked = pp.trialEnabled !== false;
+  PL.methods = (pp.payMethods || []).map((m) => ({ ...m }));
+  $("bbOn").checked = !!pp.brebEnabled; $("bbKey").value = pp.brebKey || ""; $("bbHolder").value = pp.brebHolder || ""; $("bbSender").value = pp.brebSender || "nequi";
+  PL.brebQr = pp.brebQr || ""; $("bbQrImg").src = PL.brebQr; $("bbQrImg").classList.toggle("hidden", !PL.brebQr);
+  renderPlMethods();
+}
+function readPl() {
+  PL.methods = [...document.querySelectorAll("[data-plm]")].map((r) => ({
+    label: r.querySelector(".plL").value.trim(), account: r.querySelector(".plA").value.trim(), holder: r.querySelector(".plH").value.trim(),
+    qr: PL.methods[Number(r.dataset.plm)]?.qr || ""
+  }));
+}
+function renderPlMethods() {
+  $("plMethods").innerHTML = PL.methods.map((m, i) => `<div class="grid gap-2 rounded-lg bg-paper p-2 sm:grid-cols-3" data-plm="${i}">
+    <input class="plL rounded border border-line px-2 py-1.5" placeholder="Nequi, Bre-B, Bancolombia…" value="${esc(m.label)}">
+    <input class="plA rounded border border-line px-2 py-1.5" placeholder="Número o llave" value="${esc(m.account)}">
+    <input class="plH rounded border border-line px-2 py-1.5" placeholder="Titular" value="${esc(m.holder || "")}">
+    <div class="flex flex-wrap items-center gap-2 sm:col-span-3">
+      ${m.qr ? `<img src="${m.qr}" alt="QR" class="h-12 w-12 rounded border border-line bg-white object-contain">` : ""}
+      <label class="btn-sm cursor-pointer">${m.qr ? "Cambiar QR" : "Subir QR (opcional)"}<input type="file" accept="image/*" class="hidden" data-plqr="${i}"></label>
+      <button type="button" class="btn-sm" data-plrm="${i}">Quitar</button>
+    </div></div>`).join("") || `<p class="text-sm text-ink/60">Agrega al menos un medio de pago.</p>`;
+}
+$("plAdd").onclick = () => { readPl(); PL.methods.push({ label: "", account: "", holder: "", qr: "" }); renderPlMethods(); };
+$("plMethods").addEventListener("click", (e) => { const b = e.target.closest("[data-plrm]"); if (b) { readPl(); PL.methods.splice(Number(b.dataset.plrm), 1); renderPlMethods(); } });
+$("plMethods").addEventListener("change", async (e) => {
+  const inp = e.target.closest("[data-plqr]"); if (!inp || !inp.files[0]) return;
+  readPl();
+  const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = URL.createObjectURL(inp.files[0]); });
+  const max = 480; let w = img.naturalWidth, h = img.naturalHeight;
+  if (Math.max(w, h) > max) { const r = max / Math.max(w, h); w = Math.round(w * r); h = Math.round(h * r); }
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  const x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, w, h); x.drawImage(img, 0, 0, w, h);
+  PL.methods[Number(inp.dataset.plqr)].qr = c.toDataURL("image/jpeg", 0.85);
+  renderPlMethods(); toast("QR listo. Toca Guardar.");
+});
+$("bbQr").onchange = async (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = URL.createObjectURL(f); });
+  const max = 480; let w = img.naturalWidth, h = img.naturalHeight;
+  if (Math.max(w, h) > max) { const r = max / Math.max(w, h); w = Math.round(w * r); h = Math.round(h * r); }
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  const x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, w, h); x.drawImage(img, 0, 0, w, h);
+  PL.brebQr = c.toDataURL("image/jpeg", 0.85); $("bbQrImg").src = PL.brebQr; $("bbQrImg").classList.remove("hidden");
+  toast("QR listo. Toca Guardar.");
+};
+$("plSave").onclick = async () => {
+  readPl();
+  const btn = $("plSave"); setBusy(btn, true, "Guardando…");
+  try {
+    await setDoc(doc(db, "platform", "public"), {
+      planName: $("plName").value.trim() || "Plan mensual", planPriceCOP: Number($("plPrice").value || 0),
+      trialDays: Math.min(90, Math.max(1, Number($("plDays").value || 30))), trialEnabled: $("plTrial").checked,
+      payMethods: PL.methods.filter((m) => m.label && m.account),
+      brebEnabled: $("bbOn").checked, brebKey: $("bbKey").value.trim(), brebHolder: $("bbHolder").value.trim(),
+      brebSender: $("bbSender").value.trim() || "nequi", brebQr: PL.brebQr || ""
+    }, { merge: true });
+    toast("Guardado. Los dueños ya lo ven en “Mi plan”.");
+  } catch (err) { toast(err.message, "error"); }
+  finally { setBusy(btn, false); }
+};

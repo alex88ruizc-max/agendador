@@ -7,7 +7,7 @@ import {
   startUpdateWatcher, applyBrandColors, uiConfirm, uiPrompt, setDialogBrand, viewImage, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, hora12, fechaLarga, fechaCorta, toMillis, cop, esc, normalizePhone,
   waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, DEFAULT_WA_RESCHEDULE, computeSlots, onColor, darken,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-10-08p";
+} from "./common.js?v=2026-10-08r";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -131,6 +131,7 @@ async function renderPlanBanner() {
   const msgs = [];
   if (A.me.isSuper) msgs.push(`Estás viendo el panel de ${esc(A.biz.name)} como superusuario. <a class="underline" href="super.html">Volver a mis negocios</a>`);
   if (A.biz.status !== "active") msgs.push("⛔ Tu agenda en línea está suspendida: tus clientes no pueden reservar desde la página. Comunícate con soporte para reactivarla.");
+  if (isTrial()) msgs.push(`🎁 Estás en prueba gratis: tus clientes agendan hasta ${TRIAL_DAYS_AHEAD} días adelante y algunas funciones están bloqueadas 🔒. <a href="#" class="underline" data-goplan="1">Activar mi plan</a>`);
   if (isOwner()) {
     try {
       const b = (await getDoc(doc(db, bpath("private", "billing")))).data();
@@ -157,11 +158,22 @@ function subscribeDay() {
 const TABS = {
   agenda: ["Agenda", "fa-calendar-days", "#2563eb"], staff: ["Equipo y descansos", "fa-users", "#7c3aed"],
   clients: ["Clientes", "fa-address-book", "#db2777"], services: ["Servicios", "fa-scissors", "#ea580c"],
-  appearance: ["Apariencia", "fa-palette", "#c026d3"], images: ["Imágenes", "fa-image", "#0891b2"],
+  appearance: ["Apariencia", "fa-palette", "#c026d3"], images: ["Imágenes", "fa-image", "#0891b2"], plan: ["Mi plan", "fa-crown", "#ca8a04"],
   settings: ["Configuración", "fa-gear", "#475569"]
 };
-const ALL_TABS = ["agenda", "staff", "clients", "services", "appearance", "images", "settings"];
-const LOCKED_TABS = ["appearance", "settings"]; // siempre visibles para poder deshacer cambios
+const TRIAL_LOCKED = ["clients", "appearance", "images"]; // funciones Pro
+const isTrial = () => !!A.biz?.trial && !A.me?.isSuper;
+const TRIAL_DAYS_AHEAD = 5;
+function goTab(id) { const b = document.querySelector(`[data-tab="${id}"]`); if (b) b.click(); }
+function lockCard(id) {
+  $("tab-" + id).innerHTML = `<div class="rounded-2xl border border-line bg-white p-6 text-center">
+    <p class="text-4xl">🔒</p><p class="mt-2 font-narrow text-2xl font-bold">${TABS[id][0]} es una función Pro</p>
+    <p class="mx-auto mt-1 max-w-sm text-sm text-ink/70">Durante la prueba gratis está bloqueada. Activa tu plan y se desbloquea al instante, junto con agendar más de ${TRIAL_DAYS_AHEAD} días adelante, varios profesionales y avisos por Telegram al equipo.</p>
+    <button class="btn-primary mt-4" data-goplan="1">👑 Activar mi plan</button></div>`;
+}
+document.addEventListener("click", (e) => { if (e.target.closest("[data-goplan]")) { e.preventDefault(); goTab("plan"); } });
+const ALL_TABS = ["agenda", "staff", "clients", "services", "appearance", "images", "plan", "settings"];
+const LOCKED_TABS = ["appearance", "settings", "plan"]; // siempre visibles para poder deshacer cambios
 const PANEL_DEFAULT = { useBrand: true, linkLabel: "Link clientes", shareMsg: "Agenda tu cita en {negocio} aquí: {link}", columns: 3, style: "cards", colorIcons: true, order: ALL_TABS, hidden: [] };
 function panelPrefs() {
   const p = { ...PANEL_DEFAULT, ...(A.settings?.panel || {}) };
@@ -171,11 +183,11 @@ function panelPrefs() {
 }
 function renderTabs() {
   const P = panelPrefs();
-  const allowed = ["agenda", "staff"].concat(isOwner() ? ["clients", "services", "appearance", "images", "settings"] : []);
+  const allowed = ["agenda", "staff"].concat(isOwner() ? ["clients", "services", "appearance", "images", "plan", "settings"] : []);
   const ids = P.order.filter((id) => allowed.includes(id) && (!P.hidden.includes(id) || A.tab === id));
   const t = $("tabs");
   t.className = `grid gap-1.5 lg:grid-cols-1 ${({ 2: "grid-cols-2", 3: "grid-cols-3", 4: "grid-cols-4" })[P.columns] || "grid-cols-3"} ${P.style === "list" ? "tabs-list" : ""} ${P.colorIcons ? "" : "tabs-mono"}`;
-  t.innerHTML = ids.map((id) => `<button class="admin-tab" data-tab="${id}" aria-current="${A.tab === id ? "page" : "false"}"><i class="fa-solid ${TABS[id][1]}" style="color:${TABS[id][2]}"></i><span>${TABS[id][0]}</span></button>`).join("");
+  t.innerHTML = ids.map((id) => `<button class="admin-tab relative" data-tab="${id}" aria-current="${A.tab === id ? "page" : "false"}"><i class="fa-solid ${TABS[id][1]}" style="color:${TABS[id][2]}"></i><span>${TABS[id][0]}</span>${isTrial() && TRIAL_LOCKED.includes(id) ? `<span class="absolute right-1.5 top-1 text-[11px]" aria-label="Bloqueada">🔒</span>` : ""}</button>`).join("");
   $("linkCard").classList.remove("hidden");
   $("linkTitle").textContent = P.linkLabel || PANEL_DEFAULT.linkLabel;
 }
@@ -196,11 +208,13 @@ $("tabs").addEventListener("click", (e) => {
   renderTabs();
   $("hdrTitle").textContent = TABS[A.tab][0];
   if (window.innerWidth < 1024) $("adminContent").scrollIntoView({ behavior: "smooth", block: "start" });
+  if (isTrial() && TRIAL_LOCKED.includes(A.tab)) return lockCard(A.tab);
   if (A.tab === "clients") loadUsers();
   if (A.tab === "settings") renderSettings();
   if (A.tab === "services") renderServices();
   if (A.tab === "appearance") renderAppearance();
   if (A.tab === "images") renderImages();
+  if (A.tab === "plan") renderPlan();
 });
 
 // ================= Modal genérico =================
@@ -467,7 +481,7 @@ function renderStaffTab() {
   el.innerHTML = `
     ${isOwner() ? `<div class="mb-4 flex flex-wrap items-center justify-between gap-2">
       <p class="text-sm text-ink/70">${ownerTg ? "Tu Telegram de dueño está conectado." : "Conecta tu Telegram de dueño en Configuración para recibir todos los avisos."}</p>
-      <button class="btn-primary" data-sact="new">+ Agregar al equipo</button></div>` : ""}
+      ${isTrial() ? `<button class="btn-light" data-goplan="1">🔒 Agregar al equipo (Pro)</button>` : `<button class="btn-primary" data-sact="new">+ Agregar al equipo</button>`}</div>` : ""}
     <section class="mb-4 rounded-xl border border-line bg-white p-4">
       <div class="mb-2 flex items-center gap-2"><i class="fa-regular fa-clock text-pole-blue"></i><h3 class="font-narrow text-xl font-bold">Disponibilidad ${list.length > 1 ? "del equipo" : ""}</h3></div>
       <p class="mb-3 text-xs text-ink/60">${list.length > 1
@@ -967,7 +981,7 @@ function renderSettings() {
           <input id="stSlotCustom" type="number" min="15" step="15" class="mt-2 ${[15, 30, 45, 60, 90, 120].includes(Number(s.slotDurationMinutes || 30)) ? "hidden" : ""}" value="${Number(s.slotDurationMinutes || 30)}" placeholder="Minutos (múltiplo de 15)"></label>
         ${num("stDeposit", "Abono para apartar (COP)", s.depositAmountCOP, 'min="0" step="1000"')}
         ${num("stHold", "Minutos para subir el comprobante", s.holdMinutes ?? 30, 'min="5"')}
-        ${num("stWindow", "Días hacia adelante que se puede reservar", s.bookingWindowDays ?? 30, 'min="1"')}
+        ${num("stWindow", isTrial() ? `Días hacia adelante (máx. ${TRIAL_DAYS_AHEAD} en prueba gratis)` : "Días hacia adelante que se puede reservar", isTrial() ? Math.min(TRIAL_DAYS_AHEAD, s.bookingWindowDays ?? TRIAL_DAYS_AHEAD) : (s.bookingWindowDays ?? 30), isTrial() ? `min="1" max="${TRIAL_DAYS_AHEAD}"` : 'min="1"')}
         ${num("stAdvance", "Anticipación mínima (minutos)", s.minAdvanceMinutes ?? 60, 'min="0"')}
         ${num("stTolerance", "Tolerancia de espera (minutos)", s.toleranceMinutes ?? 10, 'min="0"')}
       </div>
@@ -1115,7 +1129,7 @@ async function saveSettings(e) {
   const data = {
     businessName: $("stName").value.trim(), whatsapp: phone, address: $("stAddress").value.trim(), city: $("stCity").value.trim(),
     slotDurationMinutes: slotVal, businessType: $("stType").value, staffLabel: $("stStaffLabel").value.trim(), depositAmountCOP: n("stDeposit"), holdMinutes: Math.max(5, n("stHold")),
-    bookingWindowDays: Math.max(1, n("stWindow")), minAdvanceMinutes: n("stAdvance"), toleranceMinutes: n("stTolerance"),
+    bookingWindowDays: isTrial() ? Math.min(TRIAL_DAYS_AHEAD, Math.max(1, n("stWindow"))) : Math.max(1, n("stWindow")), minAdvanceMinutes: n("stAdvance"), toleranceMinutes: n("stTolerance"),
     autoConfirmProof: $("stAuto").checked, businessHours: hours, closedDates: A.closedDraft,
     paymentMethods: A.pmDraft.filter((m) => m.label && m.account).map((m) => ({ label: m.label, account: m.account, holder: m.holder || "", qr: m.qr || "" })), paymentInstructions: $("stPayInstr").value.trim(),
     rescheduleMinHours: n("stReschedH"), maxReschedules: n("stMaxResched"), noShowThreshold: Math.max(1, n("stNoShow")),
@@ -1529,4 +1543,121 @@ async function deleteClient(u) {
     A.users = A.users.filter((x) => x.uid !== u.uid);
     closeM(); renderClients(); toast(`${name} fue eliminado de tus clientes.`);
   } catch (err) { toast("No se pudo eliminar: " + err.message, "error"); }
+}
+
+// ================= Mi plan (lo que la tienda le paga a la plataforma) =================
+let unsubPlan = null;
+function renderPlan() {
+  const el = $("tab-plan");
+  el.innerHTML = `<p class="text-sm text-ink/60">Cargando tu plan…</p>`;
+  unsubPlan?.();
+  let pp = {};
+  getDoc(doc(db, "platform", "public")).then((s) => { pp = s.data() || {}; draw(); }).catch(() => {});
+  let bl = null;
+  unsubPlan = onSnapshot(doc(db, bpath("private", "billing")), (s) => {
+    bl = s.data() || {};
+    if (A.biz?.trial && bl.trial === false) { // el pago llegó: se desbloquea todo
+      A.biz.trial = false; renderTabs(); renderPlanBanner();
+      toast("🎉 ¡Pago recibido! Tu plan está activo y todas las funciones quedaron desbloqueadas.");
+    }
+    draw();
+  }, onErr);
+  A.unsubs.push(() => unsubPlan?.());
+  A.planMonths = A.planMonths || 1;
+  // Bloque del pago automático por Bre-B (monto único que el sistema reconoce solo)
+  function brebBlock() {
+    const o = bl.pendingOrder && bl.pendingOrder.status === "pending" && toMillis(bl.pendingOrder.expiresAt) > Date.now() ? bl.pendingOrder : null;
+    const months = bl.mode === "monthly" ? A.planMonths : 1;
+    if (!o) return `<section class="rounded-xl border-2 border-emerald-500 bg-white p-4">
+      <div class="mb-1 flex items-center gap-2"><span class="text-xl">⚡</span><h3 class="font-narrow text-xl font-bold">Pago automático Bre-B</h3></div>
+      <p class="mb-3 text-sm text-ink/70">Pagas desde Nequi, Bancolombia o cualquier banco con la llave Bre-B y tu plan se activa solo en pocos minutos. Sin comprobante.</p>
+      ${bl.mode === "monthly" ? `<div class="mb-3 flex flex-wrap gap-2">${[1, 3, 6, 12].map((m) => `<button class="chip" data-pm="${m}" aria-pressed="${months === m}">${m === 1 ? "1 mes" : m + " meses"}</button>`).join("")}</div>` : ""}
+      <button id="brebGo" class="btn-primary w-full py-3 !bg-emerald-600">Pagar ${cop(Number(bl.priceCOP || 0) * months)} con Bre-B</button></section>`;
+    return `<section class="rounded-xl border-2 border-emerald-500 bg-white p-4">
+      <div class="mb-2 flex items-center justify-between gap-2"><div class="flex items-center gap-2"><span class="text-xl">⚡</span><h3 class="font-narrow text-xl font-bold">Paga con Bre-B</h3></div>
+        <span class="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-800"><span class="spin mr-1"></span>Esperando pago</span></div>
+      <div class="pay-amount mb-2"><div><p class="text-[11px] font-semibold uppercase tracking-wider text-ink/60">Envía exactamente</p>
+        <p class="font-narrow text-3xl font-bold leading-none">${cop(o.amountCOP)}</p>
+        <p class="mt-1 text-[11px] text-ink/60">${o.months} mes(es). El valor incluye ${cop(o.amountCOP - o.baseCOP)} para reconocer tu pago.</p></div>
+        <button type="button" class="pay-ibtn" data-copy="${o.amountCOP}" aria-label="Copiar monto"><i class="fa-regular fa-copy"></i></button></div>
+      <div class="pay-row"><div class="min-w-0 flex-1"><p class="text-[10px] font-bold uppercase tracking-wider text-ink/55">Llave Bre-B${pp.brebHolder ? ` · <span class="normal-case tracking-normal">${esc(pp.brebHolder)}</span>` : ""}</p>
+        <p class="truncate font-mono text-[15px] font-bold">${esc(pp.brebKey)}</p></div>
+        ${pp.brebQr ? `<button type="button" class="pay-ibtn" id="brebQr" aria-label="Ver QR"><i class="fa-solid fa-qrcode"></i></button>` : ""}
+        <button type="button" class="pay-ibtn main" data-copy="${esc(pp.brebKey)}" aria-label="Copiar llave"><i class="fa-regular fa-copy"></i></button></div>
+      <p class="mt-2 text-xs leading-snug text-ink/65">⚠️ Envía <b>el valor exacto</b>, con los últimos pesos incluidos. Tu plan se activa solo entre 5 y 10 minutos después de pagar; esta pantalla se actualiza sola. Vigente hasta ${new Date(toMillis(o.expiresAt)).toLocaleString("es-CO", { timeZone: "America/Bogota", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}.</p>
+    </section>`;
+  }
+  function draw() {
+    if (!bl) return;
+    const today = bogNow().date;
+    const days = bl.paidUntil ? Math.round((Date.parse(bl.paidUntil + "T00:00:00-05:00") - Date.parse(today + "T00:00:00-05:00")) / 86400000) : null;
+    const suspended = A.biz?.status !== "active";
+    const status = suspended ? ["Pausada", "bg-rose-100 text-rose-900"]
+      : bl.mode === "monthly" && days !== null && days < 0 ? ["Vencido", "bg-rose-100 text-rose-900"]
+      : bl.trial ? ["Prueba gratis", "bg-sky-100 text-sky-900"] : ["Activo", "bg-emerald-100 text-emerald-900"];
+    const price = Number(bl.priceCOP || 0);
+    const planName = pp.planName || "Plan mensual";
+    let duration = "";
+    if (bl.mode === "monthly" && bl.paidUntil) duration = (bl.trial ? "Prueba gratis hasta el " : "Pagado hasta el ") + fechaLarga(bl.paidUntil) +
+      (days > 0 ? ` (faltan ${days} día${days === 1 ? "" : "s"})` : days === 0 ? " (vence hoy)" : ` (venció hace ${-days} día${days === -1 ? "" : "s"}; tienes ${Math.max(0, Number(bl.graceDays || 0) + days)} día(s) de gracia)`);
+    if (bl.mode === "one_time") duration = bl.paidOnce ? "Pago único: pagado. Tu agenda no vence." : "Pago único pendiente.";
+    if (bl.mode === "manual") duration = "Plan acordado directamente con soporte.";
+    const methods = pp.payMethods || [];
+    const canPay = bl.mode === "monthly" || (bl.mode === "one_time" && !bl.paidOnce);
+    const months = bl.mode === "monthly" ? A.planMonths : 1;
+    const total = price * months;
+    el.innerHTML = `
+      <div class="space-y-3">
+        <section class="rounded-xl border border-line bg-white p-4">
+          <div class="mb-2 flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2"><i class="fa-solid fa-crown text-amber-500"></i><h3 class="font-narrow text-xl font-bold">${esc(planName)}</h3></div>
+            <span class="rounded-full px-2.5 py-0.5 text-xs font-semibold ${status[1]}">${status[0]}</span>
+          </div>
+          <p class="font-narrow text-3xl font-bold">${cop(price)}<span class="text-base font-semibold text-ink/60"> / mes</span></p>
+          <p class="mt-1 text-sm">${esc(duration)}</p>
+          ${bl.trial ? `<p class="mt-3 rounded-lg bg-sky-50 p-3 text-sm text-sky-900">🎁 Estás en tu periodo gratis. Cuando termine, pagas la mensualidad para seguir recibiendo reservas. El pago es <b>mes vencido</b>: pagas al final de cada mes que usaste.</p>` : ""}
+          ${suspended ? `<p class="mt-3 rounded-lg bg-rose-50 p-3 text-sm text-rose-900">Tu agenda en línea está pausada: tus clientes no pueden reservar. Paga tu plan abajo y se reactiva apenas lo aprobemos.</p>` : ""}
+        </section>
+        ${bl.pendingProof ? `<section class="rounded-xl border border-sky-300 bg-sky-50 p-4 text-sm text-sky-900"><b><span class="spin mr-1"></span> Comprobante en revisión</b><br>Lo enviaste el ${new Date(toMillis(bl.pendingProof.at)).toLocaleDateString("es-CO", { timeZone: "America/Bogota" })} por ${cop(bl.pendingProof.amountCOP)}. Esta pantalla se actualiza sola cuando lo aprobemos.</section>` : ""}
+        ${canPay && pp.brebEnabled && pp.brebKey ? brebBlock() : ""}
+        ${canPay ? `<${pp.brebEnabled && pp.brebKey ? "details" : "section"} class="rounded-xl border border-line bg-white p-4">
+          ${pp.brebEnabled && pp.brebKey ? `<summary class="cursor-pointer font-semibold">¿Pagaste por otro medio? Sube el comprobante</summary><div class="mt-3"></div>` : ""}
+          <h3 class="mb-2 font-narrow text-xl font-bold">${bl.trial ? "Pagar mi plan" : "Renovar mi plan"}</h3>
+          ${bl.mode === "monthly" ? `<div class="mb-3 flex flex-wrap gap-2">${[1, 3, 6, 12].map((m) => `<button class="chip" data-pm="${m}" aria-pressed="${months === m}">${m === 1 ? "1 mes" : m + " meses"}</button>`).join("")}</div>` : ""}
+          <div class="pay-amount mb-2"><div><p class="text-[11px] font-semibold uppercase tracking-wider text-ink/60">Envía exactamente</p><p class="font-narrow text-3xl font-bold leading-none">${cop(total)}</p></div>
+            <button type="button" class="pay-ibtn" data-copy="${total}" aria-label="Copiar monto"><i class="fa-regular fa-copy"></i></button></div>
+          <div class="space-y-1.5">${methods.length ? methods.map((m, i) => `
+            <div class="pay-row"><div class="min-w-0 flex-1"><p class="text-[10px] font-bold uppercase tracking-wider text-ink/55">${esc(m.label)}${m.holder ? ` · <span class="normal-case tracking-normal">${esc(m.holder)}</span>` : ""}</p>
+              <p class="truncate font-mono text-[15px] font-bold">${esc(m.account)}</p></div>
+              ${m.qr ? `<button type="button" class="pay-ibtn" data-planqr="${i}" aria-label="Ver QR"><i class="fa-solid fa-qrcode"></i></button>` : ""}
+              <button type="button" class="pay-ibtn main" data-copy="${esc(m.account)}" aria-label="Copiar"><i class="fa-regular fa-copy"></i></button></div>`).join("")
+            : `<p class="rounded-lg border border-line p-3 text-sm text-ink/60">Los medios de pago aún no están configurados. Escríbele a soporte.</p>`}</div>
+          <p class="mt-2 text-xs text-ink/60">💬 En el mensaje de la transferencia escribe <b>${esc(A.biz?.name || "")}</b>.</p>
+          <label class="pay-drop mt-3" for="planFile"><span class="pay-drop-ico"><i class="fa-solid fa-camera"></i></span>
+            <span id="planLabel" class="min-w-0 flex-1 text-sm"><b>Sube el comprobante</b><br><span class="text-xs text-ink/60">Toca para elegir la captura del pago</span></span>
+            <img id="planPrev" class="hidden h-12 w-12 rounded-md object-cover" alt=""></label>
+          <input id="planFile" type="file" accept="image/*" class="hidden">
+          <button id="planSend" class="btn-primary mt-2 w-full py-3">Enviar comprobante</button>
+        </${pp.brebEnabled && pp.brebKey ? "details" : "section"}>` : ""}
+      </div>`;
+    el.querySelectorAll("[data-pm]").forEach((b) => b.onclick = () => { A.planMonths = Number(b.dataset.pm); draw(); });
+    if ($("brebGo")) $("brebGo").onclick = async () => {
+      const btn = $("brebGo"); setBusy(btn, true, "Generando tu pago…");
+      try { await api("createPlanOrder", { months: A.planMonths }); } catch (err) { toast(err.message, "error"); setBusy(btn, false); }
+    };
+    if ($("brebQr")) $("brebQr").onclick = () => viewImage(pp.brebQr, `Bre-B: ${pp.brebKey}`);
+    el.querySelectorAll("[data-planqr]").forEach((b) => b.onclick = () => { const m = methods[Number(b.dataset.planqr)]; viewImage(m.qr, `${m.label}: ${m.account}`); });
+    if ($("planFile")) $("planFile").onchange = (e) => {
+      const f = e.target.files[0]; if (!f) return;
+      $("planPrev").src = URL.createObjectURL(f); $("planPrev").classList.remove("hidden");
+      $("planLabel").innerHTML = `<b class="text-emerald-700">✓ Comprobante listo</b><br><span class="text-xs text-ink/60">Toca para cambiarlo</span>`;
+      A.planProof = imgToDataUrl(f, 1280, "image/jpeg");
+    };
+    if ($("planSend")) $("planSend").onclick = async () => {
+      if (!A.planProof) return toast("Primero sube la captura del pago.", "error");
+      const btn = $("planSend"); setBusy(btn, true, "Enviando…");
+      try { await api("submitPlanProof", { image: await A.planProof, months }); A.planProof = null; toast("¡Recibido! Te avisamos cuando lo aprobemos."); }
+      catch (err) { toast(err.message, "error"); setBusy(btn, false); }
+    };
+  }
 }

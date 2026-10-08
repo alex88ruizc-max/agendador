@@ -11,9 +11,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Archivo+Narrow:wght@500;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="theme.js?v=2026-10-08p"></script>
+  <script src="theme.js?v=2026-10-08r"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="styles.css?v=2026-10-08p">
+  <link rel="stylesheet" href="styles.css?v=2026-10-08r">
 </head>
 <body class="bg-paper text-ink font-sans antialiased">
 
@@ -144,9 +144,41 @@
       <button id="btnBook" class="btn-primary w-full py-3 text-base" disabled>Apartar cupo</button>
     </section>
     </div>
+    <!-- Probar gratis: para dueños de negocios que ven la página -->
+    <section id="trialCta" class="mx-auto mt-6 hidden max-w-md rounded-2xl border border-dashed border-line bg-white p-4 text-center">
+      <p class="font-narrow text-lg font-bold">¿Tienes una barbería, salón o spa?</p>
+      <p class="mb-3 text-sm text-ink/70">Crea tu propia agenda en línea como esta. <b id="trialDaysTxt">30 días gratis</b>, sin tarjeta.</p>
+      <button id="btnTrial" class="btn-dark text-sm">🚀 Probar gratis</button>
+    </section>
   </main>
 
   <!-- Barra inferior de resumen -->
+  </div>
+
+  <!-- Modal: crear tienda de prueba -->
+  <div id="trialModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="trialTitle">
+    <div class="modal-card">
+      <div class="mb-3 flex items-start justify-between gap-2">
+        <div><h3 id="trialTitle" class="font-narrow text-2xl font-bold">Crea tu agenda gratis</h3><p id="trialSub" class="text-sm text-ink/70"></p></div>
+        <button class="btn-ghost" data-close="trialModal" aria-label="Cerrar">✕</button>
+      </div>
+      <form id="trialForm" class="space-y-3" novalidate>
+        <label class="field"><span>Nombre de tu negocio</span><input name="name" required maxlength="60" placeholder="Ej. Barbería El Barbas"></label>
+        <label class="field"><span>Tipo de negocio</span><select name="type"><option value="barberia">Barbería</option><option value="salon">Salón de belleza</option><option value="unas">Uñas</option><option value="spa">Spa / estética</option><option value="otro">Otro</option></select></label>
+        <div class="grid grid-cols-2 gap-3">
+          <label class="field"><span>Tu nombre</span><input name="ownerName" required maxlength="60"></label>
+          <label class="field"><span>Tu WhatsApp</span><input name="whatsapp" type="tel" inputmode="tel" placeholder="300 123 4567"></label>
+        </div>
+        <div id="trialAccount" class="space-y-3">
+          <label class="field"><span>Correo (para entrar a tu panel)</span><input name="email" type="email" autocomplete="email"></label>
+          <label class="field"><span>Contraseña (mínimo 6)</span><input name="password" type="password" minlength="6" autocomplete="new-password"></label>
+        </div>
+        <p id="trialLogged" class="hidden rounded-lg bg-paper p-2.5 text-xs text-ink/70"></p>
+        <button class="btn-primary w-full py-3" type="submit">Crear mi agenda</button>
+        <p class="text-center text-[11px] text-ink/50">Al terminar la prueba pagas una mensualidad para seguir. Puedes cancelar cuando quieras.</p>
+      </form>
+      <div id="trialDone" class="hidden text-center"></div>
+    </div>
   </div>
 
   <!-- Modal: autorización de datos para esta barbería -->
@@ -244,6 +276,6 @@
     </div>
   </div>
 
-  <script type="module" src="app.js?v=2026-10-08p"></script>
+  <script type="module" src="app.js?v=2026-10-08r"></script>
 </body>
 </html>

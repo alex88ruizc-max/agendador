@@ -9,9 +9,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Archivo+Narrow:wght@500;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="theme.js?v=2026-10-08p"></script>
+  <script src="theme.js?v=2026-10-08r"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="styles.css?v=2026-10-08p">
+  <link rel="stylesheet" href="styles.css?v=2026-10-08r">
 </head>
 <body class="bg-paper text-ink font-sans antialiased">
 
@@ -42,7 +42,7 @@
   <div id="appView" class="mx-auto hidden max-w-6xl px-4 pb-24 pt-4 lg:grid lg:grid-cols-[230px_minmax(0,1fr)] lg:items-start lg:gap-6">
     <nav class="mb-5 rounded-2xl border border-line bg-white/60 p-2 lg:sticky lg:top-6 lg:mb-0" aria-label="Secciones">
       <div class="hidden px-2 pb-2 pt-1 lg:block"><span class="text-[10px] font-bold uppercase tracking-wider text-ink/50">Superusuario</span></div>
-      <div id="tabs" class="grid grid-cols-4 gap-1.5 lg:grid-cols-1"></div>
+      <div id="tabs" class="grid grid-cols-3 gap-1.5 lg:grid-cols-1"></div>
     </nav>
     <div class="min-w-0">
       <section id="sec-biz" class="tab-panel">
@@ -58,6 +58,41 @@
         <div class="rounded-xl border border-line bg-white p-4">
           <h2 class="mb-2 font-narrow text-xl font-bold">Últimos pagos recibidos</h2>
           <div id="payments" class="text-sm"></div>
+        </div>
+      </section>
+      <section id="sec-plan" class="tab-panel hidden">
+        <div class="space-y-3">
+          <div class="rounded-xl border border-line bg-white p-4">
+            <h2 class="mb-1 font-narrow text-xl font-bold">Plan y prueba gratis</h2>
+            <p class="mb-3 text-sm text-ink/70">Lo que ven los dueños en “Mi plan” y lo que se usa cuando alguien crea su tienda con “Probar gratis”.</p>
+            <div class="grid gap-3 sm:grid-cols-3">
+              <label class="field"><span>Nombre del plan</span><input id="plName" placeholder="Plan mensual"></label>
+              <label class="field"><span>Mensualidad (COP)</span><input id="plPrice" type="number" min="0" step="1000"></label>
+              <label class="field"><span>Días gratis</span><input id="plDays" type="number" min="1" max="90"></label>
+            </div>
+            <label class="mt-3 flex items-center gap-2 text-sm"><input id="plTrial" type="checkbox" class="h-4 w-4"> Mostrar “Probar gratis” en las páginas de las tiendas</label>
+            <p class="mt-1 text-xs text-ink/60">El precio aplica a las tiendas nuevas. Para cambiar el de una tienda existente usa “Editar nombre y plan” en su menú.</p>
+          </div>
+          <div class="rounded-xl border-2 border-emerald-500 bg-white p-4">
+            <h2 class="mb-1 font-narrow text-xl font-bold">⚡ Pago automático Bre-B</h2>
+            <p class="mb-3 text-sm text-ink/70">Como en Epic Channels: cada pago lleva un monto único (ej. $50.037) y el servidor lee en tu Gmail los avisos de Nequi y activa el plan solo.</p>
+            <label class="mb-3 flex items-center gap-2 text-sm"><input id="bbOn" type="checkbox" class="h-4 w-4"> Activar pago automático en “Mi plan” de las tiendas</label>
+            <div class="grid gap-3 sm:grid-cols-2">
+              <label class="field"><span>Tu llave Bre-B</span><input id="bbKey" placeholder="@tullave o número"></label>
+              <label class="field"><span>Titular</span><input id="bbHolder"></label>
+              <label class="field"><span>Remitente de los correos de aviso</span><input id="bbSender" placeholder="nequi"></label>
+              <div class="flex items-end gap-2"><img id="bbQrImg" class="hidden h-12 w-12 rounded border border-line bg-white object-contain" alt="QR">
+                <label class="btn-sm cursor-pointer">Subir QR (opcional)<input id="bbQr" type="file" accept="image/*" class="hidden"></label></div>
+            </div>
+            <p class="mt-2 text-xs text-ink/60">Requiere ejecutar una vez <b>activarPagosBreb</b> en Apps Script y que los avisos de Nequi lleguen al Gmail dueño del script.</p>
+          </div>
+          <div class="rounded-xl border border-line bg-white p-4">
+            <h2 class="mb-2 font-narrow text-xl font-bold">Otros medios de pago (manual con comprobante)</h2>
+            <p class="mb-3 text-sm text-ink/70">Donde los dueños te pagan la mensualidad. Pueden ver el QR en grande.</p>
+            <div id="plMethods" class="space-y-2"></div>
+            <button id="plAdd" type="button" class="btn-sm mt-2">+ Agregar medio de pago</button>
+          </div>
+          <button id="plSave" class="btn-primary w-full">Guardar</button>
         </div>
       </section>
       <section id="sec-tg" class="tab-panel hidden">
@@ -98,6 +133,6 @@
     </div>
   </div>
 
-  <script type="module" src="super.js?v=2026-10-08p"></script>
+  <script type="module" src="super.js?v=2026-10-08r"></script>
 </body>
 </html>

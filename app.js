@@ -9,7 +9,7 @@ import {
   startUpdateWatcher, applyBrandColors, warmServer, uiConfirm, setDialogBrand, viewImage, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, dow, hora12, fechaLarga, fechaCorta, toMillis, cop, esc,
   normalizePhone, waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, computeSlots, dayCapacityUnits, staffHours,
   toast, openModal, closeModal, setBusy, copyText, tmin, mstr, UNIT
-} from "./common.js?v=2026-10-08p";
+} from "./common.js?v=2026-10-08r";
 
 const $ = (id) => document.getElementById(id);
 const S = {
@@ -31,7 +31,7 @@ function showUnavailable(title, text) {
   $("bookBar").classList.add("hidden");
 }
 if (!/^[a-z0-9][a-z0-9-]{1,29}$/.test(BIZ_ID)) {
-  showUnavailable("Falta el enlace del negocio", "Abre la página con el enlace que te compartieron.");
+  showUnavailable("Agenda tus citas en línea", "Si buscas un negocio, abre el enlace que te compartieron. Si tienes un negocio, crea tu propia agenda aquí abajo.");
 } else {
   setBusiness(BIZ_ID);
 }
@@ -212,7 +212,8 @@ $("staffPick").addEventListener("click", (e) => {
 
 // ---------- Cálculo de cupos ----------
 const slotLen = () => Number(S.settings?.slotDurationMinutes || 30);
-const maxDate = () => addDays(bogNow().date, Math.min(90, Number(S.settings?.bookingWindowDays || 30)));
+// En prueba gratis la tienda solo recibe reservas hasta 5 días adelante
+const maxDate = () => addDays(bogNow().date, Math.min(S.biz?.trial ? 5 : 90, Number(S.settings?.bookingWindowDays || 30)));
 const staffPool = () => S.staff.filter((s) => !S.staffId || s.id === S.staffId);
 const hoursOfStaff = (s, date) => staffHours(S.settings, s, date);
 // Cerrado si ningún profesional (del filtro) atiende ese día
@@ -934,3 +935,56 @@ $("btnResched").onclick = async () => {
 renderNav(); renderSummary();
 if (/^[a-z0-9][a-z0-9-]{1,29}$/.test(BIZ_ID)) boot(); // arranca cuando todo está definido
 startUpdateWatcher();
+
+// ================= Probar gratis: crear la tienda de prueba =================
+let PLAT = {};
+getDoc(doc(db, "platform", "public")).then((d) => {
+  PLAT = d.data() || {};
+  const on = PLAT.trialEnabled !== false;
+  $("trialCta").classList.toggle("hidden", !on);
+  $("trialDaysTxt").textContent = `${Number(PLAT.trialDays || 30)} días gratis`;
+}).catch(() => {});
+$("btnTrial").onclick = () => {
+  const logged = !!auth.currentUser;
+  $("trialSub").textContent = `Gratis por ${Number(PLAT.trialDays || 30)} días, con reservas hasta 5 días adelante y funciones básicas. Activa tu plan cuando quieras (${PLAT.planPriceCOP ? cop(PLAT.planPriceCOP) + " al mes" : "mensualidad"}) para desbloquear todo.`;
+  $("trialAccount").classList.toggle("hidden", logged);
+  $("trialLogged").classList.toggle("hidden", !logged);
+  if (logged) $("trialLogged").textContent = `Se crea con tu cuenta ${auth.currentUser.email}. Con ella entras a tu panel.`;
+  const f = $("trialForm");
+  if (S.profile) { f.ownerName.value = `${S.profile.firstName || ""} ${S.profile.lastName || ""}`.trim(); f.whatsapp.value = S.profile.whatsapp || ""; }
+  $("trialForm").classList.remove("hidden"); $("trialDone").classList.add("hidden");
+  openModal("trialModal");
+};
+$("trialForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = e.target, btn = f.querySelector("button[type=submit]");
+  const name = f.name.value.trim(), phone = normalizePhone(f.whatsapp.value);
+  if (name.length < 2) return toast("Escribe el nombre de tu negocio.", "error");
+  if (!f.ownerName.value.trim()) return toast("Escribe tu nombre.", "error");
+  if (!phone) return toast("Escribe un WhatsApp válido.", "error");
+  setBusy(btn, true, "Creando tu agenda…");
+  try {
+    if (!auth.currentUser) {
+      const email = f.email.value.trim(), pass = f.password.value;
+      if (!/^\S+@\S+\.\S+$/.test(email)) throw new Error("Escribe un correo válido.");
+      if (pass.length < 6) throw new Error("La contraseña debe tener al menos 6 caracteres.");
+      try { await createUserWithEmailAndPassword(auth, email, pass); }
+      catch (err) {
+        if (String(err.code || "").includes("email-already-in-use")) await signInWithEmailAndPassword(auth, email, pass).catch(() => { throw new Error("Ese correo ya tiene cuenta y la contraseña no coincide."); });
+        else throw new Error(authError(err));
+      }
+    }
+    const r = await api("trialSignup", { name, type: f.type.value, ownerName: f.ownerName.value.trim(), whatsapp: phone });
+    const base = location.origin + location.pathname.replace(/index\.html$/, "");
+    const panel = `${base}admin.html?b=${r.slug}`, page = `${base}index.html?b=${r.slug}`;
+    $("trialForm").classList.add("hidden");
+    $("trialDone").classList.remove("hidden");
+    $("trialDone").innerHTML = `
+      <p class="text-4xl">🎉</p>
+      <p class="mt-1 font-narrow text-2xl font-bold">¡${esc(name)} ya tiene agenda!</p>
+      <p class="mb-4 text-sm text-ink/70">Prueba gratis hasta el ${fechaLarga(r.until)}. Configura tus servicios, horario y medios de pago desde tu panel.</p>
+      <a class="btn-primary block w-full py-3" href="${panel}">Ir a mi panel</a>
+      <div class="mt-2 grid grid-cols-2 gap-2"><a class="btn-light text-sm" href="${page}" target="_blank" rel="noopener">Ver mi página</a><button class="btn-light text-sm" data-copy="${page}">Copiar mi enlace</button></div>`;
+  } catch (err) { toast(err.message || "No se pudo crear la agenda.", "error"); }
+  finally { setBusy(btn, false); }
+});
