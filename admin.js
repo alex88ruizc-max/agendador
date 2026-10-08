@@ -22,7 +22,7 @@ const onErr = (e) => { console.error(e); toast("Error leyendo datos: " + (e.code
 // ================= Sesión =================
 onAuthStateChanged(auth, async (u) => {
   A.unsubs.forEach((f) => f()); A.unsubs = []; A.unsubDay?.();
-  show("loginView", !u); $("btnLogout").classList.toggle("hidden", !u);
+  show("loginView", !u); if (!u) { $("btnMenu").classList.add("hidden"); $("hdrTitle").textContent = "Panel de tu negocio"; }
   if (!u) { show("appView", false); show("deniedView", false); $("who").textContent = ""; return; }
   const [sup, snap] = await Promise.all([
     getDoc(doc(db, "superusers", u.uid)).catch(() => null),
@@ -41,7 +41,8 @@ onAuthStateChanged(auth, async (u) => {
   $("publicLink").href = "index.html?b=" + encodeURIComponent(bid);
   const bizSnap = await getDoc(doc(db, "businesses", bid)).catch(() => null);
   A.biz = bizSnap?.data() || { name: bid, status: "active" };
-  $("who").textContent = `${A.biz.name}. ${u.email} (${isSuper ? "superusuario" : isOwner() ? "dueño" : "equipo"})`;
+  $("who").textContent = `${A.biz.name} · ${u.email} (${isSuper ? "superusuario" : isOwner() ? "dueño" : "equipo"})`;
+  $("hdrTitle").textContent = TABS[A.tab][0];
   show("deniedView", false); show("appView", true);
   renderPlanBanner();
   start();
@@ -54,7 +55,8 @@ $("loginForm").addEventListener("submit", async (e) => {
   catch { toast("Correo o contraseña incorrectos.", "error"); }
   finally { setBusy(btn, false); }
 });
-$("btnLogout").onclick = () => signOut(auth);
+$("btnLogout").onclick = () => { openNav(false); signOut(auth); };
+$("btnLogoutDenied").onclick = () => signOut(auth);
 $("btnForgotAdmin").onclick = async () => {
   const email = $("loginForm").email.value.trim();
   if (!email) return toast("Escribe tu correo y vuelve a tocar “Olvidé mi contraseña”.", "error");
@@ -114,17 +116,30 @@ function subscribeDay() {
 }
 
 // ================= Pestañas =================
+const TABS = { agenda: ["Agenda", "fa-calendar-days"], staff: ["Equipo y descansos", "fa-users"], clients: ["Clientes", "fa-address-book"], services: ["Servicios", "fa-scissors"], settings: ["Configuración", "fa-gear"] };
 function renderTabs() {
-  const tabs = [["agenda", "Agenda"], ["staff", "Equipo y descansos"]];
-  if (isOwner()) tabs.push(["clients", "Clientes"], ["services", "Servicios"], ["settings", "Configuración"]);
-  $("tabs").innerHTML = tabs.map(([id, t]) => `<button class="tab whitespace-nowrap px-4 ${A.tab === id ? "tab-on" : ""}" data-tab="${id}">${t}</button>`).join("");
+  const ids = ["agenda", "staff"].concat(isOwner() ? ["clients", "services", "settings"] : []);
+  $("tabs").innerHTML = ids.map((id) => `<button class="navitem" data-tab="${id}" ${A.tab === id ? 'aria-current="page"' : ""}><i class="fa-solid ${TABS[id][1]}"></i><span>${TABS[id][0]}</span></button>`).join("");
+  $("navBiz").textContent = A.biz?.name || "";
+  $("btnMenu").classList.remove("hidden");
 }
+function openNav(open) {
+  $("sideNav").classList.toggle("open", open);
+  $("navBackdrop").classList.toggle("hidden", !open);
+  $("btnMenu").setAttribute("aria-expanded", open);
+  document.body.style.overflow = open && window.innerWidth < 1024 ? "hidden" : "";
+}
+$("btnMenu").onclick = () => openNav(true);
+$("btnMenuClose").onclick = () => openNav(false);
+$("navBackdrop").onclick = () => openNav(false);
 $("tabs").addEventListener("click", (e) => {
   const b = e.target.closest("[data-tab]"); if (!b) return;
   A.tab = b.dataset.tab;
   document.querySelectorAll(".tab-panel").forEach((p) => p.classList.add("hidden"));
   show("tab-" + A.tab, true);
-  renderTabs();
+  renderTabs(); openNav(false);
+  $("hdrTitle").textContent = TABS[A.tab][0];
+  window.scrollTo({ top: 0 });
   if (A.tab === "clients") loadUsers();
   if (A.tab === "settings") renderSettings();
   if (A.tab === "services") renderServices();

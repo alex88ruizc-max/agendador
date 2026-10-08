@@ -10,19 +10,17 @@
   <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Archivo+Narrow:wght@500;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="theme.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="bg-paper text-ink font-sans antialiased">
 
-  <header class="pole-top bg-ink text-white">
-    <div class="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-4">
-      <div>
-        <h1 class="font-narrow text-2xl font-bold leading-tight">Panel de tu negocio</h1>
-        <p id="who" class="text-sm text-white/70"></p>
-      </div>
-      <div class="flex items-center gap-2">
-        <a id="publicLink" href="index.html" class="btn-ghost text-sm text-white/80" target="_blank" rel="noopener">Ver página pública</a>
-        <button id="btnLogout" class="btn-ghost hidden text-sm text-white/80">Salir</button>
+  <header class="pole-top sticky top-0 z-30 bg-ink text-white">
+    <div class="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
+      <button id="btnMenu" class="btn-ghost hidden text-white lg:!hidden" aria-label="Abrir menú" aria-controls="sideNav" aria-expanded="false"><i class="fa-solid fa-bars text-lg"></i></button>
+      <div class="min-w-0 flex-1">
+        <h1 id="hdrTitle" class="truncate font-narrow text-xl font-bold leading-tight">Panel de tu negocio</h1>
+        <p id="who" class="truncate text-xs text-white/70"></p>
       </div>
     </div>
   </header>
@@ -40,17 +38,31 @@
 
   <section id="deniedView" class="mx-auto mt-12 hidden max-w-md px-4 text-center">
     <p class="rounded-2xl bg-white p-6">Esta cuenta no tiene acceso al panel. Pide al dueño que te dé acceso o ingresa con otra cuenta.</p>
+    <button id="btnLogoutDenied" class="btn-light mt-3">Salir</button>
   </section>
 
-  <!-- Aplicación -->
-  <div id="appView" class="mx-auto hidden max-w-6xl px-4 pb-24 pt-6">
-    <div id="planBanner" class="mb-4 hidden space-y-1 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-900"></div>
-    <nav id="tabs" class="mb-6 flex gap-1 overflow-x-auto rounded-xl bg-white p-1 text-sm font-semibold" aria-label="Secciones"></nav>
-    <section id="tab-agenda" class="tab-panel"></section>
-    <section id="tab-staff" class="tab-panel hidden"></section>
-    <section id="tab-clients" class="tab-panel hidden"></section>
-    <section id="tab-services" class="tab-panel hidden"></section>
-    <section id="tab-settings" class="tab-panel hidden"></section>
+  <!-- Aplicación: menú lateral (en celular se abre con ☰) -->
+  <div id="appView" class="mx-auto hidden max-w-6xl px-4 pb-24 pt-4 lg:flex lg:gap-6">
+    <div id="navBackdrop" class="fixed inset-0 z-40 hidden bg-black/50 lg:!hidden"></div>
+    <aside id="sideNav" class="sidenav" aria-label="Menú del panel">
+      <div class="mb-3 flex items-center justify-between gap-2 px-1 lg:hidden">
+        <span id="navBiz" class="truncate font-narrow text-lg font-bold"></span>
+        <button id="btnMenuClose" class="btn-ghost" aria-label="Cerrar menú"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      <nav id="tabs" class="flex flex-col gap-1" aria-label="Secciones"></nav>
+      <div class="mt-4 flex flex-col gap-1 border-t border-line pt-3">
+        <a id="publicLink" href="index.html" class="navitem" target="_blank" rel="noopener"><i class="fa-solid fa-arrow-up-right-from-square"></i><span>Ver página pública</span></a>
+        <button id="btnLogout" class="navitem"><i class="fa-solid fa-right-from-bracket"></i><span>Salir</span></button>
+      </div>
+    </aside>
+    <div class="min-w-0 flex-1">
+      <div id="planBanner" class="mb-4 hidden space-y-1 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-900"></div>
+      <section id="tab-agenda" class="tab-panel"></section>
+      <section id="tab-staff" class="tab-panel hidden"></section>
+      <section id="tab-clients" class="tab-panel hidden"></section>
+      <section id="tab-services" class="tab-panel hidden"></section>
+      <section id="tab-settings" class="tab-panel hidden"></section>
+    </div>
   </div>
 
   <!-- Modal genérico: el contenido lo arma admin.js -->

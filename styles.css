@@ -158,3 +158,16 @@ body.epic .bg-amber-50 { background:rgba(245,158,11,.1) !important; color:#fcd34
 .field input.good { border-color:#059669; }
 .spin { display:inline-block; width:1rem; height:1rem; border:2px solid rgba(36,80,138,.25); border-top-color:var(--blue); border-radius:999px; animation:spin .8s linear infinite; vertical-align:-3px; }
 @keyframes spin { to { transform:rotate(360deg); } }
+
+/* Menú lateral del panel (estilo Claude / Epic): cajón en celular, barra fija en computador */
+.sidenav { position:fixed; inset:0 auto 0 0; z-index:50; width:17rem; max-width:85vw; background:#fff; padding:1rem .75rem; box-shadow:0 10px 40px rgba(0,0,0,.25); transform:translateX(-105%); transition:transform .2s ease; overflow-y:auto; padding-top:max(1rem, env(safe-area-inset-top)); }
+.sidenav.open { transform:none; }
+@media (min-width:1024px) {
+  .sidenav { position:sticky; top:5rem; z-index:auto; width:15rem; flex-shrink:0; align-self:flex-start; transform:none; box-shadow:none; background:transparent; padding:0; max-height:calc(100vh - 6rem); }
+}
+.navitem { display:flex; align-items:center; gap:.75rem; width:100%; padding:.65rem .8rem; border-radius:.7rem; font-weight:600; font-size:.92rem; color:rgba(23,34,46,.78); text-align:left; }
+.navitem i { width:1.15rem; text-align:center; color:rgba(23,34,46,.55); }
+.navitem:hover { background:#fff; color:var(--ink); }
+@media (max-width:1023px) { .navitem:hover { background:var(--paper); } }
+.navitem[aria-current="page"] { background:var(--ink); color:#fff; }
+.navitem[aria-current="page"] i { color:#fff; }
