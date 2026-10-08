@@ -7,7 +7,7 @@ import {
   startUpdateWatcher, applyBrandColors, uiConfirm, uiPrompt, setDialogBrand, viewImage, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, hora12, fechaLarga, fechaCorta, toMillis, cop, esc, normalizePhone,
   waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, DEFAULT_WA_RESCHEDULE, computeSlots, staffHours, mapLinks, headerBgCss, onColor, darken,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-10-09k";
+} from "./common.js?v=2026-10-09l";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -2640,7 +2640,8 @@ function wizInit() {
     days: new Set(WDAYS.map(([d]) => d).filter((d) => (hrs[String(d)] || []).length).length ? WDAYS.map(([d]) => d).filter((d) => (hrs[String(d)] || []).length) : [1, 2, 3, 4, 5, 6]),
     lunch: first.length > 1, open: first[0].open, close: (first[1] || first[0]).close, lunchFrom: first.length > 1 ? first[0].close : "13:00", lunchTo: first.length > 1 ? first[1].open : "14:00",
     slot: Number(s.slotDurationMinutes || 30),
-    svc: Object.fromEntries(A.services.map((x) => [x.id, { on: x.active !== false, price: Number(x.priceCOP || 0) }])),
+    svcList: A.services.filter((x) => x.active !== false).sort((a, b) => (a.order ?? 99) - (b.order ?? 99))
+      .map((x) => ({ id: x.id, name: x.name, minutes: Number(x.minutes || 30), price: Number(x.priceCOP || 0), type: x.type || "base" })),
     deposit: Number(s.depositAmountCOP ?? 5000), pmLabel: pm.label || "Nequi", pmAccount: pm.account || "", pmHolder: pm.holder || "", pmQr: pm.qr || "",
     geo: s.geo || null, geoMode: s.geoMode || ""
   };
@@ -2734,16 +2735,39 @@ const STEPS = [
       const businessHours = Object.fromEntries([0, 1, 2, 3, 4, 5, 6].map((k) => [String(k), d.days.has(k) ? iv : []]));
       await updateDoc(doc(db, bpath("settings", "general")), { businessHours, slotDurationMinutes: d.slot });
     } },
-  { id: "services", html: () => `<h3 class="wz-h">Tus servicios</h3><p class="wz-sub">Marca los que haces y pon tu precio. Después puedes agregar más.</p>
-      <div class="sp-card !py-1">${A.services.slice().sort((a, b) => (a.order ?? 99) - (b.order ?? 99)).map((x) => { const v = W.d.svc[x.id] || { on: true, price: x.priceCOP };
-        return `<div class="flex items-center gap-3 border-t border-line py-2.5 first:border-0"><button type="button" class="grid h-6 w-6 shrink-0 place-items-center rounded-md text-xs font-bold" style="${v.on ? "background:var(--sink);color:#fff" : "border:1.5px solid #c9d2de"}" data-wsvc="${x.id}" aria-pressed="${v.on}" aria-label="${esc(x.name)}">${v.on ? "✓" : ""}</button>
-          <span class="min-w-0 flex-1 text-[14px]"><b>${esc(x.name)}</b><br><span class="soft text-xs">${Number(x.minutes || 0)} min${x.type === "addon" ? ", se suma a otro" : ""}</span></span>
-          <span class="flex items-center rounded-lg border border-line px-2"><span class="soft text-sm">$</span><input data-wprice="${x.id}" type="number" inputmode="numeric" step="1000" value="${v.price}" class="w-20 border-0 py-1.5 text-right font-bold outline-none"></span></div>`; }).join("")}</div>`,
+  { id: "services", html: () => {
+      const d = W.d, inList = new Set(d.svcList.map((x) => x.id).filter(Boolean));
+      const sugg = A.services.filter((x) => !inList.has(x.id));
+      const mins = [10, 15, 20, 30, 45, 60, 90, 120];
+      return `<h3 class="wz-h">¿Qué servicios ofreces?</h3><p class="wz-sub">Escribe al lado de cada uno <b>tu precio</b>. Quita los que no haces y agrega los tuyos.</p>
+      <div class="space-y-2">${d.svcList.map((x, i) => `
+        <div class="sp-card !p-3">
+          <div class="flex items-center gap-2">
+            <input data-sname="${i}" value="${esc(x.name)}" placeholder="Nombre del servicio" maxlength="40" class="min-w-0 flex-1 border-0 p-0 text-[15px] font-bold outline-none">
+            <button type="button" data-sdel="${i}" class="grid h-8 w-8 shrink-0 place-items-center rounded-full text-sm" style="background:#fde8eb;color:#b81d33" aria-label="Quitar ${esc(x.name || "servicio")}"><i class="fa-regular fa-trash-can"></i></button>
+          </div>
+          <div class="mt-2 flex items-center gap-2">
+            <label class="flex flex-1 items-center gap-1 rounded-xl border-2 px-3 py-1.5" style="border-color:${x.price ? "var(--hair)" : "#f3c27a"}"><span class="soft text-sm font-bold">$</span>
+              <input data-sprice="${i}" inputmode="numeric" value="${x.price ? Number(x.price).toLocaleString("es-CO") : ""}" placeholder="Pon tu precio" class="w-full border-0 p-0 text-[16px] font-extrabold outline-none" aria-label="Precio de ${esc(x.name || "este servicio")}"></label>
+            <select data-smin="${i}" class="rounded-xl border border-line bg-white px-2 py-2 text-sm font-semibold" aria-label="Duración">${mins.map((m) => `<option value="${m}" ${x.minutes === m ? "selected" : ""}>${m < 60 ? m + " min" : m / 60 === 1 ? "1 hora" : m === 90 ? "1 h 30" : "2 horas"}</option>`).join("")}</select>
+          </div>
+          ${x.type === "addon" ? `<p class="soft mt-1 text-[11px]">Se suma a otro servicio (ej. con un corte)</p>` : ""}
+        </div>`).join("")}</div>
+      <button type="button" data-sadd="1" class="mt-3 w-full rounded-2xl border-2 border-dashed py-3 text-[15px] font-extrabold" style="border-color:var(--sblue);color:var(--sblue)">+ Agregar otro servicio</button>
+      ${sugg.length ? `<p class="soft mb-1.5 mt-4 text-xs font-semibold">Toca para agregar uno de estos:</p><div class="flex flex-wrap gap-2">${sugg.map((x) => `<button type="button" class="q-chip" data-ssug="${x.id}">+ ${esc(x.name)}</button>`).join("")}</div>` : ""}`;
+    },
     save: async () => {
-      document.querySelectorAll("[data-wprice]").forEach((i) => { W.d.svc[i.dataset.wprice].price = Number(i.value || 0); });
-      await Promise.all(A.services.map((x) => { const v = W.d.svc[x.id]; if (!v) return null;
-        if (v.on === (x.active !== false) && v.price === Number(x.priceCOP || 0)) return null;
-        return setDoc(doc(db, bpath("services", x.id)), { active: v.on, priceCOP: v.price }, { merge: true }); }));
+      wizReadSvcs();
+      const list = W.d.svcList;
+      if (!list.length) throw new Error("Agrega al menos un servicio.");
+      const bad = list.find((x) => !x.name.trim() || !(x.price > 0));
+      if (bad) throw new Error(bad.name.trim() ? `Pon el precio de “${bad.name}”.` : "Escribe el nombre de cada servicio.");
+      const keep = new Set(list.map((x) => x.id).filter(Boolean));
+      const ops = list.map((x, i) => x.id
+        ? setDoc(doc(db, bpath("services", x.id)), { name: x.name.trim(), minutes: x.minutes, priceCOP: x.price, active: true, order: i }, { merge: true })
+        : setDoc(doc(db, bpath("services", "s" + Date.now().toString(36) + i)), { name: x.name.trim(), minutes: x.minutes, priceCOP: x.price, type: "base", active: true, order: i, category: "", description: "" }));
+      A.services.filter((x) => x.active !== false && !keep.has(x.id)).forEach((x) => ops.push(setDoc(doc(db, bpath("services", x.id)), { active: false }, { merge: true })));
+      await Promise.all(ops);
     } },
   { id: "deposit", html: () => {
       const d = W.d;
@@ -2814,6 +2838,11 @@ const STEPS = [
       <p class="soft mt-2 text-xs">Lo pendiente queda en la Guía de configuración (menú de tu inicial).</p>`;
     } }
 ];
+function wizReadSvcs() {
+  document.querySelectorAll("[data-sname]").forEach((i) => { const r = W.d.svcList[Number(i.dataset.sname)]; if (r) r.name = i.value; });
+  document.querySelectorAll("[data-sprice]").forEach((i) => { const r = W.d.svcList[Number(i.dataset.sprice)]; if (r) r.price = Number(i.value.replace(/\D/g, "") || 0); });
+  document.querySelectorAll("[data-smin]").forEach((i) => { const r = W.d.svcList[Number(i.dataset.smin)]; if (r) r.minutes = Number(i.value); });
+}
 function openWizard(start) {
   if (!A.settings) return;
   wizInit();
@@ -2833,8 +2862,8 @@ function drawWizard() {
   const st = STEPS[W.i], el = $("wizard");
   el.innerHTML = `<div class="wz-top"><button type="button" class="wz-x" data-wx="close" aria-label="Cerrar">✕</button><span class="soft text-xs font-bold">Paso ${W.i + 1} de ${STEPS.length}</span><span class="wz-bar"><i style="width:${((W.i + 1) / STEPS.length) * 100}%"></i></span></div>
     <div class="wz-body q-pop">${st.html()}</div>
-    <div class="wz-foot">${W.i ? `<button type="button" class="btn-light !px-5" data-wx="back">Atrás</button>` : ""}<button type="button" class="btn-primary flex-1 py-3.5 text-base" data-wx="next">${st.next || "Siguiente"}</button></div>
-    ${st.essential ? "" : `<button type="button" class="wz-skip" data-wx="skip">${st.skipTxt || "Lo hago después"}</button>`}`;
+    ${st.essential ? "" : `<button type="button" class="wz-skip" data-wx="skip">${st.skipTxt || "Lo hago después"}</button>`}
+    <div class="wz-foot">${W.i ? `<button type="button" class="btn-light !px-5" data-wx="back">Atrás</button>` : ""}<button type="button" class="btn-primary flex-1 py-3.5 text-base" data-wx="next">${st.next || "Siguiente"}</button></div>`;
   el.querySelector(".wz-body").scrollTop = 0;
   if (st.id === "telegram") wizWatchTg();
 }
@@ -2867,7 +2896,14 @@ async function wizClick(e) {
   const dy = t.closest("[data-wday]"); if (dy) { const k = Number(dy.dataset.wday); d.days.has(k) ? d.days.delete(k) : d.days.add(k); return drawWizard(); }
   const lu = t.closest("[data-wlunch]"); if (lu) { d.lunch = lu.dataset.wlunch === "1"; return drawWizard(); }
   const sl = t.closest("[data-wslot]"); if (sl) { d.slot = Number(sl.dataset.wslot); return drawWizard(); }
-  const sv = t.closest("[data-wsvc]"); if (sv) { document.querySelectorAll("[data-wprice]").forEach((i) => { d.svc[i.dataset.wprice].price = Number(i.value || 0); }); d.svc[sv.dataset.wsvc].on = !d.svc[sv.dataset.wsvc].on; return drawWizard(); }
+  const sdel = t.closest("[data-sdel]"); if (sdel) { wizReadSvcs(); d.svcList.splice(Number(sdel.dataset.sdel), 1); return drawWizard(); }
+  if (t.closest("[data-sadd]")) {
+    wizReadSvcs(); d.svcList.push({ id: null, name: "", minutes: 30, price: 0, type: "base" }); drawWizard();
+    const last = document.querySelector(`[data-sname="${d.svcList.length - 1}"]`); last?.focus(); last?.scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
+  const sg = t.closest("[data-ssug]");
+  if (sg) { wizReadSvcs(); const x = A.services.find((y) => y.id === sg.dataset.ssug); if (x) d.svcList.push({ id: x.id, name: x.name, minutes: Number(x.minutes || 30), price: Number(x.priceCOP || 0), type: x.type || "base" }); return drawWizard(); }
   const dp = t.closest("[data-wdep]"); if (dp) { if ($("wPmAcc")) { d.pmAccount = $("wPmAcc").value; d.pmHolder = $("wPmHolder").value; } d.deposit = Number(dp.dataset.wdep); return drawWizard(); }
   const pl = t.closest("[data-wpml]"); if (pl) { if ($("wPmAcc")) { d.pmAccount = $("wPmAcc").value; d.pmHolder = $("wPmHolder").value; } d.pmLabel = pl.dataset.wpml; return drawWizard(); }
   const ge = t.closest("[data-wgeo]");
@@ -2897,6 +2933,7 @@ async function wizClick(e) {
 }
 function wizInput(e) {
   const t = e.target, d = W.d;
+  if (t.dataset.sprice !== undefined) { const n = Number(t.value.replace(/\D/g, "") || 0); t.value = n ? n.toLocaleString("es-CO") : ""; t.closest("label").style.borderColor = n ? "var(--hair)" : "#f3c27a"; return; }
   if (t.dataset.wt) { d[t.dataset.wt] = t.value; clearTimeout(W.tT); W.tT = setTimeout(() => { const pos = t.dataset.wt; drawWizard(); document.querySelector(`[data-wt="${pos}"]`)?.focus(); }, 700); }
 }
 async function wizChange(e) {

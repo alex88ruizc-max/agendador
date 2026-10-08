@@ -404,3 +404,7 @@ body.branded .logo-ring .logo-in { border-color:var(--b-header); }
 header.has-photo { color:#fff; }
 header.has-photo .biz-social a { background:rgba(255,255,255,.18); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); }
 header.has-photo .logo-ring .logo-in { border-color:rgba(15,22,32,.9); }
+
+/* el asistente usa la altura real visible (sin quedar debajo de la barra del navegador) */
+.wizard { height:100dvh; bottom:auto; padding-bottom:calc(16px + env(safe-area-inset-bottom, 0px)); }
+.wz-skip { margin:0 auto 8px; }
