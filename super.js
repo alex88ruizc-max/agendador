@@ -3,8 +3,8 @@ import { onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordRe
 import {
   doc, getDoc, setDoc, addDoc, deleteDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp, where
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { PLAN_KEYS, PLAN_FEATURES, plansOf, planOfBiz, DEFAULT_PAY_WARNING, TG_EVENTS, BIZ_TYPES } from "./common.js?v=2026-10-09z";
-import { APP_VERSION, SERVER_VERSION, RULES_VERSION, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, readPublishedVersion, reloadFresh, startUpdateWatcher, warmServer, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-10-09z";
+import { PLAN_KEYS, PLAN_FEATURES, plansOf, planOfBiz, DEFAULT_PAY_WARNING, TG_EVENTS, BIZ_TYPES } from "./common.js?v=2026-10-10b";
+import { APP_VERSION, SERVER_VERSION, RULES_VERSION, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, readPublishedVersion, reloadFresh, startUpdateWatcher, warmServer, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-10-10b";
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on) => $(id).classList.toggle("hidden", !on);
@@ -577,6 +577,7 @@ async function loadPlanCfg() {
   PL.disc = { 3: 0, 6: 0, 12: 0, ...(pp.planDiscounts || {}) };
   if (!pp.planDiscounts && pp.planBundles && pp.planPriceCOP) [3, 6, 12].forEach((m) => { if (pp.planBundles[m]) PL.disc[m] = Math.max(0, Math.round((1 - pp.planBundles[m] / (pp.planPriceCOP * m)) * 100)); });
   $("plWarn").value = pp.payWarning || DEFAULT_PAY_WARNING;
+  $("plStories").value = pp.storyLimit || 10;
   renderPlanEditor(); renderDisc();
   PL.methods = (pp.payMethods || []).map((m) => ({ ...m }));
 
@@ -677,7 +678,7 @@ $("plSave").onclick = async () => {
       // compatibilidad con versiones anteriores
       planName: PL.plans.basic.name, planPriceCOP: Number(PL.plans.basic.priceCOP || 0), trialDays: Math.min(90, Math.max(1, Number(PL.plans.free.days || 30))),
       trialRules: { daysAhead: Math.max(1, Number(PL.plans.free.daysAhead || 5)), locked: [] },
-      trialEnabled: $("plTrial").checked,
+      trialEnabled: $("plTrial").checked, storyLimit: Math.min(30, Math.max(1, Number($("plStories").value || 10))),
       payMethods: PL.methods.filter((m) => m.label && m.account),
       brebEnabled: $("bbOn").checked, brebKey: $("bbKey").value.trim(), brebHolder: $("bbHolder").value.trim(),
       brebSender: $("bbSender").value.trim() || "nequi", brebQr: PL.brebQr || "",

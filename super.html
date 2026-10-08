@@ -9,9 +9,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Archivo+Narrow:wght@500;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="theme.js?v=2026-10-09z"></script>
+  <script src="theme.js?v=2026-10-10b"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="styles.css?v=2026-10-09z">
+  <link rel="stylesheet" href="styles.css?v=2026-10-10b">
   <style>
     /* ===== Panel del superusuario: claro, frío, con un solo elemento protagonista (el carril de cobros) ===== */
     .sp { --canvas:#F2F5F8; --paperw:#FFFFFF; --sink:#14213D; --soft:#5B6782; --hair:#DDE3EA; --sblue:#2B59C3; --sred:#D7263D; --mint:#1E9E63; --sky:#3F8FD6; --amber:#C77700;
@@ -162,6 +162,7 @@
               <p class="soft mb-3 text-sm">Gratis, Básico y Gold: lo que ve cada tienda al registrarse y en “Mi plan”. Los cambios aplican al instante a todas las tiendas.</p>
               <div id="plPlans" class="space-y-3"></div>
               <label class="mt-3 flex items-center gap-2 text-sm"><input id="plTrial" type="checkbox" class="h-4 w-4"> Mostrar “Probar gratis” en las páginas de las tiendas</label>
+              <label class="field mt-3 max-w-xs"><span>Máximo de estados activos por tienda</span><input id="plStories" type="number" min="1" max="30" value="10"></label>
             </div>
             <div class="sp-card">
               <h2 class="disp mb-1 text-[18px] font-bold">Descuento por pagar varios meses</h2>
@@ -263,6 +264,6 @@
     </div>
   </div>
 
-  <script type="module" src="super.js?v=2026-10-09z"></script>
+  <script type="module" src="super.js?v=2026-10-10b"></script>
 </body>
 </html>

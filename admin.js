@@ -9,7 +9,7 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, DEFAULT_PAY_WARNING, TG_EVENTS,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-10-09z";
+} from "./common.js?v=2026-10-10b";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -2006,8 +2006,8 @@ function renderHome() {
   // --- estados
   const stories = isOwner() ? `<div class="sp-h"><h2>Tus estados</h2><span>los ven tus clientes por 24 h</span></div>
     <div class="flex gap-2 overflow-x-auto pb-1">
-      <button class="story-btn" data-hstory="new"><span class="story-add">${lockedNow("marketing") ? "🔒" : "+"}</span>Nuevo</button>
-      ${H.stories.map((x) => `<button class="story-btn" data-hstory="${x.id}"><span class="story-ring"><span style="${storyBg(x)}">${x.img ? "" : esc((x.text || "").slice(0, 18))}</span></span><span class="w-full truncate text-center">${esc((x.text || "Estado").split("\n")[0].slice(0, 12))}</span></button>`).join("")}
+      <button class="story-btn" data-hstory="new"><span class="story-add">${lockedNow("marketing") ? "🔒" : "+"}</span>Nuevo <span class="soft text-[10px]">${activeStories()}/${storyLimit()}</span></button>
+      ${H.stories.map((x) => `<button class="story-btn" data-hstory="${x.id}"><span class="story-ring"><span style="${storyBg(x)}">${x.img ? "" : esc((x.text || "").slice(0, 18))}</span></span><span class="w-full truncate text-center">${esc((x.label || x.text || "Estado").split("\n")[0].slice(0, 12))}</span></button>`).join("")}
     </div>` : "";
 
   // --- huecos
@@ -2231,29 +2231,278 @@ async function saveQuick() {
 //  ESTADOS de 24 horas
 // =====================================================================
 const STORY_BGS = ["#14213D", "#2B59C3", "#D7263D", "#1E9E63", "#7C3AED", "#C77700"];
+// ================= Editor de estados PRO (estilo Epic, mejorado): 8 diseños con la marca =================
+const STORY_TPL = [["tarjeta", "Tarjeta"], ["neon", "Neón"], ["oro", "Dorado"], ["impacto", "Impacto"], ["cine", "Cine"], ["ticket", "Cupón"], ["cristal", "Cristal"], ["foto", "Foto"]];
+const STORY_TAGS = ["🔥 PROMO", "✨ NUEVO", "⏰ HOY", "⚡ ÚLTIMOS CUPOS", "🎁 REGALO", ""];
+function storyPal(base) {
+  return { base, dark: darken(base, 0.5), night: darken(base, 0.8), soft: hexRgba(base, 0.18) };
+}
+// título con *palabras destacadas* en otro color, partido en renglones
+function richLines(x, text, maxW) {
+  const lines = [];
+  String(text || "").split("\n").forEach((para) => {
+    let hl = false, cur = [], w = 0;
+    const words = []; para.split(/(\*)/).forEach((part) => { if (part === "*") { hl = !hl; return; } part.split(/\s+/).filter(Boolean).forEach((t) => words.push({ t, hl })); });
+    const sp = x.measureText(" ").width;
+    words.forEach((wd) => { const ww = x.measureText(wd.t).width; if (cur.length && w + sp + ww > maxW) { lines.push({ words: cur, w }); cur = []; w = 0; } w += (cur.length ? sp : 0) + ww; cur.push({ ...wd, ww }); });
+    if (cur.length) lines.push({ words: cur, w });
+  });
+  return lines;
+}
+function drawRich(x, lines, cx, y0, lh, color, accent, glow) {
+  const sp = x.measureText(" ").width;
+  lines.forEach((ln, i) => {
+    let xx = cx - ln.w / 2; const yy = y0 + lh * (i + 0.82);
+    ln.words.forEach((wd) => {
+      x.textAlign = "left"; x.fillStyle = wd.hl ? accent : color;
+      if (glow) { x.shadowColor = wd.hl ? accent : glow; x.shadowBlur = 38; } else { x.shadowColor = "rgba(0,0,0,.45)"; x.shadowBlur = 20; }
+      x.fillText(wd.t, xx, yy); xx += wd.ww + sp;
+    });
+  });
+  x.shadowBlur = 0; x.textAlign = "center";
+}
+async function drawOwnStory(cv, S2) {
+  const W = 1080, H = 1920; cv.width = W; cv.height = H;
+  const x = cv.getContext("2d"), img = await loadImg(S2.own);
+  x.fillStyle = "#000"; x.fillRect(0, 0, W, H);
+  if (img) {
+    if (S2.fit === "contain") {
+      // fondo desenfocado con la misma imagen y la imagen completa encima
+      const rb = Math.max(W / img.width, H / img.height); x.filter = "blur(40px) brightness(.6)"; x.drawImage(img, (W - img.width * rb) / 2, (H - img.height * rb) / 2, img.width * rb, img.height * rb); x.filter = "none";
+      const r = Math.min(W / img.width, H / img.height); x.drawImage(img, (W - img.width * r) / 2, (H - img.height * r) / 2, img.width * r, img.height * r);
+    } else { const r = Math.max(W / img.width, H / img.height); x.drawImage(img, (W - img.width * r) / 2, (H - img.height * r) / 2, img.width * r, img.height * r); }
+  }
+  if (S2.ownLogo !== false) {
+    const ap = A.settings?.appearance || {}, logo = await loadImg(ap.logo), L = 110, cx = W - 60 - L / 2, cy = 60 + L / 2;
+    x.save(); x.shadowColor = "rgba(0,0,0,.4)"; x.shadowBlur = 20; x.beginPath(); x.arc(cx, cy, L / 2 + 6, 0, 7); x.fillStyle = "#fff"; x.fill(); x.restore();
+    x.save(); x.beginPath(); x.arc(cx, cy, L / 2, 0, 7); x.clip();
+    if (logo) { const r = Math.max(L / logo.width, L / logo.height); x.drawImage(logo, cx - (logo.width * r) / 2, cy - (logo.height * r) / 2, logo.width * r, logo.height * r); }
+    else { x.fillStyle = (ap.colors || {}).primary || "#2B59C3"; x.fillRect(cx - L / 2, cy - L / 2, L, L); x.fillStyle = "#fff"; x.font = "900 44px 'Arial Black', Arial"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText((A.settings?.businessName || "").split(/\s+/).slice(0, 2).map((w) => w[0] || "").join("").toUpperCase(), cx, cy + 2); }
+    x.restore();
+  }
+}
+async function drawStory(cv, S2) {
+  if (S2.mode === "own") return drawOwnStory(cv, S2);
+  const W = 1080, H = 1920; cv.width = W; cv.height = H;
+  const x = cv.getContext("2d"), T = S2.tpl || "tarjeta";
+  const ap = A.settings?.appearance || {}, name = A.settings?.businessName || A.biz?.name || "";
+  const P = storyPal(S2.bg || (ap.colors || {}).primary || "#2B59C3");
+  const F = "'Segoe UI', Roboto, Arial, sans-serif", FB = "'Arial Black', 'Segoe UI', Impact, sans-serif";
+  const ORO = "#f5c542", ticket = T === "ticket";
+  const photo = S2.img ? await loadImg(S2.img) : null;
+  const cover = (img, dx, dy, dw, dh) => { const r = Math.max(dw / img.width, dh / img.height), pw = img.width * r, ph = img.height * r; x.save(); x.beginPath(); x.rect(dx, dy, dw, dh); x.clip(); x.drawImage(img, dx + (dw - pw) / 2, dy + (dh - ph) / 2, pw, ph); x.restore(); };
+  // ---------- fondos ----------
+  if (photo && !ticket) {
+    cover(photo, 0, 0, W, H);
+    const g = x.createLinearGradient(0, 0, 0, H);
+    const k = T === "foto" ? [0.55, 0.05, 0.25, 0.88] : [0.72, 0.5, 0.55, 0.85];
+    g.addColorStop(0, `rgba(0,0,0,${k[0]})`); g.addColorStop(0.3, `rgba(0,0,0,${k[1]})`); g.addColorStop(0.6, `rgba(0,0,0,${k[2]})`); g.addColorStop(1, `rgba(0,0,0,${k[3]})`);
+    x.fillStyle = g; x.fillRect(0, 0, W, H);
+    if (T !== "foto") { x.fillStyle = hexRgba(P.base, 0.22); x.fillRect(0, 0, W, H); }
+  } else if (T === "neon") {
+    x.fillStyle = "#04050a"; x.fillRect(0, 0, W, H);
+    x.strokeStyle = hexRgba(P.base, 0.12); x.lineWidth = 2;
+    for (let i = 0; i < W; i += 60) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, H); x.stroke(); }
+    for (let j = 0; j < H; j += 60) { x.beginPath(); x.moveTo(0, j); x.lineTo(W, j); x.stroke(); }
+    const rg = x.createRadialGradient(W / 2, H * 0.45, 20, W / 2, H * 0.45, W * 0.85); rg.addColorStop(0, hexRgba(P.base, 0.35)); rg.addColorStop(1, "rgba(0,0,0,0)"); x.fillStyle = rg; x.fillRect(0, 0, W, H);
+  } else if (T === "oro") {
+    const g = x.createLinearGradient(0, 0, W, H); g.addColorStop(0, "#17130b"); g.addColorStop(1, "#040404"); x.fillStyle = g; x.fillRect(0, 0, W, H);
+    const rg = x.createRadialGradient(W / 2, H * 0.35, 10, W / 2, H * 0.35, W * 0.9); rg.addColorStop(0, "rgba(245,197,66,.25)"); rg.addColorStop(1, "rgba(0,0,0,0)"); x.fillStyle = rg; x.fillRect(0, 0, W, H);
+  } else if (T === "impacto") {
+    const g = x.createLinearGradient(0, 0, W, H); g.addColorStop(0, P.base); g.addColorStop(1, P.dark); x.fillStyle = g; x.fillRect(0, 0, W, H);
+    x.fillStyle = "rgba(0,0,0,.5)"; x.beginPath(); x.moveTo(0, H * 0.4); x.lineTo(W, H * 0.3); x.lineTo(W, H); x.lineTo(0, H); x.closePath(); x.fill();
+    x.fillStyle = "rgba(255,255,255,.08)"; x.beginPath(); x.moveTo(0, H * 0.43); x.lineTo(W, H * 0.33); x.lineTo(W, H * 0.345); x.lineTo(0, H * 0.445); x.closePath(); x.fill();
+  } else if (T === "cine") {
+    x.fillStyle = "#07080c"; x.fillRect(0, 0, W, H);
+    const rg = x.createRadialGradient(W / 2, H * 0.45, 20, W / 2, H * 0.45, W * 0.8); rg.addColorStop(0, hexRgba(P.base, 0.55)); rg.addColorStop(0.6, hexRgba(P.dark, 0.3)); rg.addColorStop(1, "rgba(0,0,0,0)"); x.fillStyle = rg; x.fillRect(0, 0, W, H);
+  } else if (T === "cristal") {
+    x.fillStyle = P.night; x.fillRect(0, 0, W, H);
+    [[0.15, 0.18, P.base, 0.9], [0.9, 0.3, "#ff6ad5", 0.45], [0.25, 0.85, P.base, 0.8], [0.85, 0.9, "#ffffff", 0.22]].forEach(([fx, fy, c, al]) => { const g2 = x.createRadialGradient(W * fx, H * fy, 10, W * fx, H * fy, W * 0.65); g2.addColorStop(0, c.startsWith("#") ? hexRgba(c, al) : c); g2.addColorStop(1, "rgba(0,0,0,0)"); x.fillStyle = g2; x.fillRect(0, 0, W, H); });
+  } else if (ticket) {
+    x.fillStyle = "#f6efe2"; x.fillRect(0, 0, W, H);
+    x.fillStyle = hexRgba(P.base, 0.1); for (let yy = 0; yy < H; yy += 44) x.fillRect(0, yy, W, 22);
+  } else { // tarjeta
+    const g = x.createLinearGradient(0, 0, W, H); g.addColorStop(0, P.night); g.addColorStop(1, "#05060a"); x.fillStyle = g; x.fillRect(0, 0, W, H);
+    const rg = x.createRadialGradient(W / 2, H * 0.48, 40, W / 2, H * 0.48, W * 0.8); rg.addColorStop(0, hexRgba(P.base, 0.45)); rg.addColorStop(1, "rgba(0,0,0,0)"); x.fillStyle = rg; x.fillRect(0, 0, W, H);
+  }
+  // ---------- marcos y adornos ----------
+  if (T === "oro") { x.strokeStyle = "rgba(245,197,66,.8)"; x.lineWidth = 5; x.strokeRect(38, 38, W - 76, H - 76); x.strokeStyle = "rgba(245,197,66,.3)"; x.lineWidth = 2; x.strokeRect(60, 60, W - 120, H - 120); [[38, 38], [W - 38, 38], [38, H - 38], [W - 38, H - 38]].forEach(([px, py]) => { x.fillStyle = ORO; x.beginPath(); x.arc(px, py, 13, 0, 7); x.fill(); }); }
+  if (T === "cine") { const fh = 110; x.fillStyle = "#000"; x.fillRect(0, 0, W, fh); x.fillRect(0, H - fh, W, fh); x.fillStyle = "rgba(255,255,255,.85)"; const ph = fh * 0.42, pw = ph * 1.4; for (let i = 24; i < W - pw; i += pw * 1.9) { roundRect(x, i, (fh - ph) / 2, pw, ph, 6); x.fill(); roundRect(x, i, H - fh + (fh - ph) / 2, pw, ph, 6); x.fill(); } }
+  if (T === "foto") { x.strokeStyle = P.base; x.lineWidth = 18; x.strokeRect(9, 9, W - 18, H - 18); }
+  let cardTop = 0, cardBottom = 0;
+  if (ticket) {
+    const mx = 70, my = 120, bw = W - mx * 2, bh = H - my * 2; cardTop = my; cardBottom = my + bh;
+    x.save(); x.shadowColor = "rgba(0,0,0,.2)"; x.shadowBlur = 50; roundRect(x, mx, my, bw, bh, 40); x.fillStyle = "#fff"; x.fill(); x.restore();
+    if (photo) { x.save(); roundRect(x, mx, my, bw, 520, 40); x.clip(); cover(photo, mx, my, bw, 520); x.restore(); }
+    x.globalCompositeOperation = "destination-out"; [H - 440].forEach((yy) => { x.beginPath(); x.arc(mx, yy, 30, 0, 7); x.fill(); x.beginPath(); x.arc(mx + bw, yy, 30, 0, 7); x.fill(); }); x.globalCompositeOperation = "source-over";
+    x.setLineDash([16, 14]); x.strokeStyle = hexRgba(P.base, 0.55); x.lineWidth = 4; x.beginPath(); x.moveTo(mx + 50, H - 440); x.lineTo(mx + bw - 50, H - 440); x.stroke(); x.setLineDash([]);
+    x.fillStyle = P.base; x.fillRect(mx + 40, my, bw - 80, 14);
+  }
+  if (T === "cristal") { x.save(); x.shadowColor = "rgba(0,0,0,.35)"; x.shadowBlur = 60; roundRect(x, 70, 520, W - 140, 980, 48); x.fillStyle = "rgba(255,255,255,.12)"; x.fill(); x.restore(); roundRect(x, 70, 520, W - 140, 980, 48); x.strokeStyle = "rgba(255,255,255,.35)"; x.lineWidth = 2; x.stroke(); }
+  if (T === "tarjeta") { x.save(); x.shadowColor = hexRgba(P.base, 0.7); x.shadowBlur = 90; roundRect(x, 80, 520, W - 160, 980, 48); x.fillStyle = "#0e1220"; x.fill(); x.restore(); x.fillStyle = P.base; x.fillRect(140, 520, W - 280, 10); }
+  // ---------- colores del texto ----------
+  const dark = ticket && !false;
+  const TXT = dark ? "#14213D" : "#ffffff", SUB = dark ? "#5B6782" : "rgba(255,255,255,.82)";
+  const lighten = (h, f) => "#" + [1, 3, 5].map((i) => { const v = parseInt(h.slice(i, i + 2), 16); return Math.round(v + (255 - v) * f).toString(16).padStart(2, "0"); }).join("");
+  const ACC = T === "oro" ? ORO : T === "neon" ? lighten(P.base, 0.55) : dark ? P.base : "#FFD54A";
+  const glow = T === "neon" ? P.base : null;
+  x.textAlign = "center";
+  // ---------- marca: logo + nombre ----------
+  const topY = T === "cine" ? 180 : ticket ? (photo ? 680 : 200) : 130;
+  let y = topY;
+  if (S2.brand !== false) {
+    const L = ticket && photo ? 120 : 150, cy = (ticket && photo ? 640 : y) + L / 2;
+    const logo = await loadImg(ap.logo);
+    x.save(); x.shadowColor = glow || "rgba(0,0,0,.35)"; x.shadowBlur = glow ? 40 : 28; x.beginPath(); x.arc(W / 2, cy, L / 2 + 9, 0, 7); x.fillStyle = T === "oro" ? ORO : dark ? P.base : "#fff"; x.fill(); x.restore();
+    x.save(); x.beginPath(); x.arc(W / 2, cy, L / 2, 0, 7); x.clip();
+    if (logo) { x.fillStyle = "#fff"; x.fillRect(W / 2 - L / 2, cy - L / 2, L, L); const r = Math.max(L / logo.width, L / logo.height); x.drawImage(logo, W / 2 - (logo.width * r) / 2, cy - (logo.height * r) / 2, logo.width * r, logo.height * r); }
+    else { x.fillStyle = P.base; x.fillRect(W / 2 - L / 2, cy - L / 2, L, L); x.fillStyle = "#fff"; x.font = `900 ${L * 0.4}px ${FB}`; x.textBaseline = "middle"; x.fillText(name.split(/\s+/).slice(0, 2).map((w) => w[0] || "").join("").toUpperCase(), W / 2, cy + 3); x.textBaseline = "alphabetic"; }
+    x.restore();
+    y = cy + L / 2 + 78;
+    x.fillStyle = T === "oro" ? ORO : TXT; if (glow) { x.shadowColor = glow; x.shadowBlur = 30; } else if (!dark) { x.shadowColor = "rgba(0,0,0,.4)"; x.shadowBlur = 14; }
+    const et = name.toUpperCase().split("").join(" ");
+    const ns = fitText(x, et, W - 200, 44, 900, FB); x.font = `900 ${ns}px ${FB}`; x.fillText(et, W / 2, y); x.shadowBlur = 0;
+    if (ap.slogan) { y += 50; x.fillStyle = SUB; x.font = `600 30px ${F}`; x.fillText(ap.slogan, W / 2, y); }
+  }
+  // ---------- contenido: etiqueta, título, subtítulo, precio ----------
+  const zoneTop = ticket ? Math.max(y + 70, photo ? 900 : 560) : Math.max(y + 90, 560);
+  const zoneBottom = ticket ? H - 470 : (S2.cta !== false ? H - (S2.qr ? 560 : 300) : H - 220);
+  const maxW = W - (ticket || T === "cristal" || T === "tarjeta" ? 260 : 170);
+  let size = 118, lines;
+  do { x.font = `900 ${size}px ${FB}`; lines = richLines(x, (S2.title || "").toUpperCase(), maxW); size -= 4; } while ((lines.length > 4 || lines.some((l) => l.w > maxW)) && size > 50);
+  size += 4; x.font = `900 ${size}px ${FB}`; lines = richLines(x, (S2.title || "").toUpperCase(), maxW);
+  const lh = size * 1.08, titleH = lines.length * lh;
+  x.font = `600 40px ${F}`; const subLines = S2.sub ? wrapLines(x, S2.sub, maxW).slice(0, 3) : [];
+  const tagH = S2.tag ? 96 : 0, subH = subLines.length ? subLines.length * 52 + 30 : 0;
+  // el sello de precio va debajo si cabe; si no, se pega como sticker en la esquina
+  const priceInline = !!S2.price && tagH + titleH + subH + 210 <= zoneBottom - zoneTop;
+  const priceH = priceInline ? 210 : 0;
+  const total = tagH + titleH + subH + priceH;
+  let cy0 = zoneTop + Math.max(0, (zoneBottom - zoneTop - total) / 2);
+  if (S2.tag) {
+    x.font = `900 36px ${FB}`; const tw = x.measureText(S2.tag).width + 70, th = 68;
+    x.save(); x.translate(W / 2, cy0 + th / 2); x.rotate(-0.03);
+    roundRect(x, -tw / 2, -th / 2, tw, th, th / 2); x.fillStyle = T === "oro" ? ORO : dark ? P.base : T === "neon" ? "transparent" : "#FFD54A"; x.fill();
+    if (T === "neon") { x.strokeStyle = P.base; x.lineWidth = 4; x.shadowColor = P.base; x.shadowBlur = 24; x.stroke(); x.shadowBlur = 0; }
+    x.fillStyle = T === "neon" ? "#fff" : T === "oro" ? "#17130b" : dark ? "#fff" : "#14213D"; x.textBaseline = "middle"; x.fillText(S2.tag, 0, 3); x.textBaseline = "alphabetic"; x.restore();
+    cy0 += tagH;
+  }
+  x.font = `900 ${size}px ${FB}`;
+  if (T === "neon") { lines.forEach((ln, i) => { x.save(); x.font = `900 ${size}px ${FB}`; x.restore(); }); }
+  drawRich(x, lines, W / 2, cy0, lh, T === "oro" ? ORO : TXT, ACC === TXT ? P.base : ACC, glow);
+  if (T === "neon") { x.strokeStyle = hexRgba("#ffffff", 0.0); }
+  cy0 += titleH;
+  if (subLines.length) { cy0 += 30; x.fillStyle = SUB; x.font = `600 40px ${F}`; subLines.forEach((l, i) => x.fillText(l, W / 2, cy0 + 40 + i * 52)); cy0 += subLines.length * 52; }
+  if (S2.price) {
+    const r = priceInline ? 92 : 84, px = priceInline ? W / 2 : W - 190, py = priceInline ? cy0 + 40 + r : (ticket && photo ? 120 + 520 - 40 : zoneTop - 10);
+    x.save(); x.translate(px, py); x.rotate(-0.12);
+    x.beginPath(); for (let i = 0; i < 24; i++) { const a = (i / 24) * Math.PI * 2, rr = i % 2 ? r : r + 14; x.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); } x.closePath();
+    x.fillStyle = T === "oro" ? ORO : dark ? P.base : "#FFD54A"; x.shadowColor = "rgba(0,0,0,.35)"; x.shadowBlur = 24; x.fill(); x.shadowBlur = 0;
+    x.fillStyle = T === "oro" || !dark ? "#14213D" : "#fff"; x.font = `900 ${fitText(x, S2.price, r * 1.6, 46, 900, FB)}px ${FB}`; x.textBaseline = "middle"; x.fillText(S2.price, 0, 2); x.textBaseline = "alphabetic"; x.restore();
+  }
+  // ---------- pie: QR opcional + botón de agendar ----------
+  if (S2.cta !== false) {
+    if (S2.qr && window.QRious) {
+      const qs = 190, qy = H - 520;
+      roundRect(x, W / 2 - qs / 2 - 14, qy - 14, qs + 28, qs + 28, 22); x.fillStyle = "#fff"; x.fill();
+      x.drawImage(new window.QRious({ value: publicUrl(), size: qs, level: "M" }).canvas, W / 2 - qs / 2, qy, qs, qs);
+    }
+    const t = "AGENDA TU CITA  ➜"; x.font = `900 40px ${FB}`;
+    const w = x.measureText(t).width + 110, h = 104, by = ticket ? H - 330 : T === "cine" ? H - 290 : H - 250;
+    x.save(); x.shadowColor = glow || "rgba(0,0,0,.35)"; x.shadowBlur = glow ? 40 : 30;
+    roundRect(x, W / 2 - w / 2, by, w, h, h / 2);
+    const gb = x.createLinearGradient(W / 2 - w / 2, 0, W / 2 + w / 2, 0);
+    if (T === "oro") { gb.addColorStop(0, "#f8d77a"); gb.addColorStop(1, "#c9971c"); } else if (dark) { gb.addColorStop(0, P.base); gb.addColorStop(1, P.dark); } else { gb.addColorStop(0, "#ffffff"); gb.addColorStop(1, "#e9eef7"); }
+    x.fillStyle = gb; x.fill(); x.restore();
+    x.fillStyle = dark && T !== "oro" ? "#fff" : T === "oro" ? "#17130b" : "#14213D"; x.textBaseline = "middle"; x.fillText(t, W / 2, by + h / 2 + 2); x.textBaseline = "alphabetic";
+    x.fillStyle = SUB; x.font = `600 28px ${F}`; x.fillText(S2.qr ? "Escanea o toca el botón de la página" : "Toca “Agendar mi cita” aquí abajo", W / 2, by + h + 52);
+  }
+}
+const storyLimit = () => Math.max(1, Number(A.plat?.storyLimit || 10));
+const activeStories = () => H.stories.filter((x) => toMillis(x.expiresAt) > Date.now()).length;
 function newStory(preset = {}) {
   if (lockedNow("marketing")) return switchTab("marketing");
-  const S2 = { img: "", bg: preset.bg || STORY_BGS[0], text: preset.text || "" };
+  if (activeStories() >= storyLimit()) return toast(`Ya tienes ${storyLimit()} estados activos, el máximo para no saturar a tus clientes. Toca uno y “Quitar ahora”, o espera a que se venza alguno.`, "error");
+  const brandColor = A.settings?.appearance?.colors?.primary || "#2B59C3";
+  const bgs = [...new Set([brandColor, ...STORY_BGS])];
+  const lines = String(preset.text || "").split("\n");
+  const S2 = { mode: "design", tpl: "tarjeta", img: "", own: "", fit: "cover", ownLogo: true, bg: preset.bg && preset.bg !== "#D7263D" ? preset.bg : brandColor, tag: preset.text ? "⚡ ÚLTIMOS CUPOS" : "🔥 PROMO", title: lines[0] || "", sub: lines.slice(1).join(" · "), price: "", brand: true, cta: true, qr: false };
   openM("Nuevo estado", `
-    <div id="stPrev" class="relative mx-auto mb-3 grid aspect-[9/14] w-full max-w-[220px] place-items-center overflow-hidden rounded-2xl bg-cover bg-center p-4 text-center text-lg font-extrabold leading-tight text-white" style="text-shadow:0 2px 10px rgba(0,0,0,.45)"></div>
+    <div class="mb-3 grid grid-cols-2 rounded-2xl p-1 text-sm font-bold" style="background:var(--canvas)">
+      <button type="button" class="rounded-xl py-2" data-stmode="design">🎨 Diseñar aquí</button>
+      <button type="button" class="rounded-xl py-2" data-stmode="own">🖼️ Subir mi diseño</button>
+    </div>
+    <p class="soft -mt-1 mb-2 text-center text-[11.5px]">${activeStories()} de ${storyLimit()} estados activos</p>
+    <canvas id="stPrev" class="mx-auto mb-3 block aspect-[9/16] w-full max-w-[240px] rounded-2xl shadow-lg"></canvas>
+    <div id="stOwnBox" class="hidden">
+      <label class="pay-drop mb-2" for="stOwnFile"><span class="pay-drop-ico"><i class="fa-solid fa-upload"></i></span><span id="stOwnLbl" class="min-w-0 flex-1 text-sm"><b>Sube tu imagen</b><br><span class="soft text-xs">La que hiciste en Canva, una foto o un flyer. Mejor si es vertical.</span></span></label>
+      <input id="stOwnFile" type="file" accept="image/*" class="hidden">
+      <div class="mb-2 flex flex-wrap items-center gap-2 text-sm"><span class="soft text-xs font-semibold">Ajuste:</span><button type="button" class="q-chip !py-1 text-xs" data-stfit="cover" aria-pressed="true">Llenar pantalla</button><button type="button" class="q-chip !py-1 text-xs" data-stfit="contain" aria-pressed="false">Ver completa</button></div>
+      <label class="mb-3 flex items-center gap-2 text-sm"><input id="stOwnLogo" type="checkbox" class="h-4 w-4" checked> Poner mi logo pequeño en la esquina</label>
+    </div>
+    <div id="stDesignBox">
+    <p class="mb-1 text-xs font-bold soft">DISEÑO</p>
+    <div id="stTpls" class="mb-3 flex gap-2 overflow-x-auto pb-1">${STORY_TPL.map(([k, t]) => `<button type="button" class="shrink-0 text-center text-[11px] font-bold" data-sttpl="${k}"><canvas class="mb-1 block h-[96px] w-[54px] rounded-lg" style="outline:3px solid ${S2.tpl === k ? "var(--sink)" : "transparent"};outline-offset:2px" data-stthumb="${k}"></canvas>${t}</button>`).join("")}</div>
     <div class="mb-3 flex flex-wrap items-center gap-2">
       <label class="btn-light cursor-pointer text-sm"><i class="fa-regular fa-image"></i> Foto<input id="stFile" type="file" accept="image/*" class="hidden"></label>
-      ${STORY_BGS.map((c) => `<button type="button" class="h-8 w-8 rounded-full border-2 border-white" style="background:${c};box-shadow:0 0 0 1px #DDE3EA" data-stbg="${c}" aria-label="Fondo"></button>`).join("")}
+      <button type="button" id="stNoPhoto" class="btn-sm hidden">Quitar foto</button>
+      ${bgs.map((c) => `<button type="button" class="h-8 w-8 rounded-full border-2 border-white" style="background:${c};box-shadow:0 0 0 1px #DDE3EA" data-stbg="${c}" aria-label="Color"></button>`).join("")}
     </div>
-    <label class="field mb-3"><span>Texto</span><textarea id="stText" rows="3" maxlength="140" placeholder="Ej. Nuevo corte disponible 🔥">${esc(S2.text)}</textarea></label>
-    <button id="stSave" class="btn-primary w-full py-3">Publicar por 24 horas</button>`);
-  const draw = () => { const p = $("stPrev"); p.style.background = S2.img ? `center/cover url('${S2.img}')` : S2.bg; p.textContent = $("stText").value || (S2.img ? "" : "Tu texto aquí"); };
-  draw();
-  $("stText").oninput = draw;
-  $("modalBody").querySelectorAll("[data-stbg]").forEach((b) => b.onclick = () => { S2.bg = b.dataset.stbg; S2.img = ""; draw(); });
-  $("stFile").onchange = async (e) => { const f = e.target.files[0]; if (!f) return; S2.img = await imgToDataUrl(f, 900, "image/jpeg"); draw(); };
+    <p class="mb-1 text-xs font-bold soft">ETIQUETA</p>
+    <div class="mb-2 flex flex-wrap gap-1.5">${STORY_TAGS.map((t) => `<button type="button" class="q-chip !py-1 text-xs" data-sttag="${esc(t)}" aria-pressed="${S2.tag === t}">${t || "Sin etiqueta"}</button>`).join("")}</div>
+    <label class="field mb-2"><span>Título <span class="soft font-normal">(pon *entre asteriscos* lo que quieras resaltar)</span></span><input id="stTitle" maxlength="70" value="${esc(S2.title)}" placeholder="Ej. Corte + barba *20% OFF*"></label>
+    <label class="field mb-2"><span>Texto pequeño (opcional)</span><input id="stSub" maxlength="90" value="${esc(S2.sub)}" placeholder="Ej. Solo de lunes a miércoles"></label>
+    <label class="field mb-2"><span>Precio o sello (opcional)</span><input id="stPrice" maxlength="12" value="" placeholder="Ej. $20.000 o 2x1"></label>
+    <div class="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+      <label class="flex items-center gap-2"><input id="stBrand" type="checkbox" class="h-4 w-4" checked> Logo y nombre</label>
+      <label class="flex items-center gap-2"><input id="stCta" type="checkbox" class="h-4 w-4" checked> Botón “Agenda tu cita”</label>
+      <label class="flex items-center gap-2"><input id="stQr" type="checkbox" class="h-4 w-4"> Código QR</label>
+    </div>
+    </div>
+    <button id="stWa" class="mb-2 w-full rounded-2xl py-3 text-[15px] font-extrabold" style="background:#25D366;color:#0b3d1f"><i class="fa-brands fa-whatsapp"></i> Publicar en mi estado de WhatsApp</button>
+    <div class="grid grid-cols-2 gap-2"><button id="stDown" class="btn-light"><i class="fa-solid fa-download"></i> Descargar</button><button id="stSave" class="btn-primary py-3">Publicar en mi página</button></div>`);
+  const read = () => { S2.title = $("stTitle").value; S2.sub = $("stSub").value; S2.price = $("stPrice").value.trim(); };
+  let t0;
+  const draw = () => { clearTimeout(t0); t0 = setTimeout(() => { read(); drawStory($("stPrev"), S2); }, 100); };
+  const thumbs = async () => { for (const [k] of STORY_TPL) { const big = document.createElement("canvas"); await drawStory(big, { ...S2, tpl: k }); const c = document.querySelector(`[data-stthumb="${k}"]`); if (!c) return; c.width = 108; c.height = 192; c.getContext("2d").drawImage(big, 0, 0, 108, 192); } };
+  loadScript("https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js").catch(() => {}).finally(() => { draw(); thumbs(); });
+  ["stTitle", "stSub", "stPrice"].forEach((id) => $(id).oninput = draw);
+  $("stBrand").onchange = (e) => { S2.brand = e.target.checked; draw(); };
+  $("stCta").onchange = (e) => { S2.cta = e.target.checked; draw(); };
+  $("stQr").onchange = (e) => { S2.qr = e.target.checked; draw(); };
+  const mb = $("modalBody");
+  const setMode = (m) => { S2.mode = m; mb.querySelectorAll("[data-stmode]").forEach((b) => { const on = b.dataset.stmode === m; b.style.background = on ? "#fff" : "transparent"; b.style.boxShadow = on ? "0 1px 4px rgba(20,33,61,.15)" : "none"; }); $("stOwnBox").classList.toggle("hidden", m !== "own"); $("stDesignBox").classList.toggle("hidden", m === "own"); draw(); };
+  mb.querySelectorAll("[data-stmode]").forEach((b) => b.onclick = () => setMode(b.dataset.stmode));
+  setMode("design");
+  $("stOwnFile").onchange = async (e) => { const f = e.target.files[0]; if (!f) return; S2.own = await imgToDataUrl(f, 1280, "image/jpeg");
+    // si la imagen es horizontal, se muestra completa (con fondo difuminado) para no cortarla
+    const im = await loadImg(S2.own); S2.fit = im && im.width > im.height * 0.75 ? "contain" : "cover";
+    mb.querySelectorAll("[data-stfit]").forEach((y) => y.setAttribute("aria-pressed", y.dataset.stfit === S2.fit)); $("stOwnLbl").innerHTML = `<b class="text-emerald-700">✓ Imagen lista</b><br><span class="soft text-xs">Toca para cambiarla</span>`; draw(); };
+  mb.querySelectorAll("[data-stfit]").forEach((b) => b.onclick = () => { S2.fit = b.dataset.stfit; mb.querySelectorAll("[data-stfit]").forEach((y) => y.setAttribute("aria-pressed", y === b)); draw(); });
+  $("stOwnLogo").onchange = (e) => { S2.ownLogo = e.target.checked; draw(); };
+  mb.querySelectorAll("[data-sttpl]").forEach((b) => b.onclick = () => { S2.tpl = b.dataset.sttpl; mb.querySelectorAll("[data-stthumb]").forEach((c) => c.style.outlineColor = c.dataset.stthumb === S2.tpl ? "var(--sink)" : "transparent"); draw(); });
+  mb.querySelectorAll("[data-stbg]").forEach((b) => b.onclick = () => { S2.bg = b.dataset.stbg; draw(); thumbs(); });
+  mb.querySelectorAll("[data-sttag]").forEach((b) => b.onclick = () => { S2.tag = b.dataset.sttag; mb.querySelectorAll("[data-sttag]").forEach((y) => y.setAttribute("aria-pressed", y === b)); draw(); });
+  $("stFile").onchange = async (e) => { const f = e.target.files[0]; if (!f) return; S2.img = await imgToDataUrl(f, 1080, "image/jpeg"); if (S2.tpl === "tarjeta") S2.tpl = "foto"; $("stNoPhoto").classList.remove("hidden"); draw(); thumbs(); };
+  $("stNoPhoto").onclick = () => { S2.img = ""; $("stNoPhoto").classList.add("hidden"); draw(); thumbs(); };
+  $("stWa").onclick = async () => {
+    read();
+    if (S2.mode === "own" ? !S2.own : (!S2.title.trim() && !S2.img)) return toast("Primero arma tu estado.", "error");
+    const c = document.createElement("canvas"); await drawStory(c, S2);
+    shareToWhatsApp(c.toDataURL("image/jpeg", 0.9));
+  };
+  $("stDown").onclick = async () => { read(); const c = document.createElement("canvas"); await drawStory(c, S2); const a = document.createElement("a"); a.href = c.toDataURL("image/png"); a.download = "estado.png"; a.click(); };
   $("stSave").onclick = async () => {
-    const text = $("stText").value.trim();
-    if (!text && !S2.img) return toast("Agrega una foto o un texto.", "error");
+    read();
+    if (S2.mode === "own" && !S2.own) return toast("Sube tu imagen primero.", "error");
+    if (S2.mode !== "own" && !S2.title.trim() && !S2.img) return toast("Escribe un título o agrega una foto.", "error");
+    if (activeStories() >= storyLimit()) return toast(`Ya tienes ${storyLimit()} estados activos. Quita uno primero.`, "error");
     const btn = $("stSave"); setBusy(btn, true, "Publicando…");
     try {
-      await addDoc(collection(db, bpath("stories")), { img: S2.img, bg: S2.bg, text, createdAt: serverTimestamp(), expiresAt: Timestamp.fromMillis(Date.now() + 86400000) });
-      closeM(); toast("Estado publicado. Tus clientes lo ven arriba en tu página.");
+      const big = document.createElement("canvas"); await drawStory(big, S2);
+      const c = document.createElement("canvas"); c.width = 720; c.height = 1280; c.getContext("2d").drawImage(big, 0, 0, 720, 1280);
+      await addDoc(collection(db, bpath("stories")), { img: c.toDataURL("image/jpeg", 0.84), bg: S2.bg, text: "", label: S2.mode === "own" ? "Estado" : (S2.title.replace(/\*/g, "") || "Estado").slice(0, 30), createdAt: serverTimestamp(), expiresAt: Timestamp.fromMillis(Date.now() + 86400000) });
+      closeM(); toast("Estado publicado. Tus clientes lo ven al tocar tu logo.");
     } catch (err) { toast("No se pudo publicar: " + err.message, "error"); setBusy(btn, false); }
   };
 }
@@ -2262,7 +2511,9 @@ function manageStory(id) {
   const left = Math.max(0, Math.round((toMillis(x.expiresAt) - Date.now()) / 3600000));
   openM("Estado", `<div class="mx-auto mb-3 grid aspect-[9/14] w-full max-w-[220px] place-items-center overflow-hidden rounded-2xl p-4 text-center text-lg font-extrabold leading-tight text-white" style="${x.img ? `background:center/cover url('${x.img}')` : `background:${x.bg}`};text-shadow:0 2px 10px rgba(0,0,0,.45)">${esc(x.text || "")}</div>
     <p class="soft mb-3 text-center text-sm">Se quita sola en ${left} hora${left === 1 ? "" : "s"}.</p>
+    ${x.img ? `<button id="stWa2" class="mb-2 w-full rounded-2xl py-3 text-[15px] font-extrabold" style="background:#25D366;color:#0b3d1f"><i class="fa-brands fa-whatsapp"></i> Publicar en mi estado de WhatsApp</button>` : ""}
     <button id="stDel" class="w-full rounded-xl border border-rose-300 py-2.5 text-sm font-semibold text-rose-800">Quitar ahora</button>`);
+  if ($("stWa2")) $("stWa2").onclick = () => shareToWhatsApp(x.img);
   $("stDel").onclick = async () => { try { await deleteDoc(doc(db, bpath("stories", id))); closeM(); toast("Estado quitado."); } catch (err) { toast(err.message, "error"); } };
 }
 function fillAsStory(date) {
@@ -2301,7 +2552,7 @@ function renderMarketing() {
     <div class="sp-h"><h2>Estados en tu página</h2><span>${H.stories.length} activo${H.stories.length === 1 ? "" : "s"}</span></div>
     <div class="sp-card"><div class="flex gap-2 overflow-x-auto pb-1">
       <button class="story-btn" data-hstory="new"><span class="story-add">+</span>Nuevo</button>
-      ${H.stories.map((x) => `<button class="story-btn" data-hstory="${x.id}"><span class="story-ring"><span style="${storyBg(x)}">${x.img ? "" : esc((x.text || "").slice(0, 18))}</span></span><span class="w-full truncate text-center">${esc((x.text || "Estado").split("\n")[0].slice(0, 12))}</span></button>`).join("")}
+      ${H.stories.map((x) => `<button class="story-btn" data-hstory="${x.id}"><span class="story-ring"><span style="${storyBg(x)}">${x.img ? "" : esc((x.text || "").slice(0, 18))}</span></span><span class="w-full truncate text-center">${esc((x.label || x.text || "Estado").split("\n")[0].slice(0, 12))}</span></button>`).join("")}
     </div><p class="soft mt-2 text-xs">Aparecen como círculos arriba en tu página, igual que los estados de WhatsApp. Duran 24 horas.</p></div>
 
     <div class="sp-h"><h2>Aviso destacado</h2><span>${promoOn ? "visible hasta el " + fechaCorta(promo.until) : "apagado"}</span></div>
@@ -3303,3 +3554,21 @@ document.addEventListener("click", async (e) => {
   A.settings.tgPrefs = prefs; renderTgPrefs();
   try { await updateDoc(doc(db, bpath("settings", "general")), { tgPrefs: prefs }); } catch (err) { toast("No se pudo guardar: " + err.message, "error"); }
 });
+
+// Estado de WhatsApp: el celular abre su menú de compartir con la imagen lista; ahí se toca WhatsApp > "Mi estado"
+async function shareToWhatsApp(dataUrl) {
+  const link = $("linkUrl").textContent || "";
+  try {
+    const blob = await (await fetch(dataUrl)).blob();
+    const file = new File([blob], "estado.jpg", { type: blob.type || "image/jpeg" });
+    if (navigator.canShare?.({ files: [file] })) {
+      toast("Elige WhatsApp y luego “Mi estado”.");
+      await navigator.share({ files: [file], text: "Agenda tu cita aquí: " + link });
+      return;
+    }
+  } catch (err) { if (err?.name === "AbortError") return; }
+  // computador o celular sin esa opción: se descarga y se abre WhatsApp
+  const a = document.createElement("a"); a.href = dataUrl; a.download = "estado.jpg"; a.click();
+  toast("La imagen se descargó: súbela a tu estado desde WhatsApp.");
+  setTimeout(() => window.open("https://wa.me/", "_blank"), 600);
+}
