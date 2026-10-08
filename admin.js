@@ -7,7 +7,7 @@ import {
   startUpdateWatcher, applyBrandColors, uiConfirm, uiPrompt, setDialogBrand, viewImage, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, hora12, fechaLarga, fechaCorta, toMillis, cop, esc, normalizePhone,
   waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, DEFAULT_WA_RESCHEDULE, computeSlots, staffHours, mapLinks, headerBgCss, onColor, darken,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-10-09m";
+} from "./common.js?v=2026-10-09n";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];

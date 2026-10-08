@@ -3,7 +3,7 @@ import { onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordRe
 import {
   doc, getDoc, setDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp, where
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { APP_VERSION, readPublishedVersion, reloadFresh, startUpdateWatcher, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-10-09m";
+import { APP_VERSION, readPublishedVersion, reloadFresh, startUpdateWatcher, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-10-09n";
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on) => $(id).classList.toggle("hidden", !on);
@@ -234,10 +234,20 @@ function renderPayments() {
 function renderOrders() {
   $("orders").innerHTML = Z.orders.length ? Z.orders.map((o) => `<div class="todo"><span class="ic t-trial"><i class="fa-solid fa-bolt"></i></span>
     <div class="min-w-0 flex-1 text-[13.5px] leading-snug"><b>${esc(o.businessName)}</b> debe enviar <b>${cop(o.amountCOP)}</b><br><span class="soft text-xs">${o.months} mes(es), creada ${new Date(toMillis(o.createdAt)).toLocaleString("es-CO", { timeZone: "America/Bogota", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}</span></div>
-    <button class="act t-ok" data-approve="${o.id}">Aprobar</button></div>`).join("")
+    <div class="flex shrink-0 flex-col gap-1.5"><button class="act t-ok" data-approve="${o.id}">Aprobar</button><button class="act t-late" data-reject="${o.id}">Rechazar</button></div></div>`).join("")
     : `<div class="sp-card soft text-sm">No hay pagos Bre-B esperando. Cuando un dueño genere uno, aparece aquí y se activa solo al llegar el aviso de Nequi.</div>`;
 }
 $("orders").addEventListener("click", async (e) => {
+  const rj = e.target.closest("[data-reject]");
+  if (rj) {
+    const o = Z.orders.find((x) => x.id === rj.dataset.reject); if (!o) return;
+    const reason = await uiPrompt("Rechazar este pago", `No te llegaron los ${cop(o.amountCOP)} de ${o.businessName}. La orden se cierra y a la tienda le avisamos por Telegram.`, "No recibimos el pago", { okText: "Rechazar", danger: true });
+    if (reason === null) return;
+    setBusy(rj, true, "…");
+    try { await api("superRejectOrder", { orderId: o.id, reason }); toast("Pago rechazado. La tienda ya fue avisada."); }
+    catch (err) { toast(err.message, "error"); setBusy(rj, false); }
+    return;
+  }
   const b = e.target.closest("[data-approve]"); if (!b) return;
   const o = Z.orders.find((x) => x.id === b.dataset.approve);
   if (!(await uiConfirm("¿Aprobar este pago?", `Úsalo solo si ya ves en tu Nequi los ${cop(o.amountCOP)} de ${o.businessName}. Se activan ${o.months} mes(es).`, { okText: "Aprobar pago" }))) return;
