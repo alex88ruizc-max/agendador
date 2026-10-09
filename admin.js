@@ -9,8 +9,8 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-10-10l";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-10-10l";
+} from "./common.js?v=2026-10-10m";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-10-10m";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -3682,7 +3682,7 @@ let FB_READY = null;
 function loadFB() {
   if (FB_READY) return FB_READY;
   FB_READY = new Promise((res, rej) => {
-    window.fbAsyncInit = () => { window.FB.init({ appId: META_APP_ID, autoLogAppEvents: true, xfbml: false, version: "v21.0" }); res(window.FB); };
+    window.fbAsyncInit = () => { window.FB.init({ appId: META_APP_ID, autoLogAppEvents: true, xfbml: false, version: "v26.0" }); res(window.FB); };
     const sc = document.createElement("script"); sc.src = "https://connect.facebook.net/es_LA/sdk.js"; sc.async = true; sc.defer = true; sc.crossOrigin = "anonymous";
     sc.onerror = () => { FB_READY = null; rej(new Error("No se pudo abrir la ventana de Meta. Revisa tu internet.")); };
     document.body.appendChild(sc);

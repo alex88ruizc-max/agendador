@@ -3,8 +3,8 @@ import { onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordRe
 import {
   doc, getDoc, setDoc, addDoc, deleteDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp, where
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { PLAN_KEYS, PLAN_FEATURES, plansOf, planOfBiz, DEFAULT_PAY_WARNING, TG_EVENTS, BIZ_TYPES, planBenefits, planBenefitsIntro } from "./common.js?v=2026-10-10l";
-import { APP_VERSION, SERVER_VERSION, RULES_VERSION, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, readPublishedVersion, reloadFresh, startUpdateWatcher, warmServer, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-10-10l";
+import { PLAN_KEYS, PLAN_FEATURES, plansOf, planOfBiz, DEFAULT_PAY_WARNING, TG_EVENTS, BIZ_TYPES, planBenefits, planBenefitsIntro } from "./common.js?v=2026-10-10m";
+import { APP_VERSION, SERVER_VERSION, RULES_VERSION, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, readPublishedVersion, reloadFresh, startUpdateWatcher, warmServer, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-10-10m";
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on) => $(id).classList.toggle("hidden", !on);
@@ -426,23 +426,51 @@ async function handleAct(act, biz, b) {
   if (act === "delete") return deleteBusiness(biz);
 
   if (act === "wabot") {
-    openM("🤖 Bot de WhatsApp · " + biz.name, `<p class="soft -mt-2 mb-3 text-sm">Clave privada de esta tienda para la app <b>AutoResponder</b> del celular.</p><div id="wbBox" class="text-sm">Cargando…</div>`);
+    openM("🤖 Bot de WhatsApp · " + biz.name, `<p class="soft -mt-2 mb-3 text-sm">Cómo poner el asistente en el WhatsApp de esta tienda.</p><div id="wbBox" class="text-sm">Cargando…</div>`);
     const paint = (r) => {
-      const mask = r.url.replace(r.key, r.key.slice(0, 4) + "••••••••");
       $("wbBox").innerHTML = `
-        ${r.meta ? `<div class="mb-3 flex items-center gap-3 rounded-2xl p-3 text-white" style="background:linear-gradient(135deg,#25D366,#128C7E)"><span class="text-2xl"><i class="fa-brands fa-whatsapp"></i></span><div class="min-w-0 flex-1"><p class="text-[11px] font-bold uppercase opacity-90">Conectado con Meta</p><p class="truncate font-extrabold">${esc(r.meta.display || "")}${r.meta.name ? " · " + esc(r.meta.name) : ""}</p></div></div>`
-          : `<p class="mb-3 rounded-xl p-3 text-xs" style="background:#fff7e6;color:#7a4b00">Aún no conecta su WhatsApp con Meta. Puede hacerlo desde su panel: <b>Link de clientes &gt; Citas por WhatsApp &gt; Conectar mi WhatsApp</b> (en el piloto, agrégalo antes como tester de tu app de Meta). Mientras tanto puede usar AutoResponder con esta clave:</p>`}
-        <p class="mb-1 text-xs font-bold soft">AutoResponder (Android)</p>
-        <p class="break-all rounded-xl p-3 font-mono text-xs" style="background:var(--canvas)">${esc(mask)}</p>
-        <div class="mt-2 grid grid-cols-2 gap-2"><button class="btn-primary" id="wbCopy">Copiar URL</button><button class="btn-light" id="wbNew">Generar nueva clave</button></div>
-        <label class="mt-3 flex items-center gap-2"><input type="checkbox" id="wbOn" class="h-4 w-4" ${r.enabled ? "checked" : ""}> Bot activo para esta tienda</label>
-        <div class="mt-3 rounded-xl p-3 text-xs leading-relaxed" style="background:#eef4ff">
-          <b>En el celular de la tienda:</b><br>1. Instala <b>AutoResponder for WhatsApp</b>.<br>2. Crea una regla con <b>Todo</b> (todos los mensajes).<br>3. En la respuesta elige <b>Conectarse a un servidor propio</b> y pega la URL. Key y Value vacíos.<br>4. Guarda y escríbele “hola” desde otro número para probar.</div>
-        <p class="soft mt-2 text-xs">La tienda también necesita la función “Citas por WhatsApp” en su plan (Cobros > Planes).</p>`;
-      $("wbCopy").onclick = () => copyText(r.url).then(() => toast("URL copiada: pégala en la app."));
+        ${r.meta ? `<div class="mb-3 flex items-center gap-3 rounded-2xl p-3 text-white" style="background:linear-gradient(135deg,#25D366,#128C7E)"><span class="text-2xl"><i class="fa-brands fa-whatsapp"></i></span><div class="min-w-0 flex-1"><p class="text-[11px] font-bold uppercase opacity-90">Conectado con Meta</p><p class="truncate font-extrabold">${esc(r.meta.display || "")}${r.meta.name ? " · " + esc(r.meta.name) : ""}</p></div></div>` : ""}
+        <label class="mb-3 flex items-center justify-between gap-2 rounded-2xl border border-line p-3"><span class="text-sm font-bold">🤖 Bot activo para esta tienda</span><input type="checkbox" id="wbOn" class="h-5 w-5" ${r.enabled ? "checked" : ""}></label>
+        <div class="rounded-2xl border-2 p-3" style="border-color:#25D366">
+          <p class="flex items-center gap-2 text-[15px] font-extrabold">📱 Con MacroDroid <span class="rounded-full px-2 py-0.5 text-[10px] font-extrabold text-white" style="background:#1E9E63">GRATIS</span></p>
+          <p class="soft mt-0.5 text-xs">App gratuita para Android. Se instala en el celular de la tienda.</p>
+          <div class="mt-2 grid grid-cols-2 gap-2">
+            <a class="btn-light flex items-center justify-center gap-1.5 text-sm" href="https://play.google.com/store/apps/details?id=com.arlosoft.macrodroid" target="_blank" rel="noopener"><i class="fa-brands fa-google-play"></i> Descargar</a>
+            <a class="btn-light flex items-center justify-center gap-1.5 text-sm" href="https://www.youtube.com/results?search_query=MacroDroid+responder+notificaci%C3%B3n+WhatsApp+solicitud+HTTP" target="_blank" rel="noopener"><i class="fa-brands fa-youtube" style="color:#e11d48"></i> Ver videos</a>
+          </div>
+          <button class="btn-primary mt-2 w-full" id="wbCopyM">Copiar dirección para MacroDroid</button>
+          <button class="mt-2 flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-extrabold text-white" style="background:#25D366" id="wbSend"><i class="fa-brands fa-whatsapp text-lg"></i> Enviar instrucciones al celular</button>
+          <ol class="mt-3 list-decimal space-y-1.5 pl-5 text-[12.5px] leading-snug">
+            <li>Instala <b>MacroDroid</b> (Play Store) y dale los permisos de <b>notificaciones</b>.</li>
+            <li><b>Agregar macro</b> → <b>Disparador:</b> Notificación recibida → app <b>WhatsApp</b> (o WhatsApp Business).</li>
+            <li><b>Acción 1:</b> Solicitud HTTP → <b>GET</b> → pega la dirección → en <b>Respuesta</b>, guárdala en una variable (ej. <i>resp</i>).</li>
+            <li><b>Acción 2:</b> Responder notificación → texto: la variable <b>resp</b>.</li>
+            <li>Guarda la macro y escríbele “hola” desde otro número.</li>
+          </ol>
+        </div>
+        <details class="mt-3 rounded-2xl border border-line p-3 text-sm"><summary class="cursor-pointer font-bold">Otras opciones (AutoResponder · Meta)</summary>
+          <p class="soft mt-2 text-xs"><b>AutoResponder</b> (de pago): regla con “Todo” → “Conectarse a un servidor propio” → pega esta dirección:</p>
+          <button class="btn-light mt-1 w-full text-xs" id="wbCopy">Copiar dirección para AutoResponder</button>
+          <p class="soft mt-3 text-xs"><b>Meta</b> (iPhone y Android, con botones): la tienda lo conecta desde su panel en <b>Link de clientes &gt; Citas por WhatsApp</b> cuando tu negocio esté verificado en Meta.</p>
+          <button class="mt-3 text-xs font-bold underline" id="wbNew">Generar una clave nueva (la anterior deja de servir)</button>
+        </details>
+        <p class="soft mt-3 text-xs">La tienda necesita “Citas por WhatsApp” en su plan (Cobros &gt; Planes).</p>`;
+      $("wbCopyM").onclick = () => copyText(r.urlMacro).then(() => toast("Dirección copiada: pégala en MacroDroid."));
+      // todo en un mensaje: link de descarga, pasos y la dirección, para abrirlo en el celular de la tienda
+      $("wbSend").onclick = () => {
+        const msg = `🤖 *Asistente de citas por WhatsApp · ${biz.name}*\n\n` +
+          `1️⃣ Descarga MacroDroid (gratis):\nhttps://play.google.com/store/apps/details?id=com.arlosoft.macrodroid\n\n` +
+          `2️⃣ Ábrelo y dale permiso de *notificaciones*.\n\n` +
+          `3️⃣ *Agregar macro*:\n• Disparador: Notificación recibida → app WhatsApp\n• Acción 1: Solicitud HTTP → GET → pega la dirección de abajo → guarda la respuesta en una variable llamada *resp*\n• Acción 2: Responder notificación → texto: la variable *resp*\n\n` +
+          `4️⃣ Guarda la macro y escríbele "hola" desde otro número.\n\n` +
+          `🎥 Videos de ayuda: https://www.youtube.com/results?search_query=MacroDroid+responder+notificaci%C3%B3n+WhatsApp+solicitud+HTTP\n\n` +
+          `🔗 Dirección (cópiala completa):\n${r.urlMacro}`;
+        open("https://wa.me/?text=" + encodeURIComponent(msg), "_blank");
+      };
+      $("wbCopy").onclick = () => copyText(r.url).then(() => toast("Dirección copiada: pégala en AutoResponder."));
       $("wbNew").onclick = async () => {
-        if (!(await uiConfirm("¿Generar una clave nueva?", "La anterior deja de funcionar y tendrás que pegar la nueva URL en la app del celular.", { okText: "Sí, generar" }))) return;
-        try { paint(await api("superWaKey", { businessId: biz.id, regenerate: true })); toast("Clave nueva lista. Cópiala en la app."); } catch (err) { toast(err.message, "error"); }
+        if (!(await uiConfirm("¿Generar una clave nueva?", "La anterior deja de funcionar y tendrás que pegar la nueva dirección en el celular de la tienda.", { okText: "Sí, generar" }))) return;
+        try { paint(await api("superWaKey", { businessId: biz.id, regenerate: true })); toast("Clave nueva lista. Cópiala otra vez en el celular."); } catch (err) { toast(err.message, "error"); }
       };
       $("wbOn").onchange = (e) => api("superWaToggle", { businessId: biz.id, enabled: e.target.checked }).then(() => toast(e.target.checked ? "Bot activo." : "Bot apagado para esta tienda.")).catch((err) => toast(err.message, "error"));
     };
