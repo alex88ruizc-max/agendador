@@ -456,3 +456,9 @@ body.plan-gate .tab-panel:not(#tab-plan) { display:none !important; }
 .mail-sug .bad { font-size:12px; color:#b81d33; }
 /* volver al panel cuando el dueño mira su página */
 .back-panel { position:fixed; left:50%; bottom:calc(18px + env(safe-area-inset-bottom, 0px)); transform:translateX(-50%); z-index:90; background:#14213D; color:#fff; border-radius:999px; padding:11px 18px; font-weight:800; font-size:14px; box-shadow:0 10px 26px -10px rgba(20,33,61,.7); white-space:nowrap; }
+
+/* cupos por hora y por profesional */
+.tpill.tpill-n { display:flex; flex-direction:column; align-items:center; line-height:1.1; padding-top:6px; padding-bottom:6px; }
+.tpill.tpill-n small { font-size:10.5px; font-weight:600; opacity:.7; margin-top:2px; }
+.chip .chip-n { font-weight:600; opacity:.65; font-size:.85em; }
+.chip.chip-empty { opacity:.55; }

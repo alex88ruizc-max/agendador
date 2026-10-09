@@ -7,9 +7,9 @@ import {
   startUpdateWatcher, applyBrandColors, uiConfirm, uiPrompt, setDialogBrand, viewImage, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, hora12, fechaLarga, fechaCorta, toMillis, cop, esc, normalizePhone,
   waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, DEFAULT_WA_RESCHEDULE, computeSlots, staffHours, mapLinks, headerBgCss, onColor, darken,
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
-  PLAN_KEYS, plansOf, planOfBiz, planPriceOf, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro,
+  PLAN_KEYS, plansOf, planOfBiz, planPriceOf, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-10-10e";
+} from "./common.js?v=2026-10-10h";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -134,6 +134,7 @@ function start() {
   subscribeDay();
   startHome();
   startNews();
+  warmServer(); // el servidor se despierta de una vez para que las acciones respondan rápido
   setInterval(renderStaffTab, 60000);
 }
 
@@ -171,7 +172,7 @@ const TABS = {
   agenda: ["Agenda", "fa-calendar-days", "#2563eb"], staff: ["Equipo y descansos", "fa-users", "#7c3aed"],
   clients: ["Clientes", "fa-address-book", "#db2777"], services: ["Servicios", "fa-scissors", "#ea580c"],
   appearance: ["Apariencia", "fa-palette", "#c026d3"], images: ["Imágenes", "fa-image", "#0891b2"], plan: ["Mi plan", "fa-crown", "#ca8a04"],
-  settings: ["Configuración", "fa-gear", "#475569"]
+  settings: ["Configuración", "fa-gear", "#475569"], linkcli: ["Link de clientes", "fa-link", "#1E9E63"]
 };
 // Qué trae cada plan (Gratis, Básico, Gold) lo define el superusuario en su panel (Cobros)
 const PLANS = () => plansOf(A.plat || {});
@@ -204,7 +205,7 @@ document.addEventListener("click", (e) => {
   if (PLAN_KEYS.includes(g.dataset.goplan)) A.planPick = g.dataset.goplan;
   goTab("plan");
 });
-const ALL_TABS = ["home", "activity", "referrals", "agenda", "staff", "clients", "services", "marketing", "appearance", "images", "plan", "settings"];
+const ALL_TABS = ["home", "linkcli", "activity", "referrals", "agenda", "staff", "clients", "services", "marketing", "appearance", "images", "plan", "settings"];
 const LOCKED_TABS = ["home", "appearance", "settings", "plan"]; // siempre visibles para poder deshacer cambios
 const PANEL_DEFAULT = { useBrand: true, linkLabel: "Link clientes", shareMsg: "Agenda tu cita en {negocio} aquí: {link}", columns: 3, style: "cards", colorIcons: true, order: ALL_TABS, hidden: [] };
 function panelPrefs() {
@@ -215,7 +216,7 @@ function panelPrefs() {
 }
 function renderTabs() {
   const P = panelPrefs();
-  const allowed = ["home", "agenda", "staff"].concat(isOwner() ? ["activity", "referrals", "clients", "services", "marketing", "appearance", "images", "plan", "settings"] : []);
+  const allowed = ["home", "agenda", "staff"].concat(isOwner() ? ["linkcli", "activity", "referrals", "clients", "services", "marketing", "appearance", "images", "plan", "settings"] : []);
   const ids = P.order.filter((id) => allowed.includes(id) && (!P.hidden.includes(id) || A.tab === id));
   const t = $("tabs");
   t.className = `grid gap-1.5 lg:grid-cols-1 ${({ 2: "grid-cols-2", 3: "grid-cols-3", 4: "grid-cols-4" })[P.columns] || "grid-cols-3"} ${P.style === "list" ? "tabs-list" : ""} ${P.colorIcons ? "" : "tabs-mono"}`;
@@ -252,6 +253,7 @@ function switchTab(id, opts = {}) {
   if (lockedNow(A.tab)) return lockCard(A.tab);
   if (A.tab === "clients") loadUsers();
   if (A.tab === "settings") renderSettings();
+  if (A.tab === "linkcli") renderLinkCli();
   if (A.tab === "services") renderServices();
   if (A.tab === "appearance") renderAppearance();
   if (A.tab === "images") renderImages();
@@ -1013,19 +1015,8 @@ function renderSettings() {
         ${txt("stPhone", "WhatsApp del negocio", s.whatsapp, 'placeholder="300 123 4567"')}
         ${txt("stAddress", "Dirección", s.address)}
         ${txt("stCity", "Ciudad", s.city)}
-        <div class="rounded-xl p-3 md:col-span-2" style="background:var(--canvas)">
-          <p class="text-sm font-bold">👀 ¿Quién puede ver tu agenda?</p>
-          <p class="mb-2 text-xs text-ink/65">Con registro, el cliente crea su cuenta antes de ver los horarios (sabes quién entra). Sin registro, ve los horarios de una vez y solo se registra al apartar (más fácil, más reservas).</p>
-          <div class="grid gap-2 sm:grid-cols-2">
-            <label class="flex cursor-pointer items-center gap-2 rounded-lg border border-line bg-white p-2.5 text-sm"><input type="radio" name="stAgenda" value="login" ${s.agendaMode !== "open" ? "checked" : ""}> <span><b>Con registro</b><br><span class="text-xs text-ink/60">Primero se registran</span></span></label>
-            <label class="flex cursor-pointer items-center gap-2 rounded-lg border border-line bg-white p-2.5 text-sm"><input type="radio" name="stAgenda" value="open" ${s.agendaMode === "open" ? "checked" : ""}> <span><b>Sin registro</b><br><span class="text-xs text-ink/60">Ven la agenda y se registran al apartar</span></span></label>
-          </div>
-        </div>
-        <label class="flex cursor-pointer items-start gap-3 rounded-xl p-3 md:col-span-2" style="background:var(--canvas)">
-          <span class="min-w-0 flex-1"><span class="block text-sm font-bold">📡 Estado en vivo en tu página</span>
-            <span class="block text-xs text-ink/65">Tus clientes ven <b>en este momento</b> quién está libre y a qué hora queda libre el que está ocupado. Sirve para que alguien cercano sepa si puede llegar ya. Apagado, solo ven los horarios para reservar.</span></span>
-          <input id="stLive" type="checkbox" class="mt-1 h-5 w-5 shrink-0" ${s.showLiveStatus ? "checked" : ""}>
-        </label>
+        <a href="#" data-gotab="linkcli" class="flex items-center gap-3 rounded-xl p-3 md:col-span-2" style="background:#e9f7f0">
+          <span class="text-lg">🔗</span><span class="min-w-0 flex-1 text-sm"><b>Qué ven tus clientes en tu página</b><br><span class="text-xs text-ink/65">Mostrar u ocultar tu dirección, redes, estado en vivo y si se registran antes de ver la agenda.</span></span><i class="fa-solid fa-chevron-right text-ink/40"></i></a>
         <div id="geoBox" class="rounded-xl p-3 md:col-span-2" style="background:var(--canvas)">
           <p class="text-sm font-bold">Cómo llegar (Waze y Google Maps)</p>
           <p class="soft mb-2 text-xs">${s.geo ? "✓ El punto exacto de tu local está guardado. Tus clientes llegan directo." : "Ahora se usa tu dirección. Para que lleguen exacto, toca el botón estando dentro de tu local."}</p>
@@ -1209,7 +1200,7 @@ async function saveSettings(e) {
   const n = (id) => Number($(id).value || 0);
   const data = {
     businessName: $("stName").value.trim(), whatsapp: phone, address: $("stAddress").value.trim(), city: $("stCity").value.trim(),
-    slotDurationMinutes: slotVal, showLiveStatus: $("stLive").checked, agendaMode: document.querySelector('input[name="stAgenda"]:checked')?.value === "open" ? "open" : "login", businessType: $("stType").value, businessTypeLabel: $("stType").value === "otro" ? $("stTypeLabel").value.trim() : "", staffLabel: $("stStaffLabel").value.trim(), depositAmountCOP: n("stDeposit"), holdMinutes: Math.max(5, n("stHold")),
+    slotDurationMinutes: slotVal, businessType: $("stType").value, businessTypeLabel: $("stType").value === "otro" ? $("stTypeLabel").value.trim() : "", staffLabel: $("stStaffLabel").value.trim(), depositAmountCOP: n("stDeposit"), holdMinutes: Math.max(5, n("stHold")),
     bookingWindowDays: A.me?.isSuper ? Math.max(1, n("stWindow")) : Math.min(trialDays(), Math.max(1, n("stWindow"))), minAdvanceMinutes: n("stAdvance"), toleranceMinutes: n("stTolerance"),
     autoConfirmProof: $("stAuto").checked, businessHours: hours, closedDates: A.closedDraft,
     paymentMethods: A.pmDraft.filter((m) => m.label && m.account).map((m) => ({ label: m.label, account: m.account, holder: m.holder || "", qr: m.qr || "" })), paymentInstructions: $("stPayInstr").value.trim(),
@@ -1260,7 +1251,9 @@ async function imgToDataUrl(file, max, type) {
   if (Math.max(w, h) > max) { const r = max / Math.max(w, h); w = Math.round(w * r); h = Math.round(h * r); }
   const c = document.createElement("canvas"); c.width = w; c.height = h;
   c.getContext("2d").drawImage(img, 0, 0, w, h);
-  return c.toDataURL(type || "image/png");
+  // más livianas = la página carga más rápido: WebP conserva la transparencia del logo y pesa mucho menos que PNG
+  if (!type) { const webp = c.toDataURL("image/webp", 0.86); return webp.startsWith("data:image/webp") ? webp : c.toDataURL("image/png"); }
+  return c.toDataURL(type, type === "image/jpeg" ? 0.75 : undefined);
 }
 function renderPanelOrder() {
   $("pnOrder").innerHTML = A.pn.order.map((id, i) => `<div class="flex items-center gap-2 rounded-lg border border-line px-2.5 py-1.5 text-sm">
@@ -2079,22 +2072,6 @@ $("tab-home").addEventListener("click", async (e) => {
     return;
   }
   const go = e.target.closest("[data-hgo]"); if (go) return switchTab(go.dataset.hgo);
-  const bl = e.target.closest("[data-bl]");
-  if (bl) {
-    const url = $("linkUrl").textContent, name = A.settings?.businessName || A.biz?.name || "";
-    if (bl.dataset.bl === "copy") {
-      await copyText(url); markGuide("share");
-      bl.innerHTML = '<i class="fa-solid fa-check"></i> ¡Copiado!'; bl.style.background = "#d1fae5";
-      setTimeout(() => { bl.innerHTML = '<i class="fa-regular fa-copy"></i> Copiar'; bl.style.background = "#fff"; }, 2200);
-    }
-    if (bl.dataset.bl === "wa") { markGuide("share"); window.open("https://wa.me/?text=" + encodeURIComponent((panelPrefs().shareMsg || PANEL_DEFAULT.shareMsg).replace(/\{negocio\}/g, name).replace(/\{link\}/g, url)), "_blank"); }
-    if (bl.dataset.bl === "qr") {
-      await loadScript("https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js").catch(() => {});
-      if (!window.QRious) return toast("No se pudo generar el QR.", "error");
-      viewImage(new window.QRious({ value: url, size: 700, level: "M" }).toDataURL(), `${name}: escanéalo para agendar tu cita`);
-    }
-    return;
-  }
   const fr = e.target.closest("[data-hfree]");
   if (fr) { H.showFree = fr.dataset.hfree === "open" ? true : !H.showFree; renderHome(); if (H.showFree) $("chairCard")?.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
   const fa = e.target.closest("[data-hfreeat]"); if (fa) return openQuick({ date: H.today, time: fa.dataset.hfreeat });
@@ -3608,3 +3585,73 @@ function svcExample() {
   const ex = { barberia: "Ej. Corte clásico", peluqueria: "Ej. Corte y cepillado", salon: "Ej. Tinte completo", unas: "Ej. Manicure semipermanente", pestanas: "Ej. Lifting de pestañas", estetica: "Ej. Limpieza facial", spa: "Ej. Masaje relajante", masajes: "Ej. Masaje descontracturante", maquillaje: "Ej. Maquillaje social", tatuajes: "Ej. Tatuaje pequeño", mascotas: "Ej. Baño y corte" };
   return ex[A.settings?.businessType] || "Ej. Bronceado en cámara";
 }
+
+// =====================================================================
+//  LINK DE CLIENTES: tu enlace y qué se ve en tu página (en un solo lugar)
+// =====================================================================
+document.addEventListener("click", (e) => { const g = e.target.closest("[data-gotab]"); if (g) { e.preventDefault(); switchTab(g.dataset.gotab); } });
+const LINK_OPTS = [
+  ["showLocation", "📍", "Mostrar mi ubicación", "Tu dirección, los botones de Waze y Maps, y la dirección en el mensaje de WhatsApp. Apágalo si atiendes a domicilio o no quieres publicarla.", true],
+  ["showSocial", "📱", "Mostrar mis redes sociales", "Los íconos de Instagram, Facebook, TikTok y YouTube debajo de tu nombre.", true],
+  ["showLiveStatus", "📡", "Estado en vivo", "Tus clientes ven en este momento quién está libre y a qué hora queda libre el que está ocupado.", false],
+  ["agendaOpen", "👀", "Ver la agenda sin registrarse", "Ven tus horarios de una vez y solo crean su cuenta al apartar (más fácil, más reservas). Apagado, se registran antes de ver la agenda.", false]
+];
+function linkOptOn(k, def) {
+  const s = A.settings || {};
+  if (k === "agendaOpen") return s.agendaMode === "open";
+  return s[k] === undefined ? def : !!s[k];
+}
+function renderLinkCli() {
+  const el = $("tab-linkcli"), url = $("linkUrl").textContent || "", s = A.settings || {};
+  const hasAddr = !!(s.address || s.geo);
+  const sw = (on) => `<span class="relative inline-block h-7 w-12 shrink-0 rounded-full transition" style="background:${on ? "var(--mint)" : "#cfd6df"}"><i class="absolute top-[3px] h-[22px] w-[22px] rounded-full bg-white shadow transition-all" style="left:${on ? "23px" : "3px"}"></i></span>`;
+  el.innerHTML = `
+    <div class="sp-card mb-3" style="background:linear-gradient(135deg,#14213D,#2B59C3);color:#fff">
+      <p class="text-[15px] font-extrabold">📅 Tu link de clientes</p>
+      <p class="mt-2 truncate rounded-xl px-3 py-2 font-mono text-xs" style="background:rgba(255,255,255,.14)">${esc(url.replace(/^https?:\/\//, ""))}</p>
+      <div class="mt-2.5 grid grid-cols-4 gap-2 text-center text-[12px] font-extrabold">
+        <button class="rounded-2xl py-2.5" style="background:#25D366;color:#0b3d1f" data-bl="wa"><i class="fa-brands fa-whatsapp block text-lg"></i>Enviar</button>
+        <button class="rounded-2xl bg-white py-2.5" style="color:var(--sink)" data-bl="copy"><i class="fa-regular fa-copy block text-lg"></i>Copiar</button>
+        <button class="rounded-2xl py-2.5" style="background:rgba(255,255,255,.18)" data-bl="qr"><i class="fa-solid fa-qrcode block text-lg"></i>QR</button>
+        <a class="rounded-2xl py-2.5" style="background:rgba(255,255,255,.18)" href="${esc(url)}&desde=panel"><i class="fa-regular fa-eye block text-lg"></i>Ver</a>
+      </div>
+    </div>
+    <div class="sp-h"><h2>Qué ven tus clientes</h2><span>se aplica al instante</span></div>
+    <div class="sp-card !p-0 divide-y divide-line">${LINK_OPTS.map(([k, ic, t, d, def]) => { const on = linkOptOn(k, def); return `
+      <button type="button" class="flex w-full items-start gap-3 p-3.5 text-left" data-linkopt="${k}" data-def="${def}" aria-pressed="${on}">
+        <span class="text-xl leading-none">${ic}</span>
+        <span class="min-w-0 flex-1"><b class="block text-[14.5px]">${t}</b><span class="block text-xs text-ink/65">${d}</span>
+          ${k === "showLocation" && on && !hasAddr ? `<span class="mt-1 block text-xs font-bold" style="color:var(--amber)">Aún no tienes dirección: agrégala en Configuración.</span>` : ""}</span>
+        ${sw(on)}
+      </button>`; }).join("")}
+    </div>
+    <p class="soft mt-3 text-xs">Tu dirección, redes y datos se editan en <a href="#" class="font-bold underline" data-gotab="settings">Configuración</a>. Aquí solo eliges si se muestran.</p>`;
+}
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-linkopt]"); if (!b) return;
+  const k = b.dataset.linkopt, now = !linkOptOn(k, b.dataset.def === "true");
+  const patch = k === "agendaOpen" ? { agendaMode: now ? "open" : "login" } : { [k]: now };
+  Object.assign(A.settings, patch); renderLinkCli();
+  try { await updateDoc(doc(db, bpath("settings", "general")), patch); toast(now ? "✓ Activado en tu página." : "✓ Oculto en tu página."); }
+  catch (err) { toast("No se pudo guardar: " + err.message, "error"); }
+});
+
+// Botones del enlace (Enviar, Copiar, QR) en Inicio y en "Link de clientes"
+document.addEventListener("click", async (e) => {
+  const bl = e.target.closest("[data-bl]");
+  if (bl) {
+    const url = $("linkUrl").textContent, name = A.settings?.businessName || A.biz?.name || "";
+    if (bl.dataset.bl === "copy") {
+      await copyText(url); markGuide("share");
+      bl.innerHTML = '<i class="fa-solid fa-check"></i> ¡Copiado!'; bl.style.background = "#d1fae5";
+      setTimeout(() => { bl.innerHTML = '<i class="fa-regular fa-copy"></i> Copiar'; bl.style.background = "#fff"; }, 2200);
+    }
+    if (bl.dataset.bl === "wa") { markGuide("share"); window.open("https://wa.me/?text=" + encodeURIComponent((panelPrefs().shareMsg || PANEL_DEFAULT.shareMsg).replace(/\{negocio\}/g, name).replace(/\{link\}/g, url)), "_blank"); }
+    if (bl.dataset.bl === "qr") {
+      await loadScript("https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js").catch(() => {});
+      if (!window.QRious) return toast("No se pudo generar el QR.", "error");
+      viewImage(new window.QRious({ value: url, size: 700, level: "M" }).toDataURL(), `${name}: escanéalo para agendar tu cita`);
+    }
+    return;
+  }
+});

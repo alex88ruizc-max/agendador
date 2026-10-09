@@ -1,11 +1,16 @@
 // Utilidades compartidas entre la página pública y el panel de administración
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js?v=2026-10-10e";
+import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js?v=2026-10-10h";
 
 export const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+// Caché en el dispositivo: muestra al instante lo último que se vio y luego actualiza en vivo
+function makeDb() {
+  try { return initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) }); }
+  catch { return getFirestore(app); }
+}
+export const db = makeDb();
 export const auth = getAuth(app);
 // Barbería activa (viene del enlace: ?b=identificador)
 export let BID = "";
@@ -16,9 +21,9 @@ export function businessFromUrl() {
 export const bpath = (...parts) => ["businesses", BID, ...parts].join("/");
 
 // Versión de la página: cámbiala en cada actualización para comprobar que se publicó
-export const APP_VERSION = '2026-10-10e';
+export const APP_VERSION = '2026-10-10h';
 // Versiones que esta página espera del servidor y de las reglas de Firebase
-export const SERVER_VERSION = '2026-10-10e';
+export const SERVER_VERSION = '2026-10-10f';
 export const RULES_VERSION = '2026-10-09v';
 
 export const UNIT = 15;          // unidad interna de bloqueo (minutos)
@@ -133,6 +138,7 @@ export function headerBgCss(headerColor, hb) {
 }
 // Botones para llegar al negocio: con el punto exacto (si se guardó) o con la dirección
 export function mapLinks(st = {}) {
+  if (st.showLocation === false) return null;
   const g = st.geo && Number.isFinite(st.geo.lat) && Number.isFinite(st.geo.lng) ? `${st.geo.lat},${st.geo.lng}` : "";
   const addr = [st.address, st.city, "Colombia"].filter(Boolean).join(", ");
   if (!g && !st.address) return null;
@@ -155,7 +161,7 @@ export function fillTemplate(tpl, apt, settings) {
     valor: cop(apt.totalCOP),
     abono: cop(apt.depositCOP),
     saldo: cop(apt.balanceDueCOP),
-    direccion: [settings?.address, settings?.city].filter(Boolean).join(", ")
+    direccion: settings?.showLocation === false ? "" : [settings?.address, settings?.city].filter(Boolean).join(", ")
   };
   return String(tpl || "").replace(/\{(\w+)\}/g, (_, k) => (k in map ? map[k] : `{${k}}`));
 }
@@ -439,7 +445,7 @@ export function plansOf(plat = {}) {
   PLAN_KEYS.forEach((k) => { out[k] = { ...DEFAULT_PLANS[k], ...((plat.plans || {})[k] || {}) }; });
   if (!plat.plans && plat.trialDays) out.free.days = Number(plat.trialDays);
   if (!out.free.name || out.free.name === "Gratis") out.free.name = "Prueba gratis";
-  out.free.days = Math.min(15, Math.max(1, Number(out.free.days || 15))); // la prueba nunca pasa de 15 días
+  out.free.days = Math.min(365, Math.max(1, Number(out.free.days || 15))); // la define el superusuario (15 por defecto)
   return out;
 }
 // Lo que se les dice al suscribirse (una línea por beneficio); el superusuario lo edita en Cobros > Planes

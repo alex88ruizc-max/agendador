@@ -1,5 +1,5 @@
 // Página pública: ver cupos, registrarse, apartar, pagar con screenshot, mis cupos
-import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro } from "./common.js?v=2026-10-10e";
+import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro } from "./common.js?v=2026-10-10h";
 import {
   onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -10,7 +10,7 @@ import {
   startUpdateWatcher, applyBrandColors, warmServer, uiConfirm, setDialogBrand, viewImage, pushOverlay, dropOverlay, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, dow, hora12, fechaLarga, fechaCorta, toMillis, cop, esc,
   normalizePhone, waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, computeSlots, dayCapacityUnits, staffHours, mapLinks, headerBgCss,
   toast, openModal, closeModal, setBusy, copyText, tmin, mstr, UNIT
-} from "./common.js?v=2026-10-10e";
+} from "./common.js?v=2026-10-10h";
 
 const $ = (id) => document.getElementById(id);
 const S = {
@@ -160,7 +160,7 @@ function renderBiz() {
   $("bizName").textContent = s.businessName || "Reserva tu cita";
   // redes sociales del negocio como íconos de marca
   const SOC = [["instagram", "fa-instagram", "Instagram"], ["facebook", "fa-facebook-f", "Facebook"], ["tiktok", "fa-tiktok", "TikTok"], ["youtube", "fa-youtube", "YouTube"]];
-  const soc = SOC.filter(([k]) => /^https?:\/\//.test(s.social?.[k] || ""));
+  const soc = s.showSocial === false ? [] : SOC.filter(([k]) => /^https?:\/\//.test(s.social?.[k] || ""));
   $("bizSocial").innerHTML = soc.map(([k, ic, t]) => `<a href="${esc(s.social[k])}" target="_blank" rel="noopener" aria-label="${t} de ${esc(s.businessName || "")}"><i class="fa-brands ${ic}"></i></a>`).join("");
   $("bizSocial").classList.toggle("hidden", !soc.length); $("bizSocial").classList.toggle("flex", !!soc.length);
   const ml = mapLinks(s);
@@ -230,8 +230,9 @@ function renderStaff() {
   if (S.staffId && !S.staff.some((s) => s.id === S.staffId)) S.staffId = "";
   $("staffPick").classList.toggle("hidden", S.staff.length < 2);
   $("staffPick").innerHTML = `<span class="self-center text-sm text-ink/70">${esc(staffLabel())}:</span>` +
-    [`<button class="chip" data-staff="" aria-pressed="${!S.staffId}">Cualquiera</button>`]
-      .concat(S.staff.map((s) => `<button class="chip" data-staff="${esc(s.id)}" aria-pressed="${S.staffId === s.id}">${esc(s.name)}</button>`)).join("");
+    [`<button class="chip" data-staff="" aria-pressed="${!S.staffId}">Cualquiera <span class="chip-n" data-cnt="">·</span></button>`]
+      .concat(S.staff.map((s) => `<button class="chip" data-staff="${esc(s.id)}" aria-pressed="${S.staffId === s.id}">${esc(s.name)} <span class="chip-n" data-cnt="${esc(s.id)}">·</span></button>`)).join("");
+  updateStaffCounts();
 }
 $("staffPick").addEventListener("click", (e) => {
   const b = e.target.closest("[data-staff]"); if (!b) return;
@@ -254,13 +255,13 @@ function firstOpenDay() {
 }
 const takenSet = () => new Set(S.dayLocks.map((l) => `${l.staffId}_${l.time}`));
 // Todos los cupos del día con los profesionales libres en cada uno
-function dayGrid() {
-  if (!S.settings || !S.date || isClosed(S.date)) return [];
+function dayGrid(all) {
+  if (!S.settings || !S.date || (!all && isClosed(S.date))) return [];
   const now = bogNow(); if (S.date < now.date) return [];
   const slot = slotLen(), taken = takenSet();
   const minStart = S.date === now.date ? now.min + Number(S.settings.minAdvanceMinutes || 0) : -1;
   const map = new Map();
-  for (const s of staffPool()) {
+  for (const s of (all ? S.staff : staffPool())) {
     for (const h of hoursOfStaff(s, S.date)) {
       const o = tmin(h.open), c = tmin(h.close);
       for (let t = o; t + slot <= c; t += slot) {
@@ -373,8 +374,22 @@ function renderSlots() {
     return;
   }
   none.classList.add("hidden");
-  hint.textContent = `Cada cupo es de ${slotLen() < 60 ? slotLen() + " minutos" : slotLen() === 60 ? "1 hora" : slotLen() / 60 + " horas"}. Toca el que prefieras.`;
-  box.innerHTML = free.map((g) => `<button class="tpill" data-time="${g.time}" aria-pressed="${S.time === g.time}">${hora12(g.time)}</button>`).join("");
+  const multi = !S.staffId && S.staff.length > 1;
+  hint.textContent = `Cada cupo es de ${slotLen() < 60 ? slotLen() + " minutos" : slotLen() === 60 ? "1 hora" : slotLen() / 60 + " horas"}. Toca el que prefieras.${multi ? " Debajo de cada hora ves cuántos lugares quedan." : ""}`;
+  box.innerHTML = free.map((g) => `<button class="tpill ${multi ? "tpill-n" : ""}" data-time="${g.time}" aria-pressed="${S.time === g.time}">${hora12(g.time)}${multi ? `<small>${g.free.length} ${g.free.length === 1 ? "cupo" : "cupos"}</small>` : ""}</button>`).join("");
+  updateStaffCounts();
+}
+// cuántas horas libres le quedan hoy (o ese día) a cada profesional y en total
+function updateStaffCounts() {
+  if (S.staff.length < 2 || !S.settings || !S.date) return;
+  const grid = dayGrid(true);
+  const per = {}; let any = 0;
+  grid.forEach((g) => { if (g.free.length) any++; g.free.forEach((id) => { per[id] = (per[id] || 0) + 1; }); });
+  document.querySelectorAll("#staffPick [data-cnt]").forEach((el) => {
+    const n = el.dataset.cnt ? (per[el.dataset.cnt] || 0) : any;
+    el.textContent = n ? `· ${n}` : "· sin cupos";
+    el.closest(".chip").classList.toggle("chip-empty", !n);
+  });
 }
 $("btnNextDay").onclick = () => { const d = $("btnNextDay").dataset.date; if (d) selectDate(d); };
 $("slots").addEventListener("click", (e) => {
@@ -802,7 +817,7 @@ function showTicket(apt) {
       <div class="ticket-cut"></div>
       <div class="px-5 py-4 text-sm text-ink/75">
         <p class="font-semibold text-ink">${note}</p>
-        <p class="mt-1">Tolerancia de espera: ${Number(st.toleranceMinutes || 10)} minutos. ${[st.address, st.city].filter(Boolean).map(esc).join(", ")}</p>
+        <p class="mt-1">Tolerancia de espera: ${Number(st.toleranceMinutes || 10)} minutos. ${st.showLocation === false ? "" : [st.address, st.city].filter(Boolean).map(esc).join(", ")}</p>
         ${mapLinks(st) ? `<div class="mt-3 grid grid-cols-2 gap-2">
           <a class="btn-light text-center text-sm" style="background:#33ccff;border-color:#33ccff;color:#0b2540" href="${mapLinks(st).waze}" target="_blank" rel="noopener"><i class="fa-brands fa-waze"></i> Ir con Waze</a>
           <a class="btn-light text-center text-sm" href="${mapLinks(st).gmaps}" target="_blank" rel="noopener"><i class="fa-solid fa-map-location-dot"></i> Google Maps</a></div>` : ""}
