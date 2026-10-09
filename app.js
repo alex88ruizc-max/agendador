@@ -1,5 +1,5 @@
 // Página pública: ver cupos, registrarse, apartar, pagar con screenshot, mis cupos
-import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro } from "./common.js?v=2026-10-10h";
+import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro } from "./common.js?v=2026-10-10i";
 import {
   onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -10,7 +10,7 @@ import {
   startUpdateWatcher, applyBrandColors, warmServer, uiConfirm, setDialogBrand, viewImage, pushOverlay, dropOverlay, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, dow, hora12, fechaLarga, fechaCorta, toMillis, cop, esc,
   normalizePhone, waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, computeSlots, dayCapacityUnits, staffHours, mapLinks, headerBgCss,
   toast, openModal, closeModal, setBusy, copyText, tmin, mstr, UNIT
-} from "./common.js?v=2026-10-10h";
+} from "./common.js?v=2026-10-10i";
 
 const $ = (id) => document.getElementById(id);
 const S = {
@@ -95,6 +95,7 @@ function subscribeDay(date) {
 // ================= Sesión =================
 onAuthStateChanged(auth, async (u) => {
   S.user = u;
+  if (u && S.dead && S.ownerLogin) { routeOwner(u); return; }
   if (u && /^[a-z0-9][a-z0-9-]{1,29}$/.test(BIZ_ID)) {
     if (!S.registering) await loadProfile();
     subscribeMine();
@@ -525,7 +526,27 @@ async function doHold() {
 }
 
 // ================= Registro / ingreso =================
-function openAuth(mode) { setAuthTab(mode); $("gate").scrollIntoView({ behavior: "smooth", block: "start" }); }
+function openAuth(mode) {
+  // en la página principal (sin tienda) "Ingresar" es para dueños: entran y van directo a su panel
+  if (S.dead) {
+    S.ownerLogin = true;
+    if (S.user) { routeOwner(S.user); return; }
+    $("gate").classList.remove("hidden"); setAuthTab("login");
+    $("authTitle").textContent = "Ingresa a tu panel";
+    $("tabRegister").classList.add("hidden");
+  } else setAuthTab(mode);
+  $("gate").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+// lleva al dueño (o al superusuario) a su panel después de entrar desde la página principal
+async function routeOwner(u) {
+  try {
+    const sup = await getDoc(doc(db, "superusers", u.uid));
+    if (sup.exists()) { location.href = "super.html"; return; }
+    const ad = await getDoc(doc(db, "admins", u.uid));
+    if (ad.exists() && ad.data().businessId) { location.href = "admin.html?b=" + encodeURIComponent(ad.data().businessId); return; }
+  } catch { /* sin permiso: no es dueño */ }
+  toast("Esta cuenta no tiene un negocio. Si eres cliente, abre el enlace que te compartió el negocio.", "error");
+}
 function setAuthTab(mode) {
   const reg = mode === "register";
   $("registerForm").classList.toggle("hidden", !reg);
@@ -641,6 +662,7 @@ $("loginForm").addEventListener("submit", async (e) => {
   try {
     const cred = await signInWithEmailAndPassword(auth, f.email.value.trim(), f.password.value);
     S.user = cred.user;
+    if (S.dead) { setBusy(btn, true, "Abriendo tu panel…"); return; } // onAuthStateChanged lo lleva a su panel
     await loadProfile();
     f.reset();
     updateGate();
