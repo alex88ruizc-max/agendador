@@ -9,8 +9,8 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-10-10m";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-10-10m";
+} from "./common.js?v=2026-10-10n";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-10-10n";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -1921,7 +1921,7 @@ function startHome() {
     renderTabs(); syncPlanGate(); if (A.tab === "plan") renderPlan();
   }, () => {}));
   if (isOwner()) H.unsubs.push(onSnapshot(doc(db, bpath("private", "billing")), (d) => { A.bill = d.data() || {}; syncPlanGate(); if (A.tab === "plan") renderPlan(); }, () => {}));
-  H.unsubs.push(onSnapshot(doc(db, "platform", "public"), (d) => { A.plat = d.data() || {}; renderTabs(); if (A.tab === "home") renderHome(); }, () => {}));
+  H.unsubs.push(onSnapshot(doc(db, "platform", "public"), (d) => { A.plat = d.data() || {}; renderTabs(); if (A.tab === "home") renderHome(); if (A.tab === "linkcli") renderLinkCli(); }, () => {}));
   H.today = bogNow().date;
   H.unsubs.push(onSnapshot(query(collection(db, bpath("appointments")), where("date", "==", H.today)), (q) => { H.apts = q.docs.map((d) => d.data()); renderHome(); }, onErr));
   H.unsubs.push(onSnapshot(query(collection(db, bpath("slotLocks")), where("date", "==", H.today)), (q) => { H.locks = q.docs.map((d) => d.data()); renderHome(); }, onErr));
@@ -3636,7 +3636,33 @@ function waSection() {
   if (lockedNow("whatsapp")) { const need = planFor("whatsapp"); return `<div class="sp-h mt-5"><h2>💬 Citas por WhatsApp</h2></div><div class="sp-card text-sm">🔒 Un asistente en tu WhatsApp que agenda solo, las 24 horas. Viene en el plan <b>${esc(PLANS()[need].name)}</b>. <a href="#" class="font-bold underline" data-goplan="${need}">Ver planes</a></div>`; }
   const on = s.waEnabled !== false, mode = s.waMode === "register" ? "register" : "code", dep = s.waDeposit !== false;
   const mc = s.waMeta || {};
-  const metaCard = mc.connected ? `
+  const MD_PLAY = "https://play.google.com/store/apps/details?id=com.arlosoft.macrodroid";
+  const MD_VIDEO = "https://www.youtube.com/results?search_query=MacroDroid+responder+notificaci%C3%B3n+WhatsApp+solicitud+HTTP";
+  const macroCard = `
+    <div class="sp-card mb-3 overflow-hidden !p-0">
+      <div class="p-4 text-white" style="background:linear-gradient(135deg,#25D366,#128C7E)">
+        <p class="flex items-center gap-2 text-[17px] font-extrabold"><i class="fa-brands fa-whatsapp text-2xl"></i> Conecta tu WhatsApp <span class="rounded-full bg-white/25 px-2 py-0.5 text-[10px]">GRATIS</span></p>
+        <p class="mt-1 text-[13px] opacity-95">Con la app gratuita <b>MacroDroid</b> en tu celular <b>Android</b>, tu asistente responde solo en tu propio número.</p>
+      </div>
+      <div class="p-4">
+        <div class="grid grid-cols-2 gap-2">
+          <a class="btn-light flex items-center justify-center gap-1.5 text-sm" href="${MD_PLAY}" target="_blank" rel="noopener"><i class="fa-brands fa-google-play"></i> Descargar</a>
+          <a class="btn-light flex items-center justify-center gap-1.5 text-sm" href="${MD_VIDEO}" target="_blank" rel="noopener"><i class="fa-brands fa-youtube" style="color:#e11d48"></i> Ver videos</a>
+        </div>
+        <ol class="mt-4 space-y-2.5 text-[13.5px]">
+          ${[["Instala <b>MacroDroid</b> y dale el permiso de <b>notificaciones</b>."],
+             ["Toca <b>Agregar macro</b> → Disparador: <b>Notificación recibida</b> → app <b>WhatsApp</b> (o WhatsApp Business)."],
+             ["Acción 1: <b>Solicitud HTTP</b> → <b>GET</b> → pega <b>tu dirección</b> (botón de abajo) → guarda la respuesta en una variable llamada <b>resp</b>."],
+             ["Acción 2: <b>Responder notificación</b> → texto: la variable <b>resp</b>. Guarda la macro."],
+             ["Escríbele <b>“hola”</b> a tu WhatsApp desde otro número para probar."]].map((x, i) => `<li class="flex gap-3"><span class="grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-extrabold text-white" style="background:#128C7E">${i + 1}</span><span>${x[0]}</span></li>`).join("")}
+        </ol>
+        <button type="button" id="mdCopy" class="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-[15px] font-extrabold text-white" style="background:#25D366"><i class="fa-regular fa-copy"></i> Copiar mi dirección</button>
+        <p class="soft mt-2 text-center text-[11.5px]">Es privada: no la compartas. Funciona mientras tu celular tenga internet.</p>
+        <p class="mt-2 rounded-xl p-2.5 text-center text-[12px]" style="background:#eef4ff">🍎 ¿Tienes iPhone? Muy pronto podrás conectarlo también.</p>
+      </div>
+    </div>`;
+  const metaReady = !!(A.plat || {}).metaReady;
+  const metaCard = !mc.connected && !metaReady ? macroCard : mc.connected ? `
     <div class="sp-card mb-3 overflow-hidden !p-0">
       <div class="flex items-center gap-3 p-4 text-white" style="background:linear-gradient(135deg,#25D366,#128C7E)">
         <span class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/20 text-2xl"><i class="fa-brands fa-whatsapp"></i></span>
@@ -3717,6 +3743,13 @@ async function connectWhatsApp(coexistence) {
   finally { setBusy(btn, false); }
 }
 document.addEventListener("click", async (e) => {
+  if (e.target.closest("#mdCopy")) {
+    const btn = $("mdCopy"); setBusy(btn, true, "Preparando…");
+    try { const r = await api("waMyKey", {}); await copyText(r.urlMacro); toast("✓ Dirección copiada: pégala en MacroDroid."); }
+    catch (err) { toast(err.message, "error"); }
+    finally { setBusy(btn, false); }
+    return;
+  }
   if (e.target.closest("#metaOn")) return connectWhatsApp(true);
   if (e.target.closest("#metaNew")) return connectWhatsApp(false);
   if (e.target.closest("#metaOff")) {

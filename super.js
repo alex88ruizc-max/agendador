@@ -3,8 +3,8 @@ import { onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordRe
 import {
   doc, getDoc, setDoc, addDoc, deleteDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp, where
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { PLAN_KEYS, PLAN_FEATURES, plansOf, planOfBiz, DEFAULT_PAY_WARNING, TG_EVENTS, BIZ_TYPES, planBenefits, planBenefitsIntro } from "./common.js?v=2026-10-10m";
-import { APP_VERSION, SERVER_VERSION, RULES_VERSION, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, readPublishedVersion, reloadFresh, startUpdateWatcher, warmServer, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-10-10m";
+import { PLAN_KEYS, PLAN_FEATURES, plansOf, planOfBiz, DEFAULT_PAY_WARNING, TG_EVENTS, BIZ_TYPES, planBenefits, planBenefitsIntro } from "./common.js?v=2026-10-10n";
+import { APP_VERSION, SERVER_VERSION, RULES_VERSION, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, readPublishedVersion, reloadFresh, startUpdateWatcher, warmServer, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-10-10n";
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on) => $(id).classList.toggle("hidden", !on);
@@ -448,10 +448,9 @@ async function handleAct(act, biz, b) {
             <li>Guarda la macro y escríbele “hola” desde otro número.</li>
           </ol>
         </div>
-        <details class="mt-3 rounded-2xl border border-line p-3 text-sm"><summary class="cursor-pointer font-bold">Otras opciones (AutoResponder · Meta)</summary>
+        <details class="mt-3 rounded-2xl border border-line p-3 text-sm"><summary class="cursor-pointer font-bold">Otras opciones</summary>
           <p class="soft mt-2 text-xs"><b>AutoResponder</b> (de pago): regla con “Todo” → “Conectarse a un servidor propio” → pega esta dirección:</p>
           <button class="btn-light mt-1 w-full text-xs" id="wbCopy">Copiar dirección para AutoResponder</button>
-          <p class="soft mt-3 text-xs"><b>Meta</b> (iPhone y Android, con botones): la tienda lo conecta desde su panel en <b>Link de clientes &gt; Citas por WhatsApp</b> cuando tu negocio esté verificado en Meta.</p>
           <button class="mt-3 text-xs font-bold underline" id="wbNew">Generar una clave nueva (la anterior deja de servir)</button>
         </details>
         <p class="soft mt-3 text-xs">La tienda necesita “Citas por WhatsApp” en su plan (Cobros &gt; Planes).</p>`;
@@ -798,4 +797,11 @@ $("mailFromSave").onclick = async () => {
   if (!/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/.test(v)) return toast("Escribe un correo válido.", "error");
   try { await setDoc(doc(db, "platform", "public"), { mailFrom: v }, { merge: true }); toast("Guardado. Revisa en “Comprobar todo” que esté listo."); }
   catch (err) { toast(err.message, "error"); }
+};
+
+// ================= WhatsApp con Meta listo para las tiendas =================
+getDoc(doc(db, "platform", "public")).then((d) => { if ($("metaReady")) $("metaReady").checked = !!d.data()?.metaReady; }).catch(() => {});
+$("metaReady").onchange = async (e) => {
+  try { await setDoc(doc(db, "platform", "public"), { metaReady: e.target.checked }, { merge: true }); toast(e.target.checked ? "Las tiendas ya ven “Conectar mi WhatsApp” de Meta." : "Las tiendas ven la opción gratis con MacroDroid."); }
+  catch (err) { toast(err.message, "error"); e.target.checked = !e.target.checked; }
 };
