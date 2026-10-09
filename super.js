@@ -3,8 +3,8 @@ import { onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordRe
 import {
   doc, getDoc, setDoc, addDoc, deleteDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp, where
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { PLAN_KEYS, PLAN_FEATURES, plansOf, planOfBiz, DEFAULT_PAY_WARNING, TG_EVENTS, BIZ_TYPES, planBenefits, planBenefitsIntro } from "./common.js?v=2026-10-10i";
-import { APP_VERSION, SERVER_VERSION, RULES_VERSION, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, readPublishedVersion, reloadFresh, startUpdateWatcher, warmServer, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-10-10i";
+import { PLAN_KEYS, PLAN_FEATURES, plansOf, planOfBiz, DEFAULT_PAY_WARNING, TG_EVENTS, BIZ_TYPES, planBenefits, planBenefitsIntro } from "./common.js?v=2026-10-10l";
+import { APP_VERSION, SERVER_VERSION, RULES_VERSION, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, readPublishedVersion, reloadFresh, startUpdateWatcher, warmServer, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-10-10l";
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on) => $(id).classList.toggle("hidden", !on);
@@ -405,6 +405,7 @@ function openStore(biz) {
     </div>
     <div class="grid gap-0.5 border-t border-line pt-2">
       ${item("edit", "fa-pen", "Editar nombre y plan")}
+      ${item("wabot", "fa-robot", "🤖 Bot de WhatsApp (clave privada)")}
       ${biz.status === "active" ? item("suspend", "fa-circle-pause", "Pausar la tienda") : item("activate", "fa-circle-play", "Activar la tienda")}
       <a class="menu-item" href="${publicUrl(biz.id)}" target="_blank" rel="noopener"><i class="fa-regular fa-eye"></i>Ver la página de clientes</a>
       <button class="menu-item" data-copy="${publicUrl(biz.id)}"><i class="fa-regular fa-copy"></i>Copiar enlace para clientes</button>
@@ -424,6 +425,30 @@ async function handleAct(act, biz, b) {
   const bl = Z.billing[biz.id] || {};
   if (act === "delete") return deleteBusiness(biz);
 
+  if (act === "wabot") {
+    openM("🤖 Bot de WhatsApp · " + biz.name, `<p class="soft -mt-2 mb-3 text-sm">Clave privada de esta tienda para la app <b>AutoResponder</b> del celular.</p><div id="wbBox" class="text-sm">Cargando…</div>`);
+    const paint = (r) => {
+      const mask = r.url.replace(r.key, r.key.slice(0, 4) + "••••••••");
+      $("wbBox").innerHTML = `
+        ${r.meta ? `<div class="mb-3 flex items-center gap-3 rounded-2xl p-3 text-white" style="background:linear-gradient(135deg,#25D366,#128C7E)"><span class="text-2xl"><i class="fa-brands fa-whatsapp"></i></span><div class="min-w-0 flex-1"><p class="text-[11px] font-bold uppercase opacity-90">Conectado con Meta</p><p class="truncate font-extrabold">${esc(r.meta.display || "")}${r.meta.name ? " · " + esc(r.meta.name) : ""}</p></div></div>`
+          : `<p class="mb-3 rounded-xl p-3 text-xs" style="background:#fff7e6;color:#7a4b00">Aún no conecta su WhatsApp con Meta. Puede hacerlo desde su panel: <b>Link de clientes &gt; Citas por WhatsApp &gt; Conectar mi WhatsApp</b> (en el piloto, agrégalo antes como tester de tu app de Meta). Mientras tanto puede usar AutoResponder con esta clave:</p>`}
+        <p class="mb-1 text-xs font-bold soft">AutoResponder (Android)</p>
+        <p class="break-all rounded-xl p-3 font-mono text-xs" style="background:var(--canvas)">${esc(mask)}</p>
+        <div class="mt-2 grid grid-cols-2 gap-2"><button class="btn-primary" id="wbCopy">Copiar URL</button><button class="btn-light" id="wbNew">Generar nueva clave</button></div>
+        <label class="mt-3 flex items-center gap-2"><input type="checkbox" id="wbOn" class="h-4 w-4" ${r.enabled ? "checked" : ""}> Bot activo para esta tienda</label>
+        <div class="mt-3 rounded-xl p-3 text-xs leading-relaxed" style="background:#eef4ff">
+          <b>En el celular de la tienda:</b><br>1. Instala <b>AutoResponder for WhatsApp</b>.<br>2. Crea una regla con <b>Todo</b> (todos los mensajes).<br>3. En la respuesta elige <b>Conectarse a un servidor propio</b> y pega la URL. Key y Value vacíos.<br>4. Guarda y escríbele “hola” desde otro número para probar.</div>
+        <p class="soft mt-2 text-xs">La tienda también necesita la función “Citas por WhatsApp” en su plan (Cobros > Planes).</p>`;
+      $("wbCopy").onclick = () => copyText(r.url).then(() => toast("URL copiada: pégala en la app."));
+      $("wbNew").onclick = async () => {
+        if (!(await uiConfirm("¿Generar una clave nueva?", "La anterior deja de funcionar y tendrás que pegar la nueva URL en la app del celular.", { okText: "Sí, generar" }))) return;
+        try { paint(await api("superWaKey", { businessId: biz.id, regenerate: true })); toast("Clave nueva lista. Cópiala en la app."); } catch (err) { toast(err.message, "error"); }
+      };
+      $("wbOn").onchange = (e) => api("superWaToggle", { businessId: biz.id, enabled: e.target.checked }).then(() => toast(e.target.checked ? "Bot activo." : "Bot apagado para esta tienda.")).catch((err) => toast(err.message, "error"));
+    };
+    api("superWaKey", { businessId: biz.id }).then(paint).catch((err) => { $("wbBox").textContent = err.message; });
+    return;
+  }
   if (act === "edit") {
     const PP = plansOf(Z.plat || {}), curPlan = planOfBiz(biz);
     openM("Editar " + biz.name, `<label class="field mb-4"><span>Nombre del negocio</span><input id="eName" value="${esc(biz.name)}"></label>
@@ -737,3 +762,12 @@ document.addEventListener("input", (e) => {
   const t = e.target, row = t.closest?.("[data-plm]");
   if (row && (t.classList.contains("plA") || t.classList.contains("plL"))) payAccountInput(row.querySelector(".plA"), row.querySelector(".plL").value);
 });
+
+// ================= Correo desde el que salen las citas =================
+getDoc(doc(db, "platform", "public")).then((d) => { if ($("mailFrom")) $("mailFrom").value = d.data()?.mailFrom || "citas@tuagenda.vip"; }).catch(() => {});
+$("mailFromSave").onclick = async () => {
+  const v = $("mailFrom").value.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/.test(v)) return toast("Escribe un correo válido.", "error");
+  try { await setDoc(doc(db, "platform", "public"), { mailFrom: v }, { merge: true }); toast("Guardado. Revisa en “Comprobar todo” que esté listo."); }
+  catch (err) { toast(err.message, "error"); }
+};

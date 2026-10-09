@@ -9,7 +9,8 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-10-10i";
+} from "./common.js?v=2026-10-10l";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-10-10l";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -108,6 +109,7 @@ function start() {
     A.settings = s.data() || {};
     setDialogBrand(A.settings.businessName || A.biz?.name, A.settings.appearance?.logo);
     applyPanelBrand(); if (A.me) renderTabs();
+    if (A.tab === "linkcli" && !document.activeElement?.closest?.("#tab-linkcli input")) renderLinkCli(); // p. ej. al quedar conectado el WhatsApp
     // recién creada desde "Probar gratis": abre la guía de primeros pasos
     // asistente de inicio: la primera vez (o al llegar desde "Probar gratis")
     if (!A.wizAuto && isOwner() && !A.me?.isSuper && !document.body.classList.contains("plan-gate") && !A.bill?.planWanted && (!A.settings.setupDone || new URLSearchParams(location.search).get("guia") === "1")) {
@@ -190,7 +192,7 @@ function lockedNow(f) {
   if (!PLAN_FEATURES_KEYS.includes(feat)) return false;
   return !(planInfo().features || []).includes(feat);
 }
-const PLAN_FEATURES_KEYS = ["telegram", "appearance", "clients", "images", "marketing", "activity"];
+const PLAN_FEATURES_KEYS = ["telegram", "appearance", "clients", "images", "marketing", "activity", "whatsapp"];
 function goTab(id) { switchTab(id); }
 function lockCard(id) {
   const need = planFor(TAB_FEATURE[id] || id), P = PLANS()[need];
@@ -3625,8 +3627,109 @@ function renderLinkCli() {
         ${sw(on)}
       </button>`; }).join("")}
     </div>
-    <p class="soft mt-3 text-xs">Tu dirección, redes y datos se editan en <a href="#" class="font-bold underline" data-gotab="settings">Configuración</a>. Aquí solo eliges si se muestran.</p>`;
+    <p class="soft mt-3 text-xs">Tu dirección, redes y datos se editan en <a href="#" class="font-bold underline" data-gotab="settings">Configuración</a>. Aquí solo eliges si se muestran.</p>
+    ${waSection()}`;
 }
+// Citas por WhatsApp: el bot lo instala la plataforma; la tienda elige cómo funciona
+function waSection() {
+  const s = A.settings || {};
+  if (lockedNow("whatsapp")) { const need = planFor("whatsapp"); return `<div class="sp-h mt-5"><h2>💬 Citas por WhatsApp</h2></div><div class="sp-card text-sm">🔒 Un asistente en tu WhatsApp que agenda solo, las 24 horas. Viene en el plan <b>${esc(PLANS()[need].name)}</b>. <a href="#" class="font-bold underline" data-goplan="${need}">Ver planes</a></div>`; }
+  const on = s.waEnabled !== false, mode = s.waMode === "register" ? "register" : "code", dep = s.waDeposit !== false;
+  const mc = s.waMeta || {};
+  const metaCard = mc.connected ? `
+    <div class="sp-card mb-3 overflow-hidden !p-0">
+      <div class="flex items-center gap-3 p-4 text-white" style="background:linear-gradient(135deg,#25D366,#128C7E)">
+        <span class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/20 text-2xl"><i class="fa-brands fa-whatsapp"></i></span>
+        <div class="min-w-0 flex-1"><p class="text-[12px] font-bold uppercase tracking-wider opacity-90">✓ WhatsApp conectado</p>
+          <p class="truncate text-[19px] font-extrabold">${esc(mc.display || "Tu número")}</p>${mc.name ? `<p class="truncate text-xs opacity-90">${esc(mc.name)}</p>` : ""}</div>
+      </div>
+      <div class="p-4 text-sm"><p>🤖 Tu asistente responde solo con botones y listas, recibe la foto del pago y le avisa al cliente cuando apruebas.</p>
+        <p class="soft mt-2 text-xs">Para probar, escríbele <b>“hola”</b> a tu WhatsApp desde otro número.</p>
+        <button type="button" id="metaOff" class="mt-3 text-xs font-bold underline" style="color:var(--sred)">Desconectar mi WhatsApp</button></div>
+    </div>` : `
+    <div class="sp-card mb-3 overflow-hidden !p-0">
+      <div class="p-4 text-white" style="background:linear-gradient(135deg,#25D366,#128C7E)">
+        <p class="flex items-center gap-2 text-[17px] font-extrabold"><i class="fa-brands fa-whatsapp text-2xl"></i> Conecta tu WhatsApp</p>
+        <p class="mt-1 text-[13px] opacity-95">Tu asistente atiende en tu propio número, con botones y listas. Funciona en iPhone y Android, y sigues usando tu app como siempre.</p>
+      </div>
+      <div class="p-4">
+        <ol class="space-y-2.5 text-[13.5px]">
+          <li class="flex gap-3"><span class="grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-extrabold text-white" style="background:#128C7E">1</span><span>Inicia sesión con <b>Facebook</b> (la ventana es de Meta).</span></li>
+          <li class="flex gap-3"><span class="grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-extrabold text-white" style="background:#128C7E">2</span><span>Escribe tu número de <b>WhatsApp Business</b>.</span></li>
+          <li class="flex gap-3"><span class="grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-extrabold text-white" style="background:#128C7E">3</span><span>Escanea el <b>código QR</b> desde tu app de WhatsApp Business y listo.</span></li>
+        </ol>
+        <button type="button" id="metaOn" class="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-[15px] font-extrabold text-white" style="background:#25D366"><i class="fa-brands fa-whatsapp text-xl"></i> Conectar mi WhatsApp</button>
+        <p class="soft mt-2 text-center text-[11.5px]">¿Usas el WhatsApp normal y no el Business? Pásate gratis a WhatsApp Business: conserva tu número y tus chats.</p>
+        <button type="button" id="metaNew" class="mt-1 block w-full text-center text-[11.5px] font-bold underline" style="color:#128C7E">Prefiero usar un número nuevo, sin app</button>
+      </div>
+    </div>`;
+  const chip = (k, v, cur, t) => `<button type="button" class="q-chip" data-wa="${k}" data-v="${v}" aria-pressed="${cur}">${t}</button>`;
+  return `<div class="sp-h mt-5"><h2>💬 Citas por WhatsApp</h2><span>tu asistente agenda solo</span></div>
+    ${metaCard}
+    <div class="sp-card">
+      <button type="button" class="flex w-full items-start gap-3 text-left" data-wa="waEnabled" data-v="${!on}">
+        <span class="min-w-0 flex-1"><b class="block text-[14.5px]">Asistente activo</b><span class="block text-xs text-ink/65">Responde en tu WhatsApp, muestra tus horas libres y agenda solo, las 24 horas.</span></span>
+        <span class="relative inline-block h-7 w-12 shrink-0 rounded-full" style="background:${on ? "var(--mint)" : "#cfd6df"}"><i class="absolute top-[3px] h-[22px] w-[22px] rounded-full bg-white shadow" style="left:${on ? "23px" : "3px"}"></i></span></button>
+      <p class="mb-1 mt-4 text-xs font-bold text-ink/60">¿Cómo agendan?</p>
+      <div class="flex flex-wrap gap-2">${chip("waMode", "code", mode === "code", "Sin registro (con código de cita)")}${chip("waMode", "register", mode === "register", "Con registro (su cuenta)")}</div>
+      <p class="mb-1 mt-4 text-xs font-bold text-ink/60">¿Cobras abono por WhatsApp?</p>
+      <div class="flex flex-wrap gap-2">${chip("waDeposit", "true", dep, `Sí, ${cop(s.depositAmountCOP || 0)} con foto del pago`)}${chip("waDeposit", "false", !dep, "No, se confirma de una vez")}</div>
+      <p class="soft mt-3 text-xs">${dep ? "El asistente da tus datos de pago y un enlace corto para adjuntar la foto. Tú apruebas el pago aquí o en Telegram." : "La cita queda confirmada apenas el cliente la elige."}</p>
+    </div>`;
+}
+// ---- Conectar el WhatsApp de la tienda (ventana oficial de Meta) ----
+let FB_READY = null;
+function loadFB() {
+  if (FB_READY) return FB_READY;
+  FB_READY = new Promise((res, rej) => {
+    window.fbAsyncInit = () => { window.FB.init({ appId: META_APP_ID, autoLogAppEvents: true, xfbml: false, version: "v21.0" }); res(window.FB); };
+    const sc = document.createElement("script"); sc.src = "https://connect.facebook.net/es_LA/sdk.js"; sc.async = true; sc.defer = true; sc.crossOrigin = "anonymous";
+    sc.onerror = () => { FB_READY = null; rej(new Error("No se pudo abrir la ventana de Meta. Revisa tu internet.")); };
+    document.body.appendChild(sc);
+  });
+  return FB_READY;
+}
+const WA_SESSION = {};
+addEventListener("message", (ev) => {
+  if (!/facebook\.com$/.test(new URL(ev.origin).hostname)) return;
+  try {
+    const d = typeof ev.data === "string" ? JSON.parse(ev.data) : ev.data;
+    if (d?.type !== "WA_EMBEDDED_SIGNUP") return;
+    if (/^FINISH/.test(d.event)) Object.assign(WA_SESSION, { wabaId: d.data?.waba_id, phoneId: d.data?.phone_number_id, coexistence: d.event === "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING" });
+    if (d.event === "CANCEL") WA_SESSION.cancel = d.data?.current_step || true;
+  } catch { /* otros mensajes */ }
+});
+async function connectWhatsApp(coexistence) {
+  const btn = $(coexistence ? "metaOn" : "metaNew"); setBusy(btn, true, "Abriendo Meta…");
+  try {
+    const FB = await loadFB();
+    Object.keys(WA_SESSION).forEach((k) => delete WA_SESSION[k]);
+    const code = await new Promise((res, rej) => FB.login((r) => (r.authResponse?.code ? res(r.authResponse.code) : rej(new Error("Cerraste la ventana de Meta antes de terminar."))), {
+      config_id: META_CONFIG_ID, response_type: "code", override_default_response_type: true,
+      extras: coexistence ? { setup: {}, featureType: "whatsapp_business_app_onboarding", sessionInfoVersion: "3" } : { setup: {}, sessionInfoVersion: "3" }
+    }));
+    for (let i = 0; i < 20 && !WA_SESSION.phoneId; i++) await new Promise((r) => setTimeout(r, 250)); // Meta avisa el número por separado
+    if (!WA_SESSION.phoneId) throw new Error("Meta no nos dijo qué número conectaste. Intenta de nuevo y termina todos los pasos.");
+    setBusy(btn, true, "Conectando tu número…");
+    const r = await api("metaConnect", { code, wabaId: WA_SESSION.wabaId, phoneId: WA_SESSION.phoneId, coexistence: !!WA_SESSION.coexistence });
+    toast(`🎉 ¡Listo! Tu asistente ya responde en ${r.display || "tu WhatsApp"}.`);
+  } catch (err) { toast(err.message, "error"); }
+  finally { setBusy(btn, false); }
+}
+document.addEventListener("click", async (e) => {
+  if (e.target.closest("#metaOn")) return connectWhatsApp(true);
+  if (e.target.closest("#metaNew")) return connectWhatsApp(false);
+  if (e.target.closest("#metaOff")) {
+    if (!(await uiConfirm("¿Desconectar tu WhatsApp?", "El asistente deja de responder en tu número. Tu app de WhatsApp sigue funcionando normal.", { okText: "Desconectar", danger: true }))) return;
+    try { await api("metaDisconnect", {}); toast("WhatsApp desconectado."); } catch (err) { toast(err.message, "error"); }
+  }
+});
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-wa]"); if (!b) return;
+  const k = b.dataset.wa, raw = b.dataset.v, v = raw === "true" ? true : raw === "false" ? false : raw;
+  A.settings[k] = v; renderLinkCli();
+  try { await updateDoc(doc(db, bpath("settings", "general")), { [k]: v }); toast("✓ Guardado."); } catch (err) { toast("No se pudo guardar: " + err.message, "error"); }
+});
 document.addEventListener("click", async (e) => {
   const b = e.target.closest("[data-linkopt]"); if (!b) return;
   const k = b.dataset.linkopt, now = !linkOptOn(k, b.dataset.def === "true");

@@ -19,3 +19,7 @@ export const API_URL = "https://script.google.com/macros/s/AKfycbyRSqnsiFCE402ui
 // 3) (Opcional) Barbería que se abre si el enlace no trae ?b=identificador.
 //    Déjalo vacío: cada barbería usa su propio enlace, por ejemplo  index.html?b=don-carlos
 export const DEFAULT_BUSINESS_ID = "";
+
+// 4) WhatsApp con Meta (no son secretos): App ID y el identificador de la configuración de registro insertado
+export const META_APP_ID = "1660449985593428";
+export const META_CONFIG_ID = "1608671990737087";

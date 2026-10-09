@@ -1,5 +1,5 @@
 // Página pública: ver cupos, registrarse, apartar, pagar con screenshot, mis cupos
-import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro } from "./common.js?v=2026-10-10i";
+import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro } from "./common.js?v=2026-10-10l";
 import {
   onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -10,7 +10,7 @@ import {
   startUpdateWatcher, applyBrandColors, warmServer, uiConfirm, setDialogBrand, viewImage, pushOverlay, dropOverlay, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, dow, hora12, fechaLarga, fechaCorta, toMillis, cop, esc,
   normalizePhone, waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, computeSlots, dayCapacityUnits, staffHours, mapLinks, headerBgCss,
   toast, openModal, closeModal, setBusy, copyText, tmin, mstr, UNIT
-} from "./common.js?v=2026-10-10i";
+} from "./common.js?v=2026-10-10l";
 
 const $ = (id) => document.getElementById(id);
 const S = {
@@ -1264,3 +1264,51 @@ if (new URLSearchParams(location.search).get("desde") === "panel" && BIZ_ID) {
   back.innerHTML = "← Volver a mi panel";
   document.body.appendChild(back);
 }
+
+// =====================================================================
+//  PAGO DE UNA CITA DEL BOT DE WHATSAPP (enlace mágico, sin iniciar sesión)
+// =====================================================================
+(() => {
+  const qp = new URLSearchParams(location.search), code = qp.get("pagar"), tok = qp.get("t");
+  if (!code || !tok || !BIZ_ID) return;
+  const wrap = document.createElement("div");
+  wrap.className = "fixed inset-0 z-[120] overflow-y-auto bg-black/55 p-3";
+  wrap.innerHTML = `<div class="mx-auto mt-6 max-w-md rounded-3xl bg-white p-5 shadow-xl" id="waPay"><p class="py-8 text-center text-sm text-ink/60">Cargando tu cita…</p></div>`;
+  document.body.appendChild(wrap);
+  const box = () => document.getElementById("waPay");
+  const close = () => { wrap.remove(); history.replaceState(null, "", location.pathname + "?b=" + encodeURIComponent(BIZ_ID)); };
+  let proof = null;
+  const draw = (r) => {
+    const a = r.appointment || {};
+    if (a.status !== "pending_payment") {
+      box().innerHTML = `<p class="text-5xl text-center">${a.status === "cancelled" || a.status === "expired" ? "⌛" : "✅"}</p>
+        <p class="mt-2 text-center font-narrow text-2xl font-bold">${a.status === "confirmed" ? "¡Tu cita está confirmada!" : a.status === "pending_verification" ? "Recibimos tu comprobante" : "Esta cita ya no está esperando pago"}</p>
+        <p class="mt-1 text-center text-sm text-ink/70">Cita <b>${esc(a.code || code)}</b>${a.date ? ` · ${esc(fechaLarga(a.date))} a las ${hora12(a.startTime)}` : ""}</p>
+        <button class="btn-primary mt-5 w-full py-3" id="waClose">Listo</button>`;
+      document.getElementById("waClose").onclick = close; return;
+    }
+    box().innerHTML = `
+      <p class="text-[11px] font-extrabold uppercase tracking-wider text-ink/50">${esc(r.businessName || "")} · Cita ${esc(a.code)}</p>
+      <p class="font-narrow text-2xl font-bold leading-tight">Adjunta la foto de tu pago</p>
+      <p class="mt-1 text-sm text-ink/70">${esc(fechaLarga(a.date))} a las ${hora12(a.startTime)} · ${(a.items || []).map((i) => esc(i.name)).join(" + ")}</p>
+      <div class="mt-3 rounded-2xl bg-paper p-3"><p class="text-[11px] font-bold uppercase tracking-wider text-ink/55">Abono para confirmar</p><p class="text-3xl font-extrabold">${cop(a.depositCOP)}</p>
+        ${(r.methods || []).map((m) => `<div class="mt-2 flex items-center gap-2 rounded-xl border border-line bg-white px-3 py-2"><span class="min-w-0 flex-1"><span class="block text-[10px] font-bold uppercase text-ink/55">${esc(m.label)}${m.holder ? " · " + esc(m.holder) : ""}</span><b class="font-mono">${esc(m.account)}</b></span><button class="btn-sm" data-copy="${esc(m.account)}">Copiar</button></div>`).join("")}</div>
+      <label class="pay-drop mt-3" for="waFile"><span class="pay-drop-ico"><i class="fa-solid fa-camera"></i></span><span id="waLbl" class="min-w-0 flex-1 text-sm"><b>Toca para adjuntar la captura</b><br><span class="text-xs text-ink/60">La foto o captura de la transferencia</span></span></label>
+      <input id="waFile" type="file" accept="image/*" class="hidden">
+      <button class="btn-primary mt-3 w-full py-3.5 text-base" id="waSend">Enviar comprobante</button>
+      <button class="mt-2 w-full py-1 text-center text-xs text-ink/50 underline" id="waLater">Lo hago después</button>`;
+    document.getElementById("waLater").onclick = close;
+    document.getElementById("waFile").onchange = (e) => { const f = e.target.files[0]; if (!f) return; proof = compressImage(f); document.getElementById("waLbl").innerHTML = `<b class="text-emerald-700">✓ Captura lista</b><br><span class="text-xs text-ink/60">Toca “Enviar comprobante”</span>`; };
+    document.getElementById("waSend").onclick = async () => {
+      if (!proof) return toast("Primero adjunta la foto del pago.", "error");
+      const btn = document.getElementById("waSend"); setBusy(btn, true, "Enviando…");
+      try { const res = await api("waSubmitProof", { businessId: BIZ_ID, code, tok, image: await proof }); draw({ ...r, appointment: res.appointment }); toast("✓ ¡Comprobante enviado!"); }
+      catch (err) { toast(err.message, "error"); setBusy(btn, false); }
+    };
+  };
+  warmServer();
+  api("waPayInfo", { businessId: BIZ_ID, code, tok }).then(draw).catch((err) => {
+    box().innerHTML = `<p class="py-6 text-center text-sm">${esc(err.message || "No pudimos abrir tu cita.")}</p><button class="btn-light w-full" id="waClose">Cerrar</button>`;
+    document.getElementById("waClose").onclick = close;
+  });
+})();
