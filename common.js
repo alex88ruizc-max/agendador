@@ -2,7 +2,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js?v=2026-10-10n";
+import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js?v=2026-11-07a";
 
 export const app = initializeApp(firebaseConfig);
 // Caché en el dispositivo: muestra al instante lo último que se vio y luego actualiza en vivo
@@ -21,9 +21,9 @@ export function businessFromUrl() {
 export const bpath = (...parts) => ["businesses", BID, ...parts].join("/");
 
 // Versión de la página: cámbiala en cada actualización para comprobar que se publicó
-export const APP_VERSION = '2026-10-10n';
+export const APP_VERSION = '2026-11-07a';
 // Versiones que esta página espera del servidor y de las reglas de Firebase
-export const SERVER_VERSION = '2026-10-10n';
+export const SERVER_VERSION = '2026-11-07a';
 export const RULES_VERSION = '2026-10-10l';
 
 export const UNIT = 15;          // unidad interna de bloqueo (minutos)
@@ -106,12 +106,12 @@ export const statusBadge = (s) => {
 };
 
 export const DEFAULT_WA_CONFIRM =
-`¡Hola, {nombre}! 💈
+`¡Hola, {nombre}! ✨
 Tu cita en {negocio} quedó registrada con éxito.
 • Reserva: {codigo}
 • Fecha: {fecha}
 • Hora: {hora}
-• Barbero: {barbero}
+• Con: {barbero}
 • Servicio: {servicio}
 • Valor: {valor} (abono {abono}, saldo {saldo})
 📍 Dirección: {direccion}
@@ -152,7 +152,7 @@ export function fillTemplate(tpl, apt, settings) {
   const map = {
     waze: ml?.waze || "", mapa: ml?.gmaps || "",
     nombre: apt.customer?.firstName || "",
-    negocio: settings?.businessName || "la barbería",
+    negocio: settings?.businessName || "el negocio",
     codigo: apt.code,
     fecha: fechaLarga(apt.date),
     hora: hora12(apt.startTime),

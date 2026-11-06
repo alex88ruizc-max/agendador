@@ -9,8 +9,8 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-10-10n";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-10-10n";
+} from "./common.js?v=2026-11-07a";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-07a";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -3596,11 +3596,11 @@ const LINK_OPTS = [
   ["showLocation", "📍", "Mostrar mi ubicación", "Tu dirección, los botones de Waze y Maps, y la dirección en el mensaje de WhatsApp. Apágalo si atiendes a domicilio o no quieres publicarla.", true],
   ["showSocial", "📱", "Mostrar mis redes sociales", "Los íconos de Instagram, Facebook, TikTok y YouTube debajo de tu nombre.", true],
   ["showLiveStatus", "📡", "Estado en vivo", "Tus clientes ven en este momento quién está libre y a qué hora queda libre el que está ocupado.", false],
-  ["agendaOpen", "👀", "Ver la agenda sin registrarse", "Ven tus horarios de una vez y solo crean su cuenta al apartar (más fácil, más reservas). Apagado, se registran antes de ver la agenda.", false]
+  ["agendaOpen", "👀", "Ver la agenda sin registrarse", "Ven tus horarios de una vez y solo entran (con Google o correo) al escoger la hora. Más fácil, más reservas. Apagado, se registran antes de ver la agenda.", true]
 ];
 function linkOptOn(k, def) {
   const s = A.settings || {};
-  if (k === "agendaOpen") return s.agendaMode === "open";
+  if (k === "agendaOpen") return s.agendaMode !== "login";
   return s[k] === undefined ? def : !!s[k];
 }
 function renderLinkCli() {
