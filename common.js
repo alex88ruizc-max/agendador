@@ -23,7 +23,7 @@ export const bpath = (...parts) => ["businesses", BID, ...parts].join("/");
 // Versión de la página: cámbiala en cada actualización para comprobar que se publicó
 export const APP_VERSION = '2026-11-07a';
 // Versiones que esta página espera del servidor y de las reglas de Firebase
-export const SERVER_VERSION = '2026-11-07a';
+export const SERVER_VERSION = '2026-10-10n';
 export const RULES_VERSION = '2026-10-10l';
 
 export const UNIT = 15;          // unidad interna de bloqueo (minutos)

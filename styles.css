@@ -479,3 +479,4 @@ body.gate-open { overflow:hidden; }
 .gate-or::before, .gate-or::after { content:""; flex:1; height:1px; background:var(--line); }
 @keyframes gateFade { from { opacity:0; } to { opacity:1; } }
 @keyframes gateUp { from { transform:translateY(40px); opacity:.4; } to { transform:none; opacity:1; } }
+.gate-sheet.hidden { display:none !important; }

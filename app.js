@@ -28,7 +28,8 @@ const BIZ_ID = businessFromUrl();
 // enlace "Mi cita" que manda Mary por WhatsApp: ...index.html?b=negocio&cita=R-XXXXXX
 let CITA_LINK = (new URLSearchParams(location.search).get("cita") || "").toUpperCase().replace(/[^A-Z0-9-]/g, "");
 function showUnavailable(title, text) {
-  S.dead = true; $("gate").classList.add("hidden"); $("bizLogoWrap").classList.add("hidden");
+  S.dead = true; $("gate").classList.add("hidden"); $("gate").classList.remove("gate-sheet"); document.body.classList.remove("gate-open"); $("bizLogoWrap").classList.add("hidden");
+  $("googleBox")?.classList.add("hidden"); // en la página principal entran los dueños: solo correo (Google podría reemplazar su contraseña)
   $("unTitle").textContent = title; $("unText").textContent = text;
   $("unavailable").classList.remove("hidden");
   $("mainContent").classList.add("hidden");
@@ -108,10 +109,7 @@ onAuthStateChanged(auth, async (u) => {
     S.profile = null; S.cust = null; S.mine = []; unsubMine?.(); unsubCust?.();
   }
   S.authReady = true;
-  if (CITA_LINK) {
-    if (u && S.profile) { CITA_LINK = ""; S.wantCita = false; setTimeout(() => openAccount("citas"), 700); }
-    else if (!u) S.wantCita = S.wantBook = true;
-  }
+  if (CITA_LINK && !u) S.wantCita = S.wantBook = true;
   updateGate(); renderNav(); renderSummary();
 });
 
@@ -125,11 +123,25 @@ function updateGate() {
   const open = S.settings?.agendaMode !== "login";
   const showGate = need && (!open || S.wantBook);
   const sheet = showGate && open;
+  // sin sesión: el formulario vuelve a su estado normal (por si antes quedó en «Completa tus datos» con Google)
+  if (!S.user) {
+    const f = $("registerForm");
+    if (f.email.readOnly) { f.email.readOnly = false; f.email.value = ""; f.password.closest("label").classList.remove("hidden"); f.password.required = true; setAuthTab("register"); }
+    $("googleBox").classList.toggle("hidden", googleBloqueado());
+    $("authSub").textContent = T("registerSub");
+    $("registerForm").querySelector("button[type=submit]").textContent = "Crear cuenta y ver la agenda";
+  }
+  // enlace «Mi cita»: apenas tiene sesión y datos, se abre Mi cuenta › Citas (una sola vez) y se limpia la dirección
+  if (!need && S.authReady && CITA_LINK) {
+    CITA_LINK = ""; S.wantCita = false;
+    try { const u2 = new URL(location.href); u2.searchParams.delete("cita"); history.replaceState(null, "", u2); } catch { /* nada */ }
+    setTimeout(() => openAccount("citas"), 700);
+  }
   $("gate").classList.toggle("gate-sheet", sheet);
   $("gateClose").classList.toggle("hidden", !sheet);
   document.body.classList.toggle("gate-open", sheet);
   if (sheet && !(S.user && !S.profile)) {
-    $("googleBox").classList.remove("hidden");
+    $("googleBox").classList.toggle("hidden", googleBloqueado());
     $("authSub").textContent = S.wantCita ? "Entra con Google o con tu correo para ver y cambiar tu cita."
       : (S.time ? "Tu hora de las " + hora12(S.time) + " queda guardada. " : "") + "Entra con Google o con tu correo para apartarla.";
     $("registerForm").querySelector("button[type=submit]").textContent = "Crear cuenta y apartar";
@@ -557,7 +569,9 @@ function openAuth(mode) {
     $("gate").classList.remove("hidden"); setAuthTab("login");
     $("authTitle").textContent = "Ingresa a tu panel";
     $("tabRegister").classList.add("hidden");
-  } else setAuthTab(mode);
+  } else {
+    S.wantBook = true; updateGate(); setAuthTab(mode); // con la agenda abierta, «Ingresar» abre la hoja de acceso
+  }
   $("gate").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 // lleva al dueño (o al superusuario) a su panel después de entrar desde la página principal
@@ -581,10 +595,14 @@ function setAuthTab(mode) {
 $("tabRegister").onclick = () => setAuthTab("register");
 $("gateClose").onclick = () => { S.wantBook = false; updateGate(); };
 // ---------- Entrar con Google ----------
+// Google no deja entrar desde el navegador interno de WhatsApp, Instagram, Facebook o TikTok (error 403 disallowed_useragent)
+function googleBloqueado() { return /FBAN|FBAV|Instagram|WhatsApp|Line\/|TikTok|; wv\)/i.test(navigator.userAgent || ""); }
 async function afterGoogle(u) {
   if (!u) return;
   S.user = u;
+  try { const g = JSON.parse(sessionStorage.getItem("googleVuelta") || "null"); sessionStorage.removeItem("googleVuelta"); if (g && g.b === BIZ_ID) { S.wantBook = true; if (g.cita) CITA_LINK = g.cita; } } catch { /* sin almacenamiento */ }
   await loadProfile();
+  if (!S.profile) S.wantBook = true; // falta nombre y WhatsApp: la hoja sigue abierta en «Completa tus datos»
   if (S.profile) toast("Hola, " + (S.profile.firstName || u.displayName || ""));
   updateGate(); renderNav(); renderAll();
 }
@@ -595,7 +613,10 @@ $("btnGoogle").onclick = async () => {
   try { const r = await signInWithPopup(auth, prov); await afterGoogle(r.user); }
   catch (err) {
     const c = String(err?.code || "");
-    if (c.includes("popup-blocked") || c.includes("operation-not-supported")) { await signInWithRedirect(auth, prov); return; }
+    if (c.includes("popup-blocked") || c.includes("operation-not-supported")) {
+      try { sessionStorage.setItem("googleVuelta", JSON.stringify({ b: BIZ_ID, cita: CITA_LINK })); } catch { /* nada */ }
+      await signInWithRedirect(auth, prov); return;
+    }
     if (!c.includes("popup-closed") && !c.includes("cancelled-popup")) toast(c.includes("unauthorized-domain") ? "Google aún no está habilitado para este dominio." : authError(err), "error");
   } finally { setBusy(btn, false); }
 };
