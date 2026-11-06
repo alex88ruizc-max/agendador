@@ -25,6 +25,8 @@ const onErr = (e) => { console.error(e); toast("No se pudo cargar la informació
 
 // ================= Barbería del enlace =================
 const BIZ_ID = businessFromUrl();
+// enlace "Mi cita" que manda Mary por WhatsApp: ...index.html?b=negocio&cita=R-XXXXXX
+let CITA_LINK = (new URLSearchParams(location.search).get("cita") || "").toUpperCase().replace(/[^A-Z0-9-]/g, "");
 function showUnavailable(title, text) {
   S.dead = true; $("gate").classList.add("hidden"); $("bizLogoWrap").classList.add("hidden");
   $("unTitle").textContent = title; $("unText").textContent = text;
@@ -106,6 +108,10 @@ onAuthStateChanged(auth, async (u) => {
     S.profile = null; S.cust = null; S.mine = []; unsubMine?.(); unsubCust?.();
   }
   S.authReady = true;
+  if (CITA_LINK) {
+    if (u && S.profile) { CITA_LINK = ""; S.wantCita = false; setTimeout(() => openAccount("citas"), 700); }
+    else if (!u) S.wantCita = S.wantBook = true;
+  }
   updateGate(); renderNav(); renderSummary();
 });
 
@@ -124,7 +130,8 @@ function updateGate() {
   document.body.classList.toggle("gate-open", sheet);
   if (sheet && !(S.user && !S.profile)) {
     $("googleBox").classList.remove("hidden");
-    $("authSub").textContent = (S.time ? "Tu hora de las " + hora12(S.time) + " queda guardada. " : "") + "Entra con Google o con tu correo para apartarla.";
+    $("authSub").textContent = S.wantCita ? "Entra con Google o con tu correo para ver y cambiar tu cita."
+      : (S.time ? "Tu hora de las " + hora12(S.time) + " queda guardada. " : "") + "Entra con Google o con tu correo para apartarla.";
     $("registerForm").querySelector("button[type=submit]").textContent = "Crear cuenta y apartar";
   }
   if (S.authReady) presence(showGate ? "register" : (S.time ? "service" : "hours"));
