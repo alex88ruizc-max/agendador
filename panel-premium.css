@@ -1,0 +1,50 @@
+/* =====================================================================
+   TEMA PREMIUM · paneles (dueño: admin.html · plataforma: super.html) con <body class="sp pp">
+   Misma línea que la página del cliente: Sora (títulos) + Inter (texto), base cálida, tinta #121216, acento violeta.
+   Solo cambia la cara; la lógica de los paneles es la misma. Respeta los colores de marca del negocio (body.branded).
+   ===================================================================== */
+body.sp.pp { --canvas:#F6F5F3; --paperw:#FFFFFF; --sink:#121216; --soft:#6B6B76; --hair:#ECEBE8; --sblue:#5B3FE0; --pacc:#5B3FE0; --pacc-soft:rgba(91,63,224,.10);
+  --ink:#121216; --line:#ECEBE8; --blue:#5B3FE0;
+  font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; letter-spacing:-.005em; background:var(--canvas); color:var(--sink); }
+body.sp.pp .disp, body.sp.pp .sp-h h2, body.sp.pp .font-narrow, body.sp.pp .step-title, body.sp.pp h1, body.sp.pp h2, body.sp.pp h3 { font-family:Sora, Inter, system-ui, sans-serif; letter-spacing:-.02em; }
+body.sp.pp .step-title { font-weight:700; }
+
+/* Tarjetas */
+body.sp.pp .sp-card, body.sp.pp .todo, body.sp.pp main .rounded-2xl.border, body.sp.pp main .rounded-xl.border { border:1px solid var(--hair); border-radius:24px; box-shadow:0 1px 2px rgba(18,18,22,.04), 0 12px 32px -20px rgba(18,18,22,.22); }
+body.sp.pp .todo { border-radius:18px; }
+body.sp.pp .sp-h { margin-top:26px; }
+body.sp.pp .sp-h h2 { font-size:19px; }
+
+/* Botones */
+body.sp.pp .btn-primary { background:var(--sink); color:#fff; border-radius:16px; font-weight:700; min-height:46px; box-shadow:0 10px 24px -14px rgba(18,18,22,.55); }
+body.sp.pp.branded .btn-primary { background:var(--b-primary); color:var(--b-on-primary); }
+body.sp.pp .btn-primary:disabled { background:#D6D5D1; color:#8A8A93; box-shadow:none; }
+body.sp.pp .btn-dark { background:var(--sink); border-radius:14px; }
+body.sp.pp .btn-light, body.sp.pp .btn-sm { border-radius:14px; border-color:#DCDBD7; }
+body.sp.pp .btn-sm:hover, body.sp.pp .btn-light:hover { border-color:var(--sink); }
+body.sp.pp .fchip[aria-pressed="true"], body.sp.pp .chip[aria-pressed="true"], body.sp.pp .q-chip[aria-pressed="true"] { background:var(--sink); border-color:var(--sink); color:#fff; }
+
+/* Formularios */
+body.sp.pp .field input, body.sp.pp .field select, body.sp.pp .field textarea, body.sp.pp main input[type="date"], body.sp.pp main input[type="text"], body.sp.pp main input:not([type]) { border-color:#DCDBD7; border-radius:14px; }
+body.sp.pp .field input:focus, body.sp.pp .field select:focus, body.sp.pp .field textarea:focus { outline:none; border-color:var(--pacc); box-shadow:0 0 0 3px var(--pacc-soft); }
+
+/* Navegación: barra inferior oscura en el celular, columna en el computador */
+body.sp.pp .sp-bnav, body.sp.pp .sp-nav { background:#121216; border-radius:24px; box-shadow:0 18px 40px -16px rgba(18,18,22,.6); }
+body.sp.pp .sp-bnav .nv, body.sp.pp .sp-nav .nv { color:#9A9AA4; }
+body.sp.pp .sp-bnav .nv[aria-current="page"], body.sp.pp .sp-nav .nv[aria-current="page"] { color:#fff; }
+body.sp.pp .sp-bnav .nv-plus, body.sp.pp .sp-nav .nv-plus { border-radius:16px; }
+body.sp.pp .admin-tab { border-radius:16px; }
+body.sp.pp .admin-tab[aria-current="page"] { background:var(--sink); border-color:var(--sink); color:#fff; }
+body.sp.pp .admin-tab[aria-current="page"] i { color:#fff !important; }
+body.sp.pp .sp-quick-side { background:var(--sink); border-radius:18px; }
+
+/* Entrada (sin sesión): tarjeta centrada, amplia y limpia; el menú vacío no se ve */
+body.sp.pp #loginView form, body.sp.pp #loginForm { max-width:26rem; margin-left:auto; margin-right:auto; border-radius:28px; padding:28px; background:#fff; border:1px solid var(--hair); box-shadow:0 30px 60px -36px rgba(18,18,22,.35); }
+body.sp.pp #loginForm h2 { font-size:1.6rem; font-weight:700; }
+@media (min-width:1024px) { body.sp.pp .sp-shell:has(> #spNav.hidden) { grid-template-columns:minmax(0,1fr); } }
+body.sp.pp #spNav.hidden { display:none !important; }
+
+/* Ventanas */
+body.sp.pp .modal { background:rgba(12,12,16,.55); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); }
+body.sp.pp .modal-card { border-radius:28px; }
+@media (max-width:639px) { body.sp.pp .modal { align-items:flex-end; padding:0; } body.sp.pp .modal-card { border-radius:28px 28px 0 0; max-height:94dvh; } }

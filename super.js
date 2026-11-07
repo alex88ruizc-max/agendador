@@ -1,11 +1,11 @@
 // Panel del superusuario: crear y vender barberías, planes, pagos y suspensiones
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
   doc, getDoc, setDoc, addDoc, deleteDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp, where
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { PLAN_KEYS, PLAN_FEATURES, plansOf, planOfBiz, DEFAULT_PAY_WARNING, TG_EVENTS, BIZ_TYPES, planBenefits, planBenefitsIntro } from "./common.js?v=2026-11-07g";
-import { setupInstall } from "./common.js?v=2026-11-07g";
-import { APP_VERSION, SERVER_VERSION, RULES_VERSION, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, readPublishedVersion, reloadFresh, startUpdateWatcher, warmServer, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-11-07g";
+import { PLAN_KEYS, PLAN_FEATURES, plansOf, planOfBiz, DEFAULT_PAY_WARNING, TG_EVENTS, BIZ_TYPES, planBenefits, planBenefitsIntro } from "./common.js?v=2026-11-07h";
+import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-07h";
+import { APP_VERSION, SERVER_VERSION, RULES_VERSION, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, readPublishedVersion, reloadFresh, startUpdateWatcher, warmServer, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-11-07h";
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on) => $(id).classList.toggle("hidden", !on);
@@ -31,6 +31,20 @@ onAuthStateChanged(auth, async (u) => {
   show("deniedView", false); show("appView", true);
   start();
 });
+$("btnGoogleSuper").onclick = async () => {
+  if (enAppInterna()) { salirAlNavegador(); return; }
+  const btn = $("btnGoogleSuper"), prov = new GoogleAuthProvider(); prov.setCustomParameters({ prompt: "select_account" });
+  setBusy(btn, true, "Abriendo Google…");
+  try { await signInWithPopup(auth, prov); }
+  catch (err) {
+    const c = String(err?.code || "");
+    if (c.includes("popup-blocked") || c.includes("operation-not-supported")) { await signInWithRedirect(auth, prov); return; }
+    if (c.includes("unauthorized-domain")) toast("Agrega tuagenda.vip en Firebase › Authentication › Dominios autorizados.", "error");
+    else if (c.includes("operation-not-allowed") || c.includes("configuration-not-found")) toast("Activa Google en Firebase › Authentication › Método de acceso.", "error");
+    else if (!c.includes("popup-closed") && !c.includes("cancelled-popup")) toast("No se pudo entrar con Google: " + (err?.message || c), "error");
+  } finally { setBusy(btn, false); }
+};
+getRedirectResult(auth).catch((e) => console.error(e));
 $("loginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.target, btn = f.querySelector("button[type=submit]");
