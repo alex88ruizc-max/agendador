@@ -9,8 +9,9 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-11-07b";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-07b";
+} from "./common.js?v=2026-11-07c";
+import { setupInstall } from "./common.js?v=2026-11-07c";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-07c";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -1217,7 +1218,7 @@ async function saveSettings(e) {
   catch (err) { toast("No se pudo guardar: " + err.message, "error"); }
   finally { setBusy(btn, false); }
 }
-startUpdateWatcher();
+startUpdateWatcher(); setupInstall();
 
 // ================= Novedades por Telegram a los clientes =================
 function openNews() {
