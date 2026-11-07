@@ -2,7 +2,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js?v=2026-11-07c";
+import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js?v=2026-11-07d";
 
 export const app = initializeApp(firebaseConfig);
 // Caché en el dispositivo: muestra al instante lo último que se vio y luego actualiza en vivo
@@ -21,7 +21,7 @@ export function businessFromUrl() {
 export const bpath = (...parts) => ["businesses", BID, ...parts].join("/");
 
 // Versión de la página: cámbiala en cada actualización para comprobar que se publicó
-export const APP_VERSION = '2026-11-07c';
+export const APP_VERSION = '2026-11-07d';
 // Versiones que esta página espera del servidor y de las reglas de Firebase
 export const SERVER_VERSION = '2026-10-10n';
 export const RULES_VERSION = '2026-10-10l';
@@ -387,8 +387,8 @@ export function closeModal(id) {
 }
 export function setBusy(btn, busy, text) {
   if (!btn) return;
-  if (busy) { btn.dataset.label = btn.textContent; btn.textContent = text || "Procesando…"; btn.disabled = true; }
-  else { btn.textContent = btn.dataset.label || btn.textContent; btn.disabled = false; }
+  if (busy) { btn.dataset.label = btn.textContent; btn._html = btn.innerHTML; btn.textContent = text || "Procesando…"; btn.disabled = true; }
+  else { if (btn._html != null) { btn.innerHTML = btn._html; btn._html = null; } else btn.textContent = btn.dataset.label || btn.textContent; btn.disabled = false; }   // conserva los íconos del botón
 }
 export async function copyText(text) {
   try { await navigator.clipboard.writeText(text); toast("Copiado: " + text); }
