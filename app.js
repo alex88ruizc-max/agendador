@@ -1,7 +1,8 @@
 // Página pública: ver cupos, registrarse, apartar, pagar con screenshot, mis cupos
-import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro } from "./common.js?v=2026-10-10n";
+import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro } from "./common.js?v=2026-11-07b";
 import {
-  onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, sendPasswordResetEmail
+  onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, sendPasswordResetEmail,
+  GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
   doc, getDoc, setDoc, getDocs, updateDoc, collection, query, where, onSnapshot, serverTimestamp, Timestamp
@@ -10,7 +11,7 @@ import {
   startUpdateWatcher, applyBrandColors, warmServer, uiConfirm, setDialogBrand, viewImage, pushOverlay, dropOverlay, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, dow, hora12, fechaLarga, fechaCorta, toMillis, cop, esc,
   normalizePhone, waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, computeSlots, dayCapacityUnits, staffHours, mapLinks, headerBgCss,
   toast, openModal, closeModal, setBusy, copyText, tmin, mstr, UNIT
-} from "./common.js?v=2026-10-10n";
+} from "./common.js?v=2026-11-07b";
 
 const $ = (id) => document.getElementById(id);
 const S = {
@@ -24,8 +25,11 @@ const onErr = (e) => { console.error(e); toast("No se pudo cargar la informació
 
 // ================= Barbería del enlace =================
 const BIZ_ID = businessFromUrl();
+// enlace "Mi cita" que manda Mary por WhatsApp: ...index.html?b=negocio&cita=R-XXXXXX
+let CITA_LINK = (new URLSearchParams(location.search).get("cita") || "").toUpperCase().replace(/[^A-Z0-9-]/g, "");
 function showUnavailable(title, text) {
-  S.dead = true; $("gate").classList.add("hidden"); $("bizLogoWrap").classList.add("hidden");
+  S.dead = true; $("gate").classList.add("hidden"); $("gate").classList.remove("gate-sheet"); document.body.classList.remove("gate-open"); $("bizLogoWrap").classList.add("hidden");
+  $("googleBox")?.classList.add("hidden"); // en la página principal entran los dueños: solo correo (Google podría reemplazar su contraseña)
   $("unTitle").textContent = title; $("unText").textContent = text;
   $("unavailable").classList.remove("hidden");
   $("mainContent").classList.add("hidden");
@@ -105,6 +109,7 @@ onAuthStateChanged(auth, async (u) => {
     S.profile = null; S.cust = null; S.mine = []; unsubMine?.(); unsubCust?.();
   }
   S.authReady = true;
+  if (CITA_LINK && !u) S.wantCita = S.wantBook = true;
   updateGate(); renderNav(); renderSummary();
 });
 
@@ -114,8 +119,33 @@ function updateGate() {
   if (S.user && S.profile) warmServer();
   const need = S.authReady && (!S.user || !S.profile);
   // agenda abierta: se ve sin registrarse; el registro se pide solo al apartar
-  const open = S.settings?.agendaMode === "open";
+  // por defecto los cupos se ven sin cuenta; solo con agendaMode "login" se pide registro antes de ver la agenda
+  const open = S.settings?.agendaMode !== "login";
   const showGate = need && (!open || S.wantBook);
+  const sheet = showGate && open;
+  // sin sesión: el formulario vuelve a su estado normal (por si antes quedó en «Completa tus datos» con Google)
+  if (!S.user) {
+    const f = $("registerForm");
+    if (f.email.readOnly) { f.email.readOnly = false; f.email.value = ""; f.password.closest("label").classList.remove("hidden"); f.password.required = true; setAuthTab("register"); }
+    $("googleBox").classList.toggle("hidden", googleBloqueado());
+    $("authSub").textContent = T("registerSub");
+    $("registerForm").querySelector("button[type=submit]").textContent = "Crear cuenta y ver la agenda";
+  }
+  // enlace «Mi cita»: apenas tiene sesión y datos, se abre Mi cuenta › Citas (una sola vez) y se limpia la dirección
+  if (!need && S.authReady && CITA_LINK) {
+    CITA_LINK = ""; S.wantCita = false;
+    try { const u2 = new URL(location.href); u2.searchParams.delete("cita"); history.replaceState(null, "", u2); } catch { /* nada */ }
+    setTimeout(() => openAccount("citas"), 700);
+  }
+  $("gate").classList.toggle("gate-sheet", sheet);
+  $("gateClose").classList.toggle("hidden", !sheet);
+  document.body.classList.toggle("gate-open", sheet);
+  if (sheet && !(S.user && !S.profile)) {
+    $("googleBox").classList.toggle("hidden", googleBloqueado());
+    $("authSub").textContent = S.wantCita ? "Entra con Google o con tu correo para ver y cambiar tu cita."
+      : (S.time ? "Tu hora de las " + hora12(S.time) + " queda guardada. " : "") + "Entra con Google o con tu correo para apartarla.";
+    $("registerForm").querySelector("button[type=submit]").textContent = "Crear cuenta y apartar";
+  }
   if (S.authReady) presence(showGate ? "register" : (S.time ? "service" : "hours"));
   $("gate").classList.toggle("hidden", !showGate);
   $("mainContent").classList.toggle("hidden", (need && !open) || !S.authReady);
@@ -126,7 +156,10 @@ function updateGate() {
     const f = $("registerForm");
     f.email.value = S.user.email || ""; f.email.readOnly = true;
     f.password.closest("label").classList.add("hidden"); f.password.required = false;
+    if (!f.fullName.value && S.user.displayName) f.fullName.value = S.user.displayName;
     $("authTitle").textContent = "Completa tus datos";
+    $("authSub").textContent = "Solo falta tu WhatsApp para confirmarte la cita.";
+    $("googleBox").classList.add("hidden");
   }
 }
 
@@ -148,7 +181,7 @@ function subscribeMine() {
 // ================= Render =================
 // Textos que el dueño puede cambiar en Apariencia (si los deja vacíos se usan estos)
 const TXT = {
-  calendarTitle: "Selecciona día y horario", bookButton: "Apartar cupo", welcome: "",
+  calendarTitle: "Elige día y hora", bookButton: "Apartar cupo", welcome: "",
   registerTitle: "Crea tu cuenta", registerSub: "Regístrate una sola vez para ver la agenda y apartar tus citas.",
   payNote: "En el mensaje de la transferencia escribe tu nombre. Tu número de reserva te llega al confirmar el pago.", confirmedTitle: "Tu turno fue confirmado"
 };
@@ -397,6 +430,8 @@ $("slots").addEventListener("click", (e) => {
   const b = e.target.closest("[data-time]"); if (!b) return;
   S.time = b.dataset.time; presence("service");
   warmServer();
+  // agenda abierta: al escoger la hora se pide entrar o registrarse (la hora queda guardada)
+  if (S.authReady && (!S.user || !S.profile)) { S.wantBook = true; renderSlots(); renderServices(); renderSummary(); updateGate(); return; }
   renderSlots(); renderServices(); renderSummary();
   setTimeout(() => $("servSection").scrollIntoView({ behavior: "smooth", block: "start" }), 50);
 });
@@ -434,9 +469,15 @@ function renderServices() {
   if (S.mainId && !mains.some((s) => s.id === S.mainId && fitsMain(s))) { S.mainId = null; S.extras.clear(); }
   const groups = [];
   mains.forEach((s) => { const c = (s.category || "").trim() || "Servicios"; let g = groups.find((x) => x.c === c); if (!g) groups.push(g = { c, list: [] }); g.list.push(s); });
-  $("mainServices").innerHTML = mains.length ? groups.map((g) => `
-    <div>${groups.length > 1 ? `<p class="mb-2 text-xs font-bold uppercase tracking-wide text-ink/60">${esc(g.c)}</p>` : ""}
-    <div class="grid gap-2 sm:grid-cols-2">${g.list.map((s) => serviceButton(s, S.mainId === s.id, "main", fitsMain(s))).join("")}</div></div>`).join("")
+  // Categorías como botones (Uñas, Pestañas, Cejas…): se ve una a la vez. La del servicio ya elegido queda marcada.
+  if (S.cat && !groups.some((g) => g.c === S.cat)) S.cat = "";
+  if (!S.cat && S.mainId) S.cat = (groups.find((g) => g.list.some((s) => s.id === S.mainId)) || {}).c || "";
+  if (!S.cat && groups.length) S.cat = groups[0].c;
+  const shown = groups.length > 1 ? groups.filter((g) => g.c === S.cat) : groups;
+  const chips = groups.length > 1 ? `<div class="cat-chips" role="tablist" aria-label="Categorías">${groups.map((g) => `<button type="button" class="cat-chip" role="tab" data-cat="${esc(g.c)}" aria-pressed="${g.c === S.cat}" aria-selected="${g.c === S.cat}">${esc(g.c)}</button>`).join("")}</div>` : "";
+  $("mainServices").innerHTML = mains.length ? chips + shown.map((g) => `
+    <div>${groups.length > 1 ? `<p class="cat-title">${esc(g.c)}</p>` : ""}
+    <div class="grid gap-2.5 sm:grid-cols-2">${g.list.map((s) => serviceButton(s, S.mainId === s.id, "main", fitsMain(s))).join("")}</div></div>`).join("")
     : `<p class="text-sm text-ink/60">Aún no hay servicios publicados.</p>`;
   const extras = S.services.filter((s) => s.type !== "base" && s.id !== S.mainId);
   [...S.extras].forEach((id) => { if (!extras.some((s) => s.id === id)) S.extras.delete(id); });
@@ -446,6 +487,7 @@ function renderServices() {
   $("extraServices").innerHTML = extras.map((s) => serviceButton(s, S.extras.has(s.id), "extra", fitsExtra(s))).join("");
 }
 $("mainServices").addEventListener("click", (e) => {
+  const cat = e.target.closest("[data-cat]"); if (cat) { S.cat = cat.dataset.cat; renderServices(); return; }
   const b = e.target.closest("[data-main]"); if (!b || b.disabled) return;
   S.mainId = b.dataset.main; S.extras.delete(S.mainId);
   renderServices(); renderSummary();
@@ -534,7 +576,9 @@ function openAuth(mode) {
     $("gate").classList.remove("hidden"); setAuthTab("login");
     $("authTitle").textContent = "Ingresa a tu panel";
     $("tabRegister").classList.add("hidden");
-  } else setAuthTab(mode);
+  } else {
+    S.wantBook = true; updateGate(); setAuthTab(mode); // con la agenda abierta, «Ingresar» abre la hoja de acceso
+  }
   $("gate").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 // lleva al dueño (o al superusuario) a su panel después de entrar desde la página principal
@@ -556,6 +600,34 @@ function setAuthTab(mode) {
   $("authTitle").textContent = reg ? T("registerTitle") : "Ingresa a tu cuenta";
 }
 $("tabRegister").onclick = () => setAuthTab("register");
+$("gateClose").onclick = () => { S.wantBook = false; updateGate(); };
+// ---------- Entrar con Google ----------
+// Google no deja entrar desde el navegador interno de WhatsApp, Instagram, Facebook o TikTok (error 403 disallowed_useragent)
+function googleBloqueado() { return /FBAN|FBAV|Instagram|WhatsApp|Line\/|TikTok|; wv\)/i.test(navigator.userAgent || ""); }
+async function afterGoogle(u) {
+  if (!u) return;
+  S.user = u;
+  try { const g = JSON.parse(sessionStorage.getItem("googleVuelta") || "null"); sessionStorage.removeItem("googleVuelta"); if (g && g.b === BIZ_ID) { S.wantBook = true; if (g.cita) CITA_LINK = g.cita; } } catch { /* sin almacenamiento */ }
+  await loadProfile();
+  if (!S.profile) S.wantBook = true; // falta nombre y WhatsApp: la hoja sigue abierta en «Completa tus datos»
+  if (S.profile) toast("Hola, " + (S.profile.firstName || u.displayName || ""));
+  updateGate(); renderNav(); renderAll();
+}
+$("btnGoogle").onclick = async () => {
+  const btn = $("btnGoogle"), prov = new GoogleAuthProvider();
+  prov.setCustomParameters({ prompt: "select_account" });
+  setBusy(btn, true, "Abriendo Google…");
+  try { const r = await signInWithPopup(auth, prov); await afterGoogle(r.user); }
+  catch (err) {
+    const c = String(err?.code || "");
+    if (c.includes("popup-blocked") || c.includes("operation-not-supported")) {
+      try { sessionStorage.setItem("googleVuelta", JSON.stringify({ b: BIZ_ID, cita: CITA_LINK })); } catch { /* nada */ }
+      await signInWithRedirect(auth, prov); return;
+    }
+    if (!c.includes("popup-closed") && !c.includes("cancelled-popup")) toast(c.includes("unauthorized-domain") ? "Google aún no está habilitado para este dominio." : authError(err), "error");
+  } finally { setBusy(btn, false); }
+};
+getRedirectResult(auth).then((r) => r && afterGoogle(r.user)).catch((e) => console.error(e));
 $("tabLogin").onclick = () => setAuthTab("login");
 document.querySelectorAll(".pwEye").forEach((b) => b.addEventListener("click", () => {
   const inp = b.parentElement.querySelector("input");
@@ -830,7 +902,7 @@ function showTicket(apt) {
       <dl class="px-5 pb-4 pt-5">
         <div class="ticket-row"><dt>Fecha</dt><dd class="capitalize">${fechaLarga(apt.date)}</dd></div>
         <div class="ticket-row"><dt>Hora</dt><dd>${hora12(apt.startTime)}</dd></div>
-        <div class="ticket-row"><dt>Barbero</dt><dd>${esc(apt.staffName)}</dd></div>
+        <div class="ticket-row"><dt>${esc(S.settings?.staffLabel || "Profesional")}</dt><dd>${esc(apt.staffName)}</dd></div>
         <div class="ticket-row"><dt>Servicio</dt><dd>${(apt.items || []).map((i) => esc(i.name)).join(" + ")}</dd></div>
         <div class="ticket-row"><dt>Total</dt><dd>${cop(apt.totalCOP)}</dd></div>
         <div class="ticket-row"><dt>${apt.payment?.mode === "preferential" ? "Abono" : "Abono pagado"}</dt><dd>${apt.payment?.mode === "preferential" ? "No requiere" : cop(apt.depositCOP)}</dd></div>

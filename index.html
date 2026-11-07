@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Archivo+Narrow:wght@500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Archivo+Narrow:wght@500;700&family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
   <link rel="preconnect" href="https://cdn.tailwindcss.com">
   <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
@@ -17,15 +17,16 @@
   <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js">
   <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js">
   <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js">
-  <link rel="modulepreload" href="common.js?v=2026-10-10n">
-  <link rel="modulepreload" href="app.js?v=2026-10-10n">
+  <link rel="modulepreload" href="common.js?v=2026-11-07b">
+  <link rel="modulepreload" href="app.js?v=2026-11-07b">
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="theme.js?v=2026-10-10n"></script>
+  <script src="theme.js?v=2026-11-07b"></script>
   <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
-  <link rel="stylesheet" href="styles.css?v=2026-10-10n">
+  <link rel="stylesheet" href="styles.css?v=2026-11-07b">
+  <link rel="stylesheet" href="premium.css?v=2026-11-07b">
 </head>
-<body class="bg-paper text-ink font-sans antialiased">
+<body class="premium bg-paper text-ink font-sans antialiased">
 
   <!-- Encabezado -->
   <header class="pole-top bg-ink text-white">
@@ -74,9 +75,17 @@
     </section>
     <!-- Registro previo: se muestra antes de la agenda -->
     <section id="gate" class="mx-auto hidden max-w-md">
-      <div class="rounded-2xl border border-line bg-white p-5">
+      <div class="gate-card rounded-2xl border border-line bg-white p-5">
+        <button id="gateClose" type="button" class="gate-x hidden" aria-label="Cerrar"><i class="fa-solid fa-xmark"></i></button>
         <h2 id="authTitle" class="font-narrow text-2xl font-bold">Crea tu cuenta</h2>
         <p id="authSub" class="mb-4 text-sm text-ink/70">Regístrate una sola vez para ver la agenda y apartar tus citas.</p>
+        <div id="googleBox" class="mb-4">
+          <button id="btnGoogle" type="button" class="btn-google w-full">
+            <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
+            Continuar con Google
+          </button>
+          <div class="gate-or"><span>o con tu correo</span></div>
+        </div>
         <div class="mb-4 grid grid-cols-2 rounded-lg bg-paper p-1 text-sm font-semibold">
           <button id="tabRegister" class="tab tab-on">Crear cuenta</button>
           <button id="tabLogin" class="tab">Ingresar</button>
@@ -184,7 +193,7 @@
     </div>
     <!-- Probar gratis: para dueños de negocios que ven la página -->
     <section id="trialCta" class="mx-auto mt-6 hidden max-w-md rounded-2xl border border-dashed border-line bg-white p-4 text-center">
-      <p class="font-narrow text-lg font-bold">¿Tienes una barbería, salón o spa?</p>
+      <p class="font-narrow text-lg font-bold">¿Tienes un negocio con citas?</p>
       <p class="mb-3 text-sm text-ink/70">Crea tu propia agenda en línea como esta. <b id="trialDaysTxt">30 días gratis</b>, sin tarjeta.</p>
       <button id="btnTrial" class="btn-dark text-sm">🚀 Probar gratis</button>
     </section>
@@ -203,7 +212,7 @@
       <div id="trialPlans"></div>
       <form id="trialForm" class="space-y-3" novalidate>
         <div id="trialPlanLine" class="flex items-center justify-between gap-2 rounded-xl bg-paper px-3 py-2 text-sm"></div>
-        <label class="field"><span>Nombre de tu negocio</span><input name="name" required maxlength="60" placeholder="Ej. Barbería El Barbas"></label>
+        <label class="field"><span>Nombre de tu negocio</span><input name="name" required maxlength="60" placeholder="Ej. Studio Lúa"></label>
         <label class="field"><span>Tipo de negocio</span><select name="type"></select></label>
         <label id="trialTypeOther" class="field hidden"><span>¿Qué tipo de negocio es?</span><input name="typeLabel" maxlength="40" placeholder="Ej. Centro de bronceado, Barbería móvil…"></label>
         <div class="grid grid-cols-2 gap-3">
@@ -222,7 +231,7 @@
     </div>
   </div>
 
-  <!-- Modal: autorización de datos para esta barbería -->
+  <!-- Modal: autorización de datos para este negocio -->
   <div id="consentModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="consentTitle">
     <div class="modal-card">
       <div class="mb-3 flex items-start justify-between">
@@ -317,6 +326,6 @@
     </div>
   </div>
 
-  <script type="module" src="app.js?v=2026-10-10n"></script>
+  <script type="module" src="app.js?v=2026-11-07b"></script>
 </body>
 </html>
