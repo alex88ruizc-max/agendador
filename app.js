@@ -1,5 +1,5 @@
 // Página pública: ver cupos, registrarse, apartar, pagar con screenshot, mis cupos
-import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro } from "./common.js?v=2026-11-07a";
+import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro } from "./common.js?v=2026-11-07b";
 import {
   onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, sendPasswordResetEmail,
   GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult
@@ -11,7 +11,7 @@ import {
   startUpdateWatcher, applyBrandColors, warmServer, uiConfirm, setDialogBrand, viewImage, pushOverlay, dropOverlay, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, dow, hora12, fechaLarga, fechaCorta, toMillis, cop, esc,
   normalizePhone, waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, computeSlots, dayCapacityUnits, staffHours, mapLinks, headerBgCss,
   toast, openModal, closeModal, setBusy, copyText, tmin, mstr, UNIT
-} from "./common.js?v=2026-11-07a";
+} from "./common.js?v=2026-11-07b";
 
 const $ = (id) => document.getElementById(id);
 const S = {
@@ -181,7 +181,7 @@ function subscribeMine() {
 // ================= Render =================
 // Textos que el dueño puede cambiar en Apariencia (si los deja vacíos se usan estos)
 const TXT = {
-  calendarTitle: "Selecciona día y horario", bookButton: "Apartar cupo", welcome: "",
+  calendarTitle: "Elige día y hora", bookButton: "Apartar cupo", welcome: "",
   registerTitle: "Crea tu cuenta", registerSub: "Regístrate una sola vez para ver la agenda y apartar tus citas.",
   payNote: "En el mensaje de la transferencia escribe tu nombre. Tu número de reserva te llega al confirmar el pago.", confirmedTitle: "Tu turno fue confirmado"
 };
@@ -469,9 +469,15 @@ function renderServices() {
   if (S.mainId && !mains.some((s) => s.id === S.mainId && fitsMain(s))) { S.mainId = null; S.extras.clear(); }
   const groups = [];
   mains.forEach((s) => { const c = (s.category || "").trim() || "Servicios"; let g = groups.find((x) => x.c === c); if (!g) groups.push(g = { c, list: [] }); g.list.push(s); });
-  $("mainServices").innerHTML = mains.length ? groups.map((g) => `
-    <div>${groups.length > 1 ? `<p class="mb-2 text-xs font-bold uppercase tracking-wide text-ink/60">${esc(g.c)}</p>` : ""}
-    <div class="grid gap-2 sm:grid-cols-2">${g.list.map((s) => serviceButton(s, S.mainId === s.id, "main", fitsMain(s))).join("")}</div></div>`).join("")
+  // Categorías como botones (Uñas, Pestañas, Cejas…): se ve una a la vez. La del servicio ya elegido queda marcada.
+  if (S.cat && !groups.some((g) => g.c === S.cat)) S.cat = "";
+  if (!S.cat && S.mainId) S.cat = (groups.find((g) => g.list.some((s) => s.id === S.mainId)) || {}).c || "";
+  if (!S.cat && groups.length) S.cat = groups[0].c;
+  const shown = groups.length > 1 ? groups.filter((g) => g.c === S.cat) : groups;
+  const chips = groups.length > 1 ? `<div class="cat-chips" role="tablist" aria-label="Categorías">${groups.map((g) => `<button type="button" class="cat-chip" role="tab" data-cat="${esc(g.c)}" aria-pressed="${g.c === S.cat}" aria-selected="${g.c === S.cat}">${esc(g.c)}</button>`).join("")}</div>` : "";
+  $("mainServices").innerHTML = mains.length ? chips + shown.map((g) => `
+    <div>${groups.length > 1 ? `<p class="cat-title">${esc(g.c)}</p>` : ""}
+    <div class="grid gap-2.5 sm:grid-cols-2">${g.list.map((s) => serviceButton(s, S.mainId === s.id, "main", fitsMain(s))).join("")}</div></div>`).join("")
     : `<p class="text-sm text-ink/60">Aún no hay servicios publicados.</p>`;
   const extras = S.services.filter((s) => s.type !== "base" && s.id !== S.mainId);
   [...S.extras].forEach((id) => { if (!extras.some((s) => s.id === id)) S.extras.delete(id); });
@@ -481,6 +487,7 @@ function renderServices() {
   $("extraServices").innerHTML = extras.map((s) => serviceButton(s, S.extras.has(s.id), "extra", fitsExtra(s))).join("");
 }
 $("mainServices").addEventListener("click", (e) => {
+  const cat = e.target.closest("[data-cat]"); if (cat) { S.cat = cat.dataset.cat; renderServices(); return; }
   const b = e.target.closest("[data-main]"); if (!b || b.disabled) return;
   S.mainId = b.dataset.main; S.extras.delete(S.mainId);
   renderServices(); renderSummary();
