@@ -9,9 +9,9 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-11-07e";
-import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-07e";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-07e";
+} from "./common.js?v=2026-11-07f";
+import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-07f";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-07f";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -363,16 +363,41 @@ function renderAgenda() {
       <div class="mb-8 grid gap-3 md:grid-cols-2">${pending.map(aptCard).join("")}</div>` : ""}
     <h2 class="step-title capitalize">${fechaLarga(A.date)}</h2>
     <p class="mb-3 text-sm text-ink/70">${live.length} cita(s). Saldo por cobrar en el local: <b>${cop(caja)}</b></p>
+    <section id="agFree" class="mb-6 rounded-2xl border border-line bg-white p-4" aria-label="Cupos libres">
+      <div class="flex flex-wrap items-center justify-between gap-2"><h3 class="font-bold">Cupos libres</h3><span id="agFreeN" class="text-sm text-ink/60">Cargando…</span></div>
+      <div id="agFreeList" class="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-6"></div>
+      <button id="agFreeShare" type="button" class="btn-light mt-3 hidden w-full text-sm"><i class="fa-brands fa-whatsapp"></i> Enviar los cupos por WhatsApp</button>
+    </section>
     <div class="grid gap-3 md:grid-cols-2">${live.map(aptCard).join("") || `<p class="text-sm text-ink/60">No hay citas este día. Usa “+ Nueva cita” para agendar a alguien que llamó o llegó al local.</p>`}</div>
     ${dead.length ? `<details class="mt-6"><summary class="cursor-pointer text-sm font-semibold">Canceladas, vencidas y rechazadas (${dead.length})</summary>
       <div class="mt-3 grid gap-3 md:grid-cols-2">${dead.map(aptCard).join("")}</div></details>` : ""}`;
+  renderFree();
+}
+// Cupos libres del día (todo el equipo; un cupo = una hora en la que al menos alguien está libre)
+let freeTok = 0;
+async function renderFree() {
+  const box = $("agFreeList"); if (!box || !A.settings) return;
+  const tok = ++freeTok, date = A.date;
+  let L = [];
+  try { L = await freeSlotsFor(date); } catch (e) { console.error(e); }
+  if (tok !== freeTok || !$("agFreeList")) return;
+  const now = bogNow();
+  if (date === now.date) L = L.filter((t) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5)) > now.min);
+  $("agFreeN").textContent = L.length ? `${L.length} ${L.length === 1 ? "hora libre" : "horas libres"}` : "Sin cupos libres este día";
+  box.innerHTML = L.map((t) => `<button type="button" class="btn-sm py-2" data-free="${t}">${hora12(t)}</button>`).join("");
+  const sh = $("agFreeShare"); sh.classList.toggle("hidden", !L.length);
+  sh.onclick = () => {
+    const dia = date === now.date ? "hoy" : fechaLarga(date);
+    const txt = `✨ Cupos libres ${dia} en ${A.biz?.name || ""}:\n${L.map(hora12).join(" · ")}\n\nAparta el tuyo aquí: ${publicUrl()}`;
+    window.open("https://wa.me/?text=" + encodeURIComponent(txt), "_blank", "noopener");
+  };
 }
 function setAgendaDate(d) { A.date = d; A.dayApts = []; subscribeDay(); renderAgenda(); }
 
 $("tab-agenda").addEventListener("click", (e) => {
   const d = e.target.closest("[data-day]");
   if (d) { const n = Number(d.dataset.day); setAgendaDate(n === 0 ? bogNow().date : addDays(A.date, n)); return; }
-  if (e.target.closest("#btnNewApt")) { openAptModal("new"); return; }
+  if (e.target.closest("#btnNewApt") || e.target.closest("[data-free]")) { openAptModal("new"); return; }
   const b = e.target.closest("[data-act]"); if (b) aptAction(b);
 });
 $("tab-agenda").addEventListener("change", (e) => { if (e.target.id === "agDate" && e.target.value) setAgendaDate(e.target.value); });
