@@ -1,6 +1,6 @@
 // Página pública: ver cupos, registrarse, apartar, pagar con screenshot, mis cupos
-import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro } from "./common.js?v=2026-11-07j";
-import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-07j";
+import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro } from "./common.js?v=2026-11-07k";
+import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-07k";
 import {
   onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, sendPasswordResetEmail,
   GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult
@@ -12,7 +12,7 @@ import {
   startUpdateWatcher, applyBrandColors, warmServer, uiConfirm, setDialogBrand, viewImage, pushOverlay, dropOverlay, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, dow, hora12, fechaLarga, fechaCorta, toMillis, cop, esc,
   normalizePhone, waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, computeSlots, dayCapacityUnits, staffHours, mapLinks, headerBgCss,
   toast, openModal, closeModal, setBusy, copyText, tmin, mstr, UNIT
-} from "./common.js?v=2026-11-07j";
+} from "./common.js?v=2026-11-07k";
 
 const $ = (id) => document.getElementById(id);
 const S = {
@@ -1109,6 +1109,8 @@ $("btnResched").onclick = async () => {
 renderNav(); renderSummary();
 if (/^[a-z0-9][a-z0-9-]{1,29}$/.test(BIZ_ID)) boot(); // arranca cuando todo está definido
 startUpdateWatcher(); setupInstall();
+// 📱 si ya existe la APK, se ofrece en la página principal (Android)
+fetch("/tu-agenda.apk", { method: "HEAD", cache: "no-store" }).then((r) => { if (r.ok && /android/i.test(navigator.userAgent || "") || r.ok && !/iphone|ipad/i.test(navigator.userAgent || "")) { $("btnApk").classList.remove("hidden"); $("btnApk").classList.add("flex"); } }).catch(() => {});
 
 // ================= Probar gratis: crear la tienda de prueba =================
 var PLAT = {}; // var: se usa desde maxDate antes de llegar a esta línea
