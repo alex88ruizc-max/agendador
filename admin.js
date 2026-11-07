@@ -9,9 +9,9 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-11-07m";
-import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-07m";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-07m";
+} from "./common.js?v=2026-11-07n";
+import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-07n";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-07n";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];

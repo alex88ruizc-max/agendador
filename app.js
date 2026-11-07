@@ -1,6 +1,6 @@
 // Página pública: ver cupos, registrarse, apartar, pagar con screenshot, mis cupos
-import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro } from "./common.js?v=2026-11-07m";
-import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-07m";
+import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro } from "./common.js?v=2026-11-07n";
+import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-07n";
 import {
   onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, sendPasswordResetEmail,
   GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult
@@ -12,7 +12,7 @@ import {
   startUpdateWatcher, applyBrandColors, warmServer, uiConfirm, setDialogBrand, viewImage, pushOverlay, dropOverlay, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, dow, hora12, fechaLarga, fechaCorta, toMillis, cop, esc,
   normalizePhone, waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, computeSlots, dayCapacityUnits, staffHours, mapLinks, headerBgCss,
   toast, openModal, closeModal, setBusy, copyText, tmin, mstr, UNIT
-} from "./common.js?v=2026-11-07m";
+} from "./common.js?v=2026-11-07n";
 
 const $ = (id) => document.getElementById(id);
 const S = {
@@ -244,6 +244,13 @@ function renderBiz() {
 
 function renderNav() {
   const nav = $("nav");
+  if (S.user && S.dead) {   // tuagenda.vip sin negocio: aquí entran los dueños
+    $("btnMine").classList.add("hidden"); $("btnMine").classList.remove("inline-flex");
+    nav.innerHTML = `<div class="flex items-center gap-2"><button id="btnMyPanel" class="rounded-full bg-white px-4 py-2 text-sm font-bold text-ink">Ir a mi panel</button><button id="btnLogout" class="logout-round" aria-label="Salir" title="Salir"><i class="fa-solid fa-power-off"></i></button></div>`;
+    $("btnMyPanel").onclick = () => { S.ownerLogin = true; routeOwner(S.user); };
+    $("btnLogout").onclick = () => signOut(auth);
+    return;
+  }
   if (S.user) {
     const active = S.mine.filter((a) => ["pending_payment", "pending_verification", "confirmed"].includes(a.status)).length;
     nav.innerHTML = `<button id="btnLogout" class="logout-round" aria-label="Salir" title="Salir"><i class="fa-solid fa-power-off"></i></button>`;
@@ -990,7 +997,7 @@ function renderMine() {
 }
 function openAccount(tab) {
   const p = S.profile || {};
-  $("acctAvatar").textContent = ((p.firstName || "?")[0] + (p.lastName || "")[0] || "").toUpperCase();
+  $("acctAvatar").textContent = (((p.firstName || "").charAt(0) + (p.lastName || "").charAt(0)) || (S.user?.email || "?").charAt(0)).toUpperCase();
   $("mineTitle").textContent = `${p.firstName || ""} ${p.lastName || ""}`.trim() || "Mi cuenta";
   $("acctEmail").textContent = p.email || S.user?.email || "";
   const f = $("profileForm");
@@ -1012,8 +1019,8 @@ $("profileForm").addEventListener("submit", async (e) => {
   setBusy(btn, true, "Guardando…");
   try {
     const data = { firstName: f.firstName.value.trim(), lastName: f.lastName.value.trim(), whatsapp: phone, updatedAt: serverTimestamp() };
-    await updateDoc(doc(db, "users", S.user.uid), data);
-    Object.assign(S.profile, data);
+    await setDoc(doc(db, "users", S.user.uid), data, { merge: true });   // si el perfil no existía, se crea
+    S.profile = Object.assign(S.profile || {}, data);
     toast("Perfil actualizado. Tus próximas reservas usarán estos datos.");
   } catch (err) { toast(err.message, "error"); }
   finally { setBusy(btn, false); }
