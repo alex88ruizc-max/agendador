@@ -9,9 +9,9 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-11-07f";
-import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-07f";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-07f";
+} from "./common.js?v=2026-11-07g";
+import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-07g";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-07g";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -3671,6 +3671,76 @@ function renderLinkCli() {
     <p class="soft mt-3 text-xs">Tu dirección, redes y datos se editan en <a href="#" class="font-bold underline" data-gotab="settings">Configuración</a>. Aquí solo eliges si se muestran.</p>
     ${waSection()}`;
 }
+// ---------- Mary: conectar el WhatsApp del negocio con un código de 8 letras (lo atiende el servidor del agendador) ----------
+const MW = { t: null, hasta: 0 };
+function maryWaCard() {
+  const w = A.settings?.maryWa || {};
+  if (w.conectado) return `
+    <div class="sp-card mb-3 overflow-hidden !p-0">
+      <div class="flex items-center gap-3 p-4 text-white" style="background:linear-gradient(135deg,#25D366,#128C7E)">
+        <span class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/20 text-2xl"><i class="fa-brands fa-whatsapp"></i></span>
+        <div class="min-w-0 flex-1"><p class="text-[12px] font-bold uppercase tracking-wider opacity-90">✓ Mary atiende tu WhatsApp</p>
+          <p class="truncate text-[19px] font-extrabold">+${esc(w.numero || "")}</p></div></div>
+      <div class="p-4 text-sm"><p>👩‍💼 Responde con el link para agendar, muestra la cita a quien ya tiene una, recibe la captura del pago (te la manda a Telegram para aprobar) y publica estados con tus cupos.</p>
+        <p class="soft mt-2 text-xs">Sigues usando tu WhatsApp normal. Si escribes tú en un chat, Mary se hace a un lado.</p>
+        <button type="button" id="mwOff" class="mt-3 text-xs font-bold underline" style="color:var(--sred)">Desconectar mi WhatsApp de Mary</button></div></div>`;
+  const num = String(A.settings?.whatsapp || "").replace(/\D/g, "");
+  return `
+    <div class="sp-card mb-3 overflow-hidden !p-0">
+      <div class="p-4 text-white" style="background:linear-gradient(135deg,#121216,#2b2b36)">
+        <p class="flex items-center gap-2 text-[17px] font-extrabold"><i class="fa-brands fa-whatsapp text-2xl" style="color:#25D366"></i> Conecta tu WhatsApp a Mary</p>
+        <p class="mt-1 text-[13px] opacity-90">Funciona en <b>iPhone y Android</b>, con WhatsApp normal o Business. No instalas nada: sigues usando tu app igual.</p></div>
+      <div class="p-4">
+        <label class="field"><span>Número de WhatsApp del negocio</span><input id="mwNum" type="tel" inputmode="numeric" placeholder="57 300 123 4567" value="${esc(num.length === 10 ? "57" + num : num)}"></label>
+        <button type="button" id="mwOn" class="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-[15px] font-extrabold text-white" style="background:#25D366"><i class="fa-brands fa-whatsapp text-xl"></i> Pedir mi código</button>
+        <div id="mwBox" class="mt-3 hidden"></div>
+      </div></div>`;
+}
+function mwPintar(r) {
+  const box = $("mwBox"); if (!box) return;
+  box.classList.remove("hidden");
+  if (!r || r.estado === "pidiendo") { box.innerHTML = `<p class="flex items-center gap-2 text-sm"><span class="spin"></span> Preparando tu código… (tarda unos segundos)</p>`; return; }
+  if (r.estado === "error") { box.innerHTML = `<p class="rounded-xl bg-rose-50 p-3 text-sm text-rose-800">${esc(r.error || "No se pudo preparar la conexión.")} Intenta de nuevo.</p>`; return; }
+  if (r.estado === "codigo") {
+    const c = String(r.codigo || "");
+    box.innerHTML = `${c ? `<p class="text-center text-xs font-bold uppercase tracking-wider text-ink/55">Tu código</p>
+      <p class="my-1 select-all text-center font-mono text-[34px] font-extrabold tracking-[.18em]">${esc(c.slice(0, 4))}-${esc(c.slice(4))}</p>` : ""}
+      <ol class="mt-2 space-y-1.5 text-[13.5px]">
+        <li>1. Abre <b>WhatsApp</b> en el celular del negocio.</li>
+        <li>2. <b>⋮ (Android) o Configuración (iPhone)</b> › <b>Dispositivos vinculados</b> › <b>Vincular un dispositivo</b>.</li>
+        <li>3. Toca <b>«Vincular con el número de teléfono»</b> y escribe el código.</li></ol>
+      ${r.qr ? `<details class="mt-3"><summary class="cursor-pointer text-xs font-bold text-ink/60">¿Prefieres escanear un QR? (desde otra pantalla)</summary><img src="${esc(r.qr)}" alt="Código QR para vincular" class="mx-auto mt-2 w-56 rounded-xl border border-line"></details>` : ""}
+      <p class="soft mt-3 flex items-center gap-2 text-xs"><span class="spin"></span> Esperando que vincules tu WhatsApp…</p>`;
+    return;
+  }
+  if (r.estado === "conectado") { box.innerHTML = `<p class="rounded-xl bg-emerald-50 p-3 text-center text-sm font-bold text-emerald-800">🎉 ¡Listo! Mary ya atiende tu WhatsApp.</p>`; }
+}
+function mwEsperar() {
+  clearTimeout(MW.t); MW.hasta = Date.now() + 5 * 60000;
+  const paso = async () => {
+    if (Date.now() > MW.hasta || !$("mwBox")) return;
+    try { const r = await api("maryWa", { op: "estado" }); mwPintar(r.res); if (r.wa?.conectado || r.res?.estado === "conectado") { A.settings.maryWa = r.wa || { conectado: true, numero: r.res?.numero }; return; } if (r.res?.estado === "error") return; }
+    catch (e) { console.error(e); }
+    MW.t = setTimeout(paso, 3000);
+  };
+  MW.t = setTimeout(paso, 2500);
+}
+document.addEventListener("click", async (e) => {
+  if (e.target.closest("#mwOn")) {
+    const btn = $("mwOn"), num = ($("mwNum")?.value || "").replace(/\D/g, "");
+    if (num.length < 11) { toast("Escribe el número con el indicativo del país, ej. 57 300 123 4567.", "error"); return; }
+    setBusy(btn, true, "Pidiendo tu código…");
+    try { await api("maryWa", { op: "conectar", numero: num }); mwPintar({ estado: "pidiendo" }); mwEsperar(); }
+    catch (err) { toast(err.message, "error"); }
+    finally { setBusy(btn, false); }
+    return;
+  }
+  if (e.target.closest("#mwOff")) {
+    if (!(await uiConfirm("¿Desconectar tu WhatsApp de Mary?", "Mary deja de responder en tu número. Tu WhatsApp sigue funcionando normal.", { okText: "Desconectar", danger: true }))) return;
+    try { await api("maryWa", { op: "desconectar" }); toast("Listo: en unos segundos Mary deja de atender tu WhatsApp."); } catch (err) { toast(err.message, "error"); }
+  }
+});
+
 // Citas por WhatsApp: el bot lo instala la plataforma; la tienda elige cómo funciona
 function waSection() {
   const s = A.settings || {};
@@ -3731,7 +3801,9 @@ function waSection() {
       </div>
     </div>`;
   const chip = (k, v, cur, t) => `<button type="button" class="q-chip" data-wa="${k}" data-v="${v}" aria-pressed="${cur}">${t}</button>`;
-  return `<div class="sp-h mt-5"><h2>💬 Citas por WhatsApp</h2><span>tu asistente agenda solo</span></div>
+  return `<div class="sp-h mt-5"><h2>💬 WhatsApp con Mary</h2><span>tu recepcionista 24/7</span></div>
+    ${maryWaCard()}
+    <details class="mt-3"><summary class="cursor-pointer px-1 text-xs font-bold text-ink/55">Otras formas de conectar (MacroDroid, Meta) — las de antes</summary><div class="mt-3">
     ${metaCard}
     <div class="sp-card">
       <button type="button" class="flex w-full items-start gap-3 text-left" data-wa="waEnabled" data-v="${!on}">
@@ -3742,7 +3814,7 @@ function waSection() {
       <p class="mb-1 mt-4 text-xs font-bold text-ink/60">¿Cobras abono por WhatsApp?</p>
       <div class="flex flex-wrap gap-2">${chip("waDeposit", "true", dep, `Sí, ${cop(s.depositAmountCOP || 0)} con foto del pago`)}${chip("waDeposit", "false", !dep, "No, se confirma de una vez")}</div>
       <p class="soft mt-3 text-xs">${dep ? "El asistente da tus datos de pago y un enlace corto para adjuntar la foto. Tú apruebas el pago aquí o en Telegram." : "La cita queda confirmada apenas el cliente la elige."}</p>
-    </div>`;
+    </div></div></details>`;
 }
 // ---- Conectar el WhatsApp de la tienda (ventana oficial de Meta) ----
 let FB_READY = null;
