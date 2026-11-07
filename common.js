@@ -2,7 +2,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js?v=2026-11-07b";
+import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js?v=2026-11-07c";
 
 export const app = initializeApp(firebaseConfig);
 // Caché en el dispositivo: muestra al instante lo último que se vio y luego actualiza en vivo
@@ -21,7 +21,7 @@ export function businessFromUrl() {
 export const bpath = (...parts) => ["businesses", BID, ...parts].join("/");
 
 // Versión de la página: cámbiala en cada actualización para comprobar que se publicó
-export const APP_VERSION = '2026-11-07b';
+export const APP_VERSION = '2026-11-07c';
 // Versiones que esta página espera del servidor y de las reglas de Firebase
 export const SERVER_VERSION = '2026-10-10n';
 export const RULES_VERSION = '2026-10-10l';
@@ -517,4 +517,43 @@ if (typeof document !== "undefined") {
     else if (!/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/.test(v)) box.innerHTML = `<span class="bad">Revisa tu correo: parece incompleto.</span>`;
     else setTimeout(() => { if (document.activeElement !== t) box.innerHTML = ""; }, 200);
   });
+}
+
+// ================= Instalar como app (PC, Android, iPhone) =================
+// Android/PC: usa el aviso del navegador. iPhone: Safari no tiene botón, se explica «Compartir › Agregar a inicio».
+let installEvt = null;
+export function setupInstall() {
+  try { if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {}); } catch { /* nada */ }
+  const standalone = window.matchMedia?.("(display-mode: standalone)").matches || navigator.standalone === true;
+  if (standalone) return;
+  const ua = navigator.userAgent || "", ios = /iPhone|iPad|iPod/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  const safari = ios && /Safari/i.test(ua) && !/CriOS|FxiOS|EdgiOS|FBAN|FBAV|Instagram|WhatsApp/i.test(ua);
+  const cerrado = () => { try { return Date.now() - Number(localStorage.getItem("instalarCerrado") || 0) < 14 * 86400000; } catch { return false; } };
+  const mostrar = () => {
+    if (cerrado() || document.getElementById("installPill")) return;
+    const el = document.createElement("div");
+    el.id = "installPill"; el.className = "install-pill";
+    el.innerHTML = `<button type="button" class="install-go"><img src="/icon-192.png" alt="" width="28" height="28"><span><b>Instala Tu Agenda</b><small>Ábrela como app, sin buscar el enlace</small></span></button><button type="button" class="install-x" aria-label="Cerrar">✕</button>`;
+    document.body.appendChild(el); document.body.classList.add("has-install");
+    el.querySelector(".install-x").onclick = () => { try { localStorage.setItem("instalarCerrado", String(Date.now())); } catch { /* nada */ } el.remove(); document.body.classList.remove("has-install"); };
+    el.querySelector(".install-go").onclick = async () => {
+      if (installEvt) { installEvt.prompt(); const r = await installEvt.userChoice.catch(() => null); installEvt = null; if (r && r.outcome === "accepted") { el.remove(); document.body.classList.remove("has-install"); } return; }
+      if (ios) mostrarAyudaIphone(safari);
+    };
+  };
+  window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; mostrar(); });
+  window.addEventListener("appinstalled", () => { document.getElementById("installPill")?.remove(); document.body.classList.remove("has-install"); });
+  if (ios) setTimeout(mostrar, 2500);
+}
+function mostrarAyudaIphone(safari) {
+  const d = document.createElement("div");
+  d.className = "install-help";
+  d.innerHTML = `<div class="install-card" role="dialog" aria-modal="true" aria-label="Instalar en iPhone">
+    <img src="/icon-192.png" alt="" width="56" height="56">
+    <h3>Instala Tu Agenda en tu iPhone</h3>
+    ${safari ? `<ol><li>Toca <b>Compartir</b> <span class="ios-ico">⬆︎</span> abajo en Safari.</li><li>Elige <b>Agregar a inicio</b>.</li><li>Toca <b>Agregar</b>. ¡Listo! Queda como app.</li></ol>`
+      : `<p>Abre esta página en <b>Safari</b> (copia el enlace y pégalo allí). Luego: Compartir › <b>Agregar a inicio</b>.</p>`}
+    <button type="button" class="btn-primary w-full">Entendido</button></div>`;
+  document.body.appendChild(d);
+  d.onclick = (e) => { if (e.target === d || e.target.closest("button")) d.remove(); };
 }

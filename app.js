@@ -1,5 +1,6 @@
 // Página pública: ver cupos, registrarse, apartar, pagar con screenshot, mis cupos
-import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro } from "./common.js?v=2026-11-07b";
+import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro } from "./common.js?v=2026-11-07c";
+import { setupInstall } from "./common.js?v=2026-11-07c";
 import {
   onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, sendPasswordResetEmail,
   GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult
@@ -11,7 +12,7 @@ import {
   startUpdateWatcher, applyBrandColors, warmServer, uiConfirm, setDialogBrand, viewImage, pushOverlay, dropOverlay, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, dow, hora12, fechaLarga, fechaCorta, toMillis, cop, esc,
   normalizePhone, waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, computeSlots, dayCapacityUnits, staffHours, mapLinks, headerBgCss,
   toast, openModal, closeModal, setBusy, copyText, tmin, mstr, UNIT
-} from "./common.js?v=2026-11-07b";
+} from "./common.js?v=2026-11-07c";
 
 const $ = (id) => document.getElementById(id);
 const S = {
@@ -35,10 +36,15 @@ function showUnavailable(title, text) {
   $("mainContent").classList.add("hidden");
   $("bookBar").classList.add("hidden");
 }
+// 📲 Abierta como app (ícono en el inicio): el dueño va a su panel; el cliente, al último negocio que visitó
+const APP = new URLSearchParams(location.search).has("app");
+let ULTIMO = ""; try { ULTIMO = localStorage.getItem("ultimoNegocio") || ""; } catch { /* sin almacenamiento */ }
 if (!/^[a-z0-9][a-z0-9-]{1,29}$/.test(BIZ_ID)) {
+  if (APP) S.ownerLogin = true;
   showUnavailable("Agenda tus citas en línea", "Si buscas un negocio, abre el enlace que te compartieron. Si tienes un negocio, crea tu propia agenda aquí abajo.");
 } else {
   setBusiness(BIZ_ID);
+  try { localStorage.setItem("ultimoNegocio", BIZ_ID); } catch { /* nada */ }
 }
 
 // ================= Datos en tiempo real =================
@@ -100,6 +106,7 @@ function subscribeDay(date) {
 onAuthStateChanged(auth, async (u) => {
   S.user = u;
   if (u && S.dead && S.ownerLogin) { routeOwner(u); return; }
+  if (!u && S.dead && APP && /^[a-z0-9][a-z0-9-]{1,29}$/.test(ULTIMO)) { location.replace("index.html?b=" + encodeURIComponent(ULTIMO)); return; }
   if (u && /^[a-z0-9][a-z0-9-]{1,29}$/.test(BIZ_ID)) {
     if (!S.registering) await loadProfile();
     subscribeMine();
@@ -589,6 +596,7 @@ async function routeOwner(u) {
     const ad = await getDoc(doc(db, "admins", u.uid));
     if (ad.exists() && ad.data().businessId) { location.href = "admin.html?b=" + encodeURIComponent(ad.data().businessId); return; }
   } catch { /* sin permiso: no es dueño */ }
+  if (APP && /^[a-z0-9][a-z0-9-]{1,29}$/.test(ULTIMO)) { location.replace("index.html?b=" + encodeURIComponent(ULTIMO)); return; }
   toast("Esta cuenta no tiene un negocio. Si eres cliente, abre el enlace que te compartió el negocio.", "error");
 }
 function setAuthTab(mode) {
@@ -1095,7 +1103,7 @@ $("btnResched").onclick = async () => {
 
 renderNav(); renderSummary();
 if (/^[a-z0-9][a-z0-9-]{1,29}$/.test(BIZ_ID)) boot(); // arranca cuando todo está definido
-startUpdateWatcher();
+startUpdateWatcher(); setupInstall();
 
 // ================= Probar gratis: crear la tienda de prueba =================
 var PLAT = {}; // var: se usa desde maxDate antes de llegar a esta línea
