@@ -500,3 +500,4 @@ body.gate-open { overflow:hidden; }
 body.premium #bookBar ~ * .install-pill, body.gate-open .install-pill { display:none; }
 body.premium.has-install #bookBar { bottom:84px; }
 #appView.hidden { display:none !important; }   /* lg:grid le ganaba a «hidden»: sin sesión se veía el menú vacío */
+.field.hidden, label.hidden { display:none !important; }   /* .field (display:block) le ganaba a «hidden» */

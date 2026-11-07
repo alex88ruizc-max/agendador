@@ -1,6 +1,6 @@
 // Página pública: ver cupos, registrarse, apartar, pagar con screenshot, mis cupos
-import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro } from "./common.js?v=2026-11-07i";
-import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-07i";
+import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro } from "./common.js?v=2026-11-07j";
+import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-07j";
 import {
   onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, sendPasswordResetEmail,
   GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult
@@ -12,7 +12,7 @@ import {
   startUpdateWatcher, applyBrandColors, warmServer, uiConfirm, setDialogBrand, viewImage, pushOverlay, dropOverlay, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, dow, hora12, fechaLarga, fechaCorta, toMillis, cop, esc,
   normalizePhone, waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, computeSlots, dayCapacityUnits, staffHours, mapLinks, headerBgCss,
   toast, openModal, closeModal, setBusy, copyText, tmin, mstr, UNIT
-} from "./common.js?v=2026-11-07i";
+} from "./common.js?v=2026-11-07j";
 
 const $ = (id) => document.getElementById(id);
 const S = {
@@ -30,7 +30,7 @@ const BIZ_ID = businessFromUrl();
 let CITA_LINK = (new URLSearchParams(location.search).get("cita") || "").toUpperCase().replace(/[^A-Z0-9-]/g, "");
 function showUnavailable(title, text) {
   S.dead = true; $("gate").classList.add("hidden"); $("gate").classList.remove("gate-sheet"); document.body.classList.remove("gate-open"); $("bizLogoWrap").classList.add("hidden");
-  $("googleBox")?.classList.add("hidden"); // en la página principal entran los dueños: solo correo (Google podría reemplazar su contraseña)
+  // en la página principal entran los dueños: también con Google (va directo a su panel)
   $("unTitle").textContent = title; $("unText").textContent = text;
   $("unavailable").classList.remove("hidden");
   $("mainContent").classList.add("hidden");
@@ -582,6 +582,8 @@ function openAuth(mode) {
     if (S.user) { routeOwner(S.user); return; }
     $("gate").classList.remove("hidden"); setAuthTab("login");
     $("authTitle").textContent = "Ingresa a tu panel";
+    $("authSub").textContent = "Entra con Google o con tu correo y vas directo al panel de tu negocio.";
+    $("googleBox").classList.remove("hidden");
     $("tabRegister").classList.add("hidden");
   } else {
     S.wantBook = true; updateGate(); setAuthTab(mode); // con la agenda abierta, «Ingresar» abre la hoja de acceso
@@ -622,6 +624,7 @@ async function afterGoogle(u) {
   updateGate(); renderNav(); renderAll();
 }
 $("btnGoogle").onclick = async () => {
+  if (S.dead) S.ownerLogin = true;   // en la página principal: al entrar va a su panel
   if (enAppInterna()) { try { sessionStorage.setItem("googleVuelta", JSON.stringify({ b: BIZ_ID, cita: CITA_LINK })); } catch { /* nada */ } salirAlNavegador(); return; }
   const btn = $("btnGoogle"), prov = new GoogleAuthProvider();
   prov.setCustomParameters({ prompt: "select_account" });
@@ -1166,6 +1169,23 @@ $("btnTrial").onclick = () => {
   if (S.profile) { f.ownerName.value = `${S.profile.firstName || ""} ${S.profile.lastName || ""}`.trim(); f.whatsapp.value = S.profile.whatsapp || ""; }
   $("trialForm").classList.add("hidden"); $("trialDone").classList.add("hidden");
   openModal("trialModal");
+};
+// «Probar gratis» también con Google: la cuenta del dueño queda con su Gmail
+$("btnGoogleTrial").onclick = async () => {
+  if (enAppInterna()) { salirAlNavegador(); return; }
+  const btn = $("btnGoogleTrial"), prov = new GoogleAuthProvider(); prov.setCustomParameters({ prompt: "select_account" });
+  setBusy(btn, true, "Abriendo Google…");
+  try {
+    const r = await signInWithPopup(auth, prov);
+    $("trialAccount").classList.add("hidden"); $("trialLogged").classList.remove("hidden");
+    $("trialLogged").textContent = `Se crea con tu cuenta ${r.user.email}. Con ella entras a tu panel (con Google).`;
+    const f = $("trialForm"); if (!f.ownerName.value && r.user.displayName) f.ownerName.value = r.user.displayName;
+  } catch (err) {
+    const c = String(err?.code || "");
+    if (c.includes("popup-blocked") || c.includes("operation-not-supported")) toast("Tu navegador bloqueó la ventana de Google. Permite ventanas emergentes o usa correo y contraseña.", "error");
+    else if (c.includes("operation-not-allowed") || c.includes("configuration-not-found")) toast("El acceso con Google aún no está activado. Usa correo y contraseña.", "error");
+    else if (!c.includes("popup-closed") && !c.includes("cancelled-popup")) toast(authError(err), "error");
+  } finally { setBusy(btn, false); }
 };
 $("trialForm").addEventListener("submit", async (e) => {
   e.preventDefault();
