@@ -1,0 +1,138 @@
+/* =====================================================================
+   TEMA PREMIUM · página del cliente (index.html con <body class="premium">)
+   Solo cambia la cara: la lógica de reservas, pagos y cuentas es la misma.
+   Respeta los colores de marca de cada negocio (body.branded → --b-*).
+   Letras: Sora (títulos) + Inter (texto). Base neutra cálida, acento por negocio.
+   ===================================================================== */
+body.premium {
+  --p-ink:#121216; --p-ink2:#4A4A55; --p-mute:#6B6B76; --p-bg:#F6F5F3; --p-card:#FFFFFF; --p-line:#ECEBE8; --p-line2:#DCDBD7;
+  --acc:#5B3FE0; --on-acc:#FFFFFF; --acc-soft:rgba(91,63,224,.10); --acc-text:#4B30C9; --hdr:#121216; --on-hdr:#FFFFFF;
+  --r-card:24px; --r-ctl:14px; --shadow:0 1px 2px rgba(18,18,22,.04), 0 12px 32px -18px rgba(18,18,22,.18);
+  background:var(--p-bg); color:var(--p-ink); font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; letter-spacing:-.005em;
+}
+body.premium.branded { --acc:var(--b-primary); --on-acc:var(--b-on-primary); --acc-soft:var(--b-primary-soft); --acc-text:var(--b-primary-text); --hdr:var(--b-header); --on-hdr:var(--b-on-header); background:var(--b-bg) !important; }
+body.premium .font-narrow, body.premium .step-title, body.premium h1, body.premium h2, body.premium h3 { font-family:Sora, Inter, system-ui, sans-serif; letter-spacing:-.02em; }
+body.premium .bg-paper { background:var(--p-bg) !important; }
+body.premium .text-ink { color:var(--p-ink); }
+body.premium .border-line { border-color:var(--p-line) !important; }
+
+/* ---------- Encabezado ---------- */
+body.premium header.pole-top { background:var(--hdr) !important; color:var(--on-hdr) !important; border-radius:0 0 28px 28px; }
+body.premium header.pole-top::after { display:none; }
+body.premium header.pole-top > div { padding-top:22px; padding-bottom:22px; }
+body.premium #bizName { font-size:1.75rem; font-weight:700; letter-spacing:-.03em; }
+body.premium #bizSlogan { opacity:.78; margin-top:2px; }
+body.premium .logo-ring { border-radius:22px; padding:3px; }
+body.premium .logo-ring .logo-in { width:64px; height:64px; border-radius:19px; background:var(--acc); color:var(--on-acc); border:0; font-family:Sora, Inter, sans-serif; font-weight:700; font-size:1.35rem; }
+body.premium #nav a, body.premium #nav button { border-radius:999px; }
+body.premium #btnMine { border-radius:999px; padding:.5rem .95rem; font-weight:700; }
+
+/* ---------- Tarjetas ---------- */
+body.premium main .rounded-2xl.border { border-radius:var(--r-card); border-color:var(--p-line); box-shadow:var(--shadow); }
+body.premium .loc-bar { border-radius:var(--r-card); border-color:var(--p-line); box-shadow:var(--shadow); }
+body.premium .loc-pin { border-radius:16px; background:var(--acc-soft); color:var(--acc-text); }
+
+/* Paso 1: el título deja de ser una franja azul en mayúsculas */
+body.premium section[aria-labelledby="h-day"] .bg-pole-blue { background:transparent !important; text-align:left; padding:22px 20px 6px; }
+body.premium #h-day { color:var(--p-ink) !important; text-transform:none; letter-spacing:-.025em; font-size:1.45rem; font-weight:700; }
+body.premium #h-day::before { content:"Paso 1"; display:block; font-family:Inter, sans-serif; font-size:.72rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--p-mute); margin-bottom:4px; }
+body.premium #staffPick { border:0 !important; padding:10px 20px 4px; gap:8px; }
+body.premium section[aria-labelledby="h-day"] .md\:grid-cols-2 > div { border-color:var(--p-line) !important; }
+body.premium #slotsTitle { font-family:Sora, Inter, sans-serif; font-size:1.05rem; letter-spacing:-.015em; }
+body.premium #slotsHint { color:var(--p-mute); }
+
+/* Profesionales / filtros */
+body.premium .chip { height:40px; padding:0 16px; border:1px solid var(--p-line2); border-radius:999px; background:#fff; font-weight:600; font-size:.9rem; color:var(--p-ink); display:inline-flex; align-items:center; gap:6px; }
+body.premium .chip:hover { border-color:var(--p-ink); }
+body.premium .chip[aria-pressed="true"] { background:var(--p-ink); border-color:var(--p-ink); color:#fff; }
+body.premium.branded .chip[aria-pressed="true"] { background:var(--hdr); border-color:var(--hdr); color:var(--on-hdr); }
+
+/* Calendario */
+body.premium #monthLabel { font-family:Sora, Inter, sans-serif; font-size:1.05rem; letter-spacing:-.015em; text-transform:none; }
+body.premium #monthLabel::first-letter { text-transform:uppercase; }
+body.premium #slotsTitle .capitalize { text-transform:none; }
+body.premium #prevMonth, body.premium #nextMonth { width:40px; height:40px; border-radius:999px; border:1px solid var(--p-line2); background:#fff; font-size:1.1rem; line-height:1; }
+body.premium #prevMonth:disabled, body.premium #nextMonth:disabled { opacity:.35; }
+body.premium .cday { width:2.75rem; height:2.75rem; border-radius:14px; font-weight:600; transition:background .15s, transform .15s; }
+body.premium .cday:not(:disabled):hover { background:var(--acc-soft); }
+body.premium .cday:disabled { color:#C2C2C8; }
+body.premium .cday .hoy { color:var(--acc-text); font-size:7.5px; letter-spacing:.06em; }
+body.premium .cday[aria-pressed="true"] { background:var(--p-ink) !important; color:#fff !important; font-size:1.05rem; transform:scale(1.04); }
+body.premium .cday[aria-pressed="true"] .hoy { color:#fff !important; }
+
+/* Horas */
+body.premium #slots { gap:10px; }
+body.premium .tpill { min-height:52px; border:1px solid var(--p-line2); border-radius:var(--r-ctl); background:#fff; color:var(--p-ink); font-weight:700; font-size:.95rem; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; transition:border-color .15s, background .15s, transform .15s; }
+body.premium .tpill small { font-weight:600; font-size:.68rem; color:var(--p-mute); }
+body.premium .tpill:not(:disabled):hover { border-color:var(--p-ink); background:#fff; }
+body.premium .tpill[aria-pressed="true"] { background:var(--acc) !important; border-color:var(--acc) !important; color:var(--on-acc) !important; transform:translateY(-1px); box-shadow:0 10px 22px -12px var(--acc); }
+body.premium .tpill[aria-pressed="true"] small { color:var(--on-acc); opacity:.85; }
+body.premium .tpill:disabled { border-style:dashed; color:#B0B0B8; text-decoration:line-through; }
+body.premium #noSlots { border-radius:18px; border-color:var(--p-line2); background:var(--p-bg); }
+
+/* Paso 2 · servicios por categoría */
+body.premium .step-title { font-size:1.45rem; font-weight:700; letter-spacing:-.025em; gap:.7rem; }
+body.premium .step-num { width:2rem; height:2rem; background:var(--p-ink); color:#fff; font-family:Inter, sans-serif; font-size:.85rem; }
+body.premium #servHint { color:var(--p-mute); }
+body.premium .cat-chips { display:flex; gap:8px; overflow-x:auto; padding:2px 2px 6px; margin:0 -2px 14px; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+body.premium .cat-chips::-webkit-scrollbar { display:none; }
+body.premium .cat-chip { flex:0 0 auto; height:42px; padding:0 18px; border-radius:999px; border:1px solid var(--p-line2); background:#fff; font-weight:600; font-size:.92rem; color:var(--p-ink); }
+body.premium .cat-chip:hover { border-color:var(--p-ink); }
+body.premium .cat-chip[aria-pressed="true"] { background:var(--acc); border-color:var(--acc); color:var(--on-acc); }
+body.premium .cat-title { font-family:Sora, Inter, sans-serif; font-size:1rem; font-weight:700; letter-spacing:-.015em; color:var(--p-ink); margin:0 0 10px; }
+body.premium .choice { border:1px solid var(--p-line); border-radius:20px; background:#fff; padding:16px 16px; align-items:center; box-shadow:0 1px 2px rgba(18,18,22,.03); transition:border-color .15s, box-shadow .15s, transform .15s; }
+body.premium .choice:not(:disabled):hover { border-color:var(--p-line2); box-shadow:var(--shadow); }
+body.premium .choice .font-semibold { font-size:1rem; }
+body.premium .choice .text-xs { color:var(--p-mute); }
+body.premium .choice > span:last-child { font-family:Sora, Inter, sans-serif; font-size:1rem; }
+body.premium .choice[aria-pressed="true"] { border-color:var(--acc) !important; background:var(--acc-soft) !important; box-shadow:inset 0 0 0 1px var(--acc) !important; }
+
+/* Resumen + botón: barra flotante abajo */
+body.premium #bookBar { position:sticky; bottom:12px; z-index:30; border-radius:24px; border-color:var(--p-line) !important; background:rgba(255,255,255,.92) !important; backdrop-filter:saturate(1.4) blur(14px); -webkit-backdrop-filter:saturate(1.4) blur(14px); box-shadow:0 18px 40px -18px rgba(18,18,22,.35); }
+body.premium #summary { color:var(--p-ink2); }
+
+/* Botones */
+body.premium .btn-primary { background:var(--p-ink); color:#fff; border-radius:16px; min-height:52px; font-weight:700; letter-spacing:-.01em; box-shadow:0 10px 24px -14px rgba(18,18,22,.6); }
+body.premium.branded .btn-primary { background:var(--acc); color:var(--on-acc); box-shadow:0 10px 24px -14px var(--acc); }
+body.premium .btn-primary:disabled { background:#D6D5D1; color:#8A8A93; box-shadow:none; }
+body.premium #btnBook:not(:disabled) { background:var(--acc); color:var(--on-acc); box-shadow:0 12px 26px -12px var(--acc); }
+body.premium .btn-dark { background:var(--p-ink); border-radius:14px; }
+body.premium .btn-light { border-radius:14px; border-color:var(--p-line2); }
+body.premium .btn-ghost { border-radius:12px; }
+
+/* Formularios */
+body.premium .field input, body.premium .field select, body.premium .field textarea { border-color:var(--p-line2); border-radius:14px; padding:.75rem .9rem; }
+body.premium .field input:focus, body.premium .field select:focus, body.premium .field textarea:focus { outline:none; border-color:var(--acc); box-shadow:0 0 0 3px var(--acc-soft); }
+body.premium .tab { border-radius:12px; padding:.55rem; }
+body.premium #gate .rounded-lg.bg-paper { border-radius:14px; }
+body.premium .gate-card { border-radius:28px; }
+
+/* Ventanas (pago, ticket, cuenta…) */
+body.premium .modal { background:rgba(12,12,16,.55); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); }
+body.premium .modal-card { border-radius:28px; padding:1.5rem; box-shadow:0 30px 80px -30px rgba(0,0,0,.45); }
+@media (max-width:639px) {
+  body.premium .modal { align-items:flex-end; padding:0; }
+  body.premium .modal-card { border-radius:28px 28px 0 0; max-height:94dvh; padding-bottom:calc(1.25rem + env(safe-area-inset-bottom)); }
+}
+body.premium .pay-amount { border-radius:20px; background:var(--p-ink); color:#fff; padding:1rem 1.1rem; }
+body.premium .pay-amount .text-ink\/60, body.premium .pay-amount [class*="text-ink"] { color:rgba(255,255,255,.7) !important; }
+body.premium .pay-amount .pay-ibtn { background:rgba(255,255,255,.12); border-color:rgba(255,255,255,.2); color:#fff; }
+body.premium .pay-row { border-radius:18px; border-color:var(--p-line); padding:.75rem .8rem; }
+body.premium .pay-ibtn { border-radius:12px; width:2.5rem; height:2.5rem; }
+body.premium .pay-ibtn.main { background:var(--acc); border-color:var(--acc); color:var(--on-acc); }
+body.premium .pay-drop { border-radius:18px; border-color:var(--p-line2); background:var(--p-bg); padding:.8rem .9rem; }
+body.premium .pay-drop:hover { border-color:var(--acc); }
+body.premium .pay-drop-ico { border-radius:14px; color:var(--acc-text); }
+body.premium #payModal .btn-primary { background:var(--acc); color:var(--on-acc); }
+
+/* Ticket de la cita */
+body.premium .ticket { border-radius:28px; }
+body.premium .ticket-head { background:var(--hdr); color:var(--on-hdr); padding:1.25rem 1.4rem 1.3rem; }
+body.premium .ticket-head::after { display:none; }
+body.premium .ticket-code { font-family:Sora, Inter, sans-serif; letter-spacing:.06em; }
+body.premium .ticket-ok { background:#3DDC97; color:#0B3B26; border:0; }
+
+/* Para dueños */
+body.premium #trialCta { border-radius:var(--r-card); border-color:var(--p-line2); background:transparent; }
+
+@media (prefers-reduced-motion: reduce) { body.premium * { transition:none !important; transform:none !important; } }
