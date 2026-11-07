@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "vip.tuagenda.twa",
+        "sha256_cert_fingerprints": ["F2:FA:0C:02:14:11:91:CC:84:BE:27:F3:A7:A8:B2:6B:C0:0F:45:31:6A:A0:42:1F:0F:21:74:01:96:13:AE:19"]
+      }
+    }]
