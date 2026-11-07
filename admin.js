@@ -9,9 +9,9 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-11-07h";
-import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-07h";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-07h";
+} from "./common.js?v=2026-11-07i";
+import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-07i";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-07i";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -3701,6 +3701,7 @@ function mwPintar(r) {
   box.classList.remove("hidden");
   if (!r || r.estado === "pidiendo") { box.innerHTML = `<p class="flex items-center gap-2 text-sm"><span class="spin"></span> Preparando tu código… (tarda unos segundos)</p>`; return; }
   if (r.estado === "error") { box.innerHTML = `<p class="rounded-xl bg-rose-50 p-3 text-sm text-rose-800">${esc(r.error || "No se pudo preparar la conexión.")} Intenta de nuevo.</p>`; return; }
+  if (r.estado === "vencido") { box.innerHTML = `<p class="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">⏱️ El código venció porque no se vinculó a tiempo. Toca <b>«Pedir mi código»</b> otra vez.</p>`; return; }
   if (r.estado === "codigo") {
     const c = String(r.codigo || "");
     box.innerHTML = `${c ? `<p class="text-center text-xs font-bold uppercase tracking-wider text-ink/55">Tu código</p>
@@ -3716,10 +3717,10 @@ function mwPintar(r) {
   if (r.estado === "conectado") { box.innerHTML = `<p class="rounded-xl bg-emerald-50 p-3 text-center text-sm font-bold text-emerald-800">🎉 ¡Listo! Mary ya atiende tu WhatsApp.</p>`; }
 }
 function mwEsperar() {
-  clearTimeout(MW.t); MW.hasta = Date.now() + 5 * 60000;
+  clearTimeout(MW.t); MW.hasta = Date.now() + 16 * 60000;   // el VPS borra la conexión a los 15 min si no se vincula
   const paso = async () => {
     if (Date.now() > MW.hasta || !$("mwBox")) return;
-    try { const r = await api("maryWa", { op: "estado" }); mwPintar(r.res); if (r.wa?.conectado || r.res?.estado === "conectado") { A.settings.maryWa = r.wa || { conectado: true, numero: r.res?.numero }; return; } if (r.res?.estado === "error") return; }
+    try { const r = await api("maryWa", { op: "estado" }); mwPintar(r.res); if (r.wa?.conectado || r.res?.estado === "conectado") { A.settings.maryWa = r.wa || { conectado: true, numero: r.res?.numero }; return; } if (["error", "vencido"].includes(r.res?.estado)) return; }
     catch (e) { console.error(e); }
     MW.t = setTimeout(paso, 3000);
   };
