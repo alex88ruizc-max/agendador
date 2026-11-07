@@ -1,6 +1,6 @@
 // Página pública: ver cupos, registrarse, apartar, pagar con screenshot, mis cupos
-import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro } from "./common.js?v=2026-11-07l";
-import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-07l";
+import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro } from "./common.js?v=2026-11-07m";
+import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-07m";
 import {
   onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, sendPasswordResetEmail,
   GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult
@@ -12,7 +12,7 @@ import {
   startUpdateWatcher, applyBrandColors, warmServer, uiConfirm, setDialogBrand, viewImage, pushOverlay, dropOverlay, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, dow, hora12, fechaLarga, fechaCorta, toMillis, cop, esc,
   normalizePhone, waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, computeSlots, dayCapacityUnits, staffHours, mapLinks, headerBgCss,
   toast, openModal, closeModal, setBusy, copyText, tmin, mstr, UNIT
-} from "./common.js?v=2026-11-07l";
+} from "./common.js?v=2026-11-07m";
 
 const $ = (id) => document.getElementById(id);
 const S = {
@@ -42,6 +42,13 @@ let ULTIMO = ""; try { ULTIMO = localStorage.getItem("ultimoNegocio") || ""; } c
 if (!/^[a-z0-9][a-z0-9-]{1,29}$/.test(BIZ_ID)) {
   if (APP) S.ownerLogin = true;
   showUnavailable("Agenda tus citas en línea", "Si buscas un negocio, abre el enlace que te compartieron. Si tienes un negocio, crea tu propia agenda aquí abajo.");
+  // 🏁 página de venta: tuagenda.vip sin negocio (la tarjeta simple y «Probar gratis» se cambian por la página completa)
+  $("unavailable").classList.add("hidden"); $("landing").classList.remove("hidden"); document.body.classList.add("is-landing");
+  $("bizName").textContent = "Tu Agenda"; document.title = "Tu Agenda · Citas en línea para tu negocio";
+  $("landing").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-lp]"); if (!b) return;
+    if (b.dataset.lp === "trial") $("btnTrial").click(); else openAuth("login");
+  });
 } else {
   setBusiness(BIZ_ID);
   try { localStorage.setItem("ultimoNegocio", BIZ_ID); } catch { /* nada */ }
@@ -1110,7 +1117,7 @@ renderNav(); renderSummary();
 if (/^[a-z0-9][a-z0-9-]{1,29}$/.test(BIZ_ID)) boot(); // arranca cuando todo está definido
 startUpdateWatcher(); setupInstall();
 // 📱 si ya existe la APK, se ofrece en la página principal (Android)
-fetch("/tu-agenda.apk", { method: "HEAD", cache: "no-store" }).then((r) => { if (r.ok && /android/i.test(navigator.userAgent || "") || r.ok && !/iphone|ipad/i.test(navigator.userAgent || "")) { $("btnApk").classList.remove("hidden"); $("btnApk").classList.add("flex"); } }).catch(() => {});
+fetch("/tu-agenda.apk", { method: "HEAD", cache: "no-store" }).then((r) => { if (r.ok && /android/i.test(navigator.userAgent || "") || r.ok && !/iphone|ipad/i.test(navigator.userAgent || "")) { $("btnApk").classList.remove("hidden"); $("btnApk").classList.add("flex"); $("lpApk")?.classList.remove("hidden"); } }).catch(() => {});
 
 // ================= Probar gratis: crear la tienda de prueba =================
 var PLAT = {}; // var: se usa desde maxDate antes de llegar a esta línea
@@ -1120,6 +1127,8 @@ getDoc(doc(db, "platform", "public")).then((d) => {
   const on = PLAT.trialEnabled !== false;
   $("trialCta").classList.toggle("hidden", !on);
   $("trialDaysTxt").textContent = `${Number(plansOf(PLAT).free.days || 30)} días gratis`;
+  document.querySelectorAll(".lp-dias").forEach((x) => { x.textContent = String(Number(plansOf(PLAT).free.days || 15)); });
+  if (document.body.classList.contains("is-landing")) $("trialCta").classList.add("hidden");
 }).catch(() => {});
 const PSTYLE = { free: ["linear-gradient(140deg,#5B6782,#2b3446)", "#fff", "🎁"], basic: ["linear-gradient(140deg,#2B59C3,#14213D)", "#fff", "⭐"], gold: ["linear-gradient(140deg,#f5c542,#b8860b)", "#1a1200", "👑"] };
 let T_PLAN = null;

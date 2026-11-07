@@ -17,14 +17,14 @@
   <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js">
   <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js">
   <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js">
-  <link rel="modulepreload" href="common.js?v=2026-11-07l">
-  <link rel="modulepreload" href="app.js?v=2026-11-07l">
+  <link rel="modulepreload" href="common.js?v=2026-11-07m">
+  <link rel="modulepreload" href="app.js?v=2026-11-07m">
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="theme.js?v=2026-11-07l"></script>
+  <script src="theme.js?v=2026-11-07m"></script>
   <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
-  <link rel="stylesheet" href="styles.css?v=2026-11-07l">
-  <link rel="stylesheet" href="premium.css?v=2026-11-07l">
+  <link rel="stylesheet" href="styles.css?v=2026-11-07m">
+  <link rel="stylesheet" href="premium.css?v=2026-11-07m">
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="theme-color" content="#121216">
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
@@ -78,6 +78,82 @@
     <!-- Aviso destacado y estados del negocio -->
     <p id="promoBar" class="mb-4 hidden rounded-2xl px-4 py-3 text-sm font-bold text-white" style="background:linear-gradient(90deg,#D7263D,#f59e0b)"></p>
     <div id="storiesBar" class="hidden"></div>
+    <!-- ===== Página de venta de Tu Agenda (solo en tuagenda.vip sin negocio) ===== -->
+    <div id="landing" class="lp hidden">
+      <section class="lp-hero">
+        <p class="lp-kicker">Para uñas, pestañas, barberías, spa y todo negocio con citas</p>
+        <h2 class="lp-h1">Tu agenda llena.<br><span>Tu WhatsApp tranquilo.</span></h2>
+        <p class="lp-lead">Tus clientes ven tus horas libres, apartan su cita y pagan el abono <b>solos, las 24 horas</b>. Tú solo atiendes.</p>
+        <div class="lp-ctas">
+          <button type="button" class="lp-btn lp-btn-main" data-lp="trial">Probar <span class="lp-dias">15</span> días gratis</button>
+          <button type="button" class="lp-btn lp-btn-ghost" data-lp="login">Ya tengo cuenta · Ingresar</button>
+        </div>
+        <p class="lp-mini">Sin tarjeta · Lista en 2 minutos · Desde tu celular</p>
+        <div class="lp-phone" aria-hidden="true">
+          <div class="lp-ph-top"><span class="lp-ph-logo">L</span><span><b>Studio Lúa</b><small>Uñas · Pestañas · Spa</small></span></div>
+          <div class="lp-ph-card"><small>PASO 1</small><b>Elige día y hora</b>
+            <div class="lp-ph-grid"><i>9:00</i><i>9:30</i><i>10:00</i><i>10:30</i><i class="on">11:00</i><i>11:30</i><i>2:00</i><i>3:30</i><i>4:00</i></div></div>
+          <div class="lp-ph-btn">Apartar mi cita</div>
+        </div>
+      </section>
+
+      <section class="lp-sec">
+        <p class="lp-tag">Lo que ganas</p>
+        <h3 class="lp-h2">Más citas, menos trabajo.</h3>
+        <div class="lp-grid3">
+          <article class="lp-card"><span class="lp-ico"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="4"/><path d="M3 10h18M8 3v4M16 3v4M8.5 15l2.5 2.5 4.5-5"/></svg></span><h4>Reservas mientras duermes</h4><p>Tu página está abierta 24/7. El cliente que escribe a las 11 p. m. ya no se va con otro: aparta solo.</p></article>
+          <article class="lp-card"><span class="lp-ico"><svg viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="3"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5"/></svg></span><h4>Cero plantados</h4><p>Cobra un abono para apartar con tu llave Bre-B. Quien paga, llega. Y si cancela, el cupo vuelve a quedar libre.</p></article>
+          <article class="lp-card"><span class="lp-ico"><svg viewBox="0 0 24 24"><path d="M12 3l2.2 5.6L20 11l-5.8 2.4L12 19l-2.2-5.6L4 11l5.8-2.4z"/></svg></span><h4>Imagen profesional</h4><p>Tu propio link con tu logo, tus colores y tus servicios por categoría. Tus clientes lo notan.</p></article>
+        </div>
+      </section>
+
+      <section class="lp-sec lp-dark">
+        <p class="lp-tag">Lo que ahorras</p>
+        <h3 class="lp-h2">Se acabó el «¿tienes cupo?».</h3>
+        <ul class="lp-list">
+          <li><svg class="lp-ck" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11"/><path d="M7 12.5l3.2 3.2L17 9"/></svg><span><b>Horas de chat.</b> Ya no respondes uno por uno qué horas tienes: Mary les pasa tu link y les muestra su cita.</span></li>
+          <li><svg class="lp-ck" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11"/><path d="M7 12.5l3.2 3.2L17 9"/></svg><span><b>Citas perdidas.</b> Recordatorios automáticos antes de cada cita, por WhatsApp, Telegram y correo.</span></li>
+          <li><svg class="lp-ck" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11"/><path d="M7 12.5l3.2 3.2L17 9"/></svg><span><b>Revisar pagos a mano.</b> La captura te llega a Telegram con un botón para aprobar; si llega el correo del banco, se confirma sola.</span></li>
+          <li><svg class="lp-ck" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11"/><path d="M7 12.5l3.2 3.2L17 9"/></svg><span><b>El cuaderno.</b> Agenda del día, cupos libres, clientes e historial, todo en tu celular.</span></li>
+        </ul>
+      </section>
+
+      <section class="lp-sec">
+        <p class="lp-tag">Cómo funciona</p>
+        <h3 class="lp-h2">Así de simple.</h3>
+        <ol class="lp-steps">
+          <li><span>1</span><div><b>Creas tu agenda</b><p>Pones tus servicios, horarios y tu llave de pago. Toma 2 minutos.</p></div></li>
+          <li><span>2</span><div><b>Compartes tu link</b><p>En tu WhatsApp, Instagram y estados.</p></div></li>
+          <li><span>3</span><div><b>El cliente aparta y paga</b><p>Elige servicio, día y hora, y paga el abono.</p></div></li>
+          <li><span class="ok">4</span><div><b>Te llega la cita lista</b><p>Confirmada en tu agenda y con aviso a tu Telegram.</p></div></li>
+        </ol>
+      </section>
+
+      <section class="lp-sec">
+        <p class="lp-tag">Todo lo que puedes hacer</p>
+        <h3 class="lp-h2">Una sola herramienta.</h3>
+        <div class="lp-feats">
+          <div><b>Página con tu marca</b><small>Logo, colores y categorías</small></div>
+          <div><b>Cupos en tiempo real</b><small>Nunca dos citas a la misma hora</small></div>
+          <div><b>Abono con Bre-B</b><small>Llave y QR, sin comisiones</small></div>
+          <div><b>Mary en tu WhatsApp</b><small>Da tu link y muestra la cita</small></div>
+          <div><b>Estados automáticos</b><small>Tus cupos del día y la semana</small></div>
+          <div><b>Tu equipo</b><small>Cada profesional con su horario</small></div>
+          <div><b>Avisos a Telegram</b><small>Reservas, pagos y cambios</small></div>
+          <div><b>Clientes e historial</b><small>Quién viene y quién falta</small></div>
+          <div><b>Entrada con Google</b><small>Tus clientes, en un toque</small></div>
+          <div><b>App en todo</b><small>PC, Android y iPhone</small></div>
+        </div>
+      </section>
+
+      <section class="lp-final">
+        <h3>Empieza hoy.<br>Tu primera cita puede llegar esta noche.</h3>
+        <button type="button" class="lp-btn lp-btn-main" data-lp="trial">Probar <span class="lp-dias">15</span> días gratis</button>
+        <p class="lp-mini">Sin tarjeta. Si no te sirve, no pagas nada.</p>
+        <a id="lpApk" href="/tu-agenda.apk" download class="lp-apk hidden">Descargar la app para Android</a>
+      </section>
+      <p class="lp-foot">Tu Agenda · tuagenda.vip · <a href="privacidad.html">Privacidad</a></p>
+    </div>
     <section id="unavailable" class="mx-auto mt-10 hidden max-w-md rounded-2xl bg-white p-6 text-center">
       <h2 id="unTitle" class="font-narrow text-2xl font-bold"></h2><p id="unText" class="mt-2 text-ink/70"></p>
     </section>
@@ -337,6 +413,6 @@
     </div>
   </div>
 
-  <script type="module" src="app.js?v=2026-11-07l"></script>
+  <script type="module" src="app.js?v=2026-11-07m"></script>
 </body>
 </html>
