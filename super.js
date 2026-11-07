@@ -3,9 +3,9 @@ import { onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordRe
 import {
   doc, getDoc, setDoc, addDoc, deleteDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp, where
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { PLAN_KEYS, PLAN_FEATURES, plansOf, planOfBiz, DEFAULT_PAY_WARNING, TG_EVENTS, BIZ_TYPES, planBenefits, planBenefitsIntro } from "./common.js?v=2026-11-07k";
-import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-07k";
-import { APP_VERSION, SERVER_VERSION, RULES_VERSION, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, readPublishedVersion, reloadFresh, startUpdateWatcher, warmServer, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-11-07k";
+import { PLAN_KEYS, PLAN_FEATURES, plansOf, planOfBiz, DEFAULT_PAY_WARNING, TG_EVENTS, BIZ_TYPES, planBenefits, planBenefitsIntro } from "./common.js?v=2026-11-07l";
+import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-07l";
+import { APP_VERSION, SERVER_VERSION, RULES_VERSION, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, readPublishedVersion, reloadFresh, startUpdateWatcher, warmServer, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-11-07l";
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on) => $(id).classList.toggle("hidden", !on);
@@ -420,7 +420,7 @@ function openStore(biz) {
     </div>
     <div class="grid gap-0.5 border-t border-line pt-2">
       ${item("edit", "fa-pen", "Editar nombre y plan")}
-      ${item("wabot", "fa-robot", "🤖 Bot de WhatsApp (clave privada)")}
+      ${item("wabot", "fa-whatsapp", "💬 WhatsApp con Mary")}
       ${biz.status === "active" ? item("suspend", "fa-circle-pause", "Pausar la tienda") : item("activate", "fa-circle-play", "Activar la tienda")}
       <a class="menu-item" href="${publicUrl(biz.id)}" target="_blank" rel="noopener"><i class="fa-regular fa-eye"></i>Ver la página de clientes</a>
       <button class="menu-item" data-copy="${publicUrl(biz.id)}"><i class="fa-regular fa-copy"></i>Copiar enlace para clientes</button>
@@ -441,54 +441,17 @@ async function handleAct(act, biz, b) {
   if (act === "delete") return deleteBusiness(biz);
 
   if (act === "wabot") {
-    openM("🤖 Bot de WhatsApp · " + biz.name, `<p class="soft -mt-2 mb-3 text-sm">Cómo poner el asistente en el WhatsApp de esta tienda.</p><div id="wbBox" class="text-sm">Cargando…</div>`);
-    const paint = (r) => {
-      $("wbBox").innerHTML = `
-        ${r.meta ? `<div class="mb-3 flex items-center gap-3 rounded-2xl p-3 text-white" style="background:linear-gradient(135deg,#25D366,#128C7E)"><span class="text-2xl"><i class="fa-brands fa-whatsapp"></i></span><div class="min-w-0 flex-1"><p class="text-[11px] font-bold uppercase opacity-90">Conectado con Meta</p><p class="truncate font-extrabold">${esc(r.meta.display || "")}${r.meta.name ? " · " + esc(r.meta.name) : ""}</p></div></div>` : ""}
-        <label class="mb-3 flex items-center justify-between gap-2 rounded-2xl border border-line p-3"><span class="text-sm font-bold">🤖 Bot activo para esta tienda</span><input type="checkbox" id="wbOn" class="h-5 w-5" ${r.enabled ? "checked" : ""}></label>
-        <div class="rounded-2xl border-2 p-3" style="border-color:#25D366">
-          <p class="flex items-center gap-2 text-[15px] font-extrabold">📱 Con MacroDroid <span class="rounded-full px-2 py-0.5 text-[10px] font-extrabold text-white" style="background:#1E9E63">GRATIS</span></p>
-          <p class="soft mt-0.5 text-xs">App gratuita para Android. Se instala en el celular de la tienda.</p>
-          <div class="mt-2 grid grid-cols-2 gap-2">
-            <a class="btn-light flex items-center justify-center gap-1.5 text-sm" href="https://play.google.com/store/apps/details?id=com.arlosoft.macrodroid" target="_blank" rel="noopener"><i class="fa-brands fa-google-play"></i> Descargar</a>
-            <a class="btn-light flex items-center justify-center gap-1.5 text-sm" href="https://www.youtube.com/results?search_query=MacroDroid+responder+notificaci%C3%B3n+WhatsApp+solicitud+HTTP" target="_blank" rel="noopener"><i class="fa-brands fa-youtube" style="color:#e11d48"></i> Ver videos</a>
-          </div>
-          <button class="btn-primary mt-2 w-full" id="wbCopyM">Copiar dirección para MacroDroid</button>
-          <button class="mt-2 flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-extrabold text-white" style="background:#25D366" id="wbSend"><i class="fa-brands fa-whatsapp text-lg"></i> Enviar instrucciones al celular</button>
-          <ol class="mt-3 list-decimal space-y-1.5 pl-5 text-[12.5px] leading-snug">
-            <li>Instala <b>MacroDroid</b> (Play Store) y dale los permisos de <b>notificaciones</b>.</li>
-            <li><b>Agregar macro</b> → <b>Disparador:</b> Notificación recibida → app <b>WhatsApp</b> (o WhatsApp Business).</li>
-            <li><b>Acción 1:</b> Solicitud HTTP → <b>GET</b> → pega la dirección → en <b>Respuesta</b>, guárdala en una variable (ej. <i>resp</i>).</li>
-            <li><b>Acción 2:</b> Responder notificación → texto: la variable <b>resp</b>.</li>
-            <li>Guarda la macro y escríbele “hola” desde otro número.</li>
-          </ol>
-        </div>
-        <details class="mt-3 rounded-2xl border border-line p-3 text-sm"><summary class="cursor-pointer font-bold">Otras opciones</summary>
-          <p class="soft mt-2 text-xs"><b>AutoResponder</b> (de pago): regla con “Todo” → “Conectarse a un servidor propio” → pega esta dirección:</p>
-          <button class="btn-light mt-1 w-full text-xs" id="wbCopy">Copiar dirección para AutoResponder</button>
-          <button class="mt-3 text-xs font-bold underline" id="wbNew">Generar una clave nueva (la anterior deja de servir)</button>
-        </details>
-        <p class="soft mt-3 text-xs">La tienda necesita “Citas por WhatsApp” en su plan (Cobros &gt; Planes).</p>`;
-      $("wbCopyM").onclick = () => copyText(r.urlMacro).then(() => toast("Dirección copiada: pégala en MacroDroid."));
-      // todo en un mensaje: link de descarga, pasos y la dirección, para abrirlo en el celular de la tienda
-      $("wbSend").onclick = () => {
-        const msg = `🤖 *Asistente de citas por WhatsApp · ${biz.name}*\n\n` +
-          `1️⃣ Descarga MacroDroid (gratis):\nhttps://play.google.com/store/apps/details?id=com.arlosoft.macrodroid\n\n` +
-          `2️⃣ Ábrelo y dale permiso de *notificaciones*.\n\n` +
-          `3️⃣ *Agregar macro*:\n• Disparador: Notificación recibida → app WhatsApp\n• Acción 1: Solicitud HTTP → GET → pega la dirección de abajo → guarda la respuesta en una variable llamada *resp*\n• Acción 2: Responder notificación → texto: la variable *resp*\n\n` +
-          `4️⃣ Guarda la macro y escríbele "hola" desde otro número.\n\n` +
-          `🎥 Videos de ayuda: https://www.youtube.com/results?search_query=MacroDroid+responder+notificaci%C3%B3n+WhatsApp+solicitud+HTTP\n\n` +
-          `🔗 Dirección (cópiala completa):\n${r.urlMacro}`;
-        open("https://wa.me/?text=" + encodeURIComponent(msg), "_blank");
-      };
-      $("wbCopy").onclick = () => copyText(r.url).then(() => toast("Dirección copiada: pégala en AutoResponder."));
-      $("wbNew").onclick = async () => {
-        if (!(await uiConfirm("¿Generar una clave nueva?", "La anterior deja de funcionar y tendrás que pegar la nueva dirección en el celular de la tienda.", { okText: "Sí, generar" }))) return;
-        try { paint(await api("superWaKey", { businessId: biz.id, regenerate: true })); toast("Clave nueva lista. Cópiala otra vez en el celular."); } catch (err) { toast(err.message, "error"); }
-      };
-      $("wbOn").onchange = (e) => api("superWaToggle", { businessId: biz.id, enabled: e.target.checked }).then(() => toast(e.target.checked ? "Bot activo." : "Bot apagado para esta tienda.")).catch((err) => toast(err.message, "error"));
-    };
-    api("superWaKey", { businessId: biz.id }).then(paint).catch((err) => { $("wbBox").textContent = err.message; });
+    const w = (Z.settings[biz.id] || {}).maryWa || {};
+    openM("💬 WhatsApp con Mary · " + biz.name, `
+      <div class="sp-card !p-0 overflow-hidden">
+        <div class="flex items-center gap-3 p-4 text-white" style="background:${w.conectado ? "linear-gradient(135deg,#25D366,#128C7E)" : "#121216"}">
+          <span class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white/15 text-xl"><i class="fa-brands fa-whatsapp"></i></span>
+          <div class="min-w-0"><p class="text-[12px] font-bold uppercase tracking-wider opacity-90">${w.conectado ? "✓ Conectado" : "Sin conectar"}</p>
+            <p class="truncate text-[18px] font-extrabold">${w.conectado ? "+" + esc(w.numero || "") : "Mary aún no atiende aquí"}</p></div></div>
+        <div class="p-4 text-sm">
+          <p>${w.conectado ? "Mary da el link para agendar, muestra la cita a quien ya tiene una, manda las capturas de pago a Telegram y publica los estados con los cupos." : "El dueño lo conecta solo desde su panel: <b>Más › Configuración › WhatsApp con Mary</b> › «Pedir mi código». Funciona en iPhone y Android."}</p>
+          <a class="btn-primary mt-3 block w-full text-center" href="${adminUrl(biz.id)}">Abrir su panel</a>
+        </div></div>`);
     return;
   }
   if (act === "edit") {
@@ -815,8 +778,5 @@ $("mailFromSave").onclick = async () => {
 };
 
 // ================= WhatsApp con Meta listo para las tiendas =================
-getDoc(doc(db, "platform", "public")).then((d) => { if ($("metaReady")) $("metaReady").checked = !!d.data()?.metaReady; }).catch(() => {});
-$("metaReady").onchange = async (e) => {
-  try { await setDoc(doc(db, "platform", "public"), { metaReady: e.target.checked }, { merge: true }); toast(e.target.checked ? "Las tiendas ya ven “Conectar mi WhatsApp” de Meta." : "Las tiendas ven la opción gratis con MacroDroid."); }
-  catch (err) { toast(err.message, "error"); e.target.checked = !e.target.checked; }
-};
+
+

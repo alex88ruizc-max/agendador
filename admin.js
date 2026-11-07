@@ -9,9 +9,9 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-11-07k";
-import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-07k";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-07k";
+} from "./common.js?v=2026-11-07l";
+import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-07l";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-07l";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -3744,78 +3744,9 @@ document.addEventListener("click", async (e) => {
 
 // Citas por WhatsApp: el bot lo instala la plataforma; la tienda elige cómo funciona
 function waSection() {
-  const s = A.settings || {};
-  if (lockedNow("whatsapp")) { const need = planFor("whatsapp"); return `<div class="sp-h mt-5"><h2>💬 Citas por WhatsApp</h2></div><div class="sp-card text-sm">🔒 Un asistente en tu WhatsApp que agenda solo, las 24 horas. Viene en el plan <b>${esc(PLANS()[need].name)}</b>. <a href="#" class="font-bold underline" data-goplan="${need}">Ver planes</a></div>`; }
-  const on = s.waEnabled !== false, mode = s.waMode === "register" ? "register" : "code", dep = s.waDeposit !== false;
-  const mc = s.waMeta || {};
-  const MD_PLAY = "https://play.google.com/store/apps/details?id=com.arlosoft.macrodroid";
-  const MD_VIDEO = "https://www.youtube.com/results?search_query=MacroDroid+responder+notificaci%C3%B3n+WhatsApp+solicitud+HTTP";
-  const macroCard = `
-    <div class="sp-card mb-3 overflow-hidden !p-0">
-      <div class="p-4 text-white" style="background:linear-gradient(135deg,#25D366,#128C7E)">
-        <p class="flex items-center gap-2 text-[17px] font-extrabold"><i class="fa-brands fa-whatsapp text-2xl"></i> Conecta tu WhatsApp <span class="rounded-full bg-white/25 px-2 py-0.5 text-[10px]">GRATIS</span></p>
-        <p class="mt-1 text-[13px] opacity-95">Con la app gratuita <b>MacroDroid</b> en tu celular <b>Android</b>, tu asistente responde solo en tu propio número.</p>
-      </div>
-      <div class="p-4">
-        <div class="grid grid-cols-2 gap-2">
-          <a class="btn-light flex items-center justify-center gap-1.5 text-sm" href="${MD_PLAY}" target="_blank" rel="noopener"><i class="fa-brands fa-google-play"></i> Descargar</a>
-          <a class="btn-light flex items-center justify-center gap-1.5 text-sm" href="${MD_VIDEO}" target="_blank" rel="noopener"><i class="fa-brands fa-youtube" style="color:#e11d48"></i> Ver videos</a>
-        </div>
-        <ol class="mt-4 space-y-2.5 text-[13.5px]">
-          ${[["Instala <b>MacroDroid</b> y dale el permiso de <b>notificaciones</b>."],
-             ["Toca <b>Agregar macro</b> → Disparador: <b>Notificación recibida</b> → app <b>WhatsApp</b> (o WhatsApp Business)."],
-             ["Acción 1: <b>Solicitud HTTP</b> → <b>GET</b> → pega <b>tu dirección</b> (botón de abajo) → guarda la respuesta en una variable llamada <b>resp</b>."],
-             ["Acción 2: <b>Responder notificación</b> → texto: la variable <b>resp</b>. Guarda la macro."],
-             ["Escríbele <b>“hola”</b> a tu WhatsApp desde otro número para probar."]].map((x, i) => `<li class="flex gap-3"><span class="grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-extrabold text-white" style="background:#128C7E">${i + 1}</span><span>${x[0]}</span></li>`).join("")}
-        </ol>
-        <button type="button" id="mdCopy" class="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-[15px] font-extrabold text-white" style="background:#25D366"><i class="fa-regular fa-copy"></i> Copiar mi dirección</button>
-        <p class="soft mt-2 text-center text-[11.5px]">Es privada: no la compartas. Funciona mientras tu celular tenga internet.</p>
-        <p class="mt-2 rounded-xl p-2.5 text-center text-[12px]" style="background:#eef4ff">🍎 ¿Tienes iPhone? Muy pronto podrás conectarlo también.</p>
-      </div>
-    </div>`;
-  const metaReady = !!(A.plat || {}).metaReady;
-  const metaCard = !mc.connected && !metaReady ? macroCard : mc.connected ? `
-    <div class="sp-card mb-3 overflow-hidden !p-0">
-      <div class="flex items-center gap-3 p-4 text-white" style="background:linear-gradient(135deg,#25D366,#128C7E)">
-        <span class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/20 text-2xl"><i class="fa-brands fa-whatsapp"></i></span>
-        <div class="min-w-0 flex-1"><p class="text-[12px] font-bold uppercase tracking-wider opacity-90">✓ WhatsApp conectado</p>
-          <p class="truncate text-[19px] font-extrabold">${esc(mc.display || "Tu número")}</p>${mc.name ? `<p class="truncate text-xs opacity-90">${esc(mc.name)}</p>` : ""}</div>
-      </div>
-      <div class="p-4 text-sm"><p>🤖 Tu asistente responde solo con botones y listas, recibe la foto del pago y le avisa al cliente cuando apruebas.</p>
-        <p class="soft mt-2 text-xs">Para probar, escríbele <b>“hola”</b> a tu WhatsApp desde otro número.</p>
-        <button type="button" id="metaOff" class="mt-3 text-xs font-bold underline" style="color:var(--sred)">Desconectar mi WhatsApp</button></div>
-    </div>` : `
-    <div class="sp-card mb-3 overflow-hidden !p-0">
-      <div class="p-4 text-white" style="background:linear-gradient(135deg,#25D366,#128C7E)">
-        <p class="flex items-center gap-2 text-[17px] font-extrabold"><i class="fa-brands fa-whatsapp text-2xl"></i> Conecta tu WhatsApp</p>
-        <p class="mt-1 text-[13px] opacity-95">Tu asistente atiende en tu propio número, con botones y listas. Funciona en iPhone y Android, y sigues usando tu app como siempre.</p>
-      </div>
-      <div class="p-4">
-        <ol class="space-y-2.5 text-[13.5px]">
-          <li class="flex gap-3"><span class="grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-extrabold text-white" style="background:#128C7E">1</span><span>Inicia sesión con <b>Facebook</b> (la ventana es de Meta).</span></li>
-          <li class="flex gap-3"><span class="grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-extrabold text-white" style="background:#128C7E">2</span><span>Escribe tu número de <b>WhatsApp Business</b>.</span></li>
-          <li class="flex gap-3"><span class="grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-extrabold text-white" style="background:#128C7E">3</span><span>Escanea el <b>código QR</b> desde tu app de WhatsApp Business y listo.</span></li>
-        </ol>
-        <button type="button" id="metaOn" class="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-[15px] font-extrabold text-white" style="background:#25D366"><i class="fa-brands fa-whatsapp text-xl"></i> Conectar mi WhatsApp</button>
-        <p class="soft mt-2 text-center text-[11.5px]">¿Usas el WhatsApp normal y no el Business? Pásate gratis a WhatsApp Business: conserva tu número y tus chats.</p>
-        <button type="button" id="metaNew" class="mt-1 block w-full text-center text-[11.5px] font-bold underline" style="color:#128C7E">Prefiero usar un número nuevo, sin app</button>
-      </div>
-    </div>`;
-  const chip = (k, v, cur, t) => `<button type="button" class="q-chip" data-wa="${k}" data-v="${v}" aria-pressed="${cur}">${t}</button>`;
+  if (lockedNow("whatsapp")) { const need = planFor("whatsapp"); return `<div class="sp-h mt-5"><h2>💬 WhatsApp con Mary</h2></div><div class="sp-card text-sm">🔒 Mary atiende tu WhatsApp: da tu link y muestra la cita a quien ya tiene una. Viene en el plan <b>${esc(PLANS()[need].name)}</b>. <a href="#" class="font-bold underline" data-goplan="${need}">Ver planes</a></div>`; }
   return `<div class="sp-h mt-5"><h2>💬 WhatsApp con Mary</h2><span>tu recepcionista 24/7</span></div>
-    ${maryWaCard()}
-    <details class="mt-3"><summary class="cursor-pointer px-1 text-xs font-bold text-ink/55">Otras formas de conectar (MacroDroid, Meta) — las de antes</summary><div class="mt-3">
-    ${metaCard}
-    <div class="sp-card">
-      <button type="button" class="flex w-full items-start gap-3 text-left" data-wa="waEnabled" data-v="${!on}">
-        <span class="min-w-0 flex-1"><b class="block text-[14.5px]">Asistente activo</b><span class="block text-xs text-ink/65">Responde en tu WhatsApp, muestra tus horas libres y agenda solo, las 24 horas.</span></span>
-        <span class="relative inline-block h-7 w-12 shrink-0 rounded-full" style="background:${on ? "var(--mint)" : "#cfd6df"}"><i class="absolute top-[3px] h-[22px] w-[22px] rounded-full bg-white shadow" style="left:${on ? "23px" : "3px"}"></i></span></button>
-      <p class="mb-1 mt-4 text-xs font-bold text-ink/60">¿Cómo agendan?</p>
-      <div class="flex flex-wrap gap-2">${chip("waMode", "code", mode === "code", "Sin registro (con código de cita)")}${chip("waMode", "register", mode === "register", "Con registro (su cuenta)")}</div>
-      <p class="mb-1 mt-4 text-xs font-bold text-ink/60">¿Cobras abono por WhatsApp?</p>
-      <div class="flex flex-wrap gap-2">${chip("waDeposit", "true", dep, `Sí, ${cop(s.depositAmountCOP || 0)} con foto del pago`)}${chip("waDeposit", "false", !dep, "No, se confirma de una vez")}</div>
-      <p class="soft mt-3 text-xs">${dep ? "El asistente da tus datos de pago y un enlace corto para adjuntar la foto. Tú apruebas el pago aquí o en Telegram." : "La cita queda confirmada apenas el cliente la elige."}</p>
-    </div></div></details>`;
+    ${maryWaCard()}`;
 }
 // ---- Conectar el WhatsApp de la tienda (ventana oficial de Meta) ----
 let FB_READY = null;
@@ -3857,13 +3788,6 @@ async function connectWhatsApp(coexistence) {
   finally { setBusy(btn, false); }
 }
 document.addEventListener("click", async (e) => {
-  if (e.target.closest("#mdCopy")) {
-    const btn = $("mdCopy"); setBusy(btn, true, "Preparando…");
-    try { const r = await api("waMyKey", {}); await copyText(r.urlMacro); toast("✓ Dirección copiada: pégala en MacroDroid."); }
-    catch (err) { toast(err.message, "error"); }
-    finally { setBusy(btn, false); }
-    return;
-  }
   if (e.target.closest("#metaOn")) return connectWhatsApp(true);
   if (e.target.closest("#metaNew")) return connectWhatsApp(false);
   if (e.target.closest("#metaOff")) {
