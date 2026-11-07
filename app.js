@@ -1,6 +1,6 @@
 // Página pública: ver cupos, registrarse, apartar, pagar con screenshot, mis cupos
-import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro } from "./common.js?v=2026-11-07d";
-import { setupInstall } from "./common.js?v=2026-11-07d";
+import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro } from "./common.js?v=2026-11-07e";
+import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-07e";
 import {
   onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, sendPasswordResetEmail,
   GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult
@@ -12,7 +12,7 @@ import {
   startUpdateWatcher, applyBrandColors, warmServer, uiConfirm, setDialogBrand, viewImage, pushOverlay, dropOverlay, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, dow, hora12, fechaLarga, fechaCorta, toMillis, cop, esc,
   normalizePhone, waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, computeSlots, dayCapacityUnits, staffHours, mapLinks, headerBgCss,
   toast, openModal, closeModal, setBusy, copyText, tmin, mstr, UNIT
-} from "./common.js?v=2026-11-07d";
+} from "./common.js?v=2026-11-07e";
 
 const $ = (id) => document.getElementById(id);
 const S = {
@@ -611,7 +611,7 @@ $("tabRegister").onclick = () => setAuthTab("register");
 $("gateClose").onclick = () => { S.wantBook = false; updateGate(); };
 // ---------- Entrar con Google ----------
 // Google no deja entrar desde el navegador interno de WhatsApp, Instagram, Facebook o TikTok (error 403 disallowed_useragent)
-function googleBloqueado() { return /FBAN|FBAV|Instagram|WhatsApp|Line\/|TikTok|; wv\)/i.test(navigator.userAgent || ""); }
+function googleBloqueado() { return false; }   // el botón siempre se ve; dentro de WhatsApp lleva al navegador (salirAlNavegador)
 async function afterGoogle(u) {
   if (!u) return;
   S.user = u;
@@ -622,6 +622,7 @@ async function afterGoogle(u) {
   updateGate(); renderNav(); renderAll();
 }
 $("btnGoogle").onclick = async () => {
+  if (enAppInterna()) { try { sessionStorage.setItem("googleVuelta", JSON.stringify({ b: BIZ_ID, cita: CITA_LINK })); } catch { /* nada */ } salirAlNavegador(); return; }
   const btn = $("btnGoogle"), prov = new GoogleAuthProvider();
   prov.setCustomParameters({ prompt: "select_account" });
   setBusy(btn, true, "Abriendo Google…");

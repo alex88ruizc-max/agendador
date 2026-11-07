@@ -2,7 +2,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js?v=2026-11-07d";
+import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js?v=2026-11-07e";
 
 export const app = initializeApp(firebaseConfig);
 // Caché en el dispositivo: muestra al instante lo último que se vio y luego actualiza en vivo
@@ -21,7 +21,7 @@ export function businessFromUrl() {
 export const bpath = (...parts) => ["businesses", BID, ...parts].join("/");
 
 // Versión de la página: cámbiala en cada actualización para comprobar que se publicó
-export const APP_VERSION = '2026-11-07d';
+export const APP_VERSION = '2026-11-07e';
 // Versiones que esta página espera del servidor y de las reglas de Firebase
 export const SERVER_VERSION = '2026-10-10n';
 export const RULES_VERSION = '2026-10-10l';
@@ -553,6 +553,23 @@ function mostrarAyudaIphone(safari) {
     <h3>Instala Tu Agenda en tu iPhone</h3>
     ${safari ? `<ol><li>Toca <b>Compartir</b> <span class="ios-ico">⬆︎</span> abajo en Safari.</li><li>Elige <b>Agregar a inicio</b>.</li><li>Toca <b>Agregar</b>. ¡Listo! Queda como app.</li></ol>`
       : `<p>Abre esta página en <b>Safari</b> (copia el enlace y pégalo allí). Luego: Compartir › <b>Agregar a inicio</b>.</p>`}
+    <button type="button" class="btn-primary w-full">Entendido</button></div>`;
+  document.body.appendChild(d);
+  d.onclick = (e) => { if (e.target === d || e.target.closest("button")) d.remove(); };
+}
+
+// ================= Google desde WhatsApp/Instagram/Facebook =================
+// Google no deja entrar desde el navegador interno de esas apps (403 disallowed_useragent): se abre la página en el navegador de verdad.
+export function enAppInterna() { return /FBAN|FBAV|Instagram|WhatsApp|Line\/|TikTok|; wv\)/i.test(navigator.userAgent || ""); }
+export function salirAlNavegador() {
+  const ua = navigator.userAgent || "", url = location.href;
+  if (/Android/i.test(ua)) { location.href = "intent://" + url.replace(/^https?:\/\//, "") + "#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=" + encodeURIComponent(url) + ";end"; return; }
+  const d = document.createElement("div");
+  d.className = "install-help";
+  d.innerHTML = `<div class="install-card" role="dialog" aria-modal="true" aria-label="Abrir en Safari">
+    <h3>Para entrar con Google, ábrela en Safari</h3>
+    <ol><li>Toca <b>⋯</b> o <b>Compartir</b> (arriba o abajo de esta pantalla).</li><li>Elige <b>Abrir en Safari</b> (o «Abrir en el navegador»).</li><li>Allí toca otra vez <b>Continuar con Google</b>.</li></ol>
+    <p style="font-size:.85rem;opacity:.7">WhatsApp no deja que Google inicie sesión dentro de su app. También puedes entrar con tu correo aquí mismo.</p>
     <button type="button" class="btn-primary w-full">Entendido</button></div>`;
   document.body.appendChild(d);
   d.onclick = (e) => { if (e.target === d || e.target.closest("button")) d.remove(); };

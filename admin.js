@@ -9,9 +9,9 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-11-07d";
-import { setupInstall } from "./common.js?v=2026-11-07d";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-07d";
+} from "./common.js?v=2026-11-07e";
+import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-07e";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-07e";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -68,8 +68,8 @@ $("loginForm").addEventListener("submit", async (e) => {
   finally { setBusy(btn, false); }
 });
 // Entrar con Google (mismo correo del panel). En el navegador interno de WhatsApp/Instagram/Facebook Google no deja: se oculta.
-if (/FBAN|FBAV|Instagram|WhatsApp|Line\/|TikTok|; wv\)/i.test(navigator.userAgent || "")) $("btnGoogleAdmin").classList.add("hidden");
 $("btnGoogleAdmin").onclick = async () => {
+  if (enAppInterna()) { salirAlNavegador(); return; }
   const btn = $("btnGoogleAdmin"), prov = new GoogleAuthProvider(); prov.setCustomParameters({ prompt: "select_account" });
   setBusy(btn, true, "Abriendo Google…");
   try { await signInWithPopup(auth, prov); }
