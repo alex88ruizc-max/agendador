@@ -1,5 +1,5 @@
 // Panel de administración: agenda, pagos, descansos, clientes, servicios y configuración
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
   doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, collection, query, where, onSnapshot, serverTimestamp, Timestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -9,9 +9,9 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-11-07c";
-import { setupInstall } from "./common.js?v=2026-11-07c";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-07c";
+} from "./common.js?v=2026-11-07e";
+import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-07e";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-07e";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -67,6 +67,21 @@ $("loginForm").addEventListener("submit", async (e) => {
   catch { toast("Correo o contraseña incorrectos.", "error"); }
   finally { setBusy(btn, false); }
 });
+// Entrar con Google (mismo correo del panel). En el navegador interno de WhatsApp/Instagram/Facebook Google no deja: se oculta.
+$("btnGoogleAdmin").onclick = async () => {
+  if (enAppInterna()) { salirAlNavegador(); return; }
+  const btn = $("btnGoogleAdmin"), prov = new GoogleAuthProvider(); prov.setCustomParameters({ prompt: "select_account" });
+  setBusy(btn, true, "Abriendo Google…");
+  try { await signInWithPopup(auth, prov); }
+  catch (err) {
+    const c = String(err?.code || "");
+    if (c.includes("popup-blocked") || c.includes("operation-not-supported")) { await signInWithRedirect(auth, prov); return; }
+    if (c.includes("unauthorized-domain")) toast("Google aún no está habilitado para este dominio (Firebase › Authentication › Dominios autorizados).", "error");
+    else if (c.includes("operation-not-allowed") || c.includes("configuration-not-found")) toast("El acceso con Google no está activado (Firebase › Authentication › Método de acceso › Google).", "error");
+    else if (!c.includes("popup-closed") && !c.includes("cancelled-popup")) toast("No se pudo entrar con Google: " + (err?.message || c), "error");
+  } finally { setBusy(btn, false); }
+};
+getRedirectResult(auth).catch((e) => console.error(e));
 $("btnLogout").onclick = () => { closeMenus(); signOut(auth); };
 // Menús del encabezado (link de clientes y cuenta)
 function closeMenus() { $("acctMenu").classList.add("hidden"); $("btnAccount").setAttribute("aria-expanded", "false"); }
