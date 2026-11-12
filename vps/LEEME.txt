@@ -1,4 +1,4 @@
-🗓️ AGENDADOR IA · agendador-ia-3.8   (por dentro atiende «Mary», la recepcionista)
+🗓️ AGENDADOR IA · agendador-ia-3.9   (por dentro atiende «Mary», la recepcionista)
 =====================================================================================================
 🚫 REGLA UNIVERSAL N.º 1 — EPIC NO SE TOCA (manda sobre todo lo demás, para Alex, para Claude y para cada script de este paquete)
    Epic (Mary de Epic, Luisa, la tienda, epic-waha, epic-tiendas, Epic Channels…) y CUALQUIER otro proyecto:
@@ -62,6 +62,10 @@ PROBAR EN EL VPS
 AJUSTES POR NEGOCIO (negocios.json)
   "recordatorioMin": 120     ·   "estados": { "activo": true, "hoy": "07:30", "semana": "07:00", "semanaDia": 1 }
   En Firestore (settings/general del negocio) maryAutoCaptura: true → la captura confirma al instante y el dueño revisa después.
+
+NOVEDADES 3.9
+  · Si WAHA avisa el toque del negocio sin decir la opción (solo el texto «🕐 Ver cupos»), se reconoce por el título comparándolo
+    con la última lista que el asistente le mandó a ese cliente.
 
 NOVEDADES 3.8 · OPCIONES TOCADAS DESDE EL CELULAR DEL NEGOCIO
   · Si el dueño abre la lista del asistente en SU celular y toca una opción («Ver cupos», «Agendar por aquí»…), el asistente la

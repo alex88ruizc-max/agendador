@@ -609,3 +609,13 @@ test('3.8 · El dueño toca «Ver cupos» desde el celular del NEGOCIO → al cl
   await llega(wahaMsg(CLIENTE, 'quiero agendar'));
   assert.ok(ultimo().lista, 'el asistente sigue atendiendo al cliente');
 });
+
+test('3.9 · Si WAHA avisa el toque del negocio SIN la opción (solo el texto «🕐 Ver cupos»), igual se reconoce por el título', async () => {
+  await llega(wahaMsg(CLIENTE, 'hola'));
+  await llega(wahaMsg('x', '🕐 Ver cupos\nDías y horas disponibles', { id: 'true_' + CLIENTE + '@c.us_TAP2', from: '573110000000@c.us', to: CLIENTE + '@c.us', fromMe: true }));
+  assert.equal(ultimo().a, CLIENTE); assert.match(ultimo().texto, /hay cupo a las/);
+  assert.ok(!B.memHumano()['lina-spa:' + CLIENTE], 'no cuenta como «el dueño escribió»');
+  // y un mensaje normal del dueño SÍ lo calla
+  await llega(wahaMsg('x', 'te atiendo yo', { id: 'true_' + CLIENTE + '@c.us_DUE9', from: '573110000000@c.us', to: CLIENTE + '@c.us', fromMe: true }));
+  assert.ok(B.memHumano()['lina-spa:' + CLIENTE]);
+});

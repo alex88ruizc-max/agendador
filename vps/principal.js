@@ -6,7 +6,7 @@
 const http = require('http'), fs = require('fs'), path = require('path');
 const T = require('./textos'), C = require('./correo'), E = require('./estado'), A = require('./asistente');
 
-const VERSION = 'agendador-ia-3.8';
+const VERSION = 'agendador-ia-3.9';
 const env = (k, d) => (process.env[k] === undefined || process.env[k] === '' ? d : process.env[k]);
 const CFG = {
   puerto: parseInt(env('PUERTO', '3060'), 10),
@@ -279,6 +279,13 @@ async function atenderMensaje(c, neg) {
   const k = neg.bid + ':' + (c.tel || c.jid);
   // 👆 3.8: el dueño tocó una opción de la lista DESDE el celular del negocio → el asistente la hace para ese cliente
   //        (p. ej. «Ver cupos» en el chat de Marianna → a Marianna le llegan los cupos). No cuenta como «el dueño escribió».
+  // 3.9: WAHA a veces avisa el toque del negocio SIN la opción (solo el texto «🕐 Ver cupos…»): se reconoce por el título,
+  //      comparándolo con la última lista que el asistente le mandó a ese cliente
+  if (c.deMi && !c.rowId && c.texto) {
+    const cv = MEM.conv && MEM.conv[k], l0 = normal(String(c.texto).split('\n')[0]);
+    const op = cv && (cv.opciones || []).find((o) => normal(o.titulo) === l0);
+    if (op) c.rowId = op.id;
+  }
   if (c.deMi && c.rowId) {
     if (!botDe(neg).activo || !c.tel) return;
     if (MEM.humano) delete MEM.humano[k];

@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-3.8** · Página **2026-11-12d** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-12** · Mary **agendador-ia-3.9** · Página **2026-11-12d** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -113,6 +113,11 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-12 · agendador-ia-3.9 · toque del negocio reconocido por el título
+- Prueba real con 3.8 instalada (2:51 p. m.): el toque de las 2:53 desde el 318 no hizo nada. Hipótesis: WAHA (GOWS) manda el
+  toque propio sin `selectedRowID`. Ahora `deMi` + texto cuya 1.ª línea = título de una opción de la última lista de ese chat → esa opción.
+- Banco: 84 pruebas. Falta confirmar con /registro en el celular real.
 
 ### 2026-11-12 · agendador-ia-3.8 · opción tocada desde el celular del negocio
 - Prueba real: Alex (modo todos) tocó «Ver cupos» en la lista DESDE el 318 (negocio) → llegaba como mensaje del negocio (fromMe)
