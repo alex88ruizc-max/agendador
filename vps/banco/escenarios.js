@@ -90,6 +90,15 @@ global.fetch = async (url, o) => {
     return resp(Object.assign({ name: n }, W.sesiones[n])); }
   const ac = u.match(/\/api\/([^/]+)\/auth\/(request-code|qr)/);
   if (ac) { W.wahaLlamadas.push(ac[2] + ' ' + decodeURIComponent(ac[1])); return ac[2] === 'qr' ? resp({ mimetype: 'image/png', data: 'UVI=' }) : resp({ code: 'ABCD1234' }); }
+  if (W.fsDirecto && /firestore|\/documents\/businesses\//.test(u)) {   // 3.30: la base de datos que el VPS lee directo (configuración, equipo, servicios, cupos ocupados)
+    const D = W.fsDirecto, aFs2 = (v) => typeof v === 'boolean' ? { booleanValue: v } : typeof v === 'number' ? { integerValue: String(v) } : typeof v === 'string' ? { stringValue: v } : Array.isArray(v) ? { arrayValue: { values: v.map(aFs2) } } : { mapValue: { fields: Object.fromEntries(Object.entries(v).map(([k, x]) => [k, aFs2(x)])) } };
+    const docu = (n, o) => ({ name: n, fields: aFs2(o).mapValue.fields });
+    W.fsLecturas = (W.fsLecturas || 0) + 1;
+    if (/\/settings\/general/.test(u)) return resp(docu('s/general', Object.assign({ maryBot: W.fsBot || {} }, D.st)));
+    if (/\/staff\?/.test(u)) return resp({ documents: D.staff.map((x) => docu('x/staff/' + x.id, x)) });
+    if (/\/services\?/.test(u)) return resp({ documents: D.servicios.map((x) => docu('x/services/' + x.id, x)) });
+    if (/:runQuery/.test(u)) return resp([]);
+  }
   if (/\/documents\/businesses\/[^/]+\/settings\/general/.test(u)) {   // 3.23: el panel guarda «maryBot» en la base y el VPS lo lee directo
     if (!W.fsBot) return resp({ error: { code: 404 } }, 404);
     const aFs = (v) => typeof v === 'boolean' ? { booleanValue: v } : typeof v === 'number' ? { integerValue: String(v) } : typeof v === 'string' ? { stringValue: v } : Array.isArray(v) ? { arrayValue: { values: v.map(aFs) } } : { mapValue: { fields: Object.fromEntries(Object.entries(v).map(([k, x]) => [k, aFs(x)])) } };
@@ -989,4 +998,27 @@ test('3.29 · «Ver más horas» sí pasa a la siguiente página (antes volvía 
   assert.ok(ids(ultimo()).includes('hc:mas')); assert.ok(!ids(ultimo()).includes('hc:13:00'));
   await llega(toca('hc:mas'));
   assert.ok(ids(ultimo()).includes('hc:13:00'), 'segunda página'); assert.ok(!ids(ultimo()).includes('hc:09:00'));
+});
+
+test('3.30 · 💰 Agendar por WhatsApp SIN gastar Google en días y horas: el VPS los calcula leyendo la base (Google solo para el catálogo y crear)', async () => {
+  const todos = { open: '06:00', close: '23:30' };
+  W.fsDirecto = { st: { slotDurationMinutes: 30, minAdvanceMinutes: 0, bookingWindowDays: 30, businessHours: Object.fromEntries([0, 1, 2, 3, 4, 5, 6].map((d) => [String(d), [todos]])) },
+    staff: [{ id: 's1', name: 'Lina', active: true }, { id: 's2', name: 'Andrés', active: true }],
+    servicios: [{ id: 'c1', name: 'Corte clásico', minutes: 40, active: true }, { id: 'c2', name: 'Degradado', minutes: 45, active: true }, { id: 'b1', name: 'Perfilado de barba', minutes: 20, active: true }, { id: 'e1', name: 'Cejas', minutes: 15, active: true }] };
+  const cl = B.ASIS.cliente('lina-spa:' + CLIENTE); cl.nombre = 'Camila'; cl.correo = '';
+  await llega(wahaMsg(CLIENTE, 'quiero agendar')); await llega(toca('cat:2')); await llega(toca('svc:e1')); await llega(toca('mas:no'));
+  assert.equal(ultimo().lista.button, 'Elegir día');
+  assert.ok(!W.gas.includes('dias'), 'los días NO se le piden a Google');
+  const dia = ids(ultimo())[1];   // mañana (siempre tiene horas)
+  await llega(toca(dia));
+  assert.equal(ultimo().lista.button, 'Elegir hora'); assert.ok(!W.gas.includes('horas'), 'las horas tampoco');
+  const hora = ids(ultimo()).find((x) => x.startsWith('hora:'));
+  await llega(toca(hora)); await llega(toca('pro:s1'));
+  assert.ok(W.gas.includes('crear'), 'crear SÍ va a Google'); assert.match(ultimo().texto, /Cita confirmada|Te aparté/);
+  assert.ok(W.fsLecturas > 0);
+});
+test('3.30 · Si la base no deja leer, se usa Google como antes (nada se rompe)', async () => {
+  W.fsDirecto = null;
+  await llega(wahaMsg(CLIENTE, 'quiero agendar')); await llega(toca('cat:2')); await llega(toca('svc:e1')); await llega(toca('mas:no'));
+  assert.equal(ultimo().lista.button, 'Elegir día'); assert.ok(W.gas.includes('dias'), 'cayó a Google');
 });

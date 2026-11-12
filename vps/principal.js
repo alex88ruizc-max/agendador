@@ -6,7 +6,7 @@
 const http = require('http'), fs = require('fs'), path = require('path');
 const T = require('./textos'), C = require('./correo'), E = require('./estado'), A = require('./asistente');
 
-const VERSION = 'agendador-ia-3.29';
+const VERSION = 'agendador-ia-3.30';
 const env = (k, d) => (process.env[k] === undefined || process.env[k] === '' ? d : process.env[k]);
 const CFG = {
   puerto: parseInt(env('PUERTO', '3060'), 10),
@@ -16,6 +16,7 @@ const CFG = {
   datos: env('DATOS', path.join(__dirname, 'datos')), negocios: env('NEGOCIOS', path.join(__dirname, 'negocios.json')),
   modo: String(env('MARY_MODO', 'prueba')).toLowerCase(),   // prueba (solo MARY_PRUEBA) | todos | apagado
   prueba: String(env('MARY_PRUEBA', '')).split(/[,\s]+/).map((x) => x.replace(/\D/g, '')).filter((x) => x.length >= 10),
+  leerDirecto: env('LEER_DIRECTO', 'si') !== 'no',   // 3.30: días/horas/cupos calculados en el VPS (LEER_DIRECTO=no → todo por Google como antes)
   silencioMin: parseInt(env('SILENCIO_MIN', '15'), 10),     // no repite lo mismo en un chat antes de esto (salvo que el cliente diga algo de la lista)
   humanoMin: parseFloat(env('HUMANO_MIN', '30')),           // 3.1: si el dueño escribe a mano en un chat, se calla ahí 30 min (o lo que diga su panel)
   agruparMs: parseInt(env('AGRUPAR_MS', '7000'), 10),
@@ -26,7 +27,7 @@ const CFG = {
   waha: String(env('WAHA_URL', 'http://waha-agendador:3000')).replace(/\/+$/, ''), wahaKey: env('WAHA_KEY', '')
 };
 const log = (...a) => console.log(new Date().toISOString(), ...a);
-const est = { desde: new Date().toISOString(), recibidos: 0, respondidos: 0, fotos: 0, pagosLeidos: 0, pagosConfirmados: 0, estados: 0, recordatorios: 0, errores: 0 };
+const est = { desde: new Date().toISOString(), recibidos: 0, respondidos: 0, fotos: 0, pagosLeidos: 0, pagosConfirmados: 0, estados: 0, recordatorios: 0, errores: 0, directo: 0, directoFallo: 0 };   // 3.30: directo = cálculos hechos en el VPS sin gastar Google
 const ultimos = []; const anotar = (x) => { ultimos.push(Object.assign({ t: new Date().toISOString() }, x)); if (ultimos.length > 300) ultimos.shift(); };
 
 // ---------- negocios (negocios.json, se relee solo al cambiar) ----------
@@ -253,7 +254,25 @@ function frenoRobot({ texto, rowId, interactivo, enFlujo, ultimoEnvio, ahora, hi
 }
 
 // ---------- 🤖 3.0 · el asistente (agendar por listas, cupos, saludo una vez al día, nombre y gustos) ----------
-const ASIS = A.crear({ gas: (neg, op, d) => gas(neg, op, d), texto: (neg, tel, t) => escribir(neg, tel, t), lista: (neg, tel, L) => escribirLista(neg, tel, L),
+// 💰 3.30 · ahorro de Google: días, horas y cupos se calculan en el VPS leyendo la base directo (como la página). Si falla → Google.
+let CL = null;
+const DIRECTO = new Set(['horas', 'dias', 'cupos']);
+async function leer(neg, op, d) {
+  if (!DIRECTO.has(op) || CFG.leerDirecto === false) return gas(neg, op, d);
+  try {
+    CL = CL || require('./cuposLocal').crear({ fetch: (...x) => fetch(...x), url: FS.url, proyecto: FS.proyecto, llave: FS.llave, ahora: () => { const a = ahoraLocal(); const [h, m] = a.hm.split(':').map(Number); return { fecha: a.fecha, min: h * 60 + m }; } });
+    const cat = (ASIS._cat.get(neg.bid) || {}).d;
+    if (op === 'cupos' && !cat) throw new Error('sin catálogo en memoria');   // el nombre y el link vienen del catálogo
+    const r = await CL[op](neg.bid, d || {});
+    est.directo++;
+    return Object.assign({ link: (cat && cat.link) || '', negocio: (cat && cat.negocio) || '' }, r);
+  } catch (e) {
+    est.directoFallo++;
+    if (!leer.avisado) { leer.avisado = true; log('💰 no pude calcular ' + op + ' en el VPS (' + String(e.message).slice(0, 80) + '): uso Google'); }
+    return gas(neg, op, d);
+  }
+}
+const ASIS = A.crear({ gas: (neg, op, d) => leer(neg, op, d), texto: (neg, tel, t) => escribir(neg, tel, t), lista: (neg, tel, L) => escribirLista(neg, tel, L),
   get mem() { return MEM; }, guardar: () => memGuardar(), anotar: (x) => anotar(x), tz: CFG.tz, bot: (neg) => botDe(neg) });
 
 // ---------- ¿quién escribe? ----------
@@ -784,5 +803,5 @@ if (require.main === module) {
   servidor.listen(CFG.puerto, () => { log('👩‍💼 ' + VERSION + ' escuchando en ' + CFG.puerto + ' · modo ' + CFG.modo); negocios(); arrancarRelojes(); });
 }
 // 🧪 solo para el banco de escenarios (banco/escenarios.js): deja a Mary como recién encendida
-const _banco = { ASIS, BOT, yaLoDije, memDicho: () => (MEM.dicho = MEM.dicho || {}), memHumano: () => MEM.humano, memRobot: () => (MEM.robot = MEM.robot || {}), tickRecordatorios, publicarEstado, alMensaje, alEventoConexion, ultimos, reiniciar() { BOT_LEIDO.clear(); MEM.sinbot = {}; MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; MEM.conv = {}; MEM.clientes = {}; MEM.conectados = {}; MEM.pendientesWa = {}; MEM.codigos = {}; MEM.robot = {}; MEM.dicho = {}; AGRUPA.clear(); ASIS._cat.clear(); BOT.clear(); CONTACTOS.clear(); vinculando.clear(); delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
+const _banco = { ASIS, BOT, yaLoDije, memDicho: () => (MEM.dicho = MEM.dicho || {}), memHumano: () => MEM.humano, memRobot: () => (MEM.robot = MEM.robot || {}), tickRecordatorios, publicarEstado, alMensaje, alEventoConexion, ultimos, reiniciar() { CL = null; leer.avisado = false; BOT_LEIDO.clear(); MEM.sinbot = {}; MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; MEM.conv = {}; MEM.clientes = {}; MEM.conectados = {}; MEM.pendientesWa = {}; MEM.codigos = {}; MEM.robot = {}; MEM.dicho = {}; AGRUPA.clear(); ASIS._cat.clear(); BOT.clear(); CONTACTOS.clear(); vinculando.clear(); delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
 module.exports = { _banco, botNormal, frenoRobot, estadosQueTocan, atenderPedidoWa, sincronizarConectados, renovarQr, telEnAviso, deWaha, esWaha, debeResponder, alEventoConexion, tickPedidosWa, limpiarSinVincular, leerMensaje, atiende, PREGUNTA, numeroWa, ahoraLocal, enFila, yaVisto, quienVeEstados, CFG };

@@ -14,7 +14,7 @@
  * Instalación: pega este archivo, ejecuta activarMary() una vez, copia la clave que sale en el registro
  * y ponla en el mary.env del VPS (MARY_KEY). Vuelve a implementar la aplicación web (Implementar > Administrar > editar > Nueva versión).
  */
-const MARY_VERSION = 'agendador-ia-3.28';
+const MARY_VERSION = 'agendador-ia-3.30';
 
 // Se registra como acción pública del servidor (sin sesión: entra con la clave de Mary).
 // ⚠️ Este archivo debe quedar DEBAJO del archivo principal en la lista de archivos de Apps Script (los nuevos quedan al final: así está bien).
@@ -678,14 +678,17 @@ function maryWaResultado_(b) {
   const r = { estado: estado, codigo: String(b.codigo || '').slice(0, 20), qr: String(b.qr || '').slice(0, 20000), numero: String(b.numero || '').replace(/\D/g, ''), error: String(b.error || '').slice(0, 200), vence: Number(b.vence) || 0, t: Date.now() };
   ca.put('mwa_res_' + BID, JSON.stringify(r), 900);
   const fin = ['codigo', 'conectado', 'desconectado', 'error', 'vencido'].indexOf(estado) >= 0;
+  // 3.30: «✅ WhatsApp vinculado» SOLO si de verdad cambió (antes salía en cada reinicio del VPS y los dueños creían que los hackeaban)
+  const antes = estado === 'conectado' ? (loadSettings().maryWa || {}) : {};
+  const nuevo = estado === 'conectado' && !(antes.conectado && String(antes.numero || '') === r.numero);
   const w = [];
   if (fin) {   // el pedido ya se atendió: se quita (el VPS deja de revisarlo)
     ca.remove('mwa_req_' + BID); PropertiesService.getScriptProperties().deleteProperty('mwa_req_' + BID);
     w.push({ update: { name: docName('platform/public'), fields: {} }, updateMask: { fieldPaths: [fp(['maryWaPend', BID])] } });
   }
-  if (estado === 'conectado') w.push(wPatch(bp('settings/general'), { maryWa: { conectado: true, numero: r.numero, at: new Date() } }));
+  if (nuevo) w.push(wPatch(bp('settings/general'), { maryWa: { conectado: true, numero: r.numero, at: new Date() } }));
   if (estado === 'desconectado') w.push(wPatch(bp('settings/general'), { maryWa: { conectado: false, numero: '', at: new Date() } }));
   if (w.length) commit(w);
-  if (estado === 'conectado') tgSys('✅ <b>WhatsApp vinculado</b>\nTu asistente ya atiende en +' + esc(r.numero) + '.');
+  if (nuevo) tgSys('✅ <b>WhatsApp vinculado</b>\nTu asistente ya atiende en +' + esc(r.numero) + '.');
   return { ok: true };
 }

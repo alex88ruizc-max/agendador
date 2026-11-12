@@ -230,3 +230,91 @@ test('3.28 · Días con cupo (servidor): lee servicios y equipo UNA vez y no con
   assert.ok(!r.dias.some((x) => new Date(x.date + 'T12:00:00Z').getUTCDay() === 0), 'el domingo no sale');
   assert.equal(n.locks, 10, 'solo se consulta la base en los días que alguien atiende');
 });
+
+test('3.30 · «✅ WhatsApp vinculado» llega a Telegram SOLO cuando se vincula de verdad (no en cada reinicio del VPS)', { skip: !require('fs').existsSync(GS_MARY) && 'dentro de la imagen no está gs/' }, () => {
+  const src = require('fs').readFileSync(GS_MARY, 'utf8');
+  let ajustes = {}; const tg = [], commits = [];
+  const cache = { put() {}, remove() {}, get() { return null; } };
+  const G = {
+    ACTIONS: {}, PUBLIC_ACTIONS: {}, console, fail: (m) => { throw new Error(m); },
+    CacheService: { getScriptCache: () => cache }, PropertiesService: { getScriptProperties: () => ({ deleteProperty() {} }) },
+    loadSettings: () => ajustes, bp: (x) => x, docName: (x) => x, fp: (x) => x.join('.'),
+    wPatch: (p, d) => ({ p, d }), commit: (w) => { commits.push(...w); w.forEach((x) => { if (x.d && x.d.maryWa) ajustes = Object.assign({}, ajustes, { maryWa: x.d.maryWa }); }); },
+    tgSys: (m) => tg.push(m), esc: (x) => x, BID: 'b', encFields: (x) => x
+  };
+  const F = new Function(...Object.keys(G), src + '\nreturn { maryWaResultado_ };')(...Object.values(G));
+  F.maryWaResultado_({ estado: 'conectado', numero: '573117604262' });
+  assert.equal(tg.length, 1, 'la primera vez sí avisa');
+  F.maryWaResultado_({ estado: 'conectado', numero: '573117604262' });
+  F.maryWaResultado_({ estado: 'conectado', numero: '573117604262' });
+  assert.equal(tg.length, 1, 'reinicios del VPS con el MISMO número: no repite el aviso');
+  F.maryWaResultado_({ estado: 'conectado', numero: '573187920386' });
+  assert.equal(tg.length, 2, 'otro número: sí avisa');
+  F.maryWaResultado_({ estado: 'desconectado' }); F.maryWaResultado_({ estado: 'conectado', numero: '573187920386' });
+  assert.equal(tg.length, 3, 'desvinculó y volvió a vincular: sí avisa');
+});
+
+// ---------- 3.30 · 💰 cupos calculados en el VPS (sin Google) ----------
+const CL = require('../cuposLocal');
+const fsVal = (v) => v === null ? { nullValue: null } : typeof v === 'boolean' ? { booleanValue: v } : typeof v === 'number' ? { integerValue: String(v) } : typeof v === 'string' ? { stringValue: v } : Array.isArray(v) ? { arrayValue: { values: v.map(fsVal) } } : { mapValue: { fields: Object.fromEntries(Object.entries(v).map(([k, x]) => [k, fsVal(x)])) } };
+function baseFalsa(D, cuenta) {
+  const docu = (name, o) => ({ name, fields: fsVal(o).mapValue.fields });
+  return async (u, o) => {
+    cuenta.n++;
+    const ok = (j) => ({ ok: true, status: 200, json: async () => j });
+    if (/\/settings\/general\?/.test(u)) return ok(docu('x/settings/general', D.st));
+    if (/\/staff\?/.test(u)) return ok({ documents: D.staff.map((x) => docu('x/staff/' + x.id, x)) });
+    if (/\/services\?/.test(u)) return ok({ documents: D.servicios.map((x) => docu('x/services/' + x.id, x)) });
+    if (/:runQuery\?/.test(u)) { const f = JSON.parse(o.body).structuredQuery.where.fieldFilter.value.stringValue; return ok(D.locks.filter((l) => l.date === f).map((l) => ({ document: docu('x/slotLocks/' + l.staffId + l.time, l) }))); }
+    return { ok: false, status: 404, json: async () => ({}) };
+  };
+}
+const SEMANA = { '1': [{ open: '09:00', close: '12:00' }, { open: '14:00', close: '18:00' }], '2': [{ open: '09:00', close: '18:00' }], '3': [{ open: '09:00', close: '18:00' }], '4': [{ open: '09:00', close: '18:00' }], '5': [{ open: '09:00', close: '19:00' }], '6': [{ open: '08:00', close: '14:00' }] };
+function mundoCupos() {
+  return {
+    st: { slotDurationMinutes: 30, minAdvanceMinutes: 60, bookingWindowDays: 30, closedDates: ['2030-01-04'], businessHours: SEMANA },
+    staff: [{ id: 's1', name: 'Gabriel', active: true }, { id: 's2', name: 'Yeferson', active: true, ownHours: true, hours: { '2': [{ open: '13:00', close: '20:00' }] }, offDates: ['2030-01-08'], serviceIds: ['c1'] }, { id: 's3', name: 'Inactivo', active: false }],
+    servicios: [{ id: 'c1', name: 'Corte', minutes: 30, active: true }, { id: 'c2', name: 'Corte + barba', minutes: 45, active: true }, { id: 'x', name: 'Viejo', minutes: 30, active: false }],
+    locks: [{ staffId: 's1', date: '2030-01-01', time: '10:00', state: 'booked' }, { staffId: 's1', date: '2030-01-01', time: '10:15', state: 'booked' }, { staffId: 's2', date: '2030-01-01', time: '15:00', state: 'block' }]
+  };
+}
+const AHORA = () => ({ fecha: '2030-01-01', min: 9 * 60 + 10 });   // martes 1 de enero de 2030, 9:10 a. m.
+
+test('3.30 · Cupos en el VPS = las MISMAS horas que calcula la página (computeSlots) para varios servicios, días y profesionales', { skip: !require('fs').existsSync(require('path').join(__dirname, '..', '..', 'common.js')) && 'sin la página aquí' }, () => {
+  const web = require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'common.js'), 'utf8');
+  const fuente = ['export function staffHours', 'export function computeSlots'].map((n) => web.slice(web.indexOf(n), web.indexOf('\n}\n', web.indexOf(n)) + 3).replace('export ', '')).join('\n');
+  const dowW = (f) => { const [y, m, d] = f.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)).getUTCDay(); };
+  const addDays = (f, n) => { const [y, m, d] = f.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10); };
+  const pagina = new Function('tmin', 'mstr', 'UNIT', 'bogNow', 'addDays', 'dow', fuente + '; return computeSlots;')(
+    (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; }, (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'), 15, () => ({ date: AHORA().fecha, min: AHORA().min }), addDays, dowW);
+  const M = mundoCupos(), staffP = M.staff.map((x) => Object.assign({}, x));
+  let casos = 0;
+  for (const date of ['2030-01-01', '2030-01-02', '2030-01-04', '2030-01-05', '2030-01-06', '2030-01-07', '2030-01-08'])
+    for (const [ids, mins] of [[['c1'], 30], [['c2'], 45], [['c1', 'c2'], 75]])
+      for (const staffId of ['', 's1', 's2']) {
+        const vps = CL.libres({ st: M.st, staff: M.staff, servicios: M.servicios, locks: M.locks, date, ids, staffId, ahora: AHORA() });
+        const web2 = pagina({ settings: M.st, staffList: staffP.filter((x) => !x.serviceIds || ids.every((i) => x.serviceIds.includes(i))), locks: M.locks.filter((l) => l.date === date), date, totalMinutes: mins, staffFilter: staffId || undefined });
+        assert.deepEqual(vps, web2, date + ' ' + ids.join('+') + ' ' + (staffId || 'todos')); casos++;
+      }
+  assert.equal(casos, 63);
+});
+test('3.30 · horas / días / cupos salen de la base (sin Google) con el formato que espera el asistente; los domingos y días cerrados ni se consultan', async () => {
+  const M = mundoCupos(), n = { n: 0 };
+  const L = CL.crear({ fetch: baseFalsa(M, n), url: 'https://fs', proyecto: 'p', llave: 'k', ahora: AHORA });
+  const h = await L.horas('elbarba', { ids: ['c1'], date: '2030-01-01', staffId: '' });
+  assert.equal(h.dia, 'Hoy'); assert.equal(h.horas[0].time, '10:30', '9:10 + 60 min de anticipación; 10:00 lo tiene Gabriel ocupado… y Yeferson empieza a la 1');
+  assert.equal(h.horas[0].hora, '10:30 a. m.'); assert.deepEqual(h.horas.find((x) => x.time === '13:00').staff, [{ id: 's1', nombre: 'Gabriel' }, { id: 's2', nombre: 'Yeferson' }]);
+  assert.ok(!h.horas.find((x) => x.time === '15:00').staff.some((s) => s.id === 's2'), 'el bloqueo de Yeferson a las 3 cuenta');
+  const d = await L.dias('elbarba', { ids: ['c2'] });
+  assert.equal(d.dias[0].dia, 'Hoy'); assert.equal(d.dias[1].dia, 'Mañana'); assert.equal(d.dias.length, 10);
+  assert.ok(!d.dias.some((x) => x.date === '2030-01-04'), 'día cerrado'); assert.ok(!d.dias.some((x) => x.date === '2030-01-06'), 'domingo');
+  assert.equal(d.dias.find((x) => x.date === '2030-01-07').dia, 'Lunes 7 de enero');
+  const c = await L.cupos('elbarba', { dias: 3 });
+  assert.equal(c.dias.length, 3); assert.equal(c.dias[0].libres[0], '10:30'); assert.equal(c.dias[0].horas[0], '10:30 a. m.');
+  const antes = n.n; await L.horas('elbarba', { ids: ['c1'], date: '2030-01-01' });
+  assert.equal(n.n, antes, 'lo recién leído se guarda un momento en memoria (no repite lecturas)');
+});
+test('3.30 · Si la base no deja leer → falla (y el VPS usa Google como antes)', async () => {
+  const L = CL.crear({ fetch: async () => ({ ok: false, status: 403, json: async () => ({}) }), url: 'https://fs', proyecto: 'p', llave: 'k', ahora: AHORA });
+  await assert.rejects(() => L.horas('elbarba', { ids: ['c1'], date: '2030-01-01' }), /403/);
+});

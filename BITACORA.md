@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-3.29** · Página **2026-11-12n** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-12** · Mary **agendador-ia-3.30** · Página **2026-11-12n** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -113,6 +113,17 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-12 · agendador-ia-3.30 · 💰 ahorro de Google (auditoría, puntos 1 y 2) · «WhatsApp vinculado» solo cuando cambia
+- **Auditoría de cupo de Google** (solo lectura; de Epic solo se leyó su página, sin tocar nada): por cada agendamiento por WhatsApp se hacían 4-5 llamadas a Google (catálogo, días, horas, crear). Recordatorios: 1 llamada cada 15 min. Panel vinculando: 1 cada 3 s.
+- **Ahorro 1 (como Epic: leer directo lo público):** nuevo `vps/cuposLocal.js`. Días, horas y «¿hay cupos?» se calculan en el VPS leyendo la base directo, lo mismo que ya lee la página del cliente sin cuenta (configuración, equipo, servicios, cupos ocupados).
+  - Misma regla que el servidor y la página: probado contra `computeSlots` de la página en 63 casos (servicios, días, profesionales, días libres, cerrados, bloqueos) → mismas horas.
+  - Lo leído se guarda 1 min (cupos ocupados 15 s). Google queda para crear, cancelar, reagendar, pagos y lo privado.
+- **Ahorro 2 (VPS primero, Google de respaldo):** si la base no deja leer o algo falla, se usa Google como antes. Se apaga con `LEER_DIRECTO=no` en agendador-ia.env.
+- **«✅ WhatsApp vinculado» en Telegram salía en cada reinicio del VPS** (cada vez que se instala un zip): los dueños creían que los hackeaban. Ahora solo sale si de verdad se vincula un número nuevo o distinto (mary.gs 3.30).
+- El recordatorio de la cita R-RZP6UR NO fue error: en Telegram, la cancelación aparece después del recordatorio de las 4:54.
+- Banco: 131 pruebas, 0 fallas (unidad + escenario completo sin Google en días/horas + respaldo). Probado con mutaciones.
+- Pendiente de la auditoría: puntos 3-5 (memoria, recordatorios cada 30 min, panel vinculando sin Google).
 
 ### 2026-11-12 · agendador-ia-3.29 · página 2026-11-12n · sin «¿Lo confirmo?» · link que falla
 - Se probó «primero la hora, después el servicio» y Alex pidió dejarlo como estaba: **primero el servicio, luego el día y la hora**. Ese cambio se deshizo; no se entregó.
