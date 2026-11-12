@@ -1,6 +1,6 @@
 # 👂 oido-agendador · Whisper (faster-whisper) en CPU, solo dentro de la red del agendador (no se abre a internet)
 FROM python:3.12-slim
-RUN pip install --no-cache-dir faster-whisper==1.1.1 requests==2.32.3
+RUN pip install --no-cache-dir faster-whisper==1.2.1 av==15.1.0 requests==2.32.3
 WORKDIR /app
 COPY oido.py .
 ENV MODELOS=/modelos MODELO=small IDIOMA=es HILOS=2 PYTHONUNBUFFERED=1

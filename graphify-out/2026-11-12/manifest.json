@@ -54,9 +54,9 @@
     "semantic_hash": ""
   },
   "vps/banco/escenarios.js": {
-    "mtime": 1794515897.6963556,
-    "seen": 1794516038.8625062,
-    "ast_hash": "b1a9bd26714bd3631818d1c878a4f834",
+    "mtime": 1794516133.7675848,
+    "seen": 1794516253.9769685,
+    "ast_hash": "7412ebdcf6152f1fbf9c8fca6186274f",
     "semantic_hash": ""
   },
   "vps/banco/pruebas.js": {
@@ -152,15 +152,15 @@
     "semantic_hash": "5009abfe30c8d8ffe5acf888999b674b"
   },
   "vps/principal.js": {
-    "mtime": 1794515959.0012062,
-    "seen": 1794516038.8626204,
-    "ast_hash": "071278672494584b7f20984393b1a015",
+    "mtime": 1794516075.7567499,
+    "seen": 1794516253.9771826,
+    "ast_hash": "b4a922111a0b5b04e6caf95506ca5c0a",
     "semantic_hash": ""
   },
   "vps/textos.js": {
-    "mtime": 1794514006.783724,
-    "seen": 1794514131.5169735,
-    "ast_hash": "09d152fb7ec2bdf474f7f0631a7f0eac",
+    "mtime": 1794516190.289285,
+    "seen": 1794516253.9771895,
+    "ast_hash": "03512d6497719e1a5ae11a6b4c29f1a1",
     "semantic_hash": ""
   },
   ".claude/settings.json": {
@@ -182,9 +182,9 @@
     "semantic_hash": ""
   },
   "BITACORA.md": {
-    "mtime": 1794516033.7560508,
-    "seen": 1794516038.8626447,
-    "ast_hash": "23357033d5de3e55a5ea9769260ba0bd",
+    "mtime": 1794516251.1825562,
+    "seen": 1794516253.9772112,
+    "ast_hash": "4aa8aed6e6860a3f980b04ff45928269",
     "semantic_hash": ""
   },
   "CLAUDE.md": {
@@ -218,9 +218,9 @@
     "semantic_hash": ""
   },
   "vps/LEEME.txt": {
-    "mtime": 1794516033.755392,
-    "seen": 1794516038.8626914,
-    "ast_hash": "def351ba3e5c4517b6e259e10b31b624",
+    "mtime": 1794516251.1818466,
+    "seen": 1794516253.977273,
+    "ast_hash": "f6fead1cee61278cb1cef288cb2e78b7",
     "semantic_hash": ""
   },
   "vps/banco/reglas.js": {
@@ -242,9 +242,9 @@
     "semantic_hash": ""
   },
   "vps/asistente.js": {
-    "mtime": 1794515897.6955247,
-    "seen": 1794516038.8624992,
-    "ast_hash": "1f4ad237fcb97f2d983105c52af53add",
+    "mtime": 1794516190.2887285,
+    "seen": 1794516253.9768927,
+    "ast_hash": "0496ad9cad0c9cad418d8d71c91d0b43",
     "semantic_hash": ""
   },
   "vps/oido/oido.py": {

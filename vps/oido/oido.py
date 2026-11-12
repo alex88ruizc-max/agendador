@@ -15,8 +15,26 @@ PRUEBA = os.environ.get('OIDO_PRUEBA') == '1'      # banco de pruebas: sin model
 modelo, error = None, ''
 listo, turno = threading.Event(), threading.Lock()   # un audio a la vez (el VPS es compartido)
 
+def parche_av():
+    # 3.17: faster-whisper llama av.open(..., metadata_errors=...) y PyAV ≥ 16 ya no tiene esa opción → se quita sola
+    try:
+        import av, inspect
+        orig = av.open
+        try: inspect.signature(orig).bind_partial('x', metadata_errors='ignore'); return
+        except TypeError: pass
+        except ValueError: pass
+        def abrir(*a, **k):
+            k.pop('metadata_errors', None)
+            return orig(*a, **k)
+        av.open = abrir
+        import faster_whisper.audio as fa
+        fa.av.open = abrir
+    except Exception as e:
+        print('parche av:', e, flush=True)
+
 def cargar():
     global modelo, error
+    parche_av()
     if PRUEBA: listo.set(); return
     try:
         from faster_whisper import WhisperModel

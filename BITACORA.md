@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-3.16** · Página **2026-11-12f** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-12** · Mary **agendador-ia-3.17** · Página **2026-11-12f** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -113,6 +113,12 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-12 · agendador-ia-3.17 · arreglo del oído
+- /registro real: «🎤 el oído no pudo: open() got an unexpected keyword argument 'metadata_errors'». Reproducido aquí: faster-whisper
+  1.1.1 y 1.2.1 llaman `av.open(..., metadata_errors=...)`, que PyAV 19 ya no tiene. `vps/oido/Dockerfile`: faster-whisper 1.2.1 +
+  av 15.1.0 (decodifica bien un ogg/opus de prueba); `oido.py` `parche_av()` quita la opción si PyAV no la acepta (probado con av 16).
+- El audio venía del chat …6726 (= número de la tienda de Epic usado como cliente de prueba). No se tocó nada de Epic.
 
 ### 2026-11-12 · agendador-ia-3.16 · «ya tienes una cita activa» con cancelar
 - `preguntarOtra`: 4 opciones (`otra:si`, `otra:cambiar`, `otra:cancelar`, `otra:no`). `T.cancelada` robusto si la respuesta no trae la cita.
