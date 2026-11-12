@@ -1,0 +1,135 @@
+🗓️ AGENDADOR IA · agendador-ia-2.7   (por dentro atiende «Mary», la recepcionista)
+=====================================================================================================
+🚫 REGLA UNIVERSAL (manda sobre todo lo demás, para Alex, para Claude y para cualquier script de este paquete):
+   EL AGENDADOR NO MODIFICA NINGÚN OTRO PROYECTO. NUNCA. (Epic, Mary de Epic, Luisa, epic-tiendas, ni ningún otro.)
+   · SÍ se puede COPIAR: leer su código o su versión y hacer una copia propia aparte, con su propio nombre.
+   · NO se puede TOCAR: ni sus contenedores, ni sus redes, ni sus avisos (webhooks), ni sus sesiones de WhatsApp,
+     ni sus archivos, ni su base de datos, ni reiniciarlo, ni unirlo a nada del agendador.
+   · Si algo del agendador necesita algo de otro proyecto → se hace una COPIA del agendador, jamás se usa el original.
+   · Si alguna vez un script o una instrucción rompe esta regla, es un error: se deshace y se corrige.
+
+⚖️ TODO APARTE DE EPIC. Vive en ~/agendador con su PROPIO Evolution (puerto 8095), su base de datos, su red «agendador-red»
+   y su PROPIO bot de Telegram (el cartero), y desde la 2.6 su PROPIO WAHA (waha-agendador). No usa, no reinicia y no modifica nada de Epic.
+   De Epic solo se LEE una vez qué versión de Evolution usas, para usar la misma que ya te funciona.
+
+🔁 TODO SE ACTUALIZA POR TELEGRAM (igual que Epic, con tu bot nuevo):
+   agendador-ia-X.zip    → el VPS (Mary) + el Apps Script del agendador en Google (misma URL /exec)
+                           Banco de pruebas primero: si falla NO instala; si no arranca, vuelve sola a la versión anterior.
+   agendador-web-X.zip   → la página tuagenda.vip (GitHub), con respaldo de lo anterior en una rama «respaldo-fecha»
+   /estado · /registro   → cómo está Mary y qué hizo
+
+INSTALAR (UNA SOLA VEZ; después ya no vuelves a entrar al VPS)
+  1. Desde tu PC (PowerShell) sube el zip:      scp -i $k agendador-ia-2.5.zip $d:~
+  2. Entra al VPS (ssh) y corre:
+        mkdir -p ~/agendador && unzip -o ~/agendador-ia-2.5.zip -d ~/agendador && bash ~/agendador/instalar.sh
+     Te va pidiendo, en orden:
+       a) la URL del servidor del agendador (Enter = la de tuagenda.vip)
+       b) tus números de prueba (con 57). Mary SOLO les responde a ellos hasta que digas que abra a todos.
+       c) TELEGRAM: crea un bot nuevo en @BotFather (/newbot), pega su token y escríbele «hola».
+          (Opcional) token de GitHub para subir la página: github.com › Settings › Developer settings › Fine-grained tokens ›
+          solo el repo alex88ruizc-max/agendador › Contents: Read and write.
+       d) GOOGLE: activa «API de Google Apps Script» en https://script.google.com/home/usersettings , abre el enlace que sale,
+          «Permitir», y pega la dirección de la página que NO carga (localhost…). Luego pega el «ID de la secuencia de comandos»
+          (Apps Script del agendador › ⚙️ Configuración del proyecto).
+  3. Conecta el WhatsApp de cada negocio:      bash ~/agendador/conectar.sh studio-lua 573001234567
+     Sale un código de 8 letras → en ese WhatsApp: ⋮ › Dispositivos vinculados › Vincular › «Vincular con número de teléfono».
+  4. (Opcional) Correo de pagos del negocio: en ~/agendador/negocios.json agrega "correo" (mira negocios.json.ejemplo).
+     Con Gmail usa una «contraseña de aplicación». Mary relee el archivo sola.
+
+QUÉ HACE MARY (sin IA: siempre responde lo mismo, claro)
+  · Escribe alguien → si su número TIENE cita: se la muestra con el link «Mi cita» (cambiar/cancelar) y, si falta, el abono exacto.
+                      si NO tiene: el link para agendar y cuántos cupos quedan hoy.
+    No llena de mensajes: si el dueño escribe a mano en un chat, se calla ahí 15 min; si el cliente ya tiene su cita confirmada,
+    solo responde si saluda o habla de la cita (confirmar, cancelar, cambiar, pago, hora…).
+  · CAPTURA del pago → la cita queda «en revisión» y al dueño le llega por TELEGRAM con ✅ Aprobar / ❌ Rechazar;
+    cuando decide, Mary le avisa al cliente por WhatsApp.
+  · CORREO del banco del negocio → si hay UNA cita esperando ese monto (y el nombre del pagador coincide), la confirma sola.
+    Si no está segura, le avisa al dueño y NO confirma. El buzón solo se LEE.
+  · ESTADOS con los cupos reales: «Cupos de hoy» 7:30 a. m. y «Tu semana» los lunes 7:00 a. m.
+  · RECORDATORIO por WhatsApp 2 h antes de cada cita confirmada.
+
+MODOS (en ~/agendador/agendador-ia.env, luego: cd ~/agendador && sudo docker compose up -d)
+  MARY_MODO=prueba   solo tus números: mensajes, avisos de pago, recordatorios y estados (los estados solo los ven ellos)
+  MARY_MODO=todos    todos los clientes
+  MARY_MODO=apagado  no responde, no lee correos, no publica
+
+PROBAR EN EL VPS
+  curl -s 127.0.0.1:3070/salud          ·   curl -s 127.0.0.1:3070/registro?n=10
+  curl -s "127.0.0.1:3070/vista?bid=studio-lua&tipo=hoy" -o hoy.png        (ver el estado SIN publicarlo; tipo=semana)
+  curl -s -X POST "127.0.0.1:3070/publicar?bid=studio-lua&tipo=hoy"        (publicarlo ya)
+
+AJUSTES POR NEGOCIO (negocios.json)
+  "recordatorioMin": 120     ·   "estados": { "activo": true, "hoy": "07:30", "semana": "07:00", "semanaDia": 1 }
+  En Firestore (settings/general del negocio) maryAutoCaptura: true → la captura confirma al instante y el dueño revisa después.
+
+NOVEDADES 2.7
+  · BANCO DE ESCENARIOS (como el de Epic, pero propio): 18 conversaciones reales simuladas (WAHA y Evolution, número oculto,
+    modo prueba, dueño escribe, cita confirmada, foto del pago, Google sin cupo…). Si una falla, la versión NO se instala.
+  · BANCO DE LA PÁGINA: antes de subir un agendador-web-*.zip el cartero lo revisa (errores en los .js, versiones ?v= mezcladas,
+    archivos que faltan, config.js). Si algo falla, NO sube nada y la página sigue como estaba.
+
+NOVEDADES 2.6
+  · Regla universal (arriba): el agendador no toca ningún otro proyecto.
+  · WAHA PROPIO del agendador (waha-agendador): copia de la versión que ya usas, pero aparte, con su propia clave y sesiones.
+    configurar-waha.sh ya NO usa el WAHA de Epic: lo saca de la red del agendador (sin reiniciarlo), enciende el propio y te da
+    el código de 8 letras para vincular el WhatsApp del negocio.
+  · Mary deja escrito en /registro POR QUÉ se calla (modo prueba, negocio no registrado, el dueño escribió, ya respondió…).
+  · Mary encuentra el número real cuando WhatsApp lo oculta (…@lid) con WAHA.
+
+NOVEDADES 2.5
+  · Mary gasta mucho menos cupo de Google: solo pregunta por capturas cuando hay alguna esperando (antes cada 45 s todo el día)
+    y los recordatorios se revisan cada 15 min de 5 a. m. a 9:30 p. m. (antes cada 5 min, día y noche).
+
+NOVEDADES 2.4
+  · mudar-google.sh: arreglo «Project settings not found»; recuerda el proyecto ya creado (o: bash mudar-google.sh <ID>).
+
+NOVEDADES 2.3
+  · Arreglo «Google: no pude bajar el proyecto» (archivos duplicados .gs/.js). Ahora muestra el error real.
+
+NOVEDADES 2.2
+  · Mary también funciona con WAHA (no solo Evolution): recibe, responde, fotos de pago, estados y conexión desde el panel.
+    Configurar:  bash ~/agendador/configurar-waha.sh  (detecta tu WAHA solo y AGREGA el aviso a la sesión, sin quitar los que tenga)
+
+NOVEDADES 2.1
+  · mudar-google.sh: arreglo de «Conflicting files found» y reutiliza el proyecto ya creado en la cuenta nueva.
+
+NOVEDADES 2.0
+  · mudar-google.sh: pasa el servidor del agendador (Apps Script) a otro Gmail con su propio cupo, sin mover la base de datos.
+
+NOVEDADES 1.9
+  · /apk en el bot: el VPS genera la app de Android (PWABuilder), la firma con su llave (respaldo por Telegram) y la publica en tuagenda.vip/tu-agenda.apk
+
+NOVEDADES 1.8
+  · Mary se calla 15 min (no 12 h) cuando el dueño escribe. Con cita confirmada, solo responde a saludos o a temas de la cita.
+  · Responde saludos («hola», «buenas»…). No repite lo mismo en 15 min.
+
+NOVEDADES 1.7
+  · Si piden el código y NO vinculan en 15 min, se borra la conexión vacía de Evolution y el panel dice «el código venció».
+  · El negocio solo se activa para Mary cuando vincula de verdad (antes se activaba al pedir el código).
+
+NOVEDADES 1.6
+  · Correos a los clientes con diseño premium y sin «������» (los emojis del nombre ya no se rompen). Archivo gs/correo.gs.
+
+NOVEDADES 1.5
+  · Cada dueño conecta su WhatsApp DESDE SU PANEL con un código de 8 letras (iPhone y Android). El VPS no se abre a internet:
+    el panel deja el pedido en Google y el VPS lo recoge cada 5 s. Al vincular, Mary empieza a atender sola.
+
+NOVEDADES 1.4
+  · App: el cartero sube sw.js, .nojekyll, la APK (tu-agenda.apk) y su verificación (assetlinks.json) directo.
+
+NOVEDADES 1.3
+  · El cartero sube cualquier hoja de estilos de la página (premium.css del tema nuevo).
+
+NOVEDADES 1.2
+  · Puerto 3070 en el VPS (el 3060 lo usa otro servicio). Por dentro sigue igual.
+
+NOVEDADES 1.1 (revisión independiente: 13 hallazgos, todos corregidos con prueba)
+  · En modo prueba ya NADA le llega a clientes reales (avisos de pago, recordatorios, estados). Antes los avisos de pago sí.
+  · Ya no toma como «pago recibido» un pago que TÚ hiciste, un «recibió tu transferencia» ni promociones de «gana hasta $…».
+  · El nombre del pagador se compara por palabras completas («Ana» ≠ «Juliana»); si no coincide con nadie, decide el dueño.
+  · Un corte del correo ya no tumba el servicio; un correo con error no se reintenta cada minuto.
+  · Dos mensajes seguidos del mismo chat ya no producen dos respuestas; varias fotos del mismo pago no dicen «no tienes cita».
+  · Un recordatorio que falla no frena los demás ni se repite cada 5 min. El eco de Mary ya no la silencia.
+  · Si una versión falla el banco de pruebas, la imagen también vuelve a la buena.
+  · Estados: «Hoy» solo cuando es hoy; máximo 9 horas visibles («y N horas más»).
+  · Negocio suspendido: no manda recordatorios ni estados.

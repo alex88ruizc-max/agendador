@@ -1,0 +1,4 @@
+vps/node_modules/
+graphify-out/
+*.png
+*.apk

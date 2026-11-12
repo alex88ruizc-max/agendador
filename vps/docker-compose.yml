@@ -1,0 +1,57 @@
+# 👩‍💼 MARY DEL AGENDADOR (va en ~/agendador). TODO APARTE DE EPIC: su propio Evolution, su propia base de datos y su propia red.
+#    No usa ni toca el Evolution, el WAHA, la red, los archivos ni los servicios de Epic (ni de ningún otro proyecto).
+#    2.6: su PROPIO WAHA (waha-agendador). Solo arranca cuando corres configurar-waha.sh.
+name: agendador-ia
+services:
+  agendador-ia:
+    build: .
+    container_name: agendador-ia
+    restart: always
+    logging: { driver: json-file, options: { max-size: "20m", max-file: "3" } }
+    env_file: agendador-ia.env
+    environment: { PUERTO: "3060", PUBLICO: "http://agendador-ia:3060", EVO_URL: "http://evolution-agendador:8080", TZ: America/Bogota }
+    volumes: ["./datos:/datos", "./negocios.json:/config/negocios.json"]
+    ports: ["127.0.0.1:3070:3060"]
+    mem_limit: 300m
+    cpus: 0.5
+    depends_on: [evolution-agendador]
+    networks: [agenda]
+  evolution-agendador:
+    image: ${EVO_IMAGEN}
+    container_name: evolution-agendador
+    restart: always
+    logging: { driver: json-file, options: { max-size: "20m", max-file: "3" } }
+    env_file: evolution-agendador.env
+    volumes: ["evo_instancias:/evolution/instances"]
+    ports: ["127.0.0.1:8095:8080"]
+    mem_limit: 700m
+    depends_on: [postgres-agendador]
+    networks: [agenda]
+  postgres-agendador:
+    image: postgres:16-alpine
+    container_name: postgres-agendador
+    restart: always
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "2" } }
+    environment: { POSTGRES_USER: evolution, POSTGRES_PASSWORD: "${PG_CLAVE}", POSTGRES_DB: evolution }
+    volumes: ["pg_datos:/var/lib/postgresql/data"]
+    mem_limit: 250m
+    networks: [agenda]
+  waha-agendador:
+    image: ${WAHA_IMAGEN:-devlikeapro/waha:arm}
+    container_name: waha-agendador
+    restart: always
+    logging: { driver: json-file, options: { max-size: "20m", max-file: "3" } }
+    environment:
+      WAHA_API_KEY: "${WAHA_CLAVE:-}"
+      WHATSAPP_DEFAULT_ENGINE: GOWS
+      WAHA_BASE_URL: "http://waha-agendador:3000"
+      WAHA_DASHBOARD_ENABLED: "false"
+      WHATSAPP_SWAGGER_ENABLED: "false"
+      WAHA_PRINT_QR: "false"
+      TZ: America/Bogota
+    volumes: ["waha_sesiones:/app/.sessions"]
+    ports: ["127.0.0.1:3080:3000"]
+    mem_limit: 600m
+    networks: [agenda]
+volumes: { evo_instancias: {}, pg_datos: {}, waha_sesiones: {} }
+networks: { agenda: { name: agendador-red } }

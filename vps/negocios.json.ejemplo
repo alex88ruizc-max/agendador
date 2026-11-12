@@ -1,0 +1,13 @@
+[
+  {
+    "bid": "studio-lua",
+    "instancia": "studio-lua",
+    "activo": true,
+    "recordatorioMin": 120,
+    "estados": { "activo": true, "hoy": "07:30", "semana": "07:00", "semanaDia": 1 },
+    "correo": {
+      "host": "imap.gmail.com", "port": 993, "user": "pagos.del.negocio@gmail.com", "pass": "contraseña-de-aplicacion-de-16-letras",
+      "remitentes": ["nequi", "bancolombia", "daviplata"]
+    }
+  }
+]
