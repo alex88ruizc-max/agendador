@@ -150,3 +150,25 @@ test('3.4 · Categorías automáticas (servicios sin categoría): El Barba queda
     for (const n of Object.keys(esperado)) assert.equal(panel(n), srv(n), 'panel ≠ servidor en «' + n + '»');
   }
 });
+
+test('3.7 · Cita rápida SIN WhatsApp (pasar citas de antes): se guarda con el nombre y sin WhatsApp; con WhatsApp va la función de siempre', { skip: !require('fs').existsSync(GS_MARY) && 'dentro de la imagen no está gs/' }, () => {
+  const src = require('fs').readFileSync(GS_MARY, 'utf8');
+  const commits = [], llamadasOriginal = [];
+  const G = {
+    ACTIONS: { createManualAppointment: (b) => { llamadasOriginal.push(b); return { original: true }; } }, PUBLIC_ACTIONS: {},
+    getAdmin: () => ({ role: 'owner' }), loadSettings: () => ({ slotDurationMinutes: 30 }),
+    computeItems: () => ({ items: [{ id: 'c1', name: 'Corte' }], totalMinutes: 40, totalCOP: 20000 }), occupiedFor: (m) => 45,
+    loadServices: () => [], loadStaff: () => [{ _id: 's1', name: 'Lina' }], checkSlot: () => {}, withLock: (fn) => fn(),
+    reserveLocks: () => ({ all: ['l1'], create: ['l1'] }), newCode: () => 'R-MIGRA1', wCreate: (p, d) => ({ p, d }), lockWrites: () => [], incWrites: () => [], addDelta: () => ({}),
+    commit: (w) => commits.push(...w), bp: (x) => x, mstr: () => '15:45', tmin: () => 900, mkDate: () => new Date(), tgEventOn: () => false, tgNotify: () => {}, aptText: () => '',
+    emailClient: () => {}, aptPublic: (a) => a, fail: (m) => { const e = new Error(m); e.userMessage = m; throw e; }, console
+  };
+  const fn = new Function(...Object.keys(G), src + '\nreturn ACTIONS;');
+  const A = fn(...Object.values(G));
+  const base = { mainId: 'c1', staffId: 's1', date: '2026-11-20', time: '15:00', paymentMethod: 'local' };
+  assert.deepEqual(A.createManualAppointment(Object.assign({ customer: { whatsapp: '3001234567', firstName: 'Ana' } }, base), { uid: 'u' }), { original: true });
+  const r = A.createManualAppointment(Object.assign({ customer: { whatsapp: '', firstName: 'Pedro Pérez' } }, base), { uid: 'u' });
+  assert.equal(r.appointment.code, 'R-MIGRA1'); assert.equal(r.appointment.customer.whatsapp, ''); assert.equal(r.appointment.customer.firstName, 'Pedro Pérez');
+  assert.equal(llamadasOriginal.length, 1, 'sin WhatsApp no pasa por la función que lo exige');
+  assert.throws(() => A.createManualAppointment(Object.assign({ customer: { whatsapp: '', firstName: '' } }, base), { uid: 'u' }), /nombre o el WhatsApp/);
+});

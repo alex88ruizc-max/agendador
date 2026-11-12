@@ -14,7 +14,7 @@
  * Instalación: pega este archivo, ejecuta activarMary() una vez, copia la clave que sale en el registro
  * y ponla en el mary.env del VPS (MARY_KEY). Vuelve a implementar la aplicación web (Implementar > Administrar > editar > Nueva versión).
  */
-const MARY_VERSION = 'agendador-ia-3.4';
+const MARY_VERSION = 'agendador-ia-3.7';
 
 // Se registra como acción pública del servidor (sin sesión: entra con la clave de Mary).
 // ⚠️ Este archivo debe quedar DEBAJO del archivo principal en la lista de archivos de Apps Script (los nuevos quedan al final: así está bien).
@@ -508,6 +508,52 @@ function maryCrear_(st, b) {
     const m = String((e && (e.userMessage || e.message)) || e);
     return { ok: false, motivo: /tomado|ya no está disponible|fuera del horario|no alcanza/i.test(m) ? 'ocupada' : m };
   }
+}
+
+// =====================================================================
+//  3.7 · CITA RÁPIDA SIN WHATSAPP (para pasar las citas de antes): basta el nombre. Sin WhatsApp no se manda nada
+//  (ni confirmación ni recordatorio). Con WhatsApp sigue funcionando EXACTAMENTE como siempre (la función original).
+// =====================================================================
+try {
+  const maryCitaManualOriginal_ = ACTIONS.createManualAppointment;
+  ACTIONS.createManualAppointment = function (b, auth) {
+    const tel = String(((b || {}).customer || {}).whatsapp || '').replace(/\D/g, '');
+    if (tel.length >= 10) return maryCitaManualOriginal_(b, auth);
+    return maryCitaManualSinWa_(b, auth);
+  };
+} catch (e) { console.error('Mary: el archivo "mary" quedó ANTES del principal.'); }
+function maryCitaManualSinWa_(b, auth) {
+  const admin = getAdmin(auth);
+  if (admin.role !== 'owner' && b.staffId !== admin.staffId) fail('Solo puedes agendar citas en tu propia agenda.');
+  const c = b.customer || {}, nombre = String(c.firstName || '').trim();
+  if (nombre.length < 2) fail('Escribe el nombre o el WhatsApp del cliente.');
+  const st = loadSettings();
+  const sel = computeItems(loadServices(), b.mainId, b.extraIds);
+  const occ = occupiedFor(sel.totalMinutes, Number(st.slotDurationMinutes || 30));
+  const staff = loadStaff().filter(function (s) { return s._id === b.staffId; })[0];
+  if (!staff) fail('Profesional no válido.');
+  checkSlot(st, b.date, b.time, occ, false, staff);
+  const paid = b.paymentMethod === 'local' ? 0 : Math.max(0, Math.min(Number(b.depositPaidCOP || 0), sel.totalCOP));
+  const apt = withLock(function () {
+    const r = reserveLocks(staff._id, b.date, b.time, occ, { allowBreak: !!b.force });
+    const code = newCode(), now = new Date();
+    const a = {
+      code: code, customerUid: null,
+      customer: { firstName: nombre, lastName: String(c.lastName || '').trim(), whatsapp: '', email: String(c.email || '').trim() },
+      staffId: staff._id, staffName: staff.name, items: sel.items, totalCOP: sel.totalCOP, totalMinutes: sel.totalMinutes,
+      occupiedMinutes: occ, depositCOP: paid, balanceDueCOP: sel.totalCOP - paid,
+      date: b.date, startTime: b.time, endTime: mstr(tmin(b.time) + occ), startAt: mkDate(b.date, b.time), lockIds: r.all,
+      status: 'confirmed',
+      payment: { mode: 'manual', method: b.paymentMethod || 'local', amountCOP: paid, status: paid > 0 ? 'approved' : 'none', proofFileId: '', proofUrl: '', reference: '' },
+      holdExpiresAt: null, rescheduleCount: 0, history: [{ action: 'created_manual', at: now.toISOString(), by: auth.uid, sinWhatsapp: true }],
+      source: 'manual', createdBy: auth.uid, createdAt: now, updatedAt: now, reminderSent: false
+    };
+    commit([wCreate(bp('appointments/' + code), a)].concat(lockWrites(r, staff._id, b.date, 'booked', code, null)).concat(incWrites(addDelta({}, b.date, staff._id, r.create.length))));
+    return a;
+  });
+  try { if (tgEventOn('panelApt')) tgNotify([apt.staffId], '📝 <b>CITA AGENDADA DESDE EL PANEL</b> (sin WhatsApp)\n' + aptText(apt)); } catch (e) { console.error(e); }
+  if (apt.customer.email) emailClient(apt, 'Tu cita está confirmada', 'Agendamos tu cita. Presenta tu número de reserva al llegar.');
+  return { appointment: aptPublic(apt) };
 }
 
 // =====================================================================

@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-3.6** · Página **2026-11-12c** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-12** · Mary **agendador-ia-3.7** · Página **2026-11-12d** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -113,6 +113,12 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-12 · agendador-ia-3.7 · cita rápida sin WhatsApp
+- `mary.gs`: envuelve `ACTIONS.createManualAppointment`: con WhatsApp (≥10 dígitos) usa la ORIGINAL; sin WhatsApp usa
+  `maryCitaManualSinWa_` (exige nombre, guarda `whatsapp: ''` → sin recordatorios ni mensajes).
+- `admin.js` (cita rápida): WhatsApp opcional, nombre obligatorio si no hay WhatsApp, botón «Agendar», selector «Otra fecha».
+- Banco: 82 pruebas (la nueva carga `mary.gs` real con un Google simulado).
 
 ### 2026-11-12 · agendador-ia-3.6 · agrupar mensajes y no repetir
 - Prueba real (captura de Alex): las LISTAS ya salen («Ver opciones» ✅). Pero 3 mensajes seguidos dieron 2 respuestas y
