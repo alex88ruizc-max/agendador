@@ -1,20 +1,20 @@
 {
   "admin.js": {
-    "mtime": 1794510463.6556299,
-    "seen": 1794510502.5496533,
-    "ast_hash": "34f544c230a5531adf1703b89eabd30a",
+    "mtime": 1794511723.9520397,
+    "seen": 1794511728.8773007,
+    "ast_hash": "5cd9a6a37fe603ec39458f2857f48aeb",
     "semantic_hash": ""
   },
   "app.js": {
-    "mtime": 1794510463.6525285,
-    "seen": 1794510502.5496633,
-    "ast_hash": "a03555be43f68549c8735b9b80c96851",
+    "mtime": 1794511723.950288,
+    "seen": 1794511728.8773093,
+    "ast_hash": "7cc76f7282051b2cbc74375cd6b4e5c8",
     "semantic_hash": ""
   },
   "common.js": {
-    "mtime": 1794510463.6550326,
-    "seen": 1794510502.5496707,
-    "ast_hash": "39a6c49f065bb41efc704da88257af7e",
+    "mtime": 1794511723.9516795,
+    "seen": 1794511728.877316,
+    "ast_hash": "6dd4b7983f2de4f3cabd755b03befb24",
     "semantic_hash": ""
   },
   "config.js": {
@@ -24,9 +24,9 @@
     "semantic_hash": "de5f72de928795211bae338f5997befb"
   },
   "super.js": {
-    "mtime": 1794510463.6537082,
-    "seen": 1794510502.5496895,
-    "ast_hash": "7b6be248bf44747364bb62902fc5595a",
+    "mtime": 1794511723.9509172,
+    "seen": 1794511728.8773282,
+    "ast_hash": "5c617d95d671bd2453c6ed0d83e4d125",
     "semantic_hash": ""
   },
   "sw.js": {
@@ -60,9 +60,9 @@
     "semantic_hash": ""
   },
   "vps/banco/pruebas.js": {
-    "mtime": 1794508823.581358,
-    "seen": 1794509116.0141764,
-    "ast_hash": "1bd689c68739c407e71497d57560427e",
+    "mtime": 1794511659.371222,
+    "seen": 1794511728.8773696,
+    "ast_hash": "ff2ae68a3379a4ea22621292e5d170cf",
     "semantic_hash": ""
   },
   "vps/banco/web.js": {
@@ -115,9 +115,9 @@
     "language": "language=.js"
   },
   "vps/gs/mary.gs": {
-    "mtime": 1794509929.005573,
-    "seen": 1794510502.5497937,
-    "ast_hash": "1e3bf3e7568a2448a6f4ab9b26981c8d",
+    "mtime": 1794511610.6078866,
+    "seen": 1794511728.877429,
+    "ast_hash": "d4e889fe6633a9ed91483ac32d12708b",
     "semantic_hash": "",
     "language": "language=.js"
   },
@@ -152,9 +152,9 @@
     "semantic_hash": "5009abfe30c8d8ffe5acf888999b674b"
   },
   "vps/principal.js": {
-    "mtime": 1794511525.6474419,
-    "seen": 1794511541.682138,
-    "ast_hash": "200905013321b8fcf3bae279f58a6005",
+    "mtime": 1794511626.82993,
+    "seen": 1794511728.877462,
+    "ast_hash": "2cbc0881bb3369a039ec231f1a7ea697",
     "semantic_hash": ""
   },
   "vps/textos.js": {
@@ -182,9 +182,9 @@
     "semantic_hash": ""
   },
   "BITACORA.md": {
-    "mtime": 1794511539.3186185,
-    "seen": 1794511541.6821592,
-    "ast_hash": "00f71ca66c309e4cf9ef9decde10f390",
+    "mtime": 1794511724.230381,
+    "seen": 1794511728.877483,
+    "ast_hash": "c029e1e7c7d7f3b09d46bad8059a2f4f",
     "semantic_hash": ""
   },
   "CLAUDE.md": {
@@ -194,15 +194,15 @@
     "semantic_hash": ""
   },
   "admin.html": {
-    "mtime": 1794510463.6519923,
-    "seen": 1794510502.5498629,
-    "ast_hash": "43b33c99a0396bed9daaa17d2dafa24c",
+    "mtime": 1794511723.9500346,
+    "seen": 1794511728.8774986,
+    "ast_hash": "332404b10416990f8536fba033efe88d",
     "semantic_hash": ""
   },
   "index.html": {
-    "mtime": 1794510463.6544712,
-    "seen": 1794510502.549868,
-    "ast_hash": "27b2433dfb911be9dbd01be8542e1aa9",
+    "mtime": 1794511723.9513526,
+    "seen": 1794511728.8775034,
+    "ast_hash": "bcbe8502a3fac928c4ad4f653de0b453",
     "semantic_hash": ""
   },
   "privacidad.html": {
@@ -212,15 +212,15 @@
     "semantic_hash": ""
   },
   "super.html": {
-    "mtime": 1794510463.6511405,
-    "seen": 1794510502.5498784,
-    "ast_hash": "8fcd1160ae4eb0cdc18c074afbfb4f83",
+    "mtime": 1794511723.9496145,
+    "seen": 1794511728.8775136,
+    "ast_hash": "b38f98b12d0abcb116550da4255e5d5b",
     "semantic_hash": ""
   },
   "vps/LEEME.txt": {
-    "mtime": 1794511539.3180103,
-    "seen": 1794511541.6822016,
-    "ast_hash": "d7d86f342c1b8c0bdc49e566d2eba1e3",
+    "mtime": 1794511724.2298884,
+    "seen": 1794511728.8775249,
+    "ast_hash": "47c6b6c856eaac7b6c51b3bce56a17ff",
     "semantic_hash": ""
   },
   "vps/banco/reglas.js": {

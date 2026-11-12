@@ -135,3 +135,18 @@ test('2.6 · WAHA con número oculto (…@lid): encuentra el número real y no c
   const sin = P.leerMensaje(P.deWaha({ event: 'message', session: 'default', me: { id: '573110000000@c.us' }, payload: { id: 'L2', from: '999@lid', body: 'hola', _data: { Info: { Recipient: '573110000000@s.whatsapp.net' } } } }));
   assert.equal(sin.tel, '', 'el número del negocio nunca se toma como el del cliente');
 });
+
+const GS_MARY = require('path').join(__dirname, '..', 'gs', 'mary.gs');
+test('3.4 · Categorías automáticas (servicios sin categoría): El Barba queda en Cortes, Barba, Cejas, Diseños y Combos — panel y servidor con la MISMA regla', { skip: !require('fs').existsSync(GS_MARY) && 'dentro de la imagen no está gs/' }, () => {
+  const fs = require('fs'), path = require('path');
+  const gs = fs.readFileSync(GS_MARY, 'utf8');
+  const srv = new Function(gs.match(/function maryCatAuto_[\s\S]*?\n}\n/)[0] + '; return maryCatAuto_;')();
+  const web = path.join(__dirname, '..', '..', 'common.js');
+  const esperado = { 'Cejas': 'Cejas', 'Diseño o línea': 'Diseños', 'Corte + barba': 'Combos', 'Corte de tijera': 'Cortes', 'Corte clasico': 'Cortes', 'Corte + cejas': 'Combos', 'Arreglo de barba': 'Barba', 'Uñas en gel': 'Uñas', 'Lifting de pestañas': 'Pestañas', 'Keratina': 'Cabello' };
+  for (const [n, c] of Object.entries(esperado)) assert.equal(srv(n), c, n);
+  if (fs.existsSync(web)) {   // en el repositorio (en el VPS solo está el servidor)
+    const src = fs.readFileSync(web, 'utf8').match(/export function categoriaAuto[\s\S]*?\n}\n/)[0].replace('export ', '');
+    const panel = new Function(src + '; return categoriaAuto;')();
+    for (const n of Object.keys(esperado)) assert.equal(panel(n), srv(n), 'panel ≠ servidor en «' + n + '»');
+  }
+});

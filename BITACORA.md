@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-3.3** · Página **2026-11-12b** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-12** · Mary **agendador-ia-3.4** · Página **2026-11-12c** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -113,6 +113,14 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-12 · agendador-ia-3.4 · categorías
+- Prueba real: la lista mostraba todo junto en «Servicios» porque los servicios de El Barba no tenían categoría (error mío: dije que
+  las categorías «ya existían» sin revisar los datos del negocio).
+- `common.js` `categoriaAuto(nombre)` = `mary.gs` `maryCatAuto_` (la misma regla; una prueba compara las dos).
+- `maryCatalogo_`: servicio sin categoría → categoría automática. Panel › Servicios: botón «Organizar por categorías» (las guarda).
+  Asistente de inicio (`admin.js`): los servicios nuevos se crean con su categoría.
+- Banco: 71 pruebas (la de categorías se salta dentro de la imagen, donde no está `gs/`).
 
 ### 2026-11-12 · agendador-ia-3.3 · listas de WhatsApp
 - Probado en el celular real: la lista salía como texto con números. Causa (leída en el código de WAHA, `chatting.list.dto.ts`):

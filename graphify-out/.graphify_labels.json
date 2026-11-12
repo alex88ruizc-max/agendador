@@ -1,7 +1,6 @@
 {
   "3": "admin.js",
   "4": "common.js",
-  "5": "estado.js",
   "9": "cartero.py",
   "10": "mary.gs",
   "11": "newStory",
@@ -13,7 +12,6 @@
   "22": "evolution-agendador",
   "26": "options",
   "27": "waha-agendador",
-  "28": "openStoryViewer",
   "30": "actualizar-google.sh script",
   "31": "correo.gs",
   "32": "instalar.sh script",

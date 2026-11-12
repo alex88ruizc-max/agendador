@@ -14,7 +14,7 @@
  * Instalación: pega este archivo, ejecuta activarMary() una vez, copia la clave que sale en el registro
  * y ponla en el mary.env del VPS (MARY_KEY). Vuelve a implementar la aplicación web (Implementar > Administrar > editar > Nueva versión).
  */
-const MARY_VERSION = 'agendador-ia-3.1';
+const MARY_VERSION = 'agendador-ia-3.4';
 
 // Se registra como acción pública del servidor (sin sesión: entra con la clave de Mary).
 // ⚠️ Este archivo debe quedar DEBAJO del archivo principal en la lista de archivos de Apps Script (los nuevos quedan al final: así está bien).
@@ -392,10 +392,24 @@ function maryServicios_() {
   return loadServices().filter(function (s) { return s.active !== false; })
     .sort(function (a, b) { return (a.order || 99) - (b.order || 99) || String(a.name).localeCompare(String(b.name)); });
 }
+// 3.4: si el dueño no le puso categoría a un servicio, se le sugiere una por su nombre (misma regla que el panel: categoriaAuto)
+function maryCatAuto_(nombre) {
+  const n = String(nombre || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  if (/\+|\bcombo\b|\by\b.*\b(barba|ceja|corte)/.test(n)) return 'Combos';
+  if (/barba/.test(n)) return 'Barba';
+  if (/ceja/.test(n)) return 'Cejas';
+  if (/pestan|lifting/.test(n)) return 'Pestañas';
+  if (/disen|linea|tatuaje capilar/.test(n)) return 'Diseños';
+  if (/una|manicur|pedicur|semiperman|acril|gel|esmalt|press on/.test(n)) return 'Uñas';
+  if (/masaj|facial|limpieza|spa|depil|cera/.test(n)) return 'Spa';
+  if (/tinte|color|mechas|balayage|keratin|alisad|cepillad|peinad|tratamiento|ondul/.test(n)) return 'Cabello';
+  if (/corte|tijera|degrad|fade|motil|rapad|cabello|pelo|nino/.test(n)) return 'Cortes';
+  return 'Otros';
+}
 function maryCatalogo_(st) {
   const cats = {}, orden = [];
   maryServicios_().forEach(function (s) {
-    const c = String(s.category || '').trim() || 'Servicios';
+    const c = String(s.category || '').trim() || maryCatAuto_(s.name);
     if (!cats[c]) { cats[c] = []; orden.push(c); }
     cats[c].push({ id: s._id, nombre: s.name, precio: Number(s.priceCOP || 0), min: Number(s.minutes || 0), tipo: s.type || '' });
   });
