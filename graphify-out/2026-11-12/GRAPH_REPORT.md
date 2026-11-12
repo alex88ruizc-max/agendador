@@ -1,17 +1,17 @@
 # Graph Report - agendador  (2026-11-12)
 
 ## Corpus Check
-- 31 files · ~129,832 words
+- 31 files · ~131,228 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 13 file(s) not represented in the graph (top: (none) 7, .css 3, .ejemplo 2)
 
 ## Summary
-- 960 nodes · 2780 edges · 46 communities (41 shown, 5 thin omitted)
-- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 104 edges (avg confidence: 0.85)
+- 961 nodes · 2819 edges · 45 communities (40 shown, 5 thin omitted)
+- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 105 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `411c6643`
+- Built from commit: `1b4fae20`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -45,7 +45,6 @@
 - options
 - waha-agendador
 - toMillis
-- textos.js
 - actualizar-google.sh script
 - correo.gs
 - instalar.sh script
@@ -67,32 +66,32 @@
 3. `toast()` - 49 edges
 4. `bpath()` - 47 edges
 5. `crear()` - 38 edges
-6. `hora12()` - 34 edges
-7. `toMillis()` - 34 edges
-8. `cop()` - 34 edges
+6. `cop()` - 34 edges
+7. `hora12()` - 34 edges
+8. `toMillis()` - 34 edges
 9. `renderHome()` - 32 edges
-10. `seguir()` - 29 edges
+10. `seguir()` - 30 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `maryCupos_()` --indirect_call--> `hora12()`  [INFERRED]
   vps/gs/mary.gs → common.js
-- `onErr()` --calls--> `toast()`  [EXTRACTED]
-  admin.js → common.js
-- `start()` --calls--> `bpath()`  [EXTRACTED]
-  admin.js → common.js
-- `start()` --calls--> `setDialogBrand()`  [EXTRACTED]
-  admin.js → common.js
-- `start()` --calls--> `toMillis()`  [EXTRACTED]
-  admin.js → common.js
+- `atenderMensaje()` --calls--> `demora()`  [EXTRACTED]
+  vps/principal.js → vps/textos.js
+- `atenderMensaje()` --calls--> `fotoRecibida()`  [EXTRACTED]
+  vps/principal.js → vps/textos.js
+- `atenderMensaje()` --calls--> `fotoSinCita()`  [EXTRACTED]
+  vps/principal.js → vps/textos.js
+- `atenderMensaje()` --calls--> `problema()`  [EXTRACTED]
+  vps/principal.js → vps/textos.js
 
 ## Import Cycles
 - None detected.
 
-## Communities (46 total, 5 thin omitted)
+## Communities (45 total, 5 thin omitted)
 
 ### Community 0 - "principal.js"
 Cohesion: 0.06
-Nodes (33): AGRUPA, atendidos, _banco, BOT, BOT_DEF, BOT_LEIDO, botDesdeBase(), botNormal() (+25 more)
+Nodes (42): AGRUPA, armarEstado(), atendidos, _banco, BOT, BOT_DEF, BOT_LEIDO, botAlDia() (+34 more)
 
 ### Community 1 - "super.js"
 Cohesion: 0.09
@@ -139,8 +138,8 @@ Cohesion: 0.17
 Nodes (20): apInitials(), darkenIfLight(), drawImage(), drawOwnStory(), drawRich(), drawStory(), fitText(), hexRgba() (+12 more)
 
 ### Community 12 - "anotar"
-Cohesion: 0.22
-Nodes (23): ahoraLocal(), alEventoConexion(), anotar(), armarEstado(), arrancarRelojes(), atiende(), botAlDia(), botDe() (+15 more)
+Cohesion: 0.29
+Nodes (21): ahoraLocal(), alEventoConexion(), anotar(), arrancarRelojes(), ASIS, atiende(), cada(), escribir() (+13 more)
 
 ### Community 13 - "plansOf"
 Cohesion: 0.16
@@ -155,16 +154,16 @@ Cohesion: 0.43
 Nodes (7): guideCard(), guideDone(), guideProgress(), guideSteps(), openGuide(), stepDone(), wizPassed()
 
 ### Community 16 - "atenderPedidoWa"
-Cohesion: 0.40
-Nodes (15): asegurarInstancia(), atenderPedidoWa(), estadoInstancia(), evo(), guardarNegocio(), limpiarSinVincular(), motorBid(), numeroInstancia() (+7 more)
+Cohesion: 0.43
+Nodes (14): asegurarInstancia(), atenderPedidoWa(), estadoInstancia(), evo(), guardarNegocio(), limpiarSinVincular(), motorBid(), numeroInstancia() (+6 more)
 
 ### Community 17 - "environment"
 Cohesion: 0.29
 Nodes (7): WAHA_API_KEY, WAHA_BASE_URL, WAHA_DASHBOARD_ENABLED, WAHA_PRINT_QR, WHATSAPP_DEFAULT_ENGINE, WHATSAPP_SWAGGER_ENABLED, environment
 
 ### Community 18 - "textos.js"
-Cohesion: 0.15
-Nodes (48): conNumeros(), corto(), crear(), agendar(), apartar(), aprender(), cancelarCita(), catalogo() (+40 more)
+Cohesion: 0.08
+Nodes (77): conNumeros(), corto(), crear(), agendar(), apartar(), aprender(), cancelarCita(), catalogo() (+69 more)
 
 ### Community 19 - "agendador-ia"
 Cohesion: 0.18
@@ -183,8 +182,8 @@ Cohesion: 0.20
 Nodes (10): container_name, depends_on, env_file, image, mem_limit, networks, ports, restart (+2 more)
 
 ### Community 23 - "pruebas.js"
-Cohesion: 0.11
-Nodes (17): assert, GS_MARY, INFO, test, assert, fs, NUESTROS, path (+9 more)
+Cohesion: 0.10
+Nodes (18): assert, GS_MARY, INFO, test, assert, fs, NUESTROS, path (+10 more)
 
 ### Community 24 - "handleAct"
 Cohesion: 0.22
@@ -206,10 +205,6 @@ Nodes (8): waha-agendador, container_name, image, mem_limit, networks, ports, re
 Cohesion: 0.15
 Nodes (27): activeStories(), buildRecs(), fillAsStory(), firstName(), freeTimes(), goTab(), isBusy(), isServing() (+19 more)
 
-### Community 29 - "textos.js"
-Cohesion: 0.10
-Nodes (15): asistio(), citaHecha(), conCita(), cop(), cuposDia(), duracion(), enTiempo(), estadoTxt() (+7 more)
-
 ### Community 30 - "actualizar-google.sh script"
 Cohesion: 0.47
 Nodes (4): C(), actualizar-google.sh script, actualizar.sh script, volver()
@@ -223,8 +218,8 @@ Cohesion: 0.33
 Nodes (3): instalar-cartero.sh script, instalar-google.sh script, instalar.sh script
 
 ### Community 33 - "atenderMensaje"
-Cohesion: 0.29
-Nodes (14): ASIS, atenderMensaje(), bajarMediaWaha(), escribir(), escribirLista(), escuchar(), esSinbot(), esWaha() (+6 more)
+Cohesion: 0.36
+Nodes (8): atenderMensaje(), bajarMediaWaha(), escuchar(), esSinbot(), esWaha(), frenoRobot(), mudo(), normal()
 
 ### Community 39 - "web.js"
 Cohesion: 0.13
@@ -256,7 +251,7 @@ Nodes (9): build, container_name, cpus, image, mem_limit, networks, restart, vol
 
 ## Knowledge Gaps
 - **1 isolated node(s):** `RFC-5545`
-  These have ≤1 connection - possible missing edges. (Counts symbols only; 274 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+  These have ≤1 connection - possible missing edges. (Counts symbols only; 260 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **5 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
@@ -269,7 +264,7 @@ _Questions this graph is uniquely positioned to answer:_
 - **What connects `RFC-5545` to the rest of the system?**
   _1 weakly-connected nodes found - possible missing edges._
 - **Should `principal.js` be split into smaller, more focused modules?**
-  _Cohesion score 0.05873015873015873 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.05858585858585859 - nodes in this community are weakly interconnected._
 - **Why does `maryCupos_()` connect `mary.gs` to `app.js`?**
   _High betweenness centrality (0.045) - this node is a cross-community bridge._
 - **Should `super.js` be split into smaller, more focused modules?**

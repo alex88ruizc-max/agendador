@@ -1,4 +1,4 @@
-🗓️ AGENDADOR IA · agendador-ia-3.28   (por dentro atiende «Mary», la recepcionista)
+🗓️ AGENDADOR IA · agendador-ia-3.29   (por dentro atiende «Mary», la recepcionista)
 =====================================================================================================
 🚫 REGLA UNIVERSAL N.º 1 — EPIC NO SE TOCA (manda sobre todo lo demás, para Alex, para Claude y para cada script de este paquete)
    Epic (Mary de Epic, Luisa, la tienda, epic-waha, epic-tiendas, Epic Channels…) y CUALQUIER otro proyecto:
@@ -62,6 +62,11 @@ PROBAR EN EL VPS
 AJUSTES POR NEGOCIO (negocios.json)
   "recordatorioMin": 120     ·   "estados": { "activo": true, "hoy": "07:30", "semana": "07:00", "semanaDia": 1 }
   En Firestore (settings/general del negocio) maryAutoCaptura: true → la captura confirma al instante y el dueño revisa después.
+
+NOVEDADES 3.29 · 📅 PRIMERO LA HORA, DESPUÉS EL SERVICIO
+  El saludo y «quiero agendar» muestran los cupos de hoy. Al elegir la hora salen solo los servicios que caben.
+  Ya no pregunta «¿Lo confirmo?»: al final llega «✅ ¡Cita confirmada!» con el resumen.
+  Después de este zip manda agendador-web-2026-11-12n.zip.
 
 NOVEDADES 3.28 · 🗓️ YA NO SE QUEDA MUDO AL PREGUNTAR EL DÍA
   El servidor de Google busca los días con cupo mucho más rápido (lee servicios y equipo una sola vez).

@@ -6,7 +6,7 @@
 const http = require('http'), fs = require('fs'), path = require('path');
 const T = require('./textos'), C = require('./correo'), E = require('./estado'), A = require('./asistente');
 
-const VERSION = 'agendador-ia-3.28';
+const VERSION = 'agendador-ia-3.29';
 const env = (k, d) => (process.env[k] === undefined || process.env[k] === '' ? d : process.env[k]);
 const CFG = {
   puerto: parseInt(env('PUERTO', '3060'), 10),
@@ -433,7 +433,7 @@ async function atenderMensaje(c, neg) {
   if (!debeResponder({ texto: c.texto, pausadoPorDueno, reciente, citas: info.citas, repetido: prev.firma === firma && prev.n >= 2 })) { anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: 'callada (' + (info.citas.length ? 'ya tiene su cita' : 'ya le respondí') + ')' }); return; }
   const sal = ASIS.saludo(k, info.negocio, c.nombre, !botDe(neg).saludoDiario);   // «Hola 👋 Soy el asistente de…» solo la primera vez del día (o siempre, si el dueño lo apaga)
   if (info.citas && info.citas.length) await escribir(neg, c.tel, T.conCita(info, sal));
-  else if (botDe(neg).agendar || botDe(neg).cupos) await ASIS.menu(neg, { k, tel: c.tel, texto: c.texto }, T.sinCita(info, sal), info.negocio);
+  else if (botDe(neg).agendar || botDe(neg).cupos) await ASIS.menu(neg, { k, tel: c.tel, texto: c.texto }, T.sinCita(info, sal), info.negocio, sal);
   else await escribir(neg, c.tel, T.sinCita(info, sal, true));
   MEM.chats[k] = { t: Date.now(), firma, n: prev.firma === firma ? (prev.n || 1) + 1 : 1 }; memGuardar();
   anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: info.citas.length ? 'tiene ' + info.citas.length + ' cita(s)' : 'link para agendar' });

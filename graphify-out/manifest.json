@@ -1,20 +1,20 @@
 {
   "admin.js": {
-    "mtime": 1794521168.1922748,
-    "seen": 1794521172.4945953,
-    "ast_hash": "a794ae9a54e27b162b2ab9e1ef707aa9",
+    "mtime": 1794523271.1848717,
+    "seen": 1794523276.8745909,
+    "ast_hash": "ca117bc138fd7b32798f1d4660b7ec72",
     "semantic_hash": ""
   },
   "app.js": {
-    "mtime": 1794521168.1906562,
-    "seen": 1794521172.4946043,
-    "ast_hash": "e234f51082365a2c99bdcea0be663ff7",
+    "mtime": 1794523271.182604,
+    "seen": 1794523276.8745992,
+    "ast_hash": "86e4f55f9b2f5a69b4b3106eca3175ff",
     "semantic_hash": ""
   },
   "common.js": {
-    "mtime": 1794521168.191867,
-    "seen": 1794521172.4946108,
-    "ast_hash": "47351a18f6b5253fbd1fbcf9dff93524",
+    "mtime": 1794523271.1842704,
+    "seen": 1794523276.8746057,
+    "ast_hash": "0b46afe200cf309ea181608182ec405b",
     "semantic_hash": ""
   },
   "config.js": {
@@ -24,9 +24,9 @@
     "semantic_hash": ""
   },
   "super.js": {
-    "mtime": 1794521168.1911588,
-    "seen": 1794521172.4946215,
-    "ast_hash": "f28408e41d1957e6ca067e75ecd18e5a",
+    "mtime": 1794523271.1834185,
+    "seen": 1794523276.8746166,
+    "ast_hash": "4c518df8fcca5c1386af1bf2b769324a",
     "semantic_hash": ""
   },
   "sw.js": {
@@ -54,9 +54,9 @@
     "semantic_hash": ""
   },
   "vps/banco/escenarios.js": {
-    "mtime": 1794521827.8372777,
-    "seen": 1794521976.8106015,
-    "ast_hash": "2d1e9813a588d6ae5291fbbe142d86b1",
+    "mtime": 1794522915.5462513,
+    "seen": 1794523276.874649,
+    "ast_hash": "85ef599d7507c2108ee436efce7bd7c2",
     "semantic_hash": ""
   },
   "vps/banco/pruebas.js": {
@@ -152,15 +152,15 @@
     "semantic_hash": "5009abfe30c8d8ffe5acf888999b674b"
   },
   "vps/principal.js": {
-    "mtime": 1794521880.5487561,
-    "seen": 1794521976.8107924,
-    "ast_hash": "8b9ebc4ece48b21f4cb0243020dea33d",
+    "mtime": 1794522278.4833107,
+    "seen": 1794523276.8747444,
+    "ast_hash": "6356bb30f6e6774084822e5b5c98e4c8",
     "semantic_hash": ""
   },
   "vps/textos.js": {
-    "mtime": 1794521813.709592,
-    "seen": 1794521976.8107994,
-    "ast_hash": "33b8dc86f3da0659071ef13be1b85a54",
+    "mtime": 1794522480.3446155,
+    "seen": 1794523276.8747492,
+    "ast_hash": "b09f3d20f86cae0645200b396c295f66",
     "semantic_hash": ""
   },
   ".claude/settings.json": {
@@ -182,9 +182,9 @@
     "semantic_hash": ""
   },
   "BITACORA.md": {
-    "mtime": 1794521973.8119702,
-    "seen": 1794521976.8108234,
-    "ast_hash": "785be3602934f9cca990fe41594b788b",
+    "mtime": 1794523271.4437468,
+    "seen": 1794523276.8747644,
+    "ast_hash": "23119d9e2d1b14d730ee428358e206b9",
     "semantic_hash": ""
   },
   "CLAUDE.md": {
@@ -194,15 +194,15 @@
     "semantic_hash": ""
   },
   "admin.html": {
-    "mtime": 1794521168.190388,
-    "seen": 1794521172.494792,
-    "ast_hash": "281aecbe8ff0b70ae0f82c534495e060",
+    "mtime": 1794523271.1823254,
+    "seen": 1794523276.8747797,
+    "ast_hash": "9919f54bec416197e928f32cbb1f7e4d",
     "semantic_hash": ""
   },
   "index.html": {
-    "mtime": 1794521168.191605,
-    "seen": 1794521172.4947963,
-    "ast_hash": "b7b7a0ee92493dfdcf5f818edf75b239",
+    "mtime": 1794523271.183909,
+    "seen": 1794523276.8747845,
+    "ast_hash": "e9283ce6efea10c178b53fa9ea9b4cf9",
     "semantic_hash": ""
   },
   "privacidad.html": {
@@ -212,15 +212,15 @@
     "semantic_hash": ""
   },
   "super.html": {
-    "mtime": 1794521168.189897,
-    "seen": 1794521172.494806,
-    "ast_hash": "d203cd22b69fadb86a6f8078b28bab41",
+    "mtime": 1794523271.1817095,
+    "seen": 1794523276.8747938,
+    "ast_hash": "9ca703084edf326d44775700106e9ff2",
     "semantic_hash": ""
   },
   "vps/LEEME.txt": {
-    "mtime": 1794521973.8124907,
-    "seen": 1794521976.8108828,
-    "ast_hash": "e5db4871eb05498d1cdd98cffd936734",
+    "mtime": 1794523271.444434,
+    "seen": 1794523276.8748038,
+    "ast_hash": "1c10ee89e8080f3d3fe944d6317ef7fa",
     "semantic_hash": ""
   },
   "vps/banco/reglas.js": {
@@ -242,9 +242,9 @@
     "semantic_hash": ""
   },
   "vps/asistente.js": {
-    "mtime": 1794521501.6016953,
-    "seen": 1794521976.8105924,
-    "ast_hash": "2aee31354abfe3293f379da8cc9a53b2",
+    "mtime": 1794523185.590308,
+    "seen": 1794523276.8746436,
+    "ast_hash": "a47653180e2b97aaa5169cb416bf532c",
     "semantic_hash": ""
   },
   "vps/oido/oido.py": {
