@@ -109,6 +109,11 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 
 ## 📜 Historial (lo más nuevo arriba)
 
+### 2026-11-12 · ⚠️ Incidente con Epic (error de Claude)
+- `configurar-waha.sh` (2.6/2.7) sacó `epic-waha` de la red del agendador «para deshacer» lo de la 2.2. Eso **tocó un contenedor de Epic**
+  y coincidió con el aviso «se desconectó WAHA de la tienda». Rompe la regla universal: **ni para deshacer se toca otro proyecto**.
+- Corregido en el código (va en la 2.8): el script ya solo avisa, nunca toca contenedores ajenos. Ya no se repite (epic-waha ya no está en la red).
+
 ### 2026-11-12 · agendador-ia-2.7
 - **Banco de escenarios** al estilo de Epic (`vps/banco/escenarios.js`, 18 casos).
   - Cubre: WAHA y Evolution, número oculto @lid, modos, sesión no registrada, duplicados, cita confirmada, no repetir, dueño escribe, eco, agenda suspendida, Google sin cupo, foto del pago, grupos y estados.

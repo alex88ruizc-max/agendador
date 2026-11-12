@@ -2,13 +2,14 @@
 # 🔌 MARY CON SU PROPIO WAHA (2.6). Uso: bash ~/agendador/configurar-waha.sh
 #    ⚖️ REGLA: el agendador NUNCA toca otro proyecto (Epic ni ninguno). Solo usa SU contenedor «waha-agendador».
 #       De otro WAHA, a lo sumo LEE qué versión usa, para copiarla. No lo une a su red, no le cambia avisos, no lo reinicia.
-#    1) deshace lo de la 2.2 (si un contenedor ajeno quedó en la red del agendador, se saca, sin reiniciarlo)
+#    1) si un contenedor ajeno está en la red del agendador, SOLO avisa (nunca lo toca)
 #    2) enciende waha-agendador  3) vincula el WhatsApp del negocio con un código de 8 letras  4) Mary queda atendiendo
 cd "$(dirname "$0")" || exit 1
 NUESTROS=" agendador-ia evolution-agendador postgres-agendador waha-agendador "
 # 1) la red del agendador es solo del agendador
 for C in $(sudo docker network inspect agendador-red -f '{{range .Containers}}{{.Name}} {{end}}' 2>/dev/null); do
-  case "$NUESTROS" in *" $C "*) ;; *) sudo docker network disconnect agendador-red "$C" >/dev/null 2>&1 && echo "↩️  Saqué «$C» de la red del agendador (no es del agendador; no lo reinicié ni le cambié nada)." ;; esac
+  # 2.8: NI SIQUIERA para deshacer se toca un contenedor ajeno (sacarlo de la red le cortó la conexión a la tienda de Epic). Solo se avisa.
+  case "$NUESTROS" in *" $C "*) ;; *) echo "⚠️  «$C» no es del agendador y está en su red. NO lo toco: si quieres sacarlo, decídelo tú desde su propio proyecto." ;; esac
 done
 # 2) WAHA propio: misma versión que ya te funciona (solo se LEE el nombre de la imagen), clave nueva solo suya
 touch .env; chmod 600 .env
