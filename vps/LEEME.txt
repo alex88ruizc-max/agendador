@@ -1,4 +1,4 @@
-🗓️ AGENDADOR IA · agendador-ia-3.2   (por dentro atiende «Mary», la recepcionista)
+🗓️ AGENDADOR IA · agendador-ia-3.3   (por dentro atiende «Mary», la recepcionista)
 =====================================================================================================
 🚫 REGLA UNIVERSAL N.º 1 — EPIC NO SE TOCA (manda sobre todo lo demás, para Alex, para Claude y para cada script de este paquete)
    Epic (Mary de Epic, Luisa, la tienda, epic-waha, epic-tiendas, Epic Channels…) y CUALQUIER otro proyecto:
@@ -62,6 +62,11 @@ PROBAR EN EL VPS
 AJUSTES POR NEGOCIO (negocios.json)
   "recordatorioMin": 120     ·   "estados": { "activo": true, "hoy": "07:30", "semana": "07:00", "semanaDia": 1 }
   En Firestore (settings/general del negocio) maryAutoCaptura: true → la captura confirma al instante y el dueño revisa después.
+
+NOVEDADES 3.3 · LAS LISTAS YA SALEN COMO LISTA
+  · Arreglo: WAHA exige un TÍTULO en la lista y el asistente lo mandaba vacío → WAHA la rechazaba y salía el texto con números.
+    Ahora la primera línea del mensaje va de título (como «🎬 Elige tu Amazon» en Epic) y el resto debajo, con el botón «Ver opciones».
+  · El banco ahora revisa la lista con las MISMAS reglas de WAHA (70 pruebas).
 
 NOVEDADES 3.2 · MODO POR TELEGRAM (bot «Agendador VPS»)
   · /modo → muestra el modo y los números de prueba.   /modo prueba · /modo apagado · /modo todos confirmo

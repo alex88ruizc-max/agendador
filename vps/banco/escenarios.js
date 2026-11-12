@@ -70,7 +70,11 @@ global.fetch = async (url, o) => {
   if (/\/api\/sendText$/.test(u)) { const id = 'W' + W.enviados.length; W.enviados.push({ id, motor: 'waha', a: b.chatId.split('@')[0], texto: b.text, sesion: b.session }); return resp({ id }); }
   if (/\/api\/sendList$/.test(u)) {
     if (W.listaFalla) return resp({ error: 'no soportado' }, 501);
-    const id = 'WL' + W.enviados.length; W.enviados.push({ id, motor: 'waha', a: b.chatId.split('@')[0], texto: b.message.description, lista: b.message, sesion: b.session }); return resp({ id });
+    // 3.3: las MISMAS reglas que WAHA (chatting.list.dto.ts): título, botón y título de sección obligatorios; filas con título y rowId
+    const mm = b.message || {}, vacio = (x) => typeof x !== 'string' || !x.trim();
+    if (vacio(mm.title) || vacio(mm.button) || !Array.isArray(mm.sections) || !mm.sections.length || mm.sections.some((x) => vacio(x.title) || !x.rows || !x.rows.length || x.rows.some((r) => vacio(r.title) || vacio(r.rowId))))
+      return resp({ statusCode: 400, message: ['message.title should not be empty'], error: 'Bad Request' }, 400);
+    const id = 'WL' + W.enviados.length; W.enviados.push({ id, motor: 'waha', a: b.chatId.split('@')[0], texto: [b.message.title, b.message.description].filter(Boolean).join('\n'), lista: b.message, sesion: b.session }); return resp({ id });
   }
   if (/\/api\/(start|stop)Typing$/.test(u)) return resp({});
   // ---- sesiones de WAHA (vincular / desvincular desde el panel) ----
@@ -87,7 +91,7 @@ global.fetch = async (url, o) => {
   if (ac) { W.wahaLlamadas.push(ac[2] + ' ' + decodeURIComponent(ac[1])); return ac[2] === 'qr' ? resp({ mimetype: 'image/png', data: 'UVI=' }) : resp({ code: 'ABCD1234' }); }
   if (/\/status\/image$/.test(u)) { W.estados.push({ sesion: u.split('/api/')[1].split('/')[0], caption: b.caption, contacts: b.contacts }); return resp({}); }
   if (/\/message\/sendText\//.test(u)) { const id = 'E' + W.enviados.length; W.enviados.push({ motor: 'evolution', a: String(b.number), texto: b.text }); return resp({ key: { id } }, 201); }
-  if (/\/message\/sendList\//.test(u)) { const id = 'EL' + W.enviados.length; W.enviados.push({ motor: 'evolution', a: String(b.number), texto: b.description, lista: b }); return resp({ key: { id } }, 201); }
+  if (/\/message\/sendList\//.test(u)) { const id = 'EL' + W.enviados.length; W.enviados.push({ motor: 'evolution', a: String(b.number), texto: [b.title, b.description].filter((x) => x && x.trim()).join('\n'), lista: b }); return resp({ key: { id } }, 201); }
   if (/\/chat\/sendPresence\//.test(u)) return resp({}, 201);
   return resp({}, 404);
 };
@@ -214,7 +218,7 @@ const ids = (e) => filas(e).map((r) => r.rowId);
 
 test('3.0 · Saludo «Soy el asistente de…» (sin «Mary») y UNA sola vez al día', async () => {
   await llega(wahaMsg(CLIENTE, 'hola'));
-  assert.match(W.enviados[0].texto, /Soy el asistente de \*Lina Spa\*/); assert.doesNotMatch(W.enviados[0].texto, /Mary/);
+  assert.match(W.enviados[0].texto, /Soy el asistente de \*?Lina Spa\*?/); assert.doesNotMatch(W.enviados[0].texto, /Mary/);
   assert.ok(W.enviados[0].lista, 'la respuesta lleva la lista Ver opciones');
   await llega(wahaMsg(CLIENTE, 'hay cupos hoy?'));
   assert.doesNotMatch(ultimo().texto, /Soy el asistente/, 'el segundo mensaje del día ya no saluda');
@@ -222,10 +226,10 @@ test('3.0 · Saludo «Soy el asistente de…» (sin «Mary») y UNA sola vez al 
 test('3.0 · «¿hay cupos?» → las horas de hoy + el link + la lista de días (SIEMPRE el link)', async () => {
   await llega(wahaMsg(CLIENTE, 'buenas, tienen cupo hoy?'));
   const e = ultimo();
-  assert.match(e.texto, /Hoy\* hay cupo a las 3:00 p\. m\., 4:30 p\. m\. y 6:00 p\. m\./); assert.match(e.texto, /tuagenda\.vip/);
+  assert.match(e.texto, /Hoy\*? hay cupo a las 3:00 p\. m\., 4:30 p\. m\. y 6:00 p\. m\./); assert.match(e.texto, /tuagenda\.vip/);
   assert.equal(e.lista.button, 'Elegir día'); assert.ok(ids(e).includes('dia:' + HOY));
   await llega(wahaMsg(CLIENTE, 'y cupos mañana?'));
-  assert.match(ultimo().texto, /Mañana\* hay cupo a las 9:00 a\. m\./); assert.match(ultimo().texto, /tuagenda\.vip/);
+  assert.match(ultimo().texto, /Mañana\*? hay cupo a las 9:00 a\. m\./); assert.match(ultimo().texto, /tuagenda\.vip/);
 });
 test('3.0 · Hoy sin cupos → «pero sí hay mañana…» y pregunta qué día le sirve', async () => {
   W.cupos[0].horas = []; W.cupos[0].libres = [];
@@ -239,11 +243,11 @@ test('3.0 · Agendar COMPLETO con listas: 2 servicios, día, hora, profesional, 
   await llega(toca('cat:0', 'Cortes'));
   assert.ok(ids(ultimo()).includes('svc:c2')); assert.match(filas(ultimo()).find((r) => r.rowId === 'svc:c2').description, /\$25\.000 · 45 min/);
   await llega(toca('svc:c2', 'Degradado'));
-  assert.match(ultimo().texto, /Anotado: \*Degradado\*/); assert.deepEqual(ids(ultimo()), ['mas:si', 'mas:no']);
+  assert.match(ultimo().texto, /Anotado: \*?Degradado\*? \(/); assert.deepEqual(ids(ultimo()), ['mas:si', 'mas:no']);
   await llega(toca('mas:si', '➕ Agregar otro'));
   await llega(toca('cat:1', 'Barba'));
   await llega(toca('svc:b1', 'Perfilado de barba'));
-  assert.match(ultimo().texto, /Degradado \+ Perfilado de barba\* \(\$37\.000\)/);
+  assert.match(ultimo().texto, /Degradado \+ Perfilado de barba\*? \(\$37\.000\)/);
   await llega(toca('mas:no', '✅ No, solo eso'));
   assert.equal(ultimo().lista.button, 'Elegir día');
   await llega(toca('dia:' + HOY, 'Hoy'));
@@ -269,9 +273,9 @@ test('3.0 · Agendar COMPLETO con listas: 2 servicios, día, hora, profesional, 
 test('3.0 · Responder ESCRIBIENDO (número o nombre) en vez de tocar la lista también funciona', async () => {
   await llega(wahaMsg(CLIENTE, 'quiero una cita'));
   await llega(wahaMsg(CLIENTE, '2'));                       // 2 = Barba
-  assert.match(ultimo().texto, /\*Barba\*/);
+  assert.match(ultimo().texto, /\*?Barba\*?\n/);
   await llega(wahaMsg(CLIENTE, 'perfilado de barba'));
-  assert.match(ultimo().texto, /Anotado: \*Perfilado de barba\*/);
+  assert.match(ultimo().texto, /Anotado: \*?Perfilado de barba\*?/);
   await llega(wahaMsg(CLIENTE, 'no, solo eso'));
   assert.equal(ultimo().lista.button, 'Elegir día');
   await llega(wahaMsg(CLIENTE, 'mañana'));
@@ -279,7 +283,7 @@ test('3.0 · Responder ESCRIBIENDO (número o nombre) en vez de tocar la lista t
 });
 test('3.0 · «quiero corte y barba»: reconoce los servicios escritos de una', async () => {
   await llega(wahaMsg(CLIENTE, 'quiero degradado y perfilado de barba'));
-  assert.match(ultimo().texto, /Anotado: \*Degradado \+ Perfilado de barba\*/);
+  assert.match(ultimo().texto, /Anotado: \*?Degradado \+ Perfilado de barba\*?/);
 });
 test('3.0 · Con abono del dueño → queda apartada con el monto y los datos de pago', async () => {
   W.abono = 10000;
@@ -296,7 +300,7 @@ test('3.0 · «¿Lo de siempre?»: aprende la combinación y la ofrece la próxi
   const cl = B.ASIS.cliente('lina-spa:' + CLIENTE); cl.nombre = 'Camila'; cl.correo = '';
   cl.combos = { 'b1+c2|Lina': { n: 3, ids: ['c2', 'b1'], staffId: 's1', servicio: 'Degradado + Perfilado de barba', con: 'Lina' } };
   await llega(wahaMsg(CLIENTE, 'quiero agendar'));
-  assert.match(ultimo().texto, /Lo de siempre\? \*Degradado \+ Perfilado de barba\* con \*Lina\*/);
+  assert.match(ultimo().texto, /Lo de siempre\? \*?Degradado \+ Perfilado de barba\*? con \*?Lina\*?/);
   await llega(toca('fav:si'));
   assert.equal(ultimo().lista.button, 'Elegir día');
   assert.deepEqual(W.llamadas.filter((x) => x.op === 'dias').pop().ids, ['c2', 'b1']); assert.equal(W.llamadas.filter((x) => x.op === 'dias').pop().staffId, 's1');
@@ -335,13 +339,13 @@ test('3.0 · Si WhatsApp no acepta la lista → llega igual como texto con núme
   await llega(wahaMsg(CLIENTE, 'quiero agendar'));
   assert.match(ultimo().texto, /1\. Cortes\n2\. Barba\n3\. Cejas/); assert.match(ultimo().texto, /Responde con el número/);
   await llega(wahaMsg(CLIENTE, '3'));
-  assert.match(ultimo().texto, /\*Cejas\*/);
+  assert.match(ultimo().texto, /\*?Cejas\*?\n/);
 });
 test('3.0 · Evolution también manda listas y entiende la opción elegida', async () => {
   await llega(evoMsg(CLIENTE, 'quiero agendar'));
   assert.equal(ultimo().motor, 'evolution'); assert.ok(ultimo().lista.sections);
   await llega(evoMsg(CLIENTE, '', { message: { listResponseMessage: { title: 'Barba', singleSelectReply: { selectedRowId: 'cat:1' } } } }));
-  assert.match(ultimo().texto, /\*Barba\*/);
+  assert.match(ultimo().texto, /\*?Barba\*?\n/);
 });
 test('3.0 · Fechas: hoy, mañana, pasado mañana, «el viernes», «el 20», «20 de diciembre», «20/12»', () => {
   const A = require('../asistente');
@@ -499,4 +503,12 @@ test('3.1 · Un negocio vinculado por el VPS aparece «✅ Vinculado» en su pan
   await P.sincronizarConectados(); await P.sincronizarConectados();
   const r = W.resultados.filter((x) => x.estado === 'conectado' && x.businessId === 'lina-spa');
   assert.equal(r.length, 1); assert.equal(r[0].numero, '573187920386');
+});
+
+test('3.3 · La lista cumple lo que WAHA exige (título, botón, secciones): llega como LISTA, no como texto con números', async () => {
+  await llega(wahaMsg(CLIENTE, 'hola'));
+  assert.ok(W.enviados[0].lista, 'el saludo va como lista'); assert.match(W.enviados[0].lista.title, /Soy el asistente de Lina Spa/);
+  assert.doesNotMatch(W.enviados[0].lista.title, /\*/, 'sin asteriscos en el título');
+  await llega(wahaMsg(CLIENTE, 'quiero agendar'));
+  assert.ok(ultimo().lista); assert.equal(ultimo().lista.title, '✨ ¿Qué te quieres hacer?'); assert.doesNotMatch(ultimo().texto, /Responde con el número/);
 });

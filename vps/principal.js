@@ -6,7 +6,7 @@
 const http = require('http'), fs = require('fs'), path = require('path');
 const T = require('./textos'), C = require('./correo'), E = require('./estado'), A = require('./asistente');
 
-const VERSION = 'agendador-ia-3.2';
+const VERSION = 'agendador-ia-3.3';
 const env = (k, d) => (process.env[k] === undefined || process.env[k] === '' ? d : process.env[k]);
 const CFG = {
   puerto: parseInt(env('PUERTO', '3060'), 10),
@@ -126,14 +126,21 @@ async function escribir(neg, numero, texto) {
 //    L = { texto, boton, pie, secciones: [{ titulo, filas: [{ id, titulo, desc }] }] }  (WhatsApp: máximo 10 filas en total)
 async function escribirLista(neg, numero, L) {
   const n = numeroWa(numero); if (n.length < 11) { const e = new Error('número inválido'); e.permanente = true; throw e; }
-  const sec = L.secciones.map((x) => ({ title: String(x.titulo || '').slice(0, 24), rows: x.filas.map((f) => ({ title: String(f.titulo).slice(0, 24), rowId: f.id, description: String(f.desc || '').slice(0, 72) })) }));
+  // 3.3: WAHA EXIGE título en la lista y en cada sección (si va vacío la rechaza y salía el texto con números).
+  //      Título = primera línea del mensaje (sin *), como «🎬 Elige tu Amazon» en Epic; el resto va de descripción.
+  const lineas = String(L.texto || '').split('\n'), i0 = lineas.findIndex((x) => x.trim());
+  const l0 = String(lineas[i0] || '').replace(/\*/g, '').trim();
+  const corto = l0 && l0.length <= 60;   // si la primera línea es larga, no se corta: va completa en el cuerpo y el título es el negocio
+  const titulo = corto ? l0 : (String(L.pie || '').split(' · ')[0].trim() || 'Opciones').slice(0, 60);
+  const cuerpo = (corto ? lineas.slice(i0 + 1).join('\n') : String(L.texto || '')).trim();
+  const sec = L.secciones.filter((x) => x.filas.length).map((x) => ({ title: String(x.titulo || 'Opciones').slice(0, 24) || 'Opciones', rows: x.filas.map((f) => Object.assign({ title: String(f.titulo).slice(0, 24), rowId: f.id }, f.desc ? { description: String(f.desc).slice(0, 72) } : {})) }));
   ULT_ENVIO.set(neg.bid + ':' + n, Date.now());
   try {
     let r;
     if (esWaha(neg)) {
-      r = await waha('post', '/api/sendList', { session: sesionDe(neg), chatId: n + '@c.us', message: { title: '', description: L.texto, footer: L.pie || '', button: String(L.boton || 'Ver opciones').slice(0, 20), sections: sec }, reply_to: null });
+      r = await waha('post', '/api/sendList', { session: sesionDe(neg), chatId: n + '@c.us', message: Object.assign({ title: titulo, button: String(L.boton || 'Ver opciones').slice(0, 20), sections: sec }, cuerpo ? { description: cuerpo } : {}, L.pie ? { footer: String(L.pie).slice(0, 60) } : {}) });
       const idw = r && (r.id && (r.id._serialized || r.id.id || r.id)) || (r && r.key && r.key.id); r = { key: { id: typeof idw === 'string' ? idw : '' } };
-    } else r = await evo('post', '/message/sendList/' + encodeURIComponent(neg.instancia), { number: n, title: '', description: L.texto, buttonText: String(L.boton || 'Ver opciones').slice(0, 20), footerText: L.pie || '', sections: sec });
+    } else r = await evo('post', '/message/sendList/' + encodeURIComponent(neg.instancia), { number: n, title: titulo, description: cuerpo || ' ', buttonText: String(L.boton || 'Ver opciones').slice(0, 20), footerText: L.pie || ' ', sections: sec });
     const id = r && r.key && r.key.id; if (id) { MEM.enviados.push(id); if (MEM.enviados.length > 500) MEM.enviados.splice(0, 100); memGuardar(); }
     est.respondidos++;
     return r;

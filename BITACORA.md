@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-3.2** · Página **2026-11-12b** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-12** · Mary **agendador-ia-3.3** · Página **2026-11-12b** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -113,6 +113,13 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-12 · agendador-ia-3.3 · listas de WhatsApp
+- Probado en el celular real: la lista salía como texto con números. Causa (leída en el código de WAHA, `chatting.list.dto.ts`):
+  `message.title`, `button` y el título de cada sección son obligatorios; mandábamos `title: ''` → 400 → plan B.
+- `escribirLista`: título = primera línea (sin `*`, si cabe en 60) o el nombre del negocio; cuerpo = el resto. Evolution igual.
+- Banco: el WAHA simulado valida como el real. 70 pruebas, 0 fallas (mutación hecha con el título vacío).
+- Pendiente: freno anti-bucle si el otro lado es un bot (en la prueba respondió la Mary de Epic del 5453).
 
 ### 2026-11-12 · agendador-ia-3.2 · modo por Telegram
 - 3.1 instalada y verificada en el panel real: «WhatsApp Bot» muestra El Barba ✅ vinculado (+57 318…), sincronizado solo.
