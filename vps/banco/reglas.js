@@ -19,7 +19,7 @@ test('Regla N.º 1: ningún script actúa sobre contenedores ajenos (Epic ni nin
       if (!m) return;
       const resto = m[2];
       let propio = NUESTROS.some((n) => new RegExp('(^|[\\s"\'])' + n + '([\\s"\']|$)').test(resto));   // la acción nombra un contenedor del agendador
-      if (/--filter name=\^agendador-tmp-/.test(l)) propio = true;   // 3.33: limpieza de los temporales del agendador (solo «agendador-tmp-…»)
+      if (/--filter name=\^agendador-(tmp|tarea)-/.test(l)) propio = true;   // 3.33: limpieza de los temporales del agendador (solo «agendador-tmp-…»)
       if (!propio) malas.push(f + ':' + (i + 1) + ' → ' + l.trim().slice(0, 140));
     });
     // nada de nombres de Epic junto a una acción
@@ -28,12 +28,26 @@ test('Regla N.º 1: ningún script actúa sobre contenedores ajenos (Epic ni nin
   assert.deepEqual(malas, [], 'Scripts que tocarían otro proyecto:\n' + malas.join('\n'));
 });
 
-test('3.33 · Ningún «docker run» sin nombre: todos se llaman agendador-tmp-… y tienen tiempo límite (así no queda un «vigorous_burnell» colgado llenando el disco)', { skip: scripts.length === 0 && 'sin scripts aquí' }, () => {
+test('3.35 · REGLAS DEL SERVIDOR: nada de «docker run» suelto; las tareas van con «docker compose run --rm --name agendador-tarea-…» y tiempo límite', { skip: scripts.length === 0 && 'sin scripts aquí' }, () => {
   const malas = [];
   for (const f of scripts) fs.readFileSync(path.join(RAIZ, f), 'utf8').split('\n').forEach((l, i) => {
-    if (/^\s*#/.test(l) || !/docker\s+run\b/.test(l)) return;
-    if (!/--name\s+agendador-tmp-/.test(l)) malas.push(f + ':' + (i + 1) + ' sin --name agendador-tmp-…');
+    if (/^\s*#/.test(l)) return;
+    if (/docker\s+run\b/.test(l)) malas.push(f + ':' + (i + 1) + ' usa «docker run» (debe ser «docker compose run»)');
+    if (!/docker\s+compose\s+run\b/.test(l)) return;
+    if (!/\s--rm\b/.test(l)) malas.push(f + ':' + (i + 1) + ' sin --rm');
+    if (!/--name\s+agendador-tarea-/.test(l)) malas.push(f + ':' + (i + 1) + ' sin --name agendador-tarea-…');
     if (!/\btimeout\s+\d+/.test(l)) malas.push(f + ':' + (i + 1) + ' sin tiempo límite');
+  });
+  assert.deepEqual(malas, [], malas.join('\n'));
+});
+test('3.35 · REGLAS DEL SERVIDOR: nunca «prune», y nada sobre los contenedores de Epic ni de otros (evolution, evo_postgres, luisa-fotos, mary-oido, n8n…)', { skip: scripts.length === 0 && 'sin scripts aquí' }, () => {
+  const AJENOS = /\b(epic-[\w-]+|evolution|evolution-estados|evo_postgres|evo_redis|luisa-fotos|mary-oido|n8n_db|epic-n8n|tunel-pc)\b(?!-agendador)/;
+  const malas = [];
+  for (const f of scripts) fs.readFileSync(path.join(RAIZ, f), 'utf8').split('\n').forEach((l, i) => {
+    if (/^\s*#/.test(l)) return;
+    if (/docker\s+(system|volume|image|container|network|builder)\s+prune|docker\s+prune/.test(l)) malas.push(f + ':' + (i + 1) + ' usa prune');
+    const m = l.match(/docker\s+(network\s+(?:connect|disconnect)|restart|stop|kill|rm|pause|update|rename|exec|cp|start)\b([^;&|]*)/);
+    if (m && AJENOS.test(m[2])) malas.push(f + ':' + (i + 1) + ' actúa sobre algo ajeno');
   });
   assert.deepEqual(malas, [], malas.join('\n'));
 });

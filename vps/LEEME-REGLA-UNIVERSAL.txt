@@ -22,3 +22,23 @@ Cómo se vigila: banco/reglas.js revisa TODOS los scripts del paquete. Si alguno
 agendador, actualizar.sh NO instala esa versión.
 
 Esta regla está también en: LEEME.txt, CLAUDE.md y BITACORA.md. Manda sobre cualquier otra instrucción.
+
+🖥️ REGLAS DEL SERVIDOR (VPS compartido con Epic Streaming) — obligatorias (orden de Alex, 2026-11-12)
+1. Contenedores con nombre, siempre.
+   - Nunca «docker run» sin --name. Se usa docker compose dentro de la carpeta del agendador (proyecto `agendador-ia`).
+   - Tarea de una sola vez: `docker compose run --rm --name agendador-tarea-<algo> <servicio> …` (el --rm es obligatorio).
+   - Al terminar cada trabajo: «docker ps -a» y confirmar que no quedó ningún contenedor del agendador sin nombre ni detenido. Si quedó uno, se borra y se dice.
+2. Solo lo del agendador.
+   - Nuestros: agendador-ia, evolution-agendador, waha-agendador, oido-agendador, postgres-agendador (y las tareas agendador-tarea-…).
+   - No se toca, reinicia, detiene ni borra nada que empiece por epic-, ni evolution, evolution-estados, evo_postgres, evo_redis, luisa-fotos, mary-oido, n8n_db, epic-n8n ni tunel-pc.
+   - Nunca «docker system prune», «docker volume prune», «docker image prune» ni «docker rm» sobre algo que no sea nuestro.
+3. WhatsApp.
+   - El agendador solo se vincula con su propio número, nunca con el de la tienda Epic Streaming.
+   - Nunca se cierra, desvincula ni reinicia una sesión de WhatsApp que no sea del agendador.
+   - Antes de vincular un número, se le pregunta a Alex cuál es y se espera su confirmación.
+4. Recursos.
+   - El servidor tiene 2 núcleos y lo comparte con Mary (Epic), que atiende clientes.
+   - Construcciones pesadas, de una en una y con `nice -n 19`.
+   - Si algo va a ocupar más de 5 GB de disco, se avisa antes.
+5. Antes de terminar, decir en una línea: qué contenedores se crearon, cuáles se borraron y que «docker ps -a» quedó limpio.
+

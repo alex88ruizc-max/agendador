@@ -50,8 +50,8 @@ if [ ! -f agendador-ia.env ]; then
 fi
 # 4) Construir, PROBAR y encender
 echo "🐳 Construyendo (la primera vez tarda 2-3 min)…"
-sudo docker compose build agendador-ia >/dev/null || { echo "❌ No se pudo construir."; exit 1; }
-B=$(sudo docker run --rm --name agendador-tmp-banco-$$ --network none agendador-ia-agendador-ia timeout 600 sh -c 'mkdir -p /datos && node --test banco/pruebas.js' 2>&1)
+sudo nice -n 19 docker compose build agendador-ia >/dev/null || { echo "❌ No se pudo construir."; exit 1; }
+B=$(sudo docker compose run --rm -T --no-deps --name agendador-tarea-banco-$$ tarea-banco timeout 600 sh -c 'mkdir -p /datos && node --test banco/pruebas.js' 2>&1)
 echo "$B" | grep -q '^# fail 0' || { echo "$B" | grep -E '^not ok|Error' | head; echo "❌ El banco de pruebas falló. No encendí nada."; exit 1; }
 echo "🧪 Banco de pruebas OK ($(echo "$B" | grep -o '^# pass [0-9]*' | cut -d' ' -f3) pruebas)"
 sudo docker compose up -d || { echo "❌ No encendió: sudo docker compose -f ~/agendador/docker-compose.yml logs --tail 40"; exit 1; }

@@ -294,10 +294,12 @@ def sueltos():
         except Exception: continue
         nombre = str(d.get('Name', '')).lstrip('/')
         if nombre in NUESTROS or 'epic' in nombre.lower(): continue
-        if ((d.get('Config') or {}).get('Labels') or {}).get('com.docker.compose.project'): continue   # de un compose: no es suelto
+        proyecto = ((d.get('Config') or {}).get('Labels') or {}).get('com.docker.compose.project')
+        tarea = nombre.startswith('agendador-tarea-') and proyecto == 'agendador-ia'   # 3.35: una tarea nuestra que quedó colgada
+        if proyecto and not tarea: continue   # de un compose (de otro o un servicio fijo): no es suelto
         img = str((d.get('Config') or {}).get('Image', ''))
         montajes = [str(m.get('Source', '')) for m in (d.get('Mounts') or [])]
-        if img in IMAGENES_NUESTRAS or any(m == AQUI or m.startswith(AQUI + '/') for m in montajes):
+        if tarea or img in IMAGENES_NUESTRAS or any(m == AQUI or m.startswith(AQUI + '/') for m in montajes):
             out.append({ 'id': cid, 'nombre': nombre, 'imagen': img, 'estado': str((d.get('State') or {}).get('Status', '')), 'desde': str((d.get('State') or {}).get('StartedAt', ''))[:16] })
     return out
 def limpiar():
@@ -337,7 +339,10 @@ def auditoria():
     filas = [x.split('|') for x in st.split('\n') if x and (x.split('|')[0] in NUESTROS or 'epic' in x.split('|')[0].lower())]
     if filas: L.append('📊 Consumo ahora:\n' + '\n'.join('  · ' + f[0] + ': CPU ' + f[1] + ' · RAM ' + f[2].split('/')[0].strip() for f in filas if len(f) >= 3))
     su = sueltos()
+    parados = [x for x in NUESTROS if x in todos and not dk('ps', '-a', '--filter', 'name=^' + x + '$', '--format', '{{.Status}}').startswith('Up')]
     if su: L.append('🧹 Contenedores sueltos del agendador: ' + ', '.join(x['nombre'] + ' (' + x['imagen'] + ')' for x in su) + ' → mándame /limpiar para quitarlos')
+    if parados: L.append('⚠️ Contenedores del agendador detenidos: ' + ', '.join(parados))
+    if not su and not parados: L.append('🧹 docker ps -a: limpio (sin contenedores sueltos ni detenidos del agendador)')
     L.append('\n' + ('✅ *Epic no está tocado por el agendador.*' if not mal else '⚠️ Hay ' + str(mal) + ' punto(s) para revisar (arriba). No toqué nada.'))
     return '\n'.join(L)
 

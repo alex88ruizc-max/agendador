@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-3.34** · Página **2026-11-12q** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-12** · Mary **agendador-ia-3.35** · Página **2026-11-12q** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -14,6 +14,25 @@
 - ❌ Ningún script del agendador ejecuta comandos sobre contenedores o archivos que no sean del agendador (`agendador-ia`, `evolution-agendador`, `postgres-agendador`, `waha-agendador`, `oido-agendador`, `~/agendador`).
 - 🛑 Si algún paso pudiera afectar a Epic, **se para y se le pregunta a Alex**. Solo Alex, con palabras explícitas, puede autorizar algo sobre Epic.
 Ver también `CLAUDE.md` y `vps/LEEME.txt`.
+
+## 🖥️ REGLAS DEL SERVIDOR (VPS compartido con Epic Streaming) — obligatorias (orden de Alex, 2026-11-12)
+1. **Contenedores con nombre, siempre.**
+   - Nunca «docker run» sin --name. Se usa docker compose dentro de la carpeta del agendador (proyecto `agendador-ia`).
+   - Tarea de una sola vez: `docker compose run --rm --name agendador-tarea-<algo> <servicio> …` (el --rm es obligatorio).
+   - Al terminar cada trabajo: «docker ps -a» y confirmar que no quedó ningún contenedor del agendador sin nombre ni detenido. Si quedó uno, se borra y se dice.
+2. **Solo lo del agendador.**
+   - Nuestros: agendador-ia, evolution-agendador, waha-agendador, oido-agendador, postgres-agendador (y las tareas agendador-tarea-…).
+   - No se toca, reinicia, detiene ni borra nada que empiece por epic-, ni evolution, evolution-estados, evo_postgres, evo_redis, luisa-fotos, mary-oido, n8n_db, epic-n8n ni tunel-pc.
+   - Nunca «docker system prune», «docker volume prune», «docker image prune» ni «docker rm» sobre algo que no sea nuestro.
+3. **WhatsApp.**
+   - El agendador solo se vincula con su propio número, nunca con el de la tienda Epic Streaming.
+   - Nunca se cierra, desvincula ni reinicia una sesión de WhatsApp que no sea del agendador.
+   - Antes de vincular un número, se le pregunta a Alex cuál es y se espera su confirmación.
+4. **Recursos.**
+   - El servidor tiene 2 núcleos y lo comparte con Mary (Epic), que atiende clientes.
+   - Construcciones pesadas, de una en una y con `nice -n 19`.
+   - Si algo va a ocupar más de 5 GB de disco, se avisa antes.
+5. **Antes de terminar**, decir en una línea: qué contenedores se crearon, cuáles se borraron y que «docker ps -a» quedó limpio.
 
 ---
 
@@ -113,6 +132,17 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-12 · agendador-ia-3.35 · cumplir las REGLAS DEL SERVIDOR (orden de Alex)
+- Reglas guardadas en CLAUDE.md, LEEME-REGLA-UNIVERSAL.txt (raíz y vps/) y aquí arriba.
+- **Tareas de una sola vez:**
+  - Ya no hay ningún «docker run». El banco, las reglas y clasp van con `docker compose run --rm -T --no-deps --name agendador-tarea-… <servicio>` y `timeout`.
+  - Servicios nuevos `tarea-banco` (sin red, sin ./datos) y `tarea-clasp` en el perfil `tareas`: `docker compose up` nunca los enciende.
+- **Construcciones** con `nice -n 19` (agendador-ia y oído).
+- **Al terminar `actualizar.sh`:** revisa `docker ps -a` y dice «limpio» o qué quedó del agendador. Al empezar quita las tareas `agendador-tarea-`/`agendador-tmp-` que hayan quedado colgadas (solo nuestras).
+- **Bot:** `/auditoria` dice si `docker ps -a` quedó limpio o qué hay detenido; `/limpiar` también reconoce las tareas `agendador-tarea-` del proyecto agendador-ia.
+- **Banco `reglas.js`:** falla si hay un «docker run», si un `docker compose run` no tiene --rm, --name agendador-tarea- o timeout, si aparece algún prune, o si algo actúa sobre Epic, evolution, evo_postgres, evo_redis, luisa-fotos, mary-oido, n8n_db, epic-n8n o tunel-pc. Probado con mutaciones.
+- Banco: 146 pruebas, 0 fallas. `docker compose config` válido.
 
 ### 2026-11-12 · agendador-ia-3.34 · el «¿Seguimos con tu cita?» saluda por el nombre
 - Reporte de Alex: «Hola 👋 ¿Seguimos con tu cita?» salió sin el nombre de Oscar.

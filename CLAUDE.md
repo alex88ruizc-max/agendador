@@ -10,6 +10,25 @@
 - ❌ Ningún script del agendador ejecuta comandos sobre contenedores o archivos que no sean del agendador (`agendador-ia`, `evolution-agendador`, `postgres-agendador`, `waha-agendador`, `oido-agendador`, `~/agendador`).
 - 🛑 Si algún paso pudiera afectar a Epic, **se para y se le pregunta a Alex**. Solo Alex, con palabras explícitas, puede autorizar algo sobre Epic.
 
+## 🖥️ REGLAS DEL SERVIDOR (VPS compartido con Epic Streaming) — obligatorias (orden de Alex, 2026-11-12)
+1. **Contenedores con nombre, siempre.**
+   - Nunca «docker run» sin --name. Se usa docker compose dentro de la carpeta del agendador (proyecto `agendador-ia`).
+   - Tarea de una sola vez: `docker compose run --rm --name agendador-tarea-<algo> <servicio> …` (el --rm es obligatorio).
+   - Al terminar cada trabajo: «docker ps -a» y confirmar que no quedó ningún contenedor del agendador sin nombre ni detenido. Si quedó uno, se borra y se dice.
+2. **Solo lo del agendador.**
+   - Nuestros: agendador-ia, evolution-agendador, waha-agendador, oido-agendador, postgres-agendador (y las tareas agendador-tarea-…).
+   - No se toca, reinicia, detiene ni borra nada que empiece por epic-, ni evolution, evolution-estados, evo_postgres, evo_redis, luisa-fotos, mary-oido, n8n_db, epic-n8n ni tunel-pc.
+   - Nunca «docker system prune», «docker volume prune», «docker image prune» ni «docker rm» sobre algo que no sea nuestro.
+3. **WhatsApp.**
+   - El agendador solo se vincula con su propio número, nunca con el de la tienda Epic Streaming.
+   - Nunca se cierra, desvincula ni reinicia una sesión de WhatsApp que no sea del agendador.
+   - Antes de vincular un número, se le pregunta a Alex cuál es y se espera su confirmación.
+4. **Recursos.**
+   - El servidor tiene 2 núcleos y lo comparte con Mary (Epic), que atiende clientes.
+   - Construcciones pesadas, de una en una y con `nice -n 19`.
+   - Si algo va a ocupar más de 5 GB de disco, se avisa antes.
+5. **Antes de terminar**, decir en una línea: qué contenedores se crearon, cuáles se borraron y que «docker ps -a» quedó limpio.
+
 ## 📒 Bitácora y pruebas (en cada cambio)
 - **Cada cambio se anota en `BITACORA.md`** (Historial, versión actual y pendientes) en el mismo commit del cambio.
 - Antes de entregar un zip de Mary: `cd vps && node --test banco/pruebas.js banco/escenarios.js banco/reglas.js` (0 fallas). Un arreglo de Mary trae su escenario nuevo en `vps/banco/escenarios.js`.

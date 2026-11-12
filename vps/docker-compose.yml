@@ -65,5 +65,20 @@ services:
     mem_limit: 1500m
     cpus: 2
     networks: [agenda]
+  # 3.35 · TAREAS DE UNA SOLA VEZ (reglas del servidor): solo con «docker compose run --rm --name agendador-tarea-<algo> …».
+  #        Perfil «tareas»: «docker compose up» NUNCA las enciende. Se borran solas al terminar (--rm).
+  tarea-banco:   # el banco de pruebas, sin red y sin tocar ./datos
+    image: agendador-ia-agendador-ia
+    profiles: [tareas]
+    network_mode: none
+    mem_limit: 300m
+    cpus: 0.5
+  tarea-clasp:   # subir el código a Google (clasp). Las carpetas se pasan con -v en cada llamada
+    image: node:22-slim
+    profiles: [tareas]
+    working_dir: /w
+    mem_limit: 300m
+    cpus: 0.5
+    networks: [agenda]
 volumes: { evo_instancias: {}, pg_datos: {}, waha_sesiones: {}, oido_modelos: {} }
 networks: { agenda: { name: agendador-red } }
