@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-3.18** · Página **2026-11-12f** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-12** · Mary **agendador-ia-3.19** · Página **2026-11-12f** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -99,7 +99,7 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 1. Instalar 3.1 + página 2026-11-12b y probar el agendamiento por listas con El Barba (tu 318) desde el número aparte. Luego `MARY_MODO=todos`.
    Verificar en un celular real: que la lista llegue por WAHA (si no, sale el texto con números) y que la invitación entre al calendario.
    El panel guarda `maryReminderMinutes` en settings: confirmar que las reglas de Firestore lo dejan guardar.
-8. Oído instalado (3.13): confirmar en /estado que pase a «listo (small)» y probar una nota de voz real.
+8. ✅ Oído probado con una nota de voz real (3.17/3.18).
 2. Que el panel conecte por WAHA (hoy conecta por Evolution). WAHA gratis = 1 WhatsApp: para varios negocios, arreglar Evolution o WAHA Plus.
 3. Generar la APK con `/apk` en el bot. Falta confirmar si ya se hizo.
 4. **Rotar secretos** que quedaron expuestos en chats anteriores:
@@ -113,6 +113,11 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-12 · agendador-ia-3.19 · ✅ oído funcionando
+- Prueba real: /registro «🎤 escuché: «Hola, tiene cita para mañana a las 2 de la tarde.»» → «Sí, tengo un cupo mañana a las 2:00 p. m.
+  ¿Lo vas a apartar?» con Sí, apártalo / Otra hora. ~8 s desde que llegó el audio.
+- Arreglo de texto: sin doble punto después de «p. m.». Banco: 107 pruebas.
 
 ### 2026-11-12 · agendador-ia-3.18 · /auditoria (Epic no tocado)
 - Alex pidió verificar que el oído no afecta a Epic. Revisión: nada del agendador modifica Epic; único incidente fue el de 2.2–2.7

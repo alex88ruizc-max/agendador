@@ -661,7 +661,7 @@ test('3.11 · El saludo invita a escribir el día y la hora y trae la lista de S
 });
 test('3.11 · «Hey Barba, ¿tienes cupo hoy a las 3?» → «Sí, tengo… ¿Lo vas a apartar?» → sí → ¿qué te vas a hacer? → nombre → ✅ Apartado', async () => {
   await llega(wahaMsg(CLIENTE, 'Hey Barba, tienes cupo para hoy a las 3?'));
-  assert.match(ultimo().texto, /Sí, tengo un cupo \*hoy a las 3:00 p\. m\.\*\. ¿Lo vas a apartar\?/); assert.deepEqual(ids(ultimo()), ['ap:si', 'ap:otra']);
+  assert.match(ultimo().texto, /Sí, tengo un cupo \*hoy a las 3:00 p\. m\.\* ¿Lo vas a apartar\?/); assert.deepEqual(ids(ultimo()), ['ap:si', 'ap:otra']);
   await llega(wahaMsg(CLIENTE, 'si'));
   assert.deepEqual(ids(ultimo()), ['cat:0', 'cat:1', 'cat:2'], 'cliente nuevo: «¿Qué te vas a hacer?»');
   await llega(toca('cat:0')); await llega(toca('svc:c1', 'Corte clásico'));
@@ -832,4 +832,8 @@ test('3.16 · «Ya tienes una cita activa» → «🚫 Cancelar la que tengo» l
 test('3.15 · Sin citas abiertas NO pregunta nada (va directo)', async () => {
   await llega(wahaMsg(CLIENTE, 'quiero agendar'));
   assert.deepEqual(ids(ultimo()), ['cat:0', 'cat:1', 'cat:2']);
+});
+test('3.19 · Sin doble punto: «… a las 2:00 p. m. ¿Lo vas a apartar?» (no «p. m.. ¿Lo vas…»)', async () => {
+  await llega(wahaMsg(CLIENTE, 'tienes cupo hoy a las 3?'));
+  assert.doesNotMatch(ultimo().texto, /m\.\*?\.\s/); assert.match(ultimo().texto, /p\. m\.\*? ¿Lo vas a apartar\?/);
 });

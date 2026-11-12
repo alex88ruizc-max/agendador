@@ -309,10 +309,10 @@ function crear(dep) {
     if (hp && hp.franja) {
       const rango = { manana: (x) => x.t < '12:00', tarde: (x) => x.t >= '12:00' && x.t < '18:00', noche: (x) => x.t >= '18:00' }[hp.franja];
       const x = libres.find(rango);
-      if (x) return ofrecer(x, '✅ Sí, tengo un cupo *' + enDia() + ' a las ' + x.hora + '*. ¿Lo vas a apartar?');
+      if (x) return ofrecer(x, '✅ Sí, tengo un cupo *' + enDia() + ' a las ' + x.hora + '* ¿Lo vas a apartar?');
     } else if (hp && hp.hm) {
       const x = libres.find((y) => y.t === hp.hm);
-      if (x) return ofrecer(x, '✅ Sí, tengo un cupo *' + enDia() + ' a las ' + x.hora + '*. ¿Lo vas a apartar?');
+      if (x) return ofrecer(x, '✅ Sí, tengo un cupo *' + enDia() + ' a las ' + x.hora + '* ¿Lo vas a apartar?');
       const antes = libres.filter((y) => y.t < hp.hm).pop(), despues = libres.find((y) => y.t > hp.hm);
       if (antes || despues) {
         const op = [antes, despues].filter(Boolean);
@@ -325,7 +325,7 @@ function crear(dep) {
     // ese día no hay (o no dijo hora): el día pedido con su lista de horas, o el más cercano con cupo
     const otro = libres.length ? null : D.find((x) => x.date > fecha);
     if (!hp && libres.length) return cupos(neg, c, pre, fecha);
-    if (otro) { conv.date = otro.date; conv.dia = otro.dia; return ofrecer({ t: otro.libres[0], hora: otro.horas[0] }, (pre || '') + '😕 ' + (dia.dia || 'Ese día') + ' ya no tengo cupos. El más cercano es *' + otro.dia.toLowerCase() + ' a las ' + otro.horas[0] + '*. ¿Lo vas a apartar?'); }
+    if (otro) { conv.date = otro.date; conv.dia = otro.dia; return ofrecer({ t: otro.libres[0], hora: otro.horas[0] }, (pre || '') + '😕 ' + (dia.dia || 'Ese día') + ' ya no tengo cupos. El más cercano es *' + otro.dia.toLowerCase() + ' a las ' + otro.horas[0] + '* ¿Lo vas a apartar?'); }
     return cupos(neg, c, pre, fecha);
   }
   // «Sí» → servicio (el de siempre si ya lo conocemos; si no, «¿Qué te vas a hacer?») → nombre (si falta) → ✅ apartado (sin más menús)
