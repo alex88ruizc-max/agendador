@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-3.24** · Página **2026-11-12h** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-12** · Mary **agendador-ia-3.25** · Página **2026-11-12i** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -113,6 +113,13 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-12 · agendador-ia-3.25 · ⚠️ incidente: la página volvió al servidor viejo
+- Causa del «No hay conexión con el servidor» (desvincular, panel): `config.js` del repositorio tenía la dirección VIEJA
+  (AKfycbyRSqns…, cuenta alex88ruizc) y viajó en TODOS los zips de la página 12a…12h → al subirlos se deshizo la mudanza del 10-nov.
+  El VPS (Mary) seguía en el servidor nuevo. Desde ~2:11 p. m. el panel y la página usaron el servidor viejo (gastando el cupo de esa cuenta).
+- Arreglo: `config.js` = AKfycbwkfrob… (tuagenda.servidor). `cartero.py subir_web`: si un zip trae otra `API_URL`, se conserva la de
+  GitHub (salvo la mudanza, que sube «config.js (servidor nuevo)»). Probado con GitHub simulado.
 
 ### 2026-11-12 · agendador-ia-3.24 · ley /sinbot
 - `atenderMensaje`: `esSinbot()` antes de todo: del dueño → `MEM.sinbot[k]` (mudo, persistente); otro /sinbot (dueño o cliente) lo

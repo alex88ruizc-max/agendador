@@ -83,6 +83,19 @@ def subir_web(nombre, datos):
     archivos = {destino(n): z.read(n) for n in z.namelist() if not n.endswith('/') and destino(n)}
     raros = [n for n in z.namelist() if not n.endswith('/') and not destino(n)]
     if not archivos: return '❌ ' + nombre + ' no trae archivos de la página.'
+    # 3.25 · 🛡️ el servidor de Google de la página NO se cambia por un zip de la página (solo la mudanza lo cambia):
+    #        si el zip trae config.js con otra dirección del servidor, se deja la que ya está en GitHub
+    aviso_api = ''
+    if 'config.js' in archivos and not nombre.startswith('config.js (servidor nuevo)'):
+        try:
+            s_, r_ = gh('GET', '/contents/config.js?ref=' + GH_RAMA)
+            actual = base64.b64decode(r_['content']).decode('utf-8')
+            m_act = re.search(r'export const API_URL = "([^"]*)";', actual); m_zip = re.search(rb'export const API_URL = "([^"]*)";', archivos['config.js'])
+            if m_act and m_zip and m_zip.group(1).decode() != m_act.group(1):
+                archivos['config.js'] = re.sub(rb'export const API_URL = "[^"]*";', ('export const API_URL = "' + m_act.group(1) + '";').encode(), archivos['config.js'])
+                aviso_api = '\n🛡️ config.js traía otra dirección del servidor de Google: dejé la que ya funciona (' + m_act.group(1)[-18:] + ').'
+        except Exception as e:
+            aviso_api = '\n⚠️ No pude revisar la dirección del servidor en config.js: ' + str(e)[:80]
     # 0) 🧪 2.7: banco de pruebas de la página. Si algo falla, NO se sube nada (la página sigue como estaba)
     banco = banco_web(archivos)
     if banco.startswith('❌'): return banco + '\n🛑 No subí nada: tuagenda.vip sigue como estaba.'
@@ -106,7 +119,7 @@ def subir_web(nombre, datos):
     for n in ('common.js',):
         if n in archivos:
             m = re.search(rb"APP_VERSION = '([^']+)'", archivos[n]); v = (' · versión ' + m.group(1).decode()) if m else ''
-    return (banco + '\n✅ Página subida a GitHub (' + str(len(archivos)) + ' archivos' + v + '). tuagenda.vip se actualiza en 1-2 min.\n↩️ Respaldo: rama ' + resp +
+    return (banco + aviso_api + '\n✅ Página subida a GitHub (' + str(len(archivos)) + ' archivos' + v + '). tuagenda.vip se actualiza en 1-2 min.\n↩️ Respaldo: rama ' + resp +
             ('\n⚠️ Ignoré: ' + ', '.join(raros[:8]) if raros else ''))
 
 # ---------- 📱 APK de Android (la genera el servicio oficial de PWABuilder desde el VPS) ----------
