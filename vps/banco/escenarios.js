@@ -707,3 +707,13 @@ test('3.11 · horaPedida entiende cómo escribe la gente', () => {
   assert.deepEqual(H('temprano'), { franja: 'manana' }); assert.deepEqual(H('el viernes en la tarde'), { franja: 'tarde' });
   assert.equal(H('para el 20 de diciembre'), null, 'una fecha no es una hora'); assert.equal(H('hola'), null);
 });
+
+test('3.12 · Con la lista de días/horas abierta, «¿Tienes cupo para mañana a las 11am?» → responde ESA hora (no vuelve a mandar la lista)', async () => {
+  await llega(wahaMsg(CLIENTE, 'hay cupos?'));
+  await llega(toca('hc:otro', '🗓️ Otro día'));          // queda abierta «Elegir día»
+  await llega(wahaMsg(CLIENTE, 'Tienes cupo para mañana a las 11am?'));
+  assert.match(ultimo().texto, /A las 11:00 a\. m\. no tengo, pero tengo antes, a las \*9:00 a\. m\.\* mañana/);
+  assert.deepEqual(ids(ultimo()), ['ap:09:00', 'ap:otra']);
+  await llega(wahaMsg(CLIENTE, 'y a las 9?'));
+  assert.match(ultimo().texto, /Sí, tengo un cupo \*mañana a las 9:00 a\. m\.\*/);
+});

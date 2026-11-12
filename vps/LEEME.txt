@@ -1,4 +1,4 @@
-🗓️ AGENDADOR IA · agendador-ia-3.11   (por dentro atiende «Mary», la recepcionista)
+🗓️ AGENDADOR IA · agendador-ia-3.12   (por dentro atiende «Mary», la recepcionista)
 =====================================================================================================
 🚫 REGLA UNIVERSAL N.º 1 — EPIC NO SE TOCA (manda sobre todo lo demás, para Alex, para Claude y para cada script de este paquete)
    Epic (Mary de Epic, Luisa, la tienda, epic-waha, epic-tiendas, Epic Channels…) y CUALQUIER otro proyecto:
@@ -62,6 +62,10 @@ PROBAR EN EL VPS
 AJUSTES POR NEGOCIO (negocios.json)
   "recordatorioMin": 120     ·   "estados": { "activo": true, "hoy": "07:30", "semana": "07:00", "semanaDia": 1 }
   En Firestore (settings/general del negocio) maryAutoCaptura: true → la captura confirma al instante y el dueño revisa después.
+
+NOVEDADES 3.12
+  · Arreglo: si el cliente tenía abierta una lista (p. ej. «Elegir día») y escribía «¿tienes cupo mañana a las 11am?», le volvía a
+    mandar la lista. Ahora responde ESA hora: «Sí, tengo… ¿Lo vas a apartar?» o «a esa hora no, tengo antes… o después…».
 
 NOVEDADES 3.11 · CONVERSACIÓN NATURAL
   · El saludo: bienvenida + link + «dime qué servicio necesitas o escríbeme el día y la hora (ej. «mañana a las 4»)», con la

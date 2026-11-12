@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-3.11** · Página **2026-11-12d** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-12** · Mary **agendador-ia-3.12** · Página **2026-11-12d** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -113,6 +113,11 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-12 · agendador-ia-3.12 · hora concreta dentro de otra lista
+- Prueba real: con «Elegir día» abierta (2:58), «¿Tienes cupo para mañana a las 11am?» (3:18) devolvió la lista de mañana: en `seguir`,
+  el bloque «vuelve a preguntar por cupos» atendía antes de mirar la hora. Ahora, si el texto trae `horaPedida`, va a `propuesta()`
+  (salvo pasos de datos: nombre, correo, recordatorio, confirmar). Banco: 94 pruebas.
 
 ### 2026-11-12 · agendador-ia-3.11 · conversación natural
 - `horaPedida()` (a las 3 = 15:00; 1–7 sin am/pm = tarde; franjas temprano/tarde/noche). `propuesta()`: hora exacta → oferta

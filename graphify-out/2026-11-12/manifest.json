@@ -54,9 +54,9 @@
     "semantic_hash": ""
   },
   "vps/banco/escenarios.js": {
-    "mtime": 1794513741.2758162,
-    "seen": 1794513788.044138,
-    "ast_hash": "dea6f05a6df7bdb4e6a5532d285e55a6",
+    "mtime": 1794514074.338838,
+    "seen": 1794514131.516871,
+    "ast_hash": "b8eeb3087984cedcf20c81cb05be2931",
     "semantic_hash": ""
   },
   "vps/banco/pruebas.js": {
@@ -152,15 +152,15 @@
     "semantic_hash": "5009abfe30c8d8ffe5acf888999b674b"
   },
   "vps/principal.js": {
-    "mtime": 1794513785.7097292,
-    "seen": 1794513788.0442317,
-    "ast_hash": "335e0a040ce75d5ab697469db67f42ea",
+    "mtime": 1794514129.0617766,
+    "seen": 1794514131.5169685,
+    "ast_hash": "33632ac5e63e6f266cd741c708e5c548",
     "semantic_hash": ""
   },
   "vps/textos.js": {
-    "mtime": 1794510198.869931,
-    "seen": 1794510502.5498314,
-    "ast_hash": "a31a97929a94c083d924631de48766ac",
+    "mtime": 1794514006.783724,
+    "seen": 1794514131.5169735,
+    "ast_hash": "09d152fb7ec2bdf474f7f0631a7f0eac",
     "semantic_hash": ""
   },
   ".claude/settings.json": {
@@ -182,9 +182,9 @@
     "semantic_hash": ""
   },
   "BITACORA.md": {
-    "mtime": 1794513785.7246542,
-    "seen": 1794513788.0442579,
-    "ast_hash": "f2270f38dfb44fd2501ff0550b3a4615",
+    "mtime": 1794514129.0777624,
+    "seen": 1794514131.5169895,
+    "ast_hash": "f81abea869520695bc343edea28c9590",
     "semantic_hash": ""
   },
   "CLAUDE.md": {
@@ -218,9 +218,9 @@
     "semantic_hash": ""
   },
   "vps/LEEME.txt": {
-    "mtime": 1794513785.7240582,
-    "seen": 1794513788.0442984,
-    "ast_hash": "ed51e3010a3c87858d0756a560254bd9",
+    "mtime": 1794514129.0773442,
+    "seen": 1794514131.5170374,
+    "ast_hash": "8e4995de98cb80ec7a1efcfd7767ded6",
     "semantic_hash": ""
   },
   "vps/banco/reglas.js": {
@@ -242,9 +242,9 @@
     "semantic_hash": ""
   },
   "vps/asistente.js": {
-    "mtime": 1794513695.5599225,
-    "seen": 1794513788.0441313,
-    "ast_hash": "7e81036b51b20e6e63b9abeb6291b6ef",
+    "mtime": 1794514113.6201737,
+    "seen": 1794514131.5168648,
+    "ast_hash": "463c765793705db1515ea17ba5965051",
     "semantic_hash": ""
   },
   "vps/package-lock.json": {

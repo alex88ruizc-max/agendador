@@ -392,6 +392,11 @@ function crear(dep) {
       dep.guardar();
       return conv.directo ? crearCita(neg, c, conv) : pasoConfirmar(neg, c, conv);
     }
+    // 3.12: pidió un día y una HORA concretos («¿tienes cupo mañana a las 11am?») estando en otra lista → se responde ESA pregunta
+    if (!c.rowId && conv.paso !== 'oferta' && !['nombre', 'correo', 'recordatorio', 'cancelarSeguro', 'confirmar'].includes(conv.paso) && horaPedida(c.texto) && cfg(neg, cat).agendar) {
+      const conServicio = ['dia', 'hora', 'pro'].includes(conv.paso) && (conv.ids || []).length;
+      return propuesta(neg, c, '', { ids: conServicio ? conv.ids : [] });
+    }
     // vuelve a preguntar por cupos («¿y mañana hay cupo?»): se responde la pregunta, no se toma como opción elegida
     if (!c.rowId && QUIERE_CUPOS.test(t) && conv.paso !== 'hora') {
       if (conv.paso === 'horaCupos') return cupos(neg, c, '', fechaPedida(c.texto, hoy()) || conv.date);
