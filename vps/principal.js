@@ -6,7 +6,7 @@
 const http = require('http'), fs = require('fs'), path = require('path');
 const T = require('./textos'), C = require('./correo'), E = require('./estado'), A = require('./asistente');
 
-const VERSION = 'agendador-ia-3.32';
+const VERSION = 'agendador-ia-3.33';
 const env = (k, d) => (process.env[k] === undefined || process.env[k] === '' ? d : process.env[k]);
 const CFG = {
   puerto: parseInt(env('PUERTO', '3060'), 10),
@@ -579,6 +579,22 @@ async function tickVolver(aCualquierHora) {
     } catch (e) { est.errores++; log('❌ volver', neg.bid, e.message); }
   }
 }
+// ⏰ 3.33 · RETOMAR: el cliente empezó a agendar y lleva 30 min sin elegir nada → «¿Seguimos con tu cita?» (una sola vez).
+//    De noche (9:00 p. m. a 7:00 a. m.) no: se le escribe a las 7:00 si sigue pendiente. Nunca si el dueño habla en ese chat o hay /sinbot.
+async function tickRetomar(aCualquierHora) {
+  if (CFG.modo === 'apagado' || !MEM.conv) return;
+  const a = ahoraLocal(); if (!aCualquierHora && (a.hm < '07:00' || a.hm >= '21:00')) return;
+  const ahora = Date.now();
+  for (const [k, conv] of Object.entries(MEM.conv)) {
+    if (!ASIS.porRetomar(conv, ahora)) continue;
+    const i = k.indexOf(':'), bid = k.slice(0, i), tel = k.slice(i + 1), neg = negocios().find((x) => x.bid === bid);
+    if (!neg || !atiende({ tel }) || mudo(k) || (MEM.humano && MEM.humano[k] && ahora - MEM.humano[k] < botDe(neg).pausaMin * 60000)) continue;
+    if (!(await botAlDia(neg)).activo) continue;
+    conv.retomado = true; memGuardar();   // una sola vez aunque falle
+    try { await ASIS.retomar(neg, tel, conv); anotar({ bid, chat: tel.slice(-4), que: '⏰ lo retomé: «¿Seguimos con tu cita?» (llevaba 30 min sin elegir)' }); }
+    catch (e) { log('retomar', k, e.message); }
+  }
+}
 async function tickRecordatorios(aCualquierHora) {
   const hm = ahoraLocal().hm; if (!aCualquierHora && (hm < '05:00' || hm > '21:30')) return;   // 2.5: de noche no hay citas próximas: no se gasta cupo
   for (const neg of negocios()) {
@@ -797,7 +813,8 @@ function arrancarRelojes() {
   cada(60000, 'correo', revisarCorreos);
   cada(30000, 'estados', tickEstados);
   cada(15 * 60000, 'record', tickRecordatorios);
-  cada(5 * 60000, 'volver', tickVolver);   // 3.32: recordatorio de servicio (una vez al día, desde las 10:00)   // 2.5: cada 15 min (antes 5): el recordatorio sale igual con tiempo de sobra
+  cada(5 * 60000, 'volver', tickVolver);
+  cada(60000, 'retomar', tickRetomar);   // 3.33: «¿Seguimos con tu cita?» a los 30 min sin elegir nada   // 3.32: recordatorio de servicio (una vez al día, desde las 10:00)   // 2.5: cada 15 min (antes 5): el recordatorio sale igual con tiempo de sobra
   cada(60000, 'revis', tickRevisadas);
   cada(5000, 'wa', tickPedidosWa);
 }
@@ -834,5 +851,5 @@ if (require.main === module) {
   servidor.listen(CFG.puerto, () => { log('👩‍💼 ' + VERSION + ' escuchando en ' + CFG.puerto + ' · modo ' + CFG.modo); negocios(); arrancarRelojes(); });
 }
 // 🧪 solo para el banco de escenarios (banco/escenarios.js): deja a Mary como recién encendida
-const _banco = { ASIS, BOT, yaLoDije, memDicho: () => (MEM.dicho = MEM.dicho || {}), memHumano: () => MEM.humano, memRobot: () => (MEM.robot = MEM.robot || {}), tickRecordatorios, tickVolver, publicarEstado, alMensaje, alEventoConexion, ultimos, reiniciar() { CL = null; MEM.volver = {}; leer.avisado = false; BOT_LEIDO.clear(); MEM.sinbot = {}; MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; MEM.conv = {}; MEM.clientes = {}; MEM.conectados = {}; MEM.pendientesWa = {}; MEM.codigos = {}; MEM.robot = {}; MEM.dicho = {}; AGRUPA.clear(); ASIS._cat.clear(); BOT.clear(); CONTACTOS.clear(); vinculando.clear(); delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
+const _banco = { ASIS, BOT, yaLoDije, memDicho: () => (MEM.dicho = MEM.dicho || {}), memHumano: () => MEM.humano, memRobot: () => (MEM.robot = MEM.robot || {}), memConv: () => (MEM.conv = MEM.conv || {}), tickRecordatorios, tickVolver, tickRetomar, publicarEstado, alMensaje, alEventoConexion, ultimos, reiniciar() { CL = null; MEM.volver = {}; leer.avisado = false; BOT_LEIDO.clear(); MEM.sinbot = {}; MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; MEM.conv = {}; MEM.clientes = {}; MEM.conectados = {}; MEM.pendientesWa = {}; MEM.codigos = {}; MEM.robot = {}; MEM.dicho = {}; AGRUPA.clear(); ASIS._cat.clear(); BOT.clear(); CONTACTOS.clear(); vinculando.clear(); delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
 module.exports = { _banco, botNormal, frenoRobot, estadosQueTocan, atenderPedidoWa, sincronizarConectados, renovarQr, telEnAviso, deWaha, esWaha, debeResponder, alEventoConexion, tickPedidosWa, limpiarSinVincular, leerMensaje, atiende, PREGUNTA, numeroWa, ahoraLocal, enFila, yaVisto, quienVeEstados, CFG };

@@ -1079,3 +1079,39 @@ test('3.32 · 🔁 Sin días elegidos por el dueño (o apagado) NO sale nada', a
   B.BOT.set('lina-spa', { cfg: P.botNormal({ volver: { activo: false, dias: 21 } }), t: Date.now() });
   await B.tickVolver(true); assert.ok(!W.gas.includes('volver')); assert.equal(W.enviados.length, 0);
 });
+
+// =====================================================================
+//  3.33 · ⏰ retomar al cliente que dejó el agendamiento a medias
+// =====================================================================
+function envejecer(min) { const c = P._banco.memConv()['lina-spa:' + CLIENTE]; c.t -= min * 60000; }
+test('3.33 · ⏰ 30 min sin elegir el día → «¿Seguimos con tu cita? Te quedaste en elegir el día» → Seguir → la MISMA lista de días → sigue normal', async () => {
+  await llega(wahaMsg(CLIENTE, 'quiero agendar')); await llega(toca('cat:2')); await llega(toca('svc:e1')); await llega(toca('mas:no'));
+  const dias = ids(ultimo());
+  envejecer(29); await B.tickRetomar(true); assert.equal(ultimo().lista.button, 'Elegir día', 'a los 29 min todavía no');
+  envejecer(2); await B.tickRetomar(true);
+  assert.match(ultimo().texto, /¿Seguimos con tu cita\?/); assert.match(ultimo().texto, /Te quedaste en \*?elegir el día/); assert.deepEqual(ids(ultimo()), ['ret:si', 'ret:no']);
+  const n = W.enviados.length; envejecer(40); await B.tickRetomar(true); assert.equal(W.enviados.length, n, 'una sola vez');
+  await llega(toca('ret:si', '✅ Seguir'));
+  assert.match(ultimo().texto, /Seguimos/); assert.deepEqual(ids(ultimo()), dias, 'la misma lista donde quedó');
+  await llega(toca(dias[0])); assert.equal(ultimo().lista.button, 'Elegir hora', 'y sigue normal');
+});
+test('3.33 · ⏰ «Ya no» → se despide · si responde directo (p. ej. «mañana») sigue donde quedó', async () => {
+  await llega(wahaMsg(CLIENTE, 'quiero agendar')); await llega(toca('cat:2')); await llega(toca('svc:e1')); await llega(toca('mas:no'));
+  envejecer(31); await B.tickRetomar(true);
+  await llega(toca('ret:no', '🙅 Ya no'));
+  assert.match(ultimo().texto, /Cuando quieras, escribe \*agendar\*/); assert.equal(P._banco.memConv()['lina-spa:' + CLIENTE], undefined);
+  for (const x of Object.values(P._banco.memRobot())) (x.textos || []).forEach((y) => { y[1] -= 4 * 60000; });   // un rato después
+  if (B.memDicho()['lina-spa:' + CLIENTE]) B.memDicho()['lina-spa:' + CLIENTE].t -= 60000;
+  await llega(wahaMsg(CLIENTE, 'quiero agendar')); await llega(toca('cat:2')); await llega(toca('svc:e1')); await llega(toca('mas:no'));
+  envejecer(31); await B.tickRetomar(true);
+  await llega(wahaMsg(CLIENTE, 'mañana'));
+  assert.match(ultimo().texto, /Horas libres · Mañana/);
+});
+test('3.33 · ⏰ NO retoma: el saludo que nunca tocó, si el dueño habla en el chat, o con /sinbot', async () => {
+  await llega(wahaMsg(CLIENTE, 'hola')); const n0 = W.enviados.length;
+  const c0 = P._banco.memConv()['lina-spa:' + CLIENTE]; if (c0) c0.t -= 31 * 60000;
+  await B.tickRetomar(true); assert.equal(W.enviados.length, n0, 'el saludo no es un agendamiento');
+  await llega(wahaMsg(CLIENTE, 'quiero agendar')); await llega(toca('cat:2'));
+  B.memHumano()['lina-spa:' + CLIENTE] = Date.now();
+  envejecer(31); const n1 = W.enviados.length; await B.tickRetomar(true); assert.equal(W.enviados.length, n1, 'el dueño está hablando');
+});

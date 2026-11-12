@@ -414,6 +414,12 @@ function crear(dep) {
       if (NO.test(t)) return dep.texto(neg, c.tel, b.cambios ? '¿Qué prefieres? Escribe *cancelar* o *modificar* 🙏' : '¿Necesitas cambiarla? Aquí puedes: ' + conv.cita.link);
       fin(c.k); return null;   // habló de otra cosa: se atiende como mensaje normal
     }
+    if (conv.paso === 'retomar') {   // 3.33: «¿Seguimos con tu cita?» → seguir donde quedó / ya no
+      const antes = conv.pasoAntes;
+      if (c.rowId === 'ret:si' || (!c.rowId && (SI.test(t) || /^seguir|sigamos|seguimos/.test(t)))) { conv.paso = antes; conv.opciones = conv.opcionesAntes; delete conv.pasoAntes; delete conv.opcionesAntes; return reenviar(neg, c, conv, '👌 ¡Seguimos! '); }
+      if (c.rowId === 'ret:no' || (!c.rowId && (NO.test(t) || /ya no/.test(t)))) { fin(c.k); return dep.texto(neg, c.tel, '👌 Listo. Cuando quieras, escribe *agendar* y seguimos.'); }
+      conv.paso = antes; conv.opciones = conv.opcionesAntes; delete conv.pasoAntes; delete conv.opcionesAntes;   // respondió directo lo que faltaba (el día, la hora…)
+    }
     if (conv.paso === 'volver') {   // 3.32: respuesta al recordatorio de servicio
       if (c.rowId === 'vol:si' || (!c.rowId && (SI.test(t) || /lo mismo|lo de siempre|igual/.test(t)))) { delete conv.paso; conv.comoSiempre = true; return pasoDia(neg, c, conv, '👌 ¡Listo! '); }
       if (c.rowId === 'vol:otro' || (!c.rowId && /otro|otra cosa|cambiar|diferente/.test(t))) { conv.ids = []; delete conv.staffId; delete conv.paso; return pasoCategoria(neg, c, conv); }
@@ -543,8 +549,11 @@ function crear(dep) {
     if (o.id === 'ok:no') return agendar(neg, c, '✏️ Listo, empecemos de nuevo.\n\n', { ids: [] });
     return reenviar(neg, c, conv);
   }
-  async function reenviar(neg, c, conv) {
-    const pre = 'No te entendí 🙈 Elige una opción de la lista 👇\n\n';
+  async function reenviar(neg, c, conv, otroPre) {
+    const pre = otroPre !== undefined ? otroPre : 'No te entendí 🙈 Elige una opción de la lista 👇\n\n';
+    if (conv.paso === 'nombre') { mem().conv[c.k] = conv; conv.t = ahora(); dep.guardar(); return dep.texto(neg, c.tel, pre + '🙋 ¿A nombre de quién agendo la cita?'); }
+    if (conv.paso === 'nombreOtra') { mem().conv[c.k] = conv; conv.t = ahora(); dep.guardar(); return dep.texto(neg, c.tel, pre + '🙋 ¿A nombre de quién es esta cita? (si es para ti, escribe *yo*)'); }
+    if (conv.paso === 'correo') { mem().conv[c.k] = conv; conv.t = ahora(); dep.guardar(); return dep.texto(neg, c.tel, pre + T.pideCorreo()); }
     if (conv.paso === 'cat') return pasoCategoria(neg, c, conv, pre);
     if (conv.paso === 'svc') return pasoServicio(neg, c, conv, pre);
     if (conv.paso === 'mas') return pasoMas(neg, c, conv);
@@ -553,7 +562,7 @@ function crear(dep) {
     if (conv.paso === 'pro') return pasoProfesional(neg, c, conv);
     if (conv.paso === 'confirmar') return pasoConfirmar(neg, c, conv);
     if (conv.paso === 'diaCupos') return diasCupos(neg, c, conv);
-    if (conv.paso === 'horaCupos') return cupos(neg, c, pre, conv.date);
+    if (conv.paso === 'horaCupos') return cupos(neg, c, pre, conv.date, conv);
     if (conv.paso === 'oferta') return propuesta(neg, c, pre, { date: conv.date, ids: conv.ids, hp: conv.time ? { hm: conv.time } : null });
     if (conv.paso === 'siempre') return agendar(neg, c, pre);
     fin(c.k); return null;
@@ -600,6 +609,18 @@ function crear(dep) {
     return pasoDia(neg, c, conv, '🔄 Vamos a cambiar tu cita.\n\n');
   }
   // después de mandar el recordatorio: la próxima respuesta del cliente es sobre ESA cita
+  // ⏰ 3.33 · RETOMAR: empezó a agendar y lleva 30 min sin elegir nada → «¿Seguimos con tu cita? Te quedaste en elegir el día» (una sola vez)
+  const QUEDO = { cat: 'elegir el servicio', svc: 'elegir el servicio', mas: 'decirme si agregas otro servicio', siempre: 'decirme si es lo de siempre', dia: 'elegir el día', diaCupos: 'elegir el día',
+    hora: 'elegir la hora', horaCupos: 'elegir la hora', oferta: 'decirme si apartas la hora', pro: 'elegir con quién', nombre: 'decirme tu nombre', nombreOtra: 'decirme a nombre de quién es', correo: 'decirme tu correo (o «no»)' };
+  function porRetomar(conv, ms) { return !!(conv && QUEDO[conv.paso] && !conv.retomado && !conv.deSaludo && conv.modo !== 'reagendar' && ms - (conv.t || 0) >= 30 * 60000 && ms - (conv.t || 0) < 12 * 3600000); }
+  async function retomar(neg, tel, conv) {
+    const k = neg.bid + ':' + tel, cl = cliente(k), cat = await catalogo(neg).catch(() => ({ negocio: '' }));
+    const quedo = QUEDO[conv.paso];
+    conv.pasoAntes = conv.paso; conv.opcionesAntes = conv.opciones; conv.paso = 'retomar'; conv.retomado = true; conv.vence = 3 * 3600000;
+    const n = nombre1(cl.nombre);
+    return lista(neg, { k, tel }, conv, { texto: 'Hola' + (n ? ' ' + n : '') + ' 👋 ¿Seguimos con tu cita?\nTe quedaste en *' + quedo + '*.', boton: 'Ver opciones', pie: (cat.negocio || '') + ' · asistente virtual',
+      secciones: [{ titulo: '¿Seguimos?', filas: [{ id: 'ret:si', titulo: '✅ Seguir', desc: 'Donde quedamos' }, { id: 'ret:no', titulo: '🙅 Ya no', desc: '' }] }] });
+  }
   // 🔁 3.32 · recordatorio de servicio: «Ya van 3 semanas desde tu último Corte con Gabriel. ¿Te agendo de nuevo?»
   async function ofrecerVolver(neg, tel, x, negocio) {
     const k = neg.bid + ':' + tel, cl = cliente(k);
@@ -679,7 +700,7 @@ function crear(dep) {
     if (b.cupos) secciones.push({ titulo: 'Horarios', filas: [{ id: 'menu:cupos', titulo: '🕐 Ver cupos de hoy', desc: 'Horas disponibles' }] });
     return lista(neg, c, { paso: 'menu', ids: [] }, { texto, boton: b.agendar && C.length ? 'Ver servicios' : 'Ver opciones', pie: (negocio || '') + ' · asistente virtual', secciones });
   }
-  return { manejar, menu, saludo, ofrecerVolver, trasRecordatorio, preguntarDobles, cliente, fechaPedida: (t) => fechaPedida(t, hoy()), _cat: catCache };
+  return { manejar, menu, saludo, ofrecerVolver, retomar, porRetomar, trasRecordatorio, preguntarDobles, cliente, fechaPedida: (t) => fechaPedida(t, hoy()), _cat: catCache };
 }
 
 module.exports = { crear, horaPedida, fechaPedida, sinTilde, QUIERE_CUPOS, QUIERE_AGENDAR, SALUDO };

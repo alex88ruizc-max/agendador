@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-3.32** · Página **2026-11-12q** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-12** · Mary **agendador-ia-3.33** · Página **2026-11-12q** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -113,6 +113,17 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-12 · agendador-ia-3.33 · ⏰ retomar al cliente que dejó el agendamiento a medias
+- Pedido de Alex: si el cliente empezó a agendar y no eligió nada en 30 min, retomarlo.
+- A los 30 min sin elegir: «Hola Nicolás 👋 ¿Seguimos con tu cita? Te quedaste en *elegir el día*» → ✅ Seguir (vuelve la MISMA lista donde quedó, con lo ya elegido) / 🙅 Ya no.
+  - Sirve para servicio, «agregar otro», día, hora, con quién, nombre y correo. Si en vez de tocar responde directo («mañana»), sigue donde quedó.
+- **Una sola vez.** No retoma:
+  - el saludo que nunca tocó, ni los reagendamientos;
+  - si el dueño está hablando en el chat (pausa) o hay /sinbot;
+  - de noche (9:00 p. m. a 7:00 a. m.): sale a las 7:00 si sigue pendiente (hasta 12 h).
+- El recordatorio de servicio (3.32) está en el panel › WhatsApp Bot, al final (sección «🔁 Recordatorio de servicio»).
+- Banco: 141 pruebas, 0 fallas. Probado con mutaciones (una sola vez, 30 min).
 
 ### 2026-11-12 · agendador-ia-3.32 · página 2026-11-12q · 🔁 recordatorio de servicio
 - Pedido de Alex: escribirle al cliente que ya vino para que vuelva: «¿quieres hacerte lo mismo o cambiarlo?». Si dice sí, solo elige fecha y queda confirmada.

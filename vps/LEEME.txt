@@ -1,4 +1,4 @@
-🗓️ AGENDADOR IA · agendador-ia-3.32   (por dentro atiende «Mary», la recepcionista)
+🗓️ AGENDADOR IA · agendador-ia-3.33   (por dentro atiende «Mary», la recepcionista)
 =====================================================================================================
 🚫 REGLA UNIVERSAL N.º 1 — EPIC NO SE TOCA (manda sobre todo lo demás, para Alex, para Claude y para cada script de este paquete)
    Epic (Mary de Epic, Luisa, la tienda, epic-waha, epic-tiendas, Epic Channels…) y CUALQUIER otro proyecto:
@@ -62,6 +62,9 @@ PROBAR EN EL VPS
 AJUSTES POR NEGOCIO (negocios.json)
   "recordatorioMin": 120     ·   "estados": { "activo": true, "hoy": "07:30", "semana": "07:00", "semanaDia": 1 }
   En Firestore (settings/general del negocio) maryAutoCaptura: true → la captura confirma al instante y el dueño revisa después.
+
+NOVEDADES 3.33 · ⏰ RETOMAR AL CLIENTE
+  Si empezó a agendar y lleva 30 min sin elegir nada: «¿Seguimos con tu cita? Te quedaste en elegir el día» (una sola vez, de día).
 
 NOVEDADES 3.32 · 🔁 RECORDATORIO DE SERVICIO
   Panel › WhatsApp Bot › «Recordatorio de servicio»: actívalo y elige a los cuántos días. Desde las 10:00, máx. 20 al día.
