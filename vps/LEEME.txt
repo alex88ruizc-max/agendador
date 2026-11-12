@@ -1,4 +1,4 @@
-🗓️ AGENDADOR IA · agendador-ia-3.1   (por dentro atiende «Mary», la recepcionista)
+🗓️ AGENDADOR IA · agendador-ia-3.2   (por dentro atiende «Mary», la recepcionista)
 =====================================================================================================
 🚫 REGLA UNIVERSAL N.º 1 — EPIC NO SE TOCA (manda sobre todo lo demás, para Alex, para Claude y para cada script de este paquete)
    Epic (Mary de Epic, Luisa, la tienda, epic-waha, epic-tiendas, Epic Channels…) y CUALQUIER otro proyecto:
@@ -62,6 +62,11 @@ PROBAR EN EL VPS
 AJUSTES POR NEGOCIO (negocios.json)
   "recordatorioMin": 120     ·   "estados": { "activo": true, "hoy": "07:30", "semana": "07:00", "semanaDia": 1 }
   En Firestore (settings/general del negocio) maryAutoCaptura: true → la captura confirma al instante y el dueño revisa después.
+
+NOVEDADES 3.2 · MODO POR TELEGRAM (bot «Agendador VPS»)
+  · /modo → muestra el modo y los números de prueba.   /modo prueba · /modo apagado · /modo todos confirmo
+    (para «todos» pide confirmar: le responde a CUALQUIERA que escriba a los WhatsApp vinculados).
+  · /prueba 573001234567,573009998877 → cambia los números de prueba. Reinicia solo el asistente (agendador-ia).
 
 NOVEDADES 3.1 · PANEL «💬 WhatsApp Bot» (todo configurable por el dueño)
   · Pestaña nueva en el panel: vincular el WhatsApp (código de 8 letras visible o QR que se renueva solo), desvincular, y opciones:

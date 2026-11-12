@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-3.1** · Página **2026-11-12b** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-12** · Mary **agendador-ia-3.2** · Página **2026-11-12b** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -113,6 +113,11 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-12 · agendador-ia-3.2 · modo por Telegram
+- 3.1 instalada y verificada en el panel real: «WhatsApp Bot» muestra El Barba ✅ vinculado (+57 318…), sincronizado solo.
+- `cartero.py`: `/modo` (ver), `/modo prueba|apagado`, `/modo todos confirmo` (pide confirmar), `/prueba <números>`.
+  Editan `agendador-ia.env` y reinician solo `agendador-ia` (`docker compose up -d agendador-ia --force-recreate`).
 
 ### 2026-11-12 · agendador-ia-3.1 · 💬 Panel «WhatsApp Bot» + 📸 estados + recordatorio con respuesta
 - Panel (`admin.js`): pestaña nueva `wabot` («WhatsApp Bot»): tarjeta de vincular (código visible + botón «Prefiero escanear un QR»),

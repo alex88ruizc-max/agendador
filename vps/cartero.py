@@ -197,7 +197,52 @@ def atender(m):
     elif texto.startswith('/apk'): decir('📱 Generando la app de Android… (tarda 1 a 3 minutos)'); decir(hacer_apk())
     elif texto.startswith('/estado'): decir(curl('/salud'))
     elif texto.startswith('/registro'): decir(curl('/registro?n=12'))
-    elif texto: decir('Hola 👋 Soy el cartero del Agendador IA.\nMándame:\n• agendador-ia-….zip → actualizo el VPS (Mary) y el Apps Script de Google\n• agendador-web-….zip → subo la página tuagenda.vip\n/apk → genero la app de Android\n/estado · /registro')
+    elif texto.startswith('/modo'): decir(cmd_modo(texto))
+    elif texto.startswith('/prueba'): decir(cmd_prueba(texto))
+    elif texto: decir('Hola 👋 Soy el cartero del Agendador IA.\nMándame:\n• agendador-ia-….zip → actualizo el VPS (Mary) y el Apps Script de Google\n• agendador-web-….zip → subo la página tuagenda.vip\n/apk → genero la app de Android\n/estado · /registro\n/modo → ver o cambiar el modo (prueba, todos, apagado)\n/prueba <números> → tus números de prueba')
+
+# ---------- 🧪 3.1 · modo del asistente por Telegram: /modo · /modo prueba|todos|apagado · /prueba <números> ----------
+ENV_IA = os.path.join(AQUI, 'agendador-ia.env')
+def env_leer():
+    try: return open(ENV_IA, encoding='utf-8').read().splitlines()
+    except Exception: return []
+def env_valor(k):
+    for l in env_leer():
+        if l.startswith(k + '='): return l.split('=', 1)[1]
+    return ''
+def env_poner(k, v):
+    L = [l for l in env_leer() if not l.startswith(k + '=')] + [k + '=' + v]
+    open(ENV_IA + '.tmp', 'w', encoding='utf-8').write('\n'.join(L) + '\n'); os.replace(ENV_IA + '.tmp', ENV_IA)
+def reiniciar_ia():
+    # solo el contenedor del agendador (regla N.º 1: nada de otros proyectos)
+    r = subprocess.run(['sudo', 'docker', 'compose', 'up', '-d', 'agendador-ia', '--force-recreate'], cwd=AQUI, capture_output=True, text=True, timeout=300)
+    if r.returncode != 0: return '❌ No pude reiniciar el asistente: ' + (r.stderr or r.stdout)[-300:]
+    for _ in range(30):
+        time.sleep(2)
+        s = curl('/salud')
+        if '"ok":true' in s.replace(' ', ''): return s
+    return '⚠️ Reinicié, pero aún no responde. Mira /estado en un minuto.'
+MODOS = {'prueba': '🧪 PRUEBA: solo responde a tus números de prueba', 'todos': '✅ TODOS: atiende a todos los clientes', 'apagado': '⏸️ APAGADO: no responde, no lee correos, no publica'}
+def cmd_modo(texto):
+    p = texto.split()
+    actual = env_valor('MARY_MODO') or 'prueba'
+    if len(p) == 1:
+        return ('Modo actual: ' + MODOS.get(actual, actual) + '\nNúmeros de prueba: ' + (env_valor('MARY_PRUEBA') or '(ninguno)') +
+                '\n\nCambiar:\n/modo prueba\n/modo todos\n/modo apagado\n/prueba 573001234567,573009998877')
+    nuevo = p[1]
+    if nuevo not in MODOS: return '🤔 Modos: prueba, todos o apagado. Ej.: /modo todos'
+    if nuevo == actual: return 'Ya está en ' + MODOS[nuevo]
+    if nuevo == 'todos' and (len(p) < 3 or p[2] not in ('confirmo', 'si', 'sí')):
+        return ('⚠️ En modo TODOS el asistente le responde a CUALQUIERA que escriba a los WhatsApp vinculados y publica los estados.\n'
+                'Si tienes vinculado un número personal (ej. tu 318), también les respondería a tus contactos.\n\nSi estás seguro, escribe:\n/modo todos confirmo')
+    env_poner('MARY_MODO', nuevo)
+    return '🔄 Cambiando a ' + MODOS[nuevo] + '…\n' + reiniciar_ia()
+def cmd_prueba(texto):
+    nums = [re.sub(r'\D', '', x) for x in re.split(r'[,\s]+', texto.split(None, 1)[1] if len(texto.split(None, 1)) > 1 else '')]
+    nums = [('57' + n if len(n) == 10 and n.startswith('3') else n) for n in nums if n]
+    if not nums or any(len(n) < 11 or len(n) > 15 for n in nums): return '🤔 Escríbelos con el indicativo, separados por coma. Ej.:\n/prueba 573001234567,573009998877'
+    env_poner('MARY_PRUEBA', ','.join(nums))
+    return '🧪 Números de prueba: ' + ', '.join(nums) + '\n' + reiniciar_ia()
 
 INICIO = os.path.getmtime(os.path.abspath(__file__))
 def main():
