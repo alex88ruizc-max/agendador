@@ -42,15 +42,15 @@
     "semantic_hash": "efbb6a0b796eec8acf38aef12285162d"
   },
   "vps/actualizar-google.sh": {
-    "mtime": 1794526523.4622226,
-    "seen": 1794526620.397531,
-    "ast_hash": "8902bf552195d33290452ae3d983fe40",
+    "mtime": 1794527290.9176183,
+    "seen": 1794527501.179333,
+    "ast_hash": "8f6c02d3b3554077b69fbabb048a9a0f",
     "semantic_hash": ""
   },
   "vps/actualizar.sh": {
-    "mtime": 1794526547.1394627,
-    "seen": 1794526620.3975406,
-    "ast_hash": "6cf32a0cad983ca849174dc07a01d5b7",
+    "mtime": 1794527319.8429697,
+    "seen": 1794527501.1793425,
+    "ast_hash": "8fda4ea630955edf18778acb485a48d8",
     "semantic_hash": ""
   },
   "vps/banco/escenarios.js": {
@@ -72,9 +72,9 @@
     "semantic_hash": "b3af3c94a56105757f5909562ace2d9b"
   },
   "vps/cartero.py": {
-    "mtime": 1794526675.8937902,
-    "seen": 1794526764.742753,
-    "ast_hash": "f911ec8b3c9f6746ef7f0670d496a137",
+    "mtime": 1794527350.794071,
+    "seen": 1794527501.179393,
+    "ast_hash": "3b3a67e2945c09c4b0c032b552f538b1",
     "semantic_hash": ""
   },
   "vps/conectar.sh": {
@@ -96,9 +96,9 @@
     "semantic_hash": "17d71338323fbe874e7d322d42f8d9e6"
   },
   "vps/docker-compose.yml": {
-    "mtime": 1794515200.9168468,
-    "seen": 1794515410.1364434,
-    "ast_hash": "30ad5501428084afcd5adc885c83788f",
+    "mtime": 1794527290.9164987,
+    "seen": 1794527501.1794336,
+    "ast_hash": "f75ca79a2d1c1c2a5f39fe9001184835",
     "semantic_hash": ""
   },
   "vps/estado.js": {
@@ -128,21 +128,21 @@
     "semantic_hash": "eb2efa939238e509539b46da12c97764"
   },
   "vps/instalar-google.sh": {
-    "mtime": 1794526523.4632123,
-    "seen": 1794526620.3976624,
-    "ast_hash": "e36f47283b86803fb3d1051af7e1dea4",
+    "mtime": 1794527290.922724,
+    "seen": 1794527501.179478,
+    "ast_hash": "c4a774bc056ecc6b01291be3258fb82c",
     "semantic_hash": ""
   },
   "vps/instalar.sh": {
-    "mtime": 1794526523.4629767,
-    "seen": 1794526620.3976693,
-    "ast_hash": "c7626c3ff9aca9e5cbf3019b6511d979",
+    "mtime": 1794527290.9174159,
+    "seen": 1794527501.1794858,
+    "ast_hash": "0c5c53c7036e14892813f5f5ab91426b",
     "semantic_hash": ""
   },
   "vps/mudar-google.sh": {
-    "mtime": 1794526523.4635172,
-    "seen": 1794526620.397676,
-    "ast_hash": "f7bb43fa7821c38fdd9fcd0a4fe39163",
+    "mtime": 1794527290.92296,
+    "seen": 1794527501.1794927,
+    "ast_hash": "1f75c89df525d6b03902ee7f077e0c83",
     "semantic_hash": ""
   },
   "vps/package.json": {
@@ -152,9 +152,9 @@
     "semantic_hash": "5009abfe30c8d8ffe5acf888999b674b"
   },
   "vps/principal.js": {
-    "mtime": 1794527176.6280901,
-    "seen": 1794527179.1168566,
-    "ast_hash": "77e73e8411f3d34cd2cf127fa8f97c5c",
+    "mtime": 1794527431.7001922,
+    "seen": 1794527501.179516,
+    "ast_hash": "03a53a342f61529b62af1869d13842bc",
     "semantic_hash": ""
   },
   "vps/textos.js": {
@@ -182,15 +182,15 @@
     "semantic_hash": ""
   },
   "BITACORA.md": {
-    "mtime": 1794527176.6484203,
-    "seen": 1794527179.1168766,
-    "ast_hash": "cd915cecd724213faab75e6abf29ab11",
+    "mtime": 1794527431.6941328,
+    "seen": 1794527501.1795485,
+    "ast_hash": "afd2f697b01c243d04325e02bfdbcca3",
     "semantic_hash": ""
   },
   "CLAUDE.md": {
-    "mtime": 1794515349.5951884,
-    "seen": 1794515410.136526,
-    "ast_hash": "965de4ca9ec2e8a106c18061d64a8fd9",
+    "mtime": 1794527431.6907175,
+    "seen": 1794527501.1795554,
+    "ast_hash": "acec54f56250e456fcb5a1d2e3025a73",
     "semantic_hash": ""
   },
   "admin.html": {
@@ -218,27 +218,27 @@
     "semantic_hash": ""
   },
   "vps/LEEME.txt": {
-    "mtime": 1794527176.649267,
-    "seen": 1794527179.1169508,
-    "ast_hash": "8471c497eb72ccfff3960f0203b15a10",
+    "mtime": 1794527431.6947935,
+    "seen": 1794527501.1796079,
+    "ast_hash": "401e3a39ce0860d4267d17faab4b88da",
     "semantic_hash": ""
   },
   "vps/banco/reglas.js": {
-    "mtime": 1794526695.2429047,
-    "seen": 1794526764.7427394,
-    "ast_hash": "b8fa79ccf3c9ff78dc481f81342532ef",
+    "mtime": 1794527326.3456306,
+    "seen": 1794527501.1793754,
+    "ast_hash": "7f2a2a93217458aedc59369be65d9095",
     "semantic_hash": ""
   },
   "LEEME-REGLA-UNIVERSAL.txt": {
-    "mtime": 1794515349.6031437,
-    "seen": 1794515410.1365309,
-    "ast_hash": "341dbb87b9540b7497bcda9670387f02",
+    "mtime": 1794527431.6925466,
+    "seen": 1794527501.1795628,
+    "ast_hash": "e6fe882a96145233fb1e250544cab4ad",
     "semantic_hash": ""
   },
   "vps/LEEME-REGLA-UNIVERSAL.txt": {
-    "mtime": 1794515349.6056552,
-    "seen": 1794515410.1365557,
-    "ast_hash": "341dbb87b9540b7497bcda9670387f02",
+    "mtime": 1794527431.6928046,
+    "seen": 1794527501.1796012,
+    "ast_hash": "e6fe882a96145233fb1e250544cab4ad",
     "semantic_hash": ""
   },
   "vps/asistente.js": {

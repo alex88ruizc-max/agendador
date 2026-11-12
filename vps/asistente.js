@@ -185,7 +185,7 @@ function crear(dep) {
     const cat = await catalogo(neg);
     h = h || await dep.gas(neg, 'horas', { ids: conv.ids, date: conv.date, staffId: conv.staffId || '' });
     const H = h.horas || [];
-    if (!H.length) { delete conv.date; return pasoDia(neg, c, conv, '😕 Ese día ya se llenó.\n\n'); }
+    if (!H.length) { const eraHoy = conv.date === hoy(); delete conv.date; delete conv.time; return pasoDia(neg, c, conv, eraHoy ? '😕 Hoy ya no quedan horas (ya vamos a cerrar). Elige otro día 👇\n\n' : '😕 Ese día ya se llenó.\n\n'); }
     conv.horas = H;
     const pag = conv.pagH || 0, por = 8, vista = H.slice(pag * por, pag * por + por);
     const fila = (x) => ({ id: 'hora:' + x.time, titulo: x.hora, desc: x.staff.length === 1 && (cat.staff || []).length > 1 ? 'con ' + x.staff[0].nombre : '' });
@@ -416,7 +416,15 @@ function crear(dep) {
     }
     if (conv.paso === 'retomar') {   // 3.33: «¿Seguimos con tu cita?» → seguir donde quedó / ya no
       const antes = conv.pasoAntes;
-      if (c.rowId === 'ret:si' || (!c.rowId && (SI.test(t) || /^seguir|sigamos|seguimos/.test(t)))) { conv.paso = antes; conv.opciones = conv.opcionesAntes; delete conv.pasoAntes; delete conv.opcionesAntes; return reenviar(neg, c, conv, '👌 ¡Seguimos! '); }
+      if (c.rowId === 'ret:si' || (!c.rowId && (SI.test(t) || /^seguir|sigamos|seguimos|otro dia/.test(t)))) {
+        conv.paso = antes; conv.opciones = conv.opcionesAntes; delete conv.pasoAntes; delete conv.opcionesAntes;
+        if (conv.otroDia || await diaAcabado(neg, conv)) {   // 3.36: ese día ya se acabó → otro día (sin hoy), con el servicio que ya eligió
+          delete conv.otroDia; delete conv.date; delete conv.time; delete conv.dia;
+          if ((conv.ids || []).length) return pasoDia(neg, c, conv, '👌 ¡Seguimos! Hoy ya no quedan horas, elige otro día 👇\n\n');
+          return cupos(neg, c, '👌 ¡Seguimos! ', sumarDias(hoy(), 1), conv);
+        }
+        return reenviar(neg, c, conv, '👌 ¡Seguimos! ');
+      }
       if (c.rowId === 'ret:no' || (!c.rowId && (NO.test(t) || /ya no/.test(t)))) { fin(c.k); return dep.texto(neg, c.tel, '👌 Listo. Cuando quieras, escribe *agendar* y seguimos.'); }
       conv.paso = antes; conv.opciones = conv.opcionesAntes; delete conv.pasoAntes; delete conv.opcionesAntes;   // respondió directo lo que faltaba (el día, la hora…)
     }
@@ -613,6 +621,20 @@ function crear(dep) {
   const QUEDO = { cat: 'elegir el servicio', svc: 'elegir el servicio', mas: 'decirme si agregas otro servicio', siempre: 'decirme si es lo de siempre', dia: 'elegir el día', diaCupos: 'elegir el día',
     hora: 'elegir la hora', horaCupos: 'elegir la hora', oferta: 'decirme si apartas la hora', pro: 'elegir con quién', nombre: 'decirme tu nombre', nombreOtra: 'decirme a nombre de quién es', correo: 'decirme tu correo (o «no»)' };
   function porRetomar(conv, ms) { return !!(conv && QUEDO[conv.paso] && !conv.retomado && !conv.deSaludo && conv.modo !== 'reagendar' && ms - (conv.t || 0) >= 30 * 60000 && ms - (conv.t || 0) < 12 * 3600000); }
+  // 3.36 · ¿el día que estaba eligiendo ya se acabó? (era HOY y ya no quedan horas, o la hora que escogió ya pasó) → se le ofrece OTRO día
+  const PASOS_DE_HORA = ['hora', 'horaCupos', 'oferta', 'pro', 'nombre', 'nombreOtra', 'correo'];
+  async function diaAcabado(neg, conv) {
+    if (!conv.date || !PASOS_DE_HORA.includes(conv.paso)) return false;
+    if (conv.date < hoy()) return true;
+    if (conv.date > hoy()) return false;
+    if (conv.time && conv.time <= ahoraHM()) return true;   // la hora que había escogido ya pasó
+    try {
+      const h = (conv.ids || []).length ? await dep.gas(neg, 'horas', { ids: conv.ids, date: conv.date, staffId: conv.staffId || '' }) : null;
+      if (h) return conv.time ? !(h.horas || []).some((x) => x.time === conv.time) : !(h.horas || []).length;
+      const r = await dep.gas(neg, 'cupos', { dias: 1 }); const d = (r.dias || [])[0] || {};
+      return conv.time ? !(d.libres || []).includes(conv.time) : !(d.libres || []).length;
+    } catch (e) { return false; }
+  }
   async function retomar(neg, tel, conv) {
     const k = neg.bid + ':' + tel, cl = cliente(k), cat = await catalogo(neg).catch(() => ({ negocio: '' }));
     const quedo = QUEDO[conv.paso];
@@ -620,10 +642,12 @@ function crear(dep) {
       cl.nombreBuscado = hoy(); dep.guardar();
       try { const r = await dep.gas(neg, 'chat', { phone: tel, conNombre: 1 }); if (r && r.cliente && /^[\p{L}][\p{L} .'-]{1,40}$/u.test(r.cliente)) { cl.nombre = r.cliente; dep.guardar(); } } catch (e) { /* sin nombre */ }
     }
-    conv.pasoAntes = conv.paso; conv.opcionesAntes = conv.opciones; conv.paso = 'retomar'; conv.retomado = true; conv.vence = 3 * 3600000;
-    const n = nombre1(cl.nombre || cl.nombreWa);
-    return lista(neg, { k, tel }, conv, { texto: 'Hola' + (n ? ' ' + n : '') + ' 👋 ¿Seguimos con tu cita?\nTe quedaste en *' + quedo + '*.', boton: 'Ver opciones', pie: (cat.negocio || '') + ' · asistente virtual',
-      secciones: [{ titulo: '¿Seguimos?', filas: [{ id: 'ret:si', titulo: '✅ Seguir', desc: 'Donde quedamos' }, { id: 'ret:no', titulo: '🙅 Ya no', desc: '' }] }] });
+    const acabado = await diaAcabado(neg, conv);   // 3.36: si ya va a cerrar, NO se ofrece el mismo día: se le busca otro
+    conv.pasoAntes = conv.paso; conv.opcionesAntes = conv.opciones; conv.paso = 'retomar'; conv.retomado = true; conv.vence = 3 * 3600000; conv.otroDia = acabado;
+    const n = nombre1(cl.nombre || cl.nombreWa), hola = 'Hola' + (n ? ' ' + n : '') + ' 👋 ¿Seguimos con tu cita?\n';
+    const texto = acabado ? hola + (conv.date === hoy() ? 'Hoy ya no quedan horas (ya vamos a cerrar), así que te la busco para *otro día* 📅' : 'Ese día ya pasó, así que te la busco para *otro día* 📅') : hola + 'Te quedaste en *' + quedo + '*.';
+    return lista(neg, { k, tel }, conv, { texto, boton: 'Ver opciones', pie: (cat.negocio || '') + ' · asistente virtual',
+      secciones: [{ titulo: '¿Seguimos?', filas: [{ id: 'ret:si', titulo: acabado ? '📅 Elegir otro día' : '✅ Seguir', desc: acabado ? 'Con lo que ya elegiste' : 'Donde quedamos' }, { id: 'ret:no', titulo: '🙅 Ya no', desc: '' }] }] });
   }
   // 🔁 3.32 · recordatorio de servicio: «Ya van 3 semanas desde tu último Corte con Gabriel. ¿Te agendo de nuevo?»
   async function ofrecerVolver(neg, tel, x, negocio) {

@@ -61,7 +61,7 @@ global.fetch = async (url, o) => {
     if (b.op === 'proof') return ok(W.proof || { ok: false, motivo: 'sin_cita_pendiente' });
     if (b.op === 'catalogo') return ok(Object.assign({}, CATALOGO, { abono: W.abono, activo: W.activo }));
     if (b.op === 'cupos') return ok(Object.assign({ dias: W.cupos }, NEGOCIO));
-    if (b.op === 'dias') return ok({ dias: W.cupos.map((x) => ({ date: x.date, dia: x.dia, n: x.horas.length })), link: NEGOCIO.link });
+    if (b.op === 'dias') return ok({ dias: W.cupos.filter((x) => x.horas.length).map((x) => ({ date: x.date, dia: x.dia, n: x.horas.length })), link: NEGOCIO.link });   // como el servidor: solo días con horas
     if (b.op === 'horas') { const d = W.cupos.find((x) => x.date === b.date) || { horas: [], libres: [] }; return ok({ date: b.date, dia: d.dia, horas: d.libres.map((t, i) => ({ time: t, hora: d.horas[i], staff: b.staffId ? [{ id: b.staffId, nombre: b.staffId === 's1' ? 'Lina' : 'Andrés' }] : [{ id: 's1', nombre: 'Lina' }, { id: 's2', nombre: 'Andrés' }] })), link: NEGOCIO.link }); }
     if (b.op === 'crear') {
       if (W.crearFalla) { const m = W.crearFalla; W.crearFalla = null; return ok({ ok: false, motivo: m }); }
@@ -1127,4 +1127,31 @@ test('3.33 · ⏰ Sin nombre de WhatsApp → lo busca en los clientes del negoci
   await llega(wahaMsg(CLIENTE, 'quiero agendar', { _data: {} })); await llega(wahaMsg(CLIENTE, 'cat:2', { _data: { Message: { listResponseMessage: { singleSelectReply: { selectedRowID: 'cat:2' } } } } }));
   envejecer(31); await B.tickRetomar(true);
   assert.match(ultimo().texto, /^Hola Oscar 👋 ¿Seguimos/);
+});
+
+test('3.36 · ⏰ Se quedó eligiendo la hora de HOY y ya va a cerrar → «Hoy ya no quedan horas… te la busco para otro día» → otro día (sin hoy), con el servicio que ya eligió', async () => {
+  await llega(wahaMsg(CLIENTE, 'quiero agendar')); await llega(toca('cat:2')); await llega(toca('svc:e1')); await llega(toca('mas:no')); await llega(toca('dia:' + HOY));
+  assert.equal(ultimo().lista.button, 'Elegir hora');
+  W.cupos[0].libres = []; W.cupos[0].horas = [];   // ya es hora de cerrar: hoy no queda nada
+  envejecer(31); await B.tickRetomar(true);
+  assert.match(ultimo().texto, /Hoy ya no quedan horas \(ya vamos a cerrar\), así que te la busco para \*otro día\*/); assert.equal(filas(ultimo())[0].title, '📅 Elegir otro día');
+  await llega(toca('ret:si'));
+  assert.equal(ultimo().lista.button, 'Elegir día'); assert.ok(!ids(ultimo()).includes('dia:' + HOY), 'hoy NO sale'); assert.ok(ids(ultimo()).includes('dia:' + masDias(1)));
+  assert.deepEqual(W.llamadas.filter((x) => x.op === 'dias').pop().ids, ['e1'], 'con el servicio que ya había elegido');
+  await llega(toca('dia:' + masDias(1))); await llega(toca('hora:09:00'));
+  assert.ok(ids(ultimo()).includes('pro:s1') || /A nombre de quién|Cita confirmada/.test(ultimo().texto), 'sigue normal');
+});
+test('3.36 · ⏰ «¿Hay cupos?» de hoy sin tocar ninguna hora y ya cerraron → al seguir le salen los cupos de MAÑANA', async () => {
+  await llega(wahaMsg(CLIENTE, 'hay cupos?')); await llega(toca('hc:otro')); await llega(toca('dia:' + HOY));
+  W.cupos[0].libres = []; W.cupos[0].horas = [];
+  envejecer(31); await B.tickRetomar(true);
+  assert.match(ultimo().texto, /Hoy ya no quedan horas/);
+  await llega(toca('ret:si'));
+  assert.match(ultimo().texto, /cupos de mañana/i); assert.ok(!ids(ultimo()).some((x) => x === 'hc:15:00'));
+});
+test('3.36 · ⏰ Si TODAVÍA hay horas hoy, el «¿Seguimos?» sigue en el mismo día', async () => {
+  await llega(wahaMsg(CLIENTE, 'quiero agendar')); await llega(toca('cat:2')); await llega(toca('svc:e1')); await llega(toca('mas:no')); await llega(toca('dia:' + HOY));
+  envejecer(31); await B.tickRetomar(true);
+  assert.match(ultimo().texto, /Te quedaste en \*elegir la hora/);
+  await llega(toca('ret:si')); assert.equal(ultimo().lista.button, 'Elegir hora');
 });

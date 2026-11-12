@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-3.35** · Página **2026-11-12q** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-12** · Mary **agendador-ia-3.36** · Página **2026-11-12q** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -132,6 +132,15 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-12 · agendador-ia-3.36 · si ya va a cerrar, el «¿Seguimos?» ofrece OTRO día
+- Pedido de Alex (súper importante): si ya es hora de cerrar, el recordatorio debe ponerle una fecha nueva; ese día ya no hay horas.
+- **«¿Seguimos con tu cita?»:** si el cliente se quedó eligiendo una hora de HOY y ya no quedan horas, o la hora que había escogido ya pasó, ahora dice: «Hoy ya no quedan horas (ya vamos a cerrar), así que te la busco para *otro día* 📅» con la opción «📅 Elegir otro día».
+  - Al tocarla, salen los días con cupo SIN hoy, con el servicio que ya eligió. Si venía de «¿hay cupos?», salen los cupos de mañana.
+  - También se revisa al tocar «Seguir», por si cerró entre el aviso y la respuesta.
+- Cuando un día ya no tiene horas, decía «Ese día ya se llenó». Si es hoy, ahora dice «Hoy ya no quedan horas (ya vamos a cerrar). Elige otro día».
+- El recordatorio de servicio ya mostraba solo días con cupo (hoy no sale si no quedan horas).
+- Banco: 149 pruebas, 0 fallas. Probado con mutación.
 
 ### 2026-11-12 · agendador-ia-3.35 · cumplir las REGLAS DEL SERVIDOR (orden de Alex)
 - Reglas guardadas en CLAUDE.md, LEEME-REGLA-UNIVERSAL.txt (raíz y vps/) y aquí arriba.
