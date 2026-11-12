@@ -9,9 +9,9 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-11-12l";
-import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-12l";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-12l";
+} from "./common.js?v=2026-11-12m";
+import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-12m";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-12m";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -2487,7 +2487,7 @@ async function drawOwnStory(cv, S2) {
     x.save(); x.shadowColor = "rgba(0,0,0,.4)"; x.shadowBlur = 20; x.beginPath(); x.arc(cx, cy, L / 2 + 6, 0, 7); x.fillStyle = "#fff"; x.fill(); x.restore();
     x.save(); x.beginPath(); x.arc(cx, cy, L / 2, 0, 7); x.clip();
     if (logo) { const r = Math.max(L / logo.width, L / logo.height); x.drawImage(logo, cx - (logo.width * r) / 2, cy - (logo.height * r) / 2, logo.width * r, logo.height * r); }
-    else { x.fillStyle = (ap.colors || {}).primary || "#2B59C3"; x.fillRect(cx - L / 2, cy - L / 2, L, L); x.fillStyle = "#fff"; x.font = "900 44px 'Arial Black', Arial"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText((A.settings?.businessName || "").split(/\s+/).slice(0, 2).map((w) => w[0] || "").join("").toUpperCase(), cx, cy + 2); }
+    else { x.fillStyle = (ap.colors || {}).primary || "#2B59C3"; x.fillRect(cx - L / 2, cy - L / 2, L, L); x.fillStyle = "#fff"; x.font = "900 44px 'Arial Black', Arial"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText((A.settings?.businessName || "").split(/\s+/).filter((w) => /^\p{L}/u.test(w)).slice(0, 2).map((w) => w[0]).join("").toUpperCase(), cx, cy + 2); }
     x.restore();
   }
 }
@@ -2548,8 +2548,9 @@ async function drawStory(cv, S2) {
     x.setLineDash([16, 14]); x.strokeStyle = hexRgba(P.base, 0.55); x.lineWidth = 4; x.beginPath(); x.moveTo(mx + 50, H - 440); x.lineTo(mx + bw - 50, H - 440); x.stroke(); x.setLineDash([]);
     x.fillStyle = P.base; x.fillRect(mx + 40, my, bw - 80, 14);
   }
-  if (T === "cristal") { x.save(); x.shadowColor = "rgba(0,0,0,.35)"; x.shadowBlur = 60; roundRect(x, 70, 520, W - 140, 980, 48); x.fillStyle = "rgba(255,255,255,.12)"; x.fill(); x.restore(); roundRect(x, 70, 520, W - 140, 980, 48); x.strokeStyle = "rgba(255,255,255,.35)"; x.lineWidth = 2; x.stroke(); }
-  if (T === "tarjeta") { x.save(); x.shadowColor = hexRgba(P.base, 0.7); x.shadowBlur = 90; roundRect(x, 80, 520, W - 160, 980, 48); x.fillStyle = "#0e1220"; x.fill(); x.restore(); x.fillStyle = P.base; x.fillRect(140, 520, W - 280, 10); }
+  const cardH = (S2.horas || []).length ? H - 330 - 520 : 980;   // 3.28: con horas grandes la tarjeta baja hasta el botón
+  if (T === "cristal") { x.save(); x.shadowColor = "rgba(0,0,0,.35)"; x.shadowBlur = 60; roundRect(x, 70, 520, W - 140, cardH, 48); x.fillStyle = "rgba(255,255,255,.12)"; x.fill(); x.restore(); roundRect(x, 70, 520, W - 140, cardH, 48); x.strokeStyle = "rgba(255,255,255,.35)"; x.lineWidth = 2; x.stroke(); }
+  if (T === "tarjeta") { x.save(); x.shadowColor = hexRgba(P.base, 0.7); x.shadowBlur = 90; roundRect(x, 80, 520, W - 160, cardH, 48); x.fillStyle = "#0e1220"; x.fill(); x.restore(); x.fillStyle = P.base; x.fillRect(140, 520, W - 280, 10); }
   // ---------- colores del texto ----------
   const dark = ticket && !false;
   const TXT = dark ? "#14213D" : "#ffffff", SUB = dark ? "#5B6782" : "rgba(255,255,255,.82)";
@@ -2566,11 +2567,13 @@ async function drawStory(cv, S2) {
     x.save(); x.shadowColor = glow || "rgba(0,0,0,.35)"; x.shadowBlur = glow ? 40 : 28; x.beginPath(); x.arc(W / 2, cy, L / 2 + 9, 0, 7); x.fillStyle = T === "oro" ? ORO : dark ? P.base : "#fff"; x.fill(); x.restore();
     x.save(); x.beginPath(); x.arc(W / 2, cy, L / 2, 0, 7); x.clip();
     if (logo) { x.fillStyle = "#fff"; x.fillRect(W / 2 - L / 2, cy - L / 2, L, L); const r = Math.max(L / logo.width, L / logo.height); x.drawImage(logo, W / 2 - (logo.width * r) / 2, cy - (logo.height * r) / 2, logo.width * r, logo.height * r); }
-    else { x.fillStyle = P.base; x.fillRect(W / 2 - L / 2, cy - L / 2, L, L); x.fillStyle = "#fff"; x.font = `900 ${L * 0.4}px ${FB}`; x.textBaseline = "middle"; x.fillText(name.split(/\s+/).slice(0, 2).map((w) => w[0] || "").join("").toUpperCase(), W / 2, cy + 3); x.textBaseline = "alphabetic"; }
+    else { x.fillStyle = P.base; x.fillRect(W / 2 - L / 2, cy - L / 2, L, L); x.fillStyle = "#fff"; x.font = `900 ${L * 0.4}px ${FB}`; x.textBaseline = "middle"; x.fillText(name.split(/\s+/).filter((w) => /^\p{L}/u.test(w)).slice(0, 2).map((w) => w[0]).join("").toUpperCase(), W / 2, cy + 3); x.textBaseline = "alphabetic"; }
     x.restore();
     y = cy + L / 2 + 78;
     x.fillStyle = T === "oro" ? ORO : TXT; if (glow) { x.shadowColor = glow; x.shadowBlur = 30; } else if (!dark) { x.shadowColor = "rgba(0,0,0,.4)"; x.shadowBlur = 14; }
-    const et = name.toUpperCase().split("").join(" ");
+    // 3.28: separar por letras SIN partir los emojis (antes 💈 salía como ◆◆)
+    const letras = typeof Intl !== "undefined" && Intl.Segmenter ? [...new Intl.Segmenter("es", { granularity: "grapheme" }).segment(name.toUpperCase())].map((g) => g.segment) : Array.from(name.toUpperCase());
+    const et = letras.join(" ").replace(/\s{2,}/g, "   ");
     const ns = fitText(x, et, W - 200, 44, 900, FB); x.font = `900 ${ns}px ${FB}`; x.fillText(et, W / 2, y); x.shadowBlur = 0;
     if (ap.slogan) { y += 50; x.fillStyle = SUB; x.font = `600 30px ${F}`; x.fillText(ap.slogan, W / 2, y); }
   }
@@ -2583,7 +2586,10 @@ async function drawStory(cv, S2) {
   size += 4; x.font = `900 ${size}px ${FB}`; lines = richLines(x, (S2.title || "").toUpperCase(), maxW);
   const lh = size * 1.08, titleH = lines.length * lh;
   x.font = `600 40px ${F}`; const subLines = S2.sub ? wrapLines(x, S2.sub, maxW).slice(0, 3) : [];
-  const tagH = S2.tag ? 96 : 0, subH = subLines.length ? subLines.length * 52 + 30 : 0;
+  // 3.28: las horas libres van GRANDES, en botones de 2 columnas (antes iban en una línea pequeña)
+  const horas = (S2.horas || []).filter(Boolean).slice(0, 8), hCols = horas.length === 1 ? 1 : 2, hGap = 26, hH = 112;
+  const hRows = Math.ceil(horas.length / hCols), horasH = horas.length ? 40 + hRows * hH + (hRows - 1) * hGap : 0;
+  const tagH = S2.tag ? 96 : 0, subH = (subLines.length ? subLines.length * 52 + 30 : 0) + horasH;
   // el sello de precio va debajo si cabe; si no, se pega como sticker en la esquina
   const priceInline = !!S2.price && tagH + titleH + subH + 210 <= zoneBottom - zoneTop;
   const priceH = priceInline ? 210 : 0;
@@ -2602,6 +2608,19 @@ async function drawStory(cv, S2) {
   drawRich(x, lines, W / 2, cy0, lh, T === "oro" ? ORO : TXT, ACC === TXT ? P.base : ACC, glow);
   if (T === "neon") { x.strokeStyle = hexRgba("#ffffff", 0.0); }
   cy0 += titleH;
+  if (horas.length) {
+    cy0 += 40;
+    const cw = Math.min(420, (maxW - hGap * (hCols - 1)) / hCols), x0 = W / 2 - (cw * hCols + hGap * (hCols - 1)) / 2;
+    horas.forEach((h, i) => {
+      const col = i % hCols, row = Math.floor(i / hCols), last = i === horas.length - 1 && horas.length % hCols === 1 && hCols > 1;
+      const bx = last ? W / 2 - cw / 2 : x0 + col * (cw + hGap), by2 = cy0 + row * (hH + hGap);
+      x.save(); x.shadowColor = glow || "rgba(0,0,0,.35)"; x.shadowBlur = glow ? 30 : 18;
+      roundRect(x, bx, by2, cw, hH, 28); x.fillStyle = dark ? "#fff" : T === "oro" ? "rgba(245,197,66,.14)" : "rgba(255,255,255,.14)"; x.fill(); x.restore();
+      roundRect(x, bx, by2, cw, hH, 28); x.strokeStyle = T === "oro" ? ORO : dark ? P.base : glow ? P.base : "rgba(255,255,255,.75)"; x.lineWidth = 4; x.stroke();
+      x.fillStyle = dark ? "#14213D" : T === "oro" ? ORO : "#fff"; x.font = `900 ${fitText(x, h, cw - 40, 62, 900, FB)}px ${FB}`; x.textBaseline = "middle"; x.fillText(h, bx + cw / 2, by2 + hH / 2 + 3); x.textBaseline = "alphabetic";
+    });
+    cy0 += hRows * hH + (hRows - 1) * hGap;
+  }
   if (subLines.length) { cy0 += 30; x.fillStyle = SUB; x.font = `600 40px ${F}`; subLines.forEach((l, i) => x.fillText(l, W / 2, cy0 + 40 + i * 52)); cy0 += subLines.length * 52; }
   if (S2.price) {
     const r = priceInline ? 92 : 84, px = priceInline ? W / 2 : W - 190, py = priceInline ? cy0 + 40 + r : (ticket && photo ? 120 + 520 - 40 : zoneTop - 10);
@@ -2636,7 +2655,7 @@ function newStory(preset = {}) {
   const brandColor = A.settings?.appearance?.colors?.primary || "#2B59C3";
   const bgs = [...new Set([brandColor, ...STORY_BGS])];
   const lines = String(preset.text || "").split("\n");
-  const S2 = { mode: "design", tpl: "tarjeta", img: "", own: "", fit: "cover", ownLogo: true, bg: preset.bg && preset.bg !== "#D7263D" ? preset.bg : brandColor, tag: preset.text ? "⚡ ÚLTIMOS CUPOS" : "🔥 PROMO", title: lines[0] || "", sub: lines.slice(1).join(" · "), price: "", brand: true, cta: true, qr: false };
+  const S2 = { mode: "design", tpl: "tarjeta", img: "", own: "", fit: "cover", ownLogo: true, bg: preset.bg && preset.bg !== "#D7263D" ? preset.bg : brandColor, tag: preset.text ? "⚡ ÚLTIMOS CUPOS" : "🔥 PROMO", title: lines[0] || "", sub: lines.slice(1).join(" · "), horas: preset.horas || [], price: "", brand: true, cta: true, qr: false };
   openM("Nuevo estado", `
     <div class="mb-3 grid grid-cols-2 rounded-2xl p-1 text-sm font-bold" style="background:var(--canvas)">
       <button type="button" class="rounded-xl py-2" data-stmode="design">🎨 Diseñar aquí</button>
@@ -2662,6 +2681,7 @@ function newStory(preset = {}) {
     <div class="mb-2 flex flex-wrap gap-1.5">${STORY_TAGS.map((t) => `<button type="button" class="q-chip !py-1 text-xs" data-sttag="${esc(t)}" aria-pressed="${S2.tag === t}">${t || "Sin etiqueta"}</button>`).join("")}</div>
     <label class="field mb-2"><span>Título <span class="soft font-normal">(pon *entre asteriscos* lo que quieras resaltar)</span></span><input id="stTitle" maxlength="70" value="${esc(S2.title)}" placeholder="Ej. Corte + barba *20% OFF*"></label>
     <label class="field mb-2"><span>Texto pequeño (opcional)</span><input id="stSub" maxlength="90" value="${esc(S2.sub)}" placeholder="Ej. Solo de lunes a miércoles"></label>
+    ${S2.horas.length ? `<label class="field mb-2"><span>Horas libres <span class="soft font-normal">(salen grandes; sepáralas con coma)</span></span><input id="stHoras" maxlength="160" value="${esc(S2.horas.join(", "))}"></label>` : ""}
     <label class="field mb-2"><span>Precio o sello (opcional)</span><input id="stPrice" maxlength="12" value="" placeholder="Ej. $20.000 o 2x1"></label>
     <div class="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-sm">
       <label class="flex items-center gap-2"><input id="stBrand" type="checkbox" class="h-4 w-4" checked> Logo y nombre</label>
@@ -2671,12 +2691,12 @@ function newStory(preset = {}) {
     </div>
     <button id="stWa" class="mb-2 w-full rounded-2xl py-3 text-[15px] font-extrabold" style="background:#25D366;color:#0b3d1f"><i class="fa-brands fa-whatsapp"></i> Publicar en mi estado de WhatsApp</button>
     <div class="grid grid-cols-2 gap-2"><button id="stDown" class="btn-light"><i class="fa-solid fa-download"></i> Descargar</button><button id="stSave" class="btn-primary py-3">Publicar en mi página</button></div>`);
-  const read = () => { S2.title = $("stTitle").value; S2.sub = $("stSub").value; S2.price = $("stPrice").value.trim(); };
+  const read = () => { S2.title = $("stTitle").value; S2.sub = $("stSub").value; S2.price = $("stPrice").value.trim(); if ($("stHoras")) S2.horas = $("stHoras").value.split(",").map((t) => t.trim()).filter(Boolean).slice(0, 8); };
   let t0;
   const draw = () => { clearTimeout(t0); t0 = setTimeout(() => { read(); drawStory($("stPrev"), S2); }, 100); };
   const thumbs = async () => { for (const [k] of STORY_TPL) { const big = document.createElement("canvas"); await drawStory(big, { ...S2, tpl: k }); const c = document.querySelector(`[data-stthumb="${k}"]`); if (!c) return; c.width = 108; c.height = 192; c.getContext("2d").drawImage(big, 0, 0, 108, 192); } };
   loadScript("https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js").catch(() => {}).finally(() => { draw(); thumbs(); });
-  ["stTitle", "stSub", "stPrice"].forEach((id) => $(id).oninput = draw);
+  ["stTitle", "stSub", "stPrice", "stHoras"].forEach((id) => { if ($(id)) $(id).oninput = draw; });
   $("stBrand").onchange = (e) => { S2.brand = e.target.checked; draw(); };
   $("stCta").onchange = (e) => { S2.cta = e.target.checked; draw(); };
   $("stQr").onchange = (e) => { S2.qr = e.target.checked; draw(); };
@@ -2729,7 +2749,8 @@ function manageStory(id) {
 function fillAsStory(date) {
   const free = freeTimes(date, date === H.today ? H.locks : []).filter((f) => date !== H.today || (() => { const [h, m] = f.time.split(":").map(Number); return h * 60 + m > bogNow().min; })());
   const when = date === H.today ? "hoy" : "mañana";
-  newStory({ bg: "#D7263D", text: `🔥 Cupos libres ${when}\n${free.slice(0, 6).map((f) => hora12(f.time)).join(" · ")}\nAparta el tuyo aquí` });
+  const mas = free.length > 8 ? `y ${free.length - 8} más · ` : "";
+  newStory({ bg: "#D7263D", text: `🔥 Cupos libres ${when}\n${mas}Aparta el tuyo aquí`, horas: free.slice(0, 8).map((f) => hora12(f.time)) });
 }
 
 // =====================================================================

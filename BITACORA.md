@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-3.27** · Página **2026-11-12l** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-12** · Mary **agendador-ia-3.27** · Página **2026-11-12m** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -113,6 +113,13 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-12 · página 2026-11-12m · Estado de cupos con las horas grandes
+- Pedido de Alex: arreglar el formato del estado «Cupos libres» y que los cupos se vean más grandes.
+- Las horas libres salen en **botones grandes de 2 columnas** (hasta 8; si hay más, dice «y N más»). Se pueden editar en el campo «Horas libres».
+- El nombre del negocio con emojis ya no sale con «◆◆» (se separan las letras sin partir los emojis). Las iniciales del logo ignoran los emojis.
+- En «Tarjeta» y «Cristal» el recuadro baja hasta el botón cuando hay horas, para que no se salgan.
+- Revisado dibujando los 8 diseños en Chromium.
 
 ### 2026-11-12 · página 2026-11-12l · Clientes con fecha y hora de sus citas
 - Pedido de Alex: en **Clientes** deben salir las fechas y horas de las citas.

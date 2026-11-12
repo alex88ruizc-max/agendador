@@ -1,20 +1,20 @@
 {
   "admin.js": {
-    "mtime": 1794520621.3885825,
-    "seen": 1794520698.288804,
-    "ast_hash": "1c14422bd66eeb0670774e2541c6482d",
+    "mtime": 1794520769.2349555,
+    "seen": 1794520773.5927496,
+    "ast_hash": "b639914c2e8a4a60d9c3447f80ae0f9e",
     "semantic_hash": ""
   },
   "app.js": {
-    "mtime": 1794520621.386656,
-    "seen": 1794520698.288813,
-    "ast_hash": "1f849fe31dec6a3c08df401460c0a5c8",
+    "mtime": 1794520769.233478,
+    "seen": 1794520773.592758,
+    "ast_hash": "cf359e7b730f394d535f22675cfee2e2",
     "semantic_hash": ""
   },
   "common.js": {
-    "mtime": 1794520621.3881717,
-    "seen": 1794520698.2888196,
-    "ast_hash": "469c6b5aeb6754cf93bbba08ecb89fe5",
+    "mtime": 1794520769.2346826,
+    "seen": 1794520773.5927641,
+    "ast_hash": "db2137d94e912acf82a3fff951e9e237",
     "semantic_hash": ""
   },
   "config.js": {
@@ -24,9 +24,9 @@
     "semantic_hash": ""
   },
   "super.js": {
-    "mtime": 1794520621.3874173,
-    "seen": 1794520698.288831,
-    "ast_hash": "0325550ae1947f0e6e588d32f89e1c87",
+    "mtime": 1794520769.2340634,
+    "seen": 1794520773.5927799,
+    "ast_hash": "f5303cc236a07fe0bd32413eff399116",
     "semantic_hash": ""
   },
   "sw.js": {
@@ -182,9 +182,9 @@
     "semantic_hash": ""
   },
   "BITACORA.md": {
-    "mtime": 1794520693.2434223,
-    "seen": 1794520698.289037,
-    "ast_hash": "1c88ee63396cce298d3c2ee4b1241d73",
+    "mtime": 1794520769.4710789,
+    "seen": 1794520773.5929859,
+    "ast_hash": "513d9b4098e32db7260b5fd3f1609f60",
     "semantic_hash": ""
   },
   "CLAUDE.md": {
@@ -194,15 +194,15 @@
     "semantic_hash": ""
   },
   "admin.html": {
-    "mtime": 1794520621.386153,
-    "seen": 1794520698.2890532,
-    "ast_hash": "a125c583734d9382135b506e1df999f0",
+    "mtime": 1794520769.2332008,
+    "seen": 1794520773.5930007,
+    "ast_hash": "d2d061b21e68e4c7d87add54b2337b7b",
     "semantic_hash": ""
   },
   "index.html": {
-    "mtime": 1794520621.3879263,
-    "seen": 1794520698.289058,
-    "ast_hash": "dabe8bdcfbbe8ed3acaf87ad5d41c9eb",
+    "mtime": 1794520769.2344272,
+    "seen": 1794520773.593006,
+    "ast_hash": "3ee0941811e039e77ed8dfefea4d6b59",
     "semantic_hash": ""
   },
   "privacidad.html": {
@@ -212,9 +212,9 @@
     "semantic_hash": ""
   },
   "super.html": {
-    "mtime": 1794520621.3855424,
-    "seen": 1794520698.2890677,
-    "ast_hash": "feaa0f8836e9fed955136c61996ba7e4",
+    "mtime": 1794520769.232677,
+    "seen": 1794520773.593015,
+    "ast_hash": "25fd867fdae11efb1981e73855781c48",
     "semantic_hash": ""
   },
   "vps/LEEME.txt": {
