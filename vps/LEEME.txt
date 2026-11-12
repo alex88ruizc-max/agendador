@@ -1,4 +1,4 @@
-🗓️ AGENDADOR IA · agendador-ia-3.10   (por dentro atiende «Mary», la recepcionista)
+🗓️ AGENDADOR IA · agendador-ia-3.11   (por dentro atiende «Mary», la recepcionista)
 =====================================================================================================
 🚫 REGLA UNIVERSAL N.º 1 — EPIC NO SE TOCA (manda sobre todo lo demás, para Alex, para Claude y para cada script de este paquete)
    Epic (Mary de Epic, Luisa, la tienda, epic-waha, epic-tiendas, Epic Channels…) y CUALQUIER otro proyecto:
@@ -62,6 +62,17 @@ PROBAR EN EL VPS
 AJUSTES POR NEGOCIO (negocios.json)
   "recordatorioMin": 120     ·   "estados": { "activo": true, "hoy": "07:30", "semana": "07:00", "semanaDia": 1 }
   En Firestore (settings/general del negocio) maryAutoCaptura: true → la captura confirma al instante y el dueño revisa después.
+
+NOVEDADES 3.11 · CONVERSACIÓN NATURAL
+  · El saludo: bienvenida + link + «dime qué servicio necesitas o escríbeme el día y la hora (ej. «mañana a las 4»)», con la
+    lista de SERVICIOS por categorías y «🕐 Ver cupos de hoy».
+  · «¿Tienes cupo hoy a las 3?» → «✅ Sí, tengo un cupo hoy a las 3:00 p. m. ¿Lo vas a apartar?» → sí → servicio → nombre (si falta)
+    → «✅ ¡Listo, Andrés! Apartado». Sin «¿agregar otro?», sin «¿con quién?» (el que esté libre) y sin otra confirmación.
+  · A esa hora no hay → «A las 4:00 no tengo, pero tengo antes a las 3:00 o después a las 4:30. ¿Te sirve alguna?».
+    Ese día no hay → «el más cercano es mañana a las 9:00». Entiende «a las 3» (= 3 p. m.), «3pm», «3:30», «4 y media»,
+    «10 de la mañana», «mediodía», «temprano», «en la tarde», «el viernes», «el 20»…
+  · Si el cliente ya tiene su servicio de siempre (p. ej. siempre uñas), lo aparta directo y lo dice: «… como siempre».
+    Si es nuevo, pregunta UNA cosa: «¿Qué te vas a hacer?» con la lista. Banco: 93 pruebas.
 
 NOVEDADES 3.10 · CUPOS COMO LISTA DE HORAS
   · «¿Hay cupos?» / «Ver cupos» → «📅 Estos son los cupos de hoy. Elige tu hora 👇» con el botón «Ver horas»:

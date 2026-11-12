@@ -253,7 +253,7 @@ test('3.0 · Agendar COMPLETO con listas: 2 servicios, día, hora, profesional, 
   const cr = W.llamadas.find((x) => x.op === 'crear');
   assert.deepEqual(cr.ids, ['c2', 'b1']); assert.equal(cr.date, HOY); assert.equal(cr.time, '15:00'); assert.equal(cr.staffId, 's2');
   assert.equal(cr.nombre, 'Andrés Ruiz'); assert.equal(cr.email, 'andres@gmail.com'); assert.equal(cr.phone, CLIENTE);
-  assert.match(ultimo().texto, /Listo, Andrés! Tu cita quedó confirmada/); assert.match(ultimo().texto, /R-NUEVA1/); assert.match(ultimo().texto, /calendario/);
+  assert.match(ultimo().texto, /Listo, Andrés! Apartado/); assert.match(ultimo().texto, /R-NUEVA1/); assert.match(ultimo().texto, /calendario/);
   if (process.env.BANCO_VISTA) fs.writeFileSync(process.env.BANCO_VISTA, JSON.stringify(W.enviados, null, 1));   // para dibujar la vista previa
 });
 test('3.0 · Responder ESCRIBIENDO (número o nombre) en vez de tocar la lista también funciona', async () => {
@@ -591,7 +591,7 @@ test('3.8 · El dueño toca «Ver cupos» desde el celular del NEGOCIO → al cl
 
 test('3.9 · Si WAHA avisa el toque del negocio SIN la opción (solo el texto «🕐 Ver cupos»), igual se reconoce por el título', async () => {
   await llega(wahaMsg(CLIENTE, 'hola'));
-  await llega(wahaMsg('x', '🕐 Ver cupos\nDías y horas disponibles', { id: 'true_' + CLIENTE + '@c.us_TAP2', from: '573110000000@c.us', to: CLIENTE + '@c.us', fromMe: true }));
+  await llega(wahaMsg('x', '🕐 Ver cupos de hoy\nHoras disponibles', { id: 'true_' + CLIENTE + '@c.us_TAP2', from: '573110000000@c.us', to: CLIENTE + '@c.us', fromMe: true }));
   assert.equal(ultimo().a, CLIENTE); assert.match(ultimo().texto, /Estos son los cupos de hoy/);
   assert.ok(!B.memHumano()['lina-spa:' + CLIENTE], 'no cuenta como «el dueño escribió»');
   // y un mensaje normal del dueño SÍ lo calla
@@ -645,4 +645,65 @@ test('3.10 · Si la hora elegida no alcanza para el servicio → le muestra las 
   W.cupos[0].libres = ['15:00', '16:30']; W.cupos[0].horas = ['3:00 p. m.', '4:30 p. m.'];   // con ese servicio, a las 6 ya no alcanza
   await llega(toca('cat:0')); await llega(toca('svc:c2')); await llega(toca('mas:no'));
   assert.match(ultimo().texto, /A las 6:00 p\. m\. no alcanza el tiempo/); assert.equal(ultimo().lista.button, 'Elegir hora');
+});
+
+// =====================================================================
+//  3.11 · Conversación natural: «¿tienes cupo hoy a las 3?» → «Sí… ¿Lo vas a apartar?» → servicio (o el de siempre) → nombre → ✅
+// =====================================================================
+test('3.11 · El saludo invita a escribir el día y la hora y trae la lista de SERVICIOS (por categorías)', async () => {
+  await llega(wahaMsg(CLIENTE, 'hola'));
+  assert.match(W.enviados[0].texto, /escríbeme el día y la hora/); assert.equal(W.enviados[0].lista.button, 'Ver servicios');
+  assert.deepEqual(ids(W.enviados[0]), ['cat:0', 'cat:1', 'cat:2', 'menu:cupos']);
+  await llega(toca('cat:1', 'Barba'));
+  assert.match(ultimo().texto, /Barba/); assert.ok(ids(ultimo()).includes('svc:b1'));
+});
+test('3.11 · «Hey Barba, ¿tienes cupo hoy a las 3?» → «Sí, tengo… ¿Lo vas a apartar?» → sí → ¿qué te vas a hacer? → nombre → ✅ Apartado', async () => {
+  await llega(wahaMsg(CLIENTE, 'Hey Barba, tienes cupo para hoy a las 3?'));
+  assert.match(ultimo().texto, /Sí, tengo un cupo \*hoy a las 3:00 p\. m\.\*\. ¿Lo vas a apartar\?/); assert.deepEqual(ids(ultimo()), ['ap:si', 'ap:otra']);
+  await llega(wahaMsg(CLIENTE, 'si'));
+  assert.deepEqual(ids(ultimo()), ['cat:0', 'cat:1', 'cat:2'], 'cliente nuevo: «¿Qué te vas a hacer?»');
+  await llega(toca('cat:0')); await llega(toca('svc:c1', 'Corte clásico'));
+  assert.match(ultimo().texto, /A nombre de quién/, 'sin «¿agregar otro?» ni «¿con quién?»: directo');
+  await llega(wahaMsg(CLIENTE, 'Andrés'));
+  await llega(wahaMsg(CLIENTE, 'no'));   // correo (si el dueño lo deja pedir)
+  const cr = W.llamadas.find((x) => x.op === 'crear');
+  assert.ok(cr, 'apartada sin otra pregunta de confirmación'); assert.equal(cr.date, HOY); assert.equal(cr.time, '15:00'); assert.deepEqual(cr.ids, ['c1']);
+  assert.match(ultimo().texto, /Listo, Andrés! Apartado/);
+});
+test('3.11 · A esa hora no hay → «A las 4:00 no tengo, pero tengo antes a las 3:00 o después a las 4:30» → toca una → apartada', async () => {
+  const cl = B.ASIS.cliente('lina-spa:' + CLIENTE); cl.nombre = 'Camila'; cl.correo = '';
+  await llega(wahaMsg(CLIENTE, 'hay cupo hoy a las 4?'));
+  assert.match(ultimo().texto, /A las 4:00 p\. m\. no tengo, pero tengo antes a las \*3:00 p\. m\.\* o después a las \*4:30 p\. m\.\* hoy/);
+  assert.deepEqual(ids(ultimo()), ['ap:15:00', 'ap:16:30', 'ap:otra']);
+  await llega(toca('ap:16:30', '✅ 4:30 p. m.'));
+  await llega(toca('cat:2')); await llega(toca('svc:e1'));
+  assert.equal(W.llamadas.find((x) => x.op === 'crear').time, '16:30');
+});
+test('3.11 · «Si siempre se hace las uñas, ya sabemos que es uñas»: cliente conocido → aparta lo de siempre sin preguntar', async () => {
+  const cl = B.ASIS.cliente('lina-spa:' + CLIENTE); cl.nombre = 'Camila'; cl.correo = '';
+  cl.combos = { 'e1|Lina': { n: 4, ids: ['e1'], staffId: 's1', servicio: 'Cejas', con: 'Lina' } };
+  await llega(wahaMsg(CLIENTE, 'mañana a las 9 tienes?'));
+  assert.match(ultimo().texto, /Sí, tengo un cupo \*mañana a las 9:00 a\. m\.\*/);
+  await llega(toca('ap:si'));
+  const cr = W.llamadas.find((x) => x.op === 'crear');
+  assert.deepEqual(cr.ids, ['e1']); assert.equal(cr.staffId, 's1'); assert.match(ultimo().texto, /Apartado/); assert.match(ultimo().texto, /como siempre/);
+});
+test('3.11 · Servicio y hora en el mismo mensaje («un degradado hoy a las 6») → revisa con el tiempo de ESE servicio', async () => {
+  await llega(wahaMsg(CLIENTE, 'quiero un degradado hoy a las 6'));
+  assert.match(ultimo().texto, /Sí, tengo un cupo \*hoy a las 6:00 p\. m\.\*/);
+  assert.deepEqual(W.llamadas.filter((x) => x.op === 'horas').pop().ids, ['c2']);
+});
+test('3.11 · Ese día no hay nada → «Ese día ya no tengo cupos. El más cercano es…»', async () => {
+  W.cupos[0].horas = []; W.cupos[0].libres = [];
+  await llega(wahaMsg(CLIENTE, 'tienes cupo hoy a las 5?'));
+  assert.match(ultimo().texto, /Hoy ya no tengo cupos\. El más cercano es \*mañana a las 9:00 a\. m\.\*/);
+});
+test('3.11 · horaPedida entiende cómo escribe la gente', () => {
+  const A = require('../asistente');
+  const H = (t) => A.horaPedida(t);
+  assert.deepEqual(H('a las 3'), { hm: '15:00' }); assert.deepEqual(H('3pm'), { hm: '15:00' }); assert.deepEqual(H('3:30'), { hm: '15:30' });
+  assert.deepEqual(H('16:00'), { hm: '16:00' }); assert.deepEqual(H('a las 10 de la mañana'), { hm: '10:00' }); assert.deepEqual(H('a las 9'), { hm: '09:00' });
+  assert.deepEqual(H('a las 4 y media'), { hm: '16:30' }); assert.deepEqual(H('mediodía'), { hm: '12:00' }); assert.deepEqual(H('8 de la noche'), { hm: '20:00' });
+  assert.deepEqual(H('temprano'), { franja: 'manana' }); assert.deepEqual(H('el viernes en la tarde'), { franja: 'tarde' });
+  assert.equal(H('para el 20 de diciembre'), null, 'una fecha no es una hora'); assert.equal(H('hola'), null);
 });

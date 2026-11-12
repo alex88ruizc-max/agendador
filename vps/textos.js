@@ -9,7 +9,7 @@ const saludo = (negocio, quien) => { const n = nombre1(quien); return `Hola${n ?
 function sinCita(info, sal, sinMenu) {
   const hoy = Number(info.cuposHoy || 0);
   return (sal || '') + (hoy > 0 ? `Hoy quedan *${hoy} ${hoy === 1 ? 'cupo' : 'cupos'}*. ` : '') +
-    `Agenda tu cita aquí en 1 minuto:\n${info.link}` + (sinMenu ? '' : '\n\nO toca *Ver opciones* y te ayudo por aquí 👇');
+    `Agenda tu cita aquí en 1 minuto:\n${info.link}` + (sinMenu ? '' : '\n\nO dime qué servicio necesitas 👇 o escríbeme el día y la hora que te sirven (ej. «mañana a las 4»).');
 }
 // Cliente CON cita (una o varias)
 function conCita(info, sal) {
@@ -73,7 +73,7 @@ const parafrasis = (x) => `📝 *Entendí esto:*\n✂️ ${x.servicio || x.servi
 function citaHecha(c, info, nombre, conCorreo) {
   const n = nombre1(nombre);
   const cab = `📅 ${c.dia} a las *${c.hora}*\n✂️ ${c.servicio}${c.con ? ' · con ' + c.con : ''}\n🔖 Reserva *${c.code}*`;
-  if (c.status === 'confirmed') return `✅ *¡Listo${n ? ', ' + n : ''}! Tu cita quedó confirmada.*\n${cab}` + (conCorreo ? '\n📧 Te la mandé a tu correo para tu calendario.' : '') + `\n\nPara verla o cambiarla: ${c.link}\n¡Te esperamos! ✨`;
+  if (c.status === 'confirmed') return `✅ *¡Listo${n ? ', ' + n : ''}! Apartado.*\n${cab}${info.comoSiempre ? ' · como siempre' : ''}` + (conCorreo ? '\n📧 Te la mandé a tu correo para tu calendario.' : '') + `\n\nPara verla o cambiarla: ${c.link}\n¡Te esperamos! ✨`;
   return `🗓️ *¡Te aparté el cupo${n ? ', ' + n : ''}!*\n${cab}\n\n` + pagoTxt(info, c) + `\n⏳ Tienes ${info.holdMinutes || 30} minutos; si no, el cupo se libera.`;
 }
 const audio = () => '🎤 En este momento no puedo escuchar audios 🙏 ¿Me lo escribes, por favor?';

@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-3.10** · Página **2026-11-12d** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-12** · Mary **agendador-ia-3.11** · Página **2026-11-12d** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -113,6 +113,14 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-12 · agendador-ia-3.11 · conversación natural
+- `horaPedida()` (a las 3 = 15:00; 1–7 sin am/pm = tarde; franjas temprano/tarde/noche). `propuesta()`: hora exacta → oferta
+  «¿Lo vas a apartar?» (paso `oferta`, filas `ap:si`/`ap:otra`/`ap:HH:MM`); si no hay → antes/después; si el día no tiene → el más cercano.
+- `apartar()`: camino `directo` = servicio (lo de siempre si `loDeSiempre`, si no lista) → sin `pasoMas`, profesional automático,
+  nombre/correo si faltan → `crearCita` sin paráfrasis. Mensaje final «¡Listo! Apartado» (+ «como siempre»).
+- `menu()`: el saludo trae la lista de servicios por categorías + «🕐 Ver cupos de hoy»; texto invita a escribir día y hora.
+- Banco: 93 pruebas (mutación hecha apagando la conversación natural).
 
 ### 2026-11-12 · agendador-ia-3.10 · cupos como lista de horas
 - Prueba real: «Ver cupos» ya funciona desde el celular del cliente. Alex pidió otro diseño: las horas en la LISTA, no en el texto.
