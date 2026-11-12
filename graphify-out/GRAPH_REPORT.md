@@ -1,7 +1,7 @@
 # Graph Report - agendador  (2026-11-12)
 
 ## Corpus Check
-- 32 files · ~140,190 words
+- 32 files · ~140,488 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 13 file(s) not represented in the graph (top: (none) 7, .css 3, .ejemplo 2)
 
@@ -11,7 +11,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `00cddf62`
+- Built from commit: `abd23457`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -71,8 +71,8 @@
 3. `toast()` - 49 edges
 4. `bpath()` - 47 edges
 5. `crear()` - 41 edges
-6. `cop()` - 34 edges
-7. `toMillis()` - 34 edges
+6. `toMillis()` - 34 edges
+7. `cop()` - 34 edges
 8. `hora12()` - 34 edges
 9. `renderHome()` - 32 edges
 10. `seguir()` - 28 edges
@@ -80,14 +80,14 @@
 ## Surprising Connections (you probably didn't know these)
 - `maryCupos_()` --indirect_call--> `hora12()`  [INFERRED]
   vps/gs/mary.gs → common.js
-- `llega()` --calls--> `deWaha()`  [EXTRACTED]
-  vps/banco/escenarios.js → vps/principal.js
-- `drawImage()` --calls--> `addDays()`  [EXTRACTED]
-  admin.js → common.js
-- `drawImage()` --calls--> `bogNow()`  [EXTRACTED]
-  admin.js → common.js
-- `drawImage()` --calls--> `fechaLarga()`  [EXTRACTED]
-  admin.js → common.js
+- `planForm()` --calls--> `bogNow()`  [EXTRACTED]
+  super.js → common.js
+- `planForm()` --calls--> `esc()`  [EXTRACTED]
+  super.js → common.js
+- `renderNewsAdmin()` --calls--> `esc()`  [EXTRACTED]
+  super.js → common.js
+- `renderNewsAdmin()` --calls--> `toMillis()`  [EXTRACTED]
+  super.js → common.js
 
 ## Import Cycles
 - None detected.
@@ -283,7 +283,7 @@ Nodes (7): guideCard(), guideDone(), guideProgress(), guideSteps(), openGuide(),
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `hora12()` connect `cop` to `app.js`, `admin.js`, `common.js`, `bpath`, `esc`, `bogNow`, `mary.gs`, `drawStory`, `esc`, `toMillis`?**
-  _High betweenness centrality (0.064) - this node is a cross-community bridge._
+  _High betweenness centrality (0.048) - this node is a cross-community bridge._
 - **Are the 10 inferred relationships involving `crear()` (e.g. with `asistente.js` and `cliente()`) actually correct?**
   _`crear()` has 10 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `RFC-5545` to the rest of the system?**
@@ -291,8 +291,8 @@ _Questions this graph is uniquely positioned to answer:_
 - **Should `principal.js` be split into smaller, more focused modules?**
   _Cohesion score 0.062388591800356503 - nodes in this community are weakly interconnected._
 - **Why does `maryCupos_()` connect `mary.gs` to `cop`?**
-  _High betweenness centrality (0.061) - this node is a cross-community bridge._
+  _High betweenness centrality (0.045) - this node is a cross-community bridge._
 - **Should `super.js` be split into smaller, more focused modules?**
   _Cohesion score 0.08735632183908046 - nodes in this community are weakly interconnected._
-- **Should `app.js` be split into smaller, more focused modules?**
-  _Cohesion score 0.05240549828178694 - nodes in this community are weakly interconnected._
+- **Why does `esc()` connect `esc` to `super.js`, `app.js`, `admin.js`, `common.js`, `bpath`, `esc`, `bogNow`, `cop`, `drawStory`, `isKeyMethod`, `guideSteps`, `handleAct`, `plansOf`, `toMillis`?**
+  _High betweenness centrality (0.020) - this node is a cross-community bridge._

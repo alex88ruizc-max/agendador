@@ -4,7 +4,7 @@
 #    4) sube  5) publica una versión nueva en la MISMA implementación  6) comprueba que responde
 cd "$(dirname "$0")" || exit 1
 [ -s clasp/.clasprc.json ] && [ -f google/.clasp.json ] || { echo "ℹ️  Google no está autorizado todavía: bash ~/agendador/instalar-google.sh"; exit 0; }
-C(){ sudo docker run --rm -v "$(pwd)/google:/w" -v "$(pwd)/clasp:/root" -w /w node:22-slim npx -y @google/clasp@3.4.1 "$@"; }
+C(){ sudo docker run --rm --name agendador-tmp-clasp-$$ -v "$(pwd)/google:/w" -v "$(pwd)/clasp:/root" -w /w node:22-slim timeout 600 npx -y @google/clasp@3.4.1 "$@"; }   # 3.33: con nombre y tiempo límite (nunca queda colgado)
 # 2.3: nuestros archivos se quitan antes de bajar (Google los devuelve como .js y con los .gs locales choca: «Conflicting files found»)
 rm -f google/mary.gs google/mary.js google/correo.gs google/correo.js google/mary-clave.gs google/mary-clave.js
 C pull >/tmp/agendador-pull.log 2>&1 || { echo "❌ Google: no pude bajar el proyecto:"; tail -4 /tmp/agendador-pull.log | sed 's/^/   /'; grep -qiE 'invalid_grant|unauthorized|login' /tmp/agendador-pull.log && echo "   🔑 Vuelve a autorizar: bash ~/agendador/instalar-google.sh"; exit 1; }

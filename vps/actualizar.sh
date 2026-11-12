@@ -15,16 +15,18 @@ if isinstance(L, list):
     N = [x for x in L if not (x.get('bid') == 'default' and x.get('instancia') == 'default')]
     if len(N) != len(L): json.dump(N, open('negocios.json', 'w'), ensure_ascii=False, indent=2); print('🧹 Quité el negocio falso «default» de negocios.json')
 EOL
+# 3.33 · 🧹 contenedores temporales del agendador que hayan quedado colgados (SOLO los nuestros: agendador-tmp-…; nunca otro proyecto)
+T=$(sudo docker ps -aq --filter name=^agendador-tmp- 2>/dev/null); [ -n "$T" ] && sudo docker rm -f $T >/dev/null 2>&1 && echo "🧹 Quité contenedores temporales del agendador que habían quedado colgados."
 CODIGOS="principal.js textos.js correo.js estado.js asistente.js cuposLocal.js package.json package-lock.json Dockerfile docker-compose.yml banco"
 volver(){ for f in $CODIGOS; do [ -e "respaldo/$f" ] && cp -rf "respaldo/$f" .; done
   sudo docker image inspect $IMG:buena >/dev/null 2>&1 && sudo docker tag $IMG:buena $IMG:latest; }   # 1.1: la imagen vuelve a la buena (no queda la que falló)
 sudo docker image inspect $IMG:latest >/dev/null 2>&1 && sudo docker tag $IMG:latest $IMG:buena
 sudo docker compose build agendador-ia >/dev/null 2>&1 || { echo "❌ No se pudo construir la versión nueva. Sigue la de antes."; volver; exit 1; }
-B=$(sudo docker run --rm --network none $IMG sh -c 'mkdir -p /datos && node --test banco/pruebas.js banco/escenarios.js' 2>&1)
+B=$(sudo docker run --rm --name agendador-tmp-banco-$$ --network none $IMG timeout 600 sh -c 'mkdir -p /datos && node --test banco/pruebas.js banco/escenarios.js' 2>&1)
 if ! echo "$B" | grep -q '^# fail 0'; then echo "$B" | grep -E '^not ok|Error' | head
   echo "❌ La versión nueva NO pasó el banco de pruebas. No la instalé: sigue la de antes."; volver; exit 1; fi
 # 2.8 · REGLA N.º 1: si algún script del paquete tocaría un contenedor ajeno (Epic u otro), NO se instala
-RG=$(sudo docker run --rm --network none -v "$(pwd)":/p:ro $IMG node --test /p/banco/reglas.js 2>&1)
+RG=$(sudo docker run --rm --name agendador-tmp-reglas-$$ --network none -v "$(pwd)":/p:ro $IMG timeout 300 node --test /p/banco/reglas.js 2>&1)
 if ! echo "$RG" | grep -q '^# fail 0'; then echo "$RG" | grep -E '→' | head -5
   echo "🚫 Esta versión tocaría otro proyecto (regla N.º 1: Epic no se toca). No la instalé: sigue la de antes."; volver; exit 1; fi
 echo "🧪 Banco de pruebas OK ($(echo "$B" | grep -o '^# pass [0-9]*' | cut -d' ' -f3) pruebas)"

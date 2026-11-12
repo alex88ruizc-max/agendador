@@ -4,7 +4,7 @@
 #    1) autorizas la cuenta NUEVA  2) se crea el proyecto allí con el MISMO código  3) se publica  4) activas sus permisos (2 clics)
 #    5) se cambia todo a la dirección nueva: Mary, el VPS y la página (config.js en GitHub). La cuenta vieja queda de respaldo.
 cd "$(dirname "$0")" || exit 1
-CL(){ D="$1"; shift; sudo docker run --rm -i -v "$(pwd)/$D:/w" -v "$(pwd)/clasp-nuevo:/root" -w /w node:22-slim npx -y @google/clasp@3.4.1 "$@"; }
+CL(){ D="$1"; shift; sudo docker run --rm --name agendador-tmp-mudar-$$-$RANDOM -i -v "$(pwd)/$D:/w" -v "$(pwd)/clasp-nuevo:/root" -w /w node:22-slim timeout 600 npx -y @google/clasp@3.4.1 "$@"; }
 [ -d google ] && ls google/*.gs google/*.js >/dev/null 2>&1 || { echo "❌ No encontré el código actual en ~/agendador/google. Corre antes: bash instalar-google.sh"; exit 1; }
 VIEJA=$(grep -m1 '^GAS_URL=' agendador-ia.env | cut -d= -f2-)
 echo "🚚 Mudanza del servidor del agendador a un Gmail nuevo."
@@ -14,13 +14,13 @@ echo "PASO 1 · Entra a https://script.google.com/home/usersettings con la cuent
 mkdir -p clasp-nuevo
 if [ ! -s clasp-nuevo/.clasprc.json ]; then
   echo "PASO 2 · Abre el enlace que sale, elige la cuenta NUEVA (¡no la de Epic!), toca «Permitir» y pega la dirección de la página que NO carga."
-  sudo docker run --rm -it -v "$(pwd)/clasp-nuevo:/root" node:22-slim npx -y @google/clasp@3.4.1 login --no-localhost || { echo "❌ No quedó autorizada."; exit 1; }
+  sudo docker run --rm --name agendador-tmp-login-$$ -it -v "$(pwd)/clasp-nuevo:/root" node:22-slim timeout 900 npx -y @google/clasp@3.4.1 login --no-localhost || { echo "❌ No quedó autorizada."; exit 1; }
   sudo chown -R "$(id -u):$(id -g)" clasp-nuevo
 fi
 # 3) copia del código actual (lo que corre hoy en Google, con Mary y los correos)
 echo "📥 Bajando la versión de hoy para copiarla tal cual…"
 rm -f google/mary.gs google/mary.js google/correo.gs google/correo.js google/mary-clave.gs google/mary-clave.js
-sudo docker run --rm -v "$(pwd)/google:/w" -v "$(pwd)/clasp:/root" -w /w node:22-slim npx -y @google/clasp@3.4.1 pull >/tmp/mudar-pull.log 2>&1 || { echo "❌ No pude bajar el servidor de hoy:"; tail -4 /tmp/mudar-pull.log; exit 1; }
+sudo docker run --rm --name agendador-tmp-pull-$$ -v "$(pwd)/google:/w" -v "$(pwd)/clasp:/root" -w /w node:22-slim timeout 600 npx -y @google/clasp@3.4.1 pull >/tmp/mudar-pull.log 2>&1 || { echo "❌ No pude bajar el servidor de hoy:"; tail -4 /tmp/mudar-pull.log; exit 1; }
 for f in google/*.gs; do [ -f "${f%.gs}.js" ] && rm -f "$f"; done
 sudo chown -R "$(id -u):$(id -g)" google
 # 2.1: si ya se creó el proyecto en un intento anterior, se reutiliza (no se crean dos)

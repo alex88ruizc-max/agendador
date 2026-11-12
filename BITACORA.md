@@ -123,6 +123,11 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
   - si el dueño está hablando en el chat (pausa) o hay /sinbot;
   - de noche (9:00 p. m. a 7:00 a. m.): sale a las 7:00 si sigue pendiente (hasta 12 h).
 - El recordatorio de servicio (3.32) está en el panel › WhatsApp Bot, al final (sección «🔁 Recordatorio de servicio»).
+- **Contenedor sin nombre «vigorous_burnell»** (lo vio Alex desde Epic; Epic no se tocó):
+  - Era un `docker run --rm` del agendador que quedó colgado cuando el proceso que lo lanzó se cortó (banco o clasp). Así se llenó el disco el 6 de noviembre.
+  - Ahora TODOS los `docker run` de los scripts se llaman `agendador-tmp-…` y tienen tiempo límite (`timeout 600`).
+  - `actualizar.sh` quita al empezar los `agendador-tmp-…` que hayan quedado. SOLO esos, nunca otro contenedor.
+  - Banco `reglas.js`: falla si un `docker run` no tiene nombre o tiempo límite.
 - Banco: 141 pruebas, 0 fallas. Probado con mutaciones (una sola vez, 30 min).
 
 ### 2026-11-12 · agendador-ia-3.32 · página 2026-11-12q · 🔁 recordatorio de servicio
