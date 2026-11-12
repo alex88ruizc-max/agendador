@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-3.4** · Página **2026-11-12c** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-12** · Mary **agendador-ia-3.5** · Página **2026-11-12c** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -114,6 +114,13 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 
 ## 📜 Historial (lo más nuevo arriba)
 
+### 2026-11-12 · agendador-ia-3.5 · freno anti-bots
+- `frenoRobot()` (pura) en `principal.js`: pausa si el mensaje trae listas/botones, repite uno de las últimas 12 h (≥ 4 letras; en el
+  agendamiento ≥ 12), es publicidad (`PUBLICIDAD` o link + precio) o es un texto ≥ 40 letras que llega < 3 s después de nuestra respuesta.
+  Pausado: mensaje distinto → responde; el mismo → sigue pausado. Memoria por chat en `MEM.robot`.
+- Cambio de regla: «hola» repetido el mismo día ya no se responde 2 veces (pausa al segundo, como pidió Alex).
+- Banco: 76 pruebas (mutación hecha apagando el freno).
+
 ### 2026-11-12 · agendador-ia-3.4 · categorías
 - Prueba real: la lista mostraba todo junto en «Servicios» porque los servicios de El Barba no tenían categoría (error mío: dije que
   las categorías «ya existían» sin revisar los datos del negocio).
@@ -127,7 +134,6 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
   `message.title`, `button` y el título de cada sección son obligatorios; mandábamos `title: ''` → 400 → plan B.
 - `escribirLista`: título = primera línea (sin `*`, si cabe en 60) o el nombre del negocio; cuerpo = el resto. Evolution igual.
 - Banco: el WAHA simulado valida como el real. 70 pruebas, 0 fallas (mutación hecha con el título vacío).
-- Pendiente: freno anti-bucle si el otro lado es un bot (en la prueba respondió la Mary de Epic del 5453).
 
 ### 2026-11-12 · agendador-ia-3.2 · modo por Telegram
 - 3.1 instalada y verificada en el panel real: «WhatsApp Bot» muestra El Barba ✅ vinculado (+57 318…), sincronizado solo.

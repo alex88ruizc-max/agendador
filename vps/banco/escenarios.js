@@ -158,9 +158,9 @@ test('Cita confirmada · «ok gracias» → callada; «quiero cancelar» → le 
   await llega(wahaMsg(CLIENTE, 'quiero cancelar mi cita'));
   assert.equal(W.enviados.length, 1); assert.match(W.enviados[0].texto, /viernes 14/);
 });
-test('No repite: «hola» 3 veces seguidas → máximo 2 respuestas', async () => {
+test('No repite: «hola» 3 veces seguidas → 1 respuesta (3.5: el mismo mensaje otra vez = pausa)', async () => {
   for (let i = 0; i < 3; i++) await llega(wahaMsg(CLIENTE, 'hola'));
-  assert.equal(W.enviados.length, 2);
+  assert.equal(W.enviados.length, 1); assert.match(ultimoRegistro(), /pausado/);
 });
 test('Tras responder, un «ok» sin pregunta → callada y no gasta cupo de Google', async () => {
   await llega(wahaMsg(CLIENTE, 'hola'));
@@ -511,4 +511,49 @@ test('3.3 · La lista cumple lo que WAHA exige (título, botón, secciones): lle
   assert.doesNotMatch(W.enviados[0].lista.title, /\*/, 'sin asteriscos en el título');
   await llega(wahaMsg(CLIENTE, 'quiero agendar'));
   assert.ok(ultimo().lista); assert.equal(ultimo().lista.title, '✨ ¿Qué te quieres hacer?'); assert.doesNotMatch(ultimo().texto, /Responde con el número/);
+});
+
+// =====================================================================
+//  3.5 · FRENO ANTI-BOTS: listas/botones de otro bot, mensajes repetidos, publicidad, respuestas instantáneas
+// =====================================================================
+test('3.5 · Otro bot contesta al instante con un texto largo → se pausa; un mensaje DISTINTO después → vuelve a responder', async () => {
+  await llega(wahaMsg(CLIENTE, 'hola'));
+  const n0 = W.enviados.length;
+  await llega(wahaMsg(CLIENTE, 'Parece que me mandaste un mensaje de otra parte por error 🙂 ¿Quieres que sigamos con las cuentas de streaming o necesitas algo más?'));
+  assert.equal(W.enviados.length, n0, 'no le contesta al otro bot'); assert.match(ultimoRegistro(), /pausado/);
+  await llega(wahaMsg(CLIENTE, 'Parece que me mandaste un mensaje de otra parte por error 🙂 ¿Quieres que sigamos con las cuentas de streaming o necesitas algo más?'));
+  assert.equal(W.enviados.length, n0, 'el mismo mensaje otra vez: sigue pausado'); assert.match(ultimoRegistro(), /pausado/);
+  await new Promise((ok) => setTimeout(ok, 5));
+  P._banco.memHumano();   // (sin dueño de por medio)
+  await llega(wahaMsg(CLIENTE, 'hay cupos hoy?'));
+  assert.equal(W.enviados.length, n0 + 1, 'mensaje distinto: responde');
+});
+test('3.5 · Publicidad de una empresa (link + precio) → pausa; la misma publicidad repetida → sigue pausado', async () => {
+  const promo = '🔥 PROMOCIÓN 50% de descuento en planes de internet desde $49.900 al mes. Escríbenos ya: https://promo.ejemplo.com';
+  await llega(wahaMsg(CLIENTE, promo));
+  assert.equal(W.enviados.length, 0); assert.match(ultimoRegistro(), /publicidad/);
+  await llega(wahaMsg(CLIENTE, promo));
+  assert.equal(W.enviados.length, 0);
+});
+test('3.5 · Mensaje con listas o botones (de otro bot) → pausa', async () => {
+  await llega(wahaMsg(CLIENTE, 'Elige una opción', { _data: { notifyName: 'Tienda X', Message: { listMessage: { title: 'Menú', sections: [] } } } }));
+  assert.equal(W.enviados.length, 0); assert.match(ultimoRegistro(), /listas o botones/);
+});
+test('3.5 · Una PERSONA tocando la lista rápido o escribiendo «1» dos veces en el agendamiento NO se pausa', async () => {
+  await llega(wahaMsg(CLIENTE, 'quiero agendar'));
+  await llega(toca('cat:0', 'Cortes'));           // tocar la lista al instante es normal
+  await llega(toca('svc:c1', 'Corte clásico'));
+  await llega(toca('mas:si')); await llega(wahaMsg(CLIENTE, '1'));   // «1» = Cortes otra vez (otra lista): no es repetición de bot
+  assert.match(ultimo().texto, /Cortes/); assert.doesNotMatch(ultimoRegistro(), /pausado/);
+});
+test('3.5 · frenoRobot (reglas sueltas)', () => {
+  const F = (x) => P.frenoRobot(Object.assign({ ahora: 100000, hist: { textos: [], pausa: false } }, x));
+  assert.equal(F({ texto: 'hola, tienen cupo mañana?' }).responder, true);
+  assert.equal(F({ texto: 'Gracias por comunicarte con nosotros. En breve te atenderemos.' }).responder, false);
+  assert.equal(F({ texto: 'Te escribo porque quiero saber si atienden el sábado en la tarde', ultimoEnvio: 99000 }).responder, false, 'texto largo en 1 s');
+  assert.equal(F({ texto: 'Te escribo porque quiero saber si atienden el sábado en la tarde', ultimoEnvio: 60000 }).responder, true, 'en 40 s sí es una persona');
+  assert.equal(F({ texto: 'ok', hist: { textos: [['ok', 99000]], pausa: false } }).responder, true, '«ok» corto no cuenta como repetición');
+  assert.equal(F({ texto: 'cuanto vale el corte', hist: { textos: [['cuanto vale el corte', 99000]], pausa: true } }).responder, false);
+  assert.equal(F({ texto: 'y la barba?', hist: { textos: [['cuanto vale el corte', 99000]], pausa: true } }).responder, true);
+  assert.equal(F({ texto: 'hola', hist: { textos: [['hola', 100000 - 13 * 3600000]], pausa: false } }).responder, true, 'un «hola» de ayer no cuenta');
 });
