@@ -1,4 +1,7 @@
 {
+  "8": "renderHome",
+  "18": "renderReferrals",
   "23": "start",
-  "24": "plansOf"
+  "24": "plansOf",
+  "25": "toMillis"
 }

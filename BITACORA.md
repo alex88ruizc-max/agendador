@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-2.8** · Página **2026-11-07n** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-12** · Mary **agendador-ia-2.9** · Página **2026-11-07n** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -96,8 +96,8 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## ⏳ Pendientes
-1. Instalar **2.7** por Telegram y correr `bash ~/agendador/configurar-waha.sh`, que vincula el WhatsApp del negocio al WAHA propio.
-2. Probar con «hola» desde 573187920386 y mirar `/registro`. Luego pasar a `MARY_MODO=todos`.
+1. Seguir probando a Mary con El Barba (tu 318) desde un número aparte en `MARY_PRUEBA`. Luego pasar a `MARY_MODO=todos`.
+2. Que el panel conecte por WAHA (hoy conecta por Evolution). WAHA gratis = 1 WhatsApp: para varios negocios, arreglar Evolution o WAHA Plus.
 3. Generar la APK con `/apk` en el bot. Falta confirmar si ya se hizo.
 4. **Rotar secretos** que quedaron expuestos en chats anteriores:
    - llave de la cuenta de servicio de Firebase (id 0dd1d316…);
@@ -110,6 +110,11 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-12 · agendador-ia-2.9 · ✅ Mary responde por WAHA
+- Tu 318 quedó vinculado como «El Barba» (`elbarba`) en `waha-agendador` (código de 8 letras). Primera prueba: Mary mandó el link para agendar.
+- Arreglo: el aviso de conexión de WAHA creaba un negocio falso «default». Ahora se ignora si no es un negocio registrado
+  ni pedido desde el panel. `actualizar.sh` borra el que quedó. Escenario nuevo (19 escenarios, 37 pruebas).
 
 ### 2026-11-12 · agendador-ia-2.8
 - Regla N.º 1 «Epic no se toca: solo copiar, jamás modificar» reforzada en `CLAUDE.md`, `vps/LEEME.txt` y aquí.

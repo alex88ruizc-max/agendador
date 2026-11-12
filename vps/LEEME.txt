@@ -1,4 +1,4 @@
-🗓️ AGENDADOR IA · agendador-ia-2.8   (por dentro atiende «Mary», la recepcionista)
+🗓️ AGENDADOR IA · agendador-ia-2.9   (por dentro atiende «Mary», la recepcionista)
 =====================================================================================================
 🚫 REGLA UNIVERSAL N.º 1 — EPIC NO SE TOCA (manda sobre todo lo demás, para Alex, para Claude y para cada script de este paquete)
    Epic (Mary de Epic, Luisa, la tienda, epic-waha, epic-tiendas, Epic Channels…) y CUALQUIER otro proyecto:
@@ -62,6 +62,9 @@ PROBAR EN EL VPS
 AJUSTES POR NEGOCIO (negocios.json)
   "recordatorioMin": 120     ·   "estados": { "activo": true, "hoy": "07:30", "semana": "07:00", "semanaDia": 1 }
   En Firestore (settings/general del negocio) maryAutoCaptura: true → la captura confirma al instante y el dueño revisa después.
+
+NOVEDADES 2.9
+  · Arreglo: al vincular por WAHA aparecía un negocio falso «default». Ya no se crea y la actualización borra el que quedó.
 
 NOVEDADES 2.8
   · REGLA N.º 1 (Epic no se toca) reforzada y VIGILADA: un banco nuevo revisa todos los scripts; si alguno actuaría sobre un

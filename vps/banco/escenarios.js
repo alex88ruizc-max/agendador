@@ -149,3 +149,10 @@ test('Mensajes de grupos y estados → nunca responde', async () => {
   await llega(evoMsg('x', 'hola', { key: { remoteJid: 'status@broadcast', fromMe: false, id: 'S1' } }));
   assert.equal(W.enviados.length, 0);
 });
+
+test('2.9 · Al vincular por WAHA, la sesión «default» NO se vuelve un negocio falso', async () => {
+  await P._banco.alEventoConexion(P.deWaha({ event: 'session.status', session: 'otra-sesion', payload: { status: 'WORKING' }, me: { id: '573110000000@c.us' } }));
+  const L = JSON.parse(fs.readFileSync(NEG_F, 'utf8'));
+  assert.equal(L.some((n) => n.bid === 'otra-sesion'), false, 'no debió crear un negocio');
+  assert.match(ultimoRegistro(), /no es ningún negocio/);
+});

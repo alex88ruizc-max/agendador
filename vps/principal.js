@@ -6,7 +6,7 @@
 const http = require('http'), fs = require('fs'), path = require('path');
 const T = require('./textos'), C = require('./correo'), E = require('./estado');
 
-const VERSION = 'agendador-ia-2.8';
+const VERSION = 'agendador-ia-2.9';
 const env = (k, d) => (process.env[k] === undefined || process.env[k] === '' ? d : process.env[k]);
 const CFG = {
   puerto: parseInt(env('PUERTO', '3060'), 10),
@@ -340,6 +340,7 @@ function guardarNegocio(bid, extra) {
   fs.writeFileSync(CFG.negocios, JSON.stringify(L, null, 2));   // se escribe en el MISMO archivo (está montado desde el VPS)
   negT = 0; negocios();
 }
+function negocioRegistrado(bid) { try { return JSON.parse(fs.readFileSync(CFG.negocios, 'utf8')).some((x) => x && x.bid === bid); } catch (e) { return false; } }
 const motorBid = (bid) => { const n = negocios().find((x) => x.bid === bid); return esWaha(n || null) ? 'waha' : 'evolution'; };
 async function asegurarInstancia(bid) {
   if (motorBid(bid) === 'waha') {
@@ -425,6 +426,9 @@ async function alEventoConexion(b) {
   const ev = String(b.event || '').toLowerCase().replace(/_/g, '.'), bid = String(b.instance || ''), d = b.data || {};
   if (!/^[a-z0-9][a-z0-9-]{1,29}$/.test(bid)) return;
   if (ev === 'connection.update' && String(d.state || '') === 'open') {
+    // 2.9: solo cuenta si ese negocio existe o lo pidió desde su panel (antes, la sesión «default» de WAHA se volvía un negocio falso)
+    const pedido = !!(MEM.pendientesWa && MEM.pendientesWa[bid]) || vinculando.has(bid);
+    if (!pedido && !negocioRegistrado(bid)) { anotar({ que: '⚠️ conexión de «' + bid + '», que no es ningún negocio: la ignoro' }); return; }
     vinculando.delete(bid); if (MEM.pendientesWa) { delete MEM.pendientesWa[bid]; memGuardar(); }
     if (MEM.conectados && MEM.conectados[bid]) return;
     MEM.conectados = MEM.conectados || {}; MEM.conectados[bid] = Date.now(); memGuardar();
@@ -480,5 +484,5 @@ if (require.main === module) {
   servidor.listen(CFG.puerto, () => { log('👩‍💼 ' + VERSION + ' escuchando en ' + CFG.puerto + ' · modo ' + CFG.modo); negocios(); arrancarRelojes(); });
 }
 // 🧪 solo para el banco de escenarios (banco/escenarios.js): deja a Mary como recién encendida
-const _banco = { alMensaje, ultimos, reiniciar() { MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
+const _banco = { alMensaje, alEventoConexion, ultimos, reiniciar() { MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
 module.exports = { _banco, telEnAviso, deWaha, esWaha, debeResponder, alEventoConexion, tickPedidosWa, limpiarSinVincular, leerMensaje, atiende, PREGUNTA, numeroWa, ahoraLocal, enFila, yaVisto, quienVeEstados, CFG };

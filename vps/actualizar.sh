@@ -6,6 +6,15 @@ cd "$(dirname "$0")" || exit 1
 # 1.8: Mary se calla 15 min cuando el dueño escribe (antes 12 h) y no repite lo mismo en 15 min (antes 30). Se pasan los valores viejos solos.
 if [ -f agendador-ia.env ]; then sed -i 's/^SILENCIO_MIN=30$/SILENCIO_MIN=15/; /^HUMANO_HORAS=/d' agendador-ia.env; grep -q '^HUMANO_MIN=' agendador-ia.env || echo 'HUMANO_MIN=15' >> agendador-ia.env; fi
 IMG=agendador-ia-agendador-ia
+# 2.9: limpia el negocio falso «default» que se creó al vincular por WAHA (solo en el negocios.json del agendador)
+[ -f negocios.json ] && python3 - <<'EOL'
+import json
+try: L = json.load(open('negocios.json'))
+except Exception: L = None
+if isinstance(L, list):
+    N = [x for x in L if not (x.get('bid') == 'default' and x.get('instancia') == 'default')]
+    if len(N) != len(L): json.dump(N, open('negocios.json', 'w'), ensure_ascii=False, indent=2); print('🧹 Quité el negocio falso «default» de negocios.json')
+EOL
 CODIGOS="principal.js textos.js correo.js estado.js package.json package-lock.json Dockerfile docker-compose.yml banco"
 volver(){ for f in $CODIGOS; do [ -e "respaldo/$f" ] && cp -rf "respaldo/$f" .; done
   sudo docker image inspect $IMG:buena >/dev/null 2>&1 && sudo docker tag $IMG:buena $IMG:latest; }   # 1.1: la imagen vuelve a la buena (no queda la que falló)
