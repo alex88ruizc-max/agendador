@@ -1,4 +1,4 @@
-🗓️ AGENDADOR IA · agendador-ia-3.9   (por dentro atiende «Mary», la recepcionista)
+🗓️ AGENDADOR IA · agendador-ia-3.10   (por dentro atiende «Mary», la recepcionista)
 =====================================================================================================
 🚫 REGLA UNIVERSAL N.º 1 — EPIC NO SE TOCA (manda sobre todo lo demás, para Alex, para Claude y para cada script de este paquete)
    Epic (Mary de Epic, Luisa, la tienda, epic-waha, epic-tiendas, Epic Channels…) y CUALQUIER otro proyecto:
@@ -62,6 +62,13 @@ PROBAR EN EL VPS
 AJUSTES POR NEGOCIO (negocios.json)
   "recordatorioMin": 120     ·   "estados": { "activo": true, "hoy": "07:30", "semana": "07:00", "semanaDia": 1 }
   En Firestore (settings/general del negocio) maryAutoCaptura: true → la captura confirma al instante y el dueño revisa después.
+
+NOVEDADES 3.10 · CUPOS COMO LISTA DE HORAS
+  · «¿Hay cupos?» / «Ver cupos» → «📅 Estos son los cupos de hoy. Elige tu hora 👇» con el botón «Ver horas»:
+    🌅 Mañana / 🌇 Tarde con las horas libres, «📅 Mañana» y «🗓️ Otro día». Las horas ya no van escritas en el texto.
+  · Elige la hora → servicio (por categorías) → con quién → «¿Lo confirmo?». Otro día → días con cupo → horas de ese día → servicio.
+  · Si hoy no hay cupos: «Hoy ya no hay cupos» + las horas del siguiente día con cupo. Si la hora no alcanza para el servicio,
+    muestra las que sí sirven.
 
 NOVEDADES 3.9
   · Si WAHA avisa el toque del negocio sin decir la opción (solo el texto «🕐 Ver cupos»), se reconoce por el título comparándolo

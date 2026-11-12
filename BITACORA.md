@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-3.9** · Página **2026-11-12d** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-12** · Mary **agendador-ia-3.10** · Página **2026-11-12d** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -113,6 +113,13 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-12 · agendador-ia-3.10 · cupos como lista de horas
+- Prueba real: «Ver cupos» ya funciona desde el celular del cliente. Alex pidió otro diseño: las horas en la LISTA, no en el texto.
+- `asistente.js`: `cupos()` → `horasCupos()` (paso `horaCupos`, filas `hc:HH:MM`, `hc:dia:<fecha>` = Mañana, `hc:otro`, `hc:mas`)
+  y `diasCupos()`. Elegir hora → `agendar` con `date` + `time` → al tener el servicio, `pasoDia` valida esa hora con `horas`
+  (si alcanza → `pasoProfesional`; si no → horas que sí sirven).
+- Banco: 86 pruebas (se reescribieron las de cupos del diseño anterior).
 
 ### 2026-11-12 · agendador-ia-3.9 · toque del negocio reconocido por el título
 - Prueba real con 3.8 instalada (2:51 p. m.): el toque de las 2:53 desde el 318 no hizo nada. Hipótesis: WAHA (GOWS) manda el

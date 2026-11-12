@@ -1,7 +1,7 @@
 # Graph Report - agendador  (2026-11-12)
 
 ## Corpus Check
-- 30 files · ~113,296 words
+- 30 files · ~113,587 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 12 file(s) not represented in the graph (top: (none) 6, .css 3, .ejemplo 2)
 
@@ -11,7 +11,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `44a15cfb`
+- Built from commit: `c5109912`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
