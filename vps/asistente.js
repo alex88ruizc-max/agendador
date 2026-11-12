@@ -19,34 +19,49 @@ const VENCE_RECORDATORIO = 5 * 3600000;   // la respuesta al recordatorio («sí
 const QUIERE_CANCELAR = /\bcancel/;
 const QUIERE_MODIFICAR = /modific|reagend|reprogram|\bmover\b|\bmuev|cambi(ar|o|e)? (la |mi |de )?(cita|hora|dia|fecha|turno)|otra hora|otro dia|aplaz/;
 
+// 3.22 · los números escritos en palabras (así los escribe a veces el oído): «el veinte de noviembre», «a las cuatro y media»
+const NUM = { primero: 1, uno: 1, un: 1, una: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6, siete: 7, ocho: 8, nueve: 9, diez: 10, once: 11, doce: 12, trece: 13, catorce: 14, quince: 15,
+  dieciseis: 16, diecisiete: 17, dieciocho: 18, diecinueve: 19, veinte: 20, veintiuno: 21, veintiun: 21, veintiuna: 21, veintidos: 22, veintitres: 23, veinticuatro: 24, veinticinco: 25,
+  veintiseis: 26, veintisiete: 27, veintiocho: 28, veintinueve: 29, treinta: 30 };
+function conNumeros(t) {
+  return sinTilde(t)
+    .replace(/\btreinta y (uno|un|una)\b/g, '31').replace(/\bveinte y (\w+)\b/g, (m, x) => NUM[x] && NUM[x] < 10 ? String(20 + NUM[x]) : m)
+    .replace(/\b(diez|dieci) y (\w+)\b/g, (m, a, x) => NUM[x] && NUM[x] < 10 ? String(10 + NUM[x]) : m)
+    .replace(/(?<=\b(?:la|las|el|dia|del|tipo|lunes|martes|miercoles|jueves|viernes|sabado|domingo) )(\w+)\b/g, (x) => NUM[x] ? String(NUM[x]) : x)
+    .replace(/\b(\w+) (de la (manana|tarde|noche)|de (enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)|y media|y cuarto|pm|am)\b/g, (m, x, resto) => NUM[x] ? NUM[x] + ' ' + resto : m);
+}
+
 // ---------- fechas (en la hora de Colombia) ----------
 function hoyLocal(tz, ms) { const p = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms)); return p; }
 function sumarDias(f, n) { const [y, m, d] = f.split('-').map(Number); const x = new Date(Date.UTC(y, m - 1, d + n)); return x.toISOString().slice(0, 10); }
 function dowDe(f) { const [y, m, d] = f.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)).getUTCDay(); }
 // «hoy», «mañana», «pasado mañana», «el viernes», «el 20», «20 de noviembre», «20/11» → AAAA-MM-DD (o null)
 function fechaPedida(texto, hoy) {
-  let t = sinTilde(texto).replace(/\b(en|por|de|a) la manana\b/g, ' ');
+  let t = conNumeros(texto).replace(/\b(en|por|de|a) la manana\b/g, ' ');
   if (/pasado manana/.test(t)) return sumarDias(hoy, 2);
   if (/\bmanana\b/.test(t)) return sumarDias(hoy, 1);
   if (/\bhoy\b|\besta (tarde|noche)\b/.test(t)) return hoy;
+  // 3.22: el NÚMERO del día manda sobre el día de la semana («el lunes 17» = el 17)
+  let dia = null, mes = null, m = t.match(/\b(\d{1,2})\s*[\/-]\s*(\d{1,2})\b/);
+  if (m) { dia = Number(m[1]); mes = Number(m[2]); }
+  if (!m) { m = t.match(new RegExp('\\b(\\d{1,2})\\s+(?:de\\s+)?(' + MESES.join('|') + ')\\b')); if (m) { dia = Number(m[1]); mes = MESES.indexOf(m[2]) + 1; } }
+  if (!m) { m = t.match(/\b(?:el|dia|del|para el|(?:lunes|martes|miercoles|jueves|viernes|sabado|domingo))\s+(\d{1,2})\b(?!\s*(?:de la|am|pm|:|y media|y cuarto))/); if (m) dia = Number(m[1]); }
+  if (dia && dia >= 1 && dia <= 31 && (!mes || (mes >= 1 && mes <= 12))) {
+    const [y, mh, dh] = hoy.split('-').map(Number);
+    let yy = y, mm = mes || mh;
+    if (!mes && dia < dh) mm += 1;
+    if (mes && (mes < mh || (mes === mh && dia < dh))) yy += 1;
+    if (mm > 12) { mm = 1; yy += 1; }
+    return yy + '-' + String(mm).padStart(2, '0') + '-' + String(dia).padStart(2, '0');
+  }
   for (let i = 0; i < 7; i++) if (new RegExp('\\b' + DIAS[i] + '\\b').test(t)) { const n = (i - dowDe(hoy) + 7) % 7; return sumarDias(hoy, n); }
-  let m = t.match(/\b(\d{1,2})\s*(?:\/|-|de\s+)(\d{1,2}|[a-z]+)\b/);
-  let dia = null, mes = null;
-  if (m) { dia = Number(m[1]); mes = /^\d+$/.test(m[2]) ? Number(m[2]) : MESES.indexOf(m[2]) + 1; if (!mes) mes = null; }
-  else { m = t.match(/\b(?:el|dia|para el)\s+(\d{1,2})\b/); if (m) dia = Number(m[1]); }
-  if (!dia || dia > 31) return null;
-  const [y, mh, dh] = hoy.split('-').map(Number);
-  let yy = y, mm = mes || mh;
-  if (!mes && dia < dh) mm += 1;
-  if (mes && (mes < mh || (mes === mh && dia < dh))) yy += 1;
-  if (mm > 12) { mm = 1; yy += 1; }
-  return yy + '-' + String(mm).padStart(2, '0') + '-' + String(dia).padStart(2, '0');
+  return null;
 }
 
 // 3.11 · la hora escrita: «a las 3», «3pm», «3:30», «15:00», «4 de la tarde», «10 de la mañana», «mediodía», «temprano», «en la tarde»
 // En un negocio, una hora suelta de 1 a 7 es de la tarde («a las 3» = 3 p. m.).
 function horaPedida(texto) {
-  const t = sinTilde(texto);
+  const t = conNumeros(texto).replace(/\ba la 1\b/, 'a las 1');
   if (/medio ?dia/.test(t)) return { hm: '12:00' };
   const fin = (h, m, suf) => {
     h = Number(h); m = Number(m || 0); if (h > 23 || m > 59) return null;

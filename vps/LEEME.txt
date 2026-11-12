@@ -1,4 +1,4 @@
-🗓️ AGENDADOR IA · agendador-ia-3.20   (por dentro atiende «Mary», la recepcionista)
+🗓️ AGENDADOR IA · agendador-ia-3.22   (por dentro atiende «Mary», la recepcionista)
 =====================================================================================================
 🚫 REGLA UNIVERSAL N.º 1 — EPIC NO SE TOCA (manda sobre todo lo demás, para Alex, para Claude y para cada script de este paquete)
    Epic (Mary de Epic, Luisa, la tienda, epic-waha, epic-tiendas, Epic Channels…) y CUALQUIER otro proyecto:
@@ -62,6 +62,12 @@ PROBAR EN EL VPS
 AJUSTES POR NEGOCIO (negocios.json)
   "recordatorioMin": 120     ·   "estados": { "activo": true, "hoy": "07:30", "semana": "07:00", "semanaDia": 1 }
   En Firestore (settings/general del negocio) maryAutoCaptura: true → la captura confirma al instante y el dueño revisa después.
+
+NOVEDADES 3.22 · FECHAS Y HORAS EN PALABRAS
+  · El oído a veces escribe los números en palabras: ahora entiende «el veinte de noviembre», «a las cuatro de la tarde»,
+    «el quince a las tres y media», «el treinta y uno de diciembre», «a la una». Si dicen día de la semana Y número («el lunes 17»),
+    manda el número. «4 de la tarde» o «10 de la mañana» ya no se confunden con el día 4 o el día 10. Antes, al no entender la fecha,
+    se quedaba con la que ya había ofrecido (por eso respondía «mañana, mañana»). Incluye el arreglo del doble punto (3.19).
 
 NOVEDADES 3.21 (solo la página: agendador-web-2026-11-12h.zip) · 🗓️ SECCIÓN «CUPOS»
   · Pestaña nueva «Cupos» en el panel: el tablero del día con TODAS las horas: 🟢 libre (y cuántos profesionales libres), 🔴 ocupado

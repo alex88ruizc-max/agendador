@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-3.20** · Página **2026-11-12h** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-12** · Mary **agendador-ia-3.22** · Página **2026-11-12h** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -113,6 +113,13 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-12 · agendador-ia-3.22 · fechas en palabras
+- Prueba real: audios pidiendo otra fecha recibían «mañana a las 2:00» otra vez. Causa probable: el oído escribe números en palabras;
+  `fechaPedida` no la entendía y la oferta reusaba `conv.date`. `conNumeros()` (palabras → números) en `fechaPedida`/`horaPedida`;
+  orden nuevo: hoy/mañana/pasado → número de día (dd/mm, «15 de noviembre», «el 15», «lunes 17») → día de la semana.
+- El panel mostró «No hay conexión con el servidor» en WhatsApp Bot (pendiente revisar con Alex).
+- Banco: 110 pruebas.
 
 ### 2026-11-12 · página 2026-11-12h · 🗓️ sección «Cupos»
 - `admin.js`: pestaña `cupos` («Cupos», `fa-table-cells`): `abrirCupos()` escucha en vivo `slotLocks` y `appointments` del día;

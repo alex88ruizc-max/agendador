@@ -837,3 +837,21 @@ test('3.19 · Sin doble punto: «… a las 2:00 p. m. ¿Lo vas a apartar?» (no 
   await llega(wahaMsg(CLIENTE, 'tienes cupo hoy a las 3?'));
   assert.doesNotMatch(ultimo().texto, /m\.\*?\.\s/); assert.match(ultimo().texto, /p\. m\.\*? ¿Lo vas a apartar\?/);
 });
+
+test('3.22 · Fechas y horas en PALABRAS (como las escribe el oído): «el veinte de noviembre a las cuatro de la tarde»…', () => {
+  const A = require('../asistente'), F = (t) => A.fechaPedida(t, '2026-11-12'), H = (t) => A.horaPedida(t);
+  assert.equal(F('tienes cita para el veinte de noviembre a las cuatro de la tarde'), '2026-11-20'); assert.deepEqual(H('tienes cita para el veinte de noviembre a las cuatro de la tarde'), { hm: '16:00' });
+  assert.equal(F('para el sábado a las diez de la mañana'), '2026-11-14'); assert.deepEqual(H('para el sábado a las diez de la mañana'), { hm: '10:00' });
+  assert.equal(F('el quince a las tres y media'), '2026-11-15'); assert.deepEqual(H('el quince a las tres y media'), { hm: '15:30' });
+  assert.equal(F('el treinta y uno de diciembre'), '2026-12-31'); assert.deepEqual(H('a la una'), { hm: '13:00' });
+  assert.equal(F('el lunes diecisiete a las once'), '2026-11-17', 'el número del día manda sobre el día de la semana');
+  assert.equal(F('el viernes 14 a las 3'), '2026-11-14'); assert.equal(F('mañana a las 4 de la tarde'), '2026-11-13', '«4 de la tarde» no es el día 4');
+  assert.equal(F('para el sábado a las 10 de la mañana'), '2026-11-14', '«10 de la mañana» no es el día 10');
+  assert.equal(F('quiero una cita el viernes'), '2026-11-13');
+});
+test('3.22 · Con una oferta abierta para mañana, pedir OTRA fecha («el viernes a las 10») responde por ESA fecha (no por mañana)', async () => {
+  await llega(wahaMsg(CLIENTE, 'tienes cupo mañana a las 9?'));
+  assert.match(ultimo().texto, /mañana a las 9:00/);
+  await llega(wahaMsg(CLIENTE, 'mejor pasado mañana a las diez'));
+  assert.match(ultimo().texto, /Sí, tengo un cupo \*?el pasado a las 10:00 a\. m\./);
+});
