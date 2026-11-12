@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-3.22** · Página **2026-11-12h** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-12** · Mary **agendador-ia-3.23** · Página **2026-11-12h** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -113,6 +113,15 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-12 · agendador-ia-3.23 · el panel manda (lectura directa de la base)
+- Prueba real: Alex apagó todo en «WhatsApp Bot» y el asistente siguió respondiendo; el panel decía «No hay conexión con el servidor»
+  (servidor de Google con problemas → el VPS nunca recibía la configuración nueva, que solo llegaba en respuestas de Google).
+- `principal.js`: `botDesdeBase()` lee `businesses/<bid>/settings/general` (maryBot, maryReminderMinutes) por REST con la llave web
+  (es lectura pública, igual que la página de clientes); `botAlDia()` antes de cada mensaje, recordatorios y estados (≤ 60 s);
+  `botNormal()` = mismos defaults que `maryBotCfg_`. `gas()` ya no pisa lo leído de la base.
+- PENDIENTE: averiguar por qué el panel no conecta con el servidor de Google (desvincular, guardar). Pedido a Alex: curl a GAS_URL.
+- Banco: 113 pruebas (mutación hecha quitando la lectura directa).
 
 ### 2026-11-12 · agendador-ia-3.22 · fechas en palabras
 - Prueba real: audios pidiendo otra fecha recibían «mañana a las 2:00» otra vez. Causa probable: el oído escribe números en palabras;

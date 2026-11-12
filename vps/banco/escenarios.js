@@ -89,6 +89,11 @@ global.fetch = async (url, o) => {
     return resp(Object.assign({ name: n }, W.sesiones[n])); }
   const ac = u.match(/\/api\/([^/]+)\/auth\/(request-code|qr)/);
   if (ac) { W.wahaLlamadas.push(ac[2] + ' ' + decodeURIComponent(ac[1])); return ac[2] === 'qr' ? resp({ mimetype: 'image/png', data: 'UVI=' }) : resp({ code: 'ABCD1234' }); }
+  if (/\/documents\/businesses\/[^/]+\/settings\/general/.test(u)) {   // 3.23: el panel guarda «maryBot» en la base y el VPS lo lee directo
+    if (!W.fsBot) return resp({ error: { code: 404 } }, 404);
+    const aFs = (v) => typeof v === 'boolean' ? { booleanValue: v } : typeof v === 'number' ? { integerValue: String(v) } : typeof v === 'string' ? { stringValue: v } : Array.isArray(v) ? { arrayValue: { values: v.map(aFs) } } : { mapValue: { fields: Object.fromEntries(Object.entries(v).map(([k, x]) => [k, aFs(x)])) } };
+    return resp({ fields: { maryBot: aFs(W.fsBot) } });
+  }
   if (/\/api\/files\//.test(u)) return new Response(Buffer.from('AUDIO-OGG'), { status: 200 });   // la nota de voz que baja de WAHA
   if (/oido-agendador:9000\/transcribir$/.test(u)) { W.oidoLlamadas = (W.oidoLlamadas || 0) + 1; return W.oido == null ? resp({ error: 'el oído todavía está cargando' }, 503) : resp({ texto: W.oido, duracion: 3, tardo: 2 }); }
   if (/\/status\/image$/.test(u)) { W.estados.push({ sesion: u.split('/api/')[1].split('/')[0], caption: b.caption, contacts: b.contacts }); return resp({}); }
@@ -854,4 +859,24 @@ test('3.22 · Con una oferta abierta para mañana, pedir OTRA fecha («el vierne
   assert.match(ultimo().texto, /mañana a las 9:00/);
   await llega(wahaMsg(CLIENTE, 'mejor pasado mañana a las diez'));
   assert.match(ultimo().texto, /Sí, tengo un cupo \*?el pasado a las 10:00 a\. m\./);
+});
+
+// =====================================================================
+//  3.23 · El panel manda: apagar en «WhatsApp Bot» se aplica aunque Google esté caído (se lee directo de la base)
+// =====================================================================
+test('3.23 · El dueño APAGA el asistente en el panel → no responde, aunque Google siga diciendo «encendido» o esté caído', async () => {
+  W.fsBot = { activo: false }; W.bot = { activo: true };
+  await llega(wahaMsg(CLIENTE, 'hola')); await llega(wahaMsg(CLIENTE, 'hay cupos hoy?'));
+  assert.equal(W.enviados.length, 0); assert.match(ultimoRegistro(), /apagado en el panel/);
+  assert.ok(!W.gas.includes('chat'), 'ni siquiera le pregunta a Google');
+});
+test('3.23 · Apagar «agendar» y «cupos» en el panel → solo el link (leído de la base, sin Google)', async () => {
+  W.fsBot = { agendar: false, cupos: false };
+  await llega(wahaMsg(CLIENTE, 'hola')); await llega(wahaMsg(CLIENTE, 'quiero agendar'));
+  assert.ok(!ultimo().lista); assert.match(ultimo().texto, /tuagenda\.vip/);
+});
+test('3.23 · botNormal: los mismos valores por defecto que el servidor y el panel', () => {
+  const c = P.botNormal({ activo: false, estados: { horas: ['09:00', '11:00', '15:00'] } }, 60);
+  assert.equal(c.activo, false); assert.equal(c.agendar, true); assert.equal(c.recordatorioMin, 60); assert.equal(c.pausaMin, 30);
+  assert.deepEqual(c.estados.horas, ['09:00', '11:00'], 'máximo 2 estados'); assert.deepEqual(P.botNormal(null).estados.horas, ['11:00']);
 });

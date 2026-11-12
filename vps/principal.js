@@ -6,7 +6,7 @@
 const http = require('http'), fs = require('fs'), path = require('path');
 const T = require('./textos'), C = require('./correo'), E = require('./estado'), A = require('./asistente');
 
-const VERSION = 'agendador-ia-3.22';
+const VERSION = 'agendador-ia-3.23';
 const env = (k, d) => (process.env[k] === undefined || process.env[k] === '' ? d : process.env[k]);
 const CFG = {
   puerto: parseInt(env('PUERTO', '3060'), 10),
@@ -189,13 +189,42 @@ async function gas(neg, op, datos) {
   const txt = await r.text(); let j; try { j = JSON.parse(txt); } catch (e) { throw new Error('El servidor respondió algo raro: ' + txt.slice(0, 160)); }
   if (!j.ok) throw new Error(j.error || 'error del servidor');
   const bc = j.data && (j.data.bot || (j.data.info && j.data.info.bot));
-  if (bc) BOT.set(neg.bid, { cfg: bc, t: Date.now() });   // 3.1: «💬 WhatsApp Bot» del panel (viene en cada respuesta, sin gastar llamadas extra)
+  if (bc && Date.now() - (BOT_LEIDO.get(neg.bid) || 0) > 60000) BOT.set(neg.bid, { cfg: bc, t: Date.now() });   // la base (panel) manda   // 3.1: «💬 WhatsApp Bot» del panel (viene en cada respuesta, sin gastar llamadas extra)
   return j.data;
 }
 // ---------- 3.1 · configuración del panel «WhatsApp Bot» (por negocio) ----------
 const BOT = new Map();
 const BOT_DEF = { audios: true, activo: true, agendar: true, cupos: true, saludoDiario: true, pedirNombre: true, pedirCorreo: true, loDeSiempre: true, recordatorioMin: 120, recordatorioConfirmar: true, cambios: true, pausaMin: 30, estados: { activo: true, horas: ['11:00'], manana: true, semanal: false } };
 function botDe(neg) { const x = BOT.get(neg.bid); const c = Object.assign({}, BOT_DEF, x ? x.cfg : {}); c.estados = Object.assign({}, BOT_DEF.estados, (x && x.cfg.estados) || {}); if (!x) c.pausaMin = CFG.humanoMin; return c; }
+// 3.23 · lo que el dueño elige en el panel se lee DIRECTO de la base (cada minuto como mucho), sin pasar por Google:
+//        si apaga el asistente, en menos de 1 minuto deja de responder aunque el servidor de Google esté caído
+function deFs(v) {
+  if (!v || typeof v !== 'object') return null;
+  if ('booleanValue' in v) return v.booleanValue; if ('integerValue' in v) return Number(v.integerValue); if ('doubleValue' in v) return v.doubleValue;
+  if ('stringValue' in v) return v.stringValue; if ('nullValue' in v) return null;
+  if ('arrayValue' in v) return ((v.arrayValue || {}).values || []).map(deFs);
+  if ('mapValue' in v) { const o = {}; Object.entries(((v.mapValue || {}).fields) || {}).forEach(([k, x]) => { o[k] = deFs(x); }); return o; }
+  return null;
+}
+function botNormal(b, recordatorioViejo) {   // mismos valores por defecto que el servidor (maryBotCfg_) y el panel (BOT_DEF)
+  b = b || {}; const e = b.estados || {}, d = (v, x) => (v === undefined || v === null || v === '' ? x : v);
+  let horas = (Array.isArray(e.horas) ? e.horas : ['11:00']).filter((h) => /^\d{2}:\d{2}$/.test(String(h))).slice(0, 2); if (!horas.length) horas = ['11:00'];
+  const c = {}; ['audios', 'activo', 'agendar', 'cupos', 'saludoDiario', 'pedirNombre', 'pedirCorreo', 'loDeSiempre', 'recordatorioConfirmar', 'cambios'].forEach((k) => { c[k] = d(b[k], true) !== false; });
+  c.recordatorioMin = Math.max(0, Number(d(b.recordatorioMin, d(recordatorioViejo, 120)))); c.pausaMin = Math.max(5, Number(d(b.pausaMin, 30)));
+  c.estados = { activo: d(e.activo, true) !== false, horas, manana: d(e.manana, true) !== false, semanal: d(e.semanal, false) === true };
+  return c;
+}
+const BOT_LEIDO = new Map();   // bid → cuándo se leyó de la base
+async function botDesdeBase(neg) {
+  try {
+    const r = await fetch(FS.url + '/v1/projects/' + FS.proyecto + '/databases/(default)/documents/businesses/' + encodeURIComponent(neg.bid) + '/settings/general?key=' + FS.llave + '&mask.fieldPaths=maryBot&mask.fieldPaths=maryReminderMinutes', { signal: AbortSignal.timeout(5000) });
+    if (!r.ok) return false;
+    const f = ((await r.json()) || {}).fields || {};
+    BOT.set(neg.bid, { cfg: botNormal(deFs(f.maryBot), deFs(f.maryReminderMinutes)), t: Date.now() }); BOT_LEIDO.set(neg.bid, Date.now());
+    return true;
+  } catch (e) { return false; }
+}
+async function botAlDia(neg) { if (Date.now() - (BOT_LEIDO.get(neg.bid) || 0) > 60000) await botDesdeBase(neg); return botDe(neg); }
 async function botFresco(neg, maxMs) { const x = BOT.get(neg.bid); if (!x || Date.now() - x.t > maxMs) await gas(neg, 'info').catch(() => {}); return botDe(neg); }
 
 // ---------- 🛑 3.5 · FRENO ANTI-BOTS (función pura, con pruebas) ----------
@@ -304,6 +333,7 @@ async function atenderMensaje(c, neg) {
     if (op) c.rowId = op.id;
   }
   if (c.deMi && c.rowId) {
+    await botAlDia(neg);
     if (!botDe(neg).activo || !c.tel) return;
     if (MEM.humano) delete MEM.humano[k];
     anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: '👆 el negocio tocó «' + (c.texto || c.rowId).split('\n')[0] + '»: lo hago para el cliente' });
@@ -320,6 +350,7 @@ async function atenderMensaje(c, neg) {
   est.recibidos++;
   if (!c.tel) { anotar({ bid: neg.bid, que: 'sin número visible (LID): no respondo' }); return; }
   if (!atiende(c)) { anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: CFG.modo === 'apagado' ? 'Mary está apagada' : 'modo prueba: no es un número de prueba' }); return; }
+  await botAlDia(neg);
   if (!botDe(neg).activo) { anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: 'asistente apagado en el panel' }); return; }
   const pausadoPorDueno = !!(MEM.humano[k] && Date.now() - MEM.humano[k] < botDe(neg).pausaMin * 60000);
   if (pausadoPorDueno) { anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: 'callada: el dueño escribió hace poco' }); return; }
@@ -463,7 +494,7 @@ async function tickEstados() {
   if (a.hm < '06:30' || a.hm > '21:00') return;
   for (const neg of negocios()) {
     if (neg.estados && neg.estados.activo === false) continue;   // apagado a mano en negocios.json
-    const bot = await botFresco(neg, 30 * 60000);   // lo que el dueño eligió en su panel (se lee cada 30 min como mucho)
+    const bot = await botAlDia(neg);   // 3.23: lo que el dueño eligió en su panel (de la base, cada minuto como mucho)
     if (!bot.activo) continue;
     const tareas = estadosQueTocan(bot.estados, a, MEM.estados, neg.bid);
     for (const [n, t] of tareas.entries()) {
@@ -480,6 +511,7 @@ async function tickRecordatorios(aCualquierHora) {
   const hm = ahoraLocal().hm; if (!aCualquierHora && (hm < '05:00' || hm > '21:30')) return;   // 2.5: de noche no hay citas próximas: no se gasta cupo
   for (const neg of negocios()) {
     const min = Number(neg.recordatorioMin == null ? 120 : neg.recordatorioMin); if (!min) continue;
+    if (!(await botAlDia(neg)).activo) continue;   // 3.23: asistente apagado en el panel → sin recordatorios
     try {
       const r = await gas(neg, 'proximas', { minutos: min });
       if (!r.info || !r.info.activo) continue;
@@ -726,5 +758,5 @@ if (require.main === module) {
   servidor.listen(CFG.puerto, () => { log('👩‍💼 ' + VERSION + ' escuchando en ' + CFG.puerto + ' · modo ' + CFG.modo); negocios(); arrancarRelojes(); });
 }
 // 🧪 solo para el banco de escenarios (banco/escenarios.js): deja a Mary como recién encendida
-const _banco = { ASIS, BOT, yaLoDije, memDicho: () => (MEM.dicho = MEM.dicho || {}), memHumano: () => MEM.humano, tickRecordatorios, publicarEstado, alMensaje, alEventoConexion, ultimos, reiniciar() { MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; MEM.conv = {}; MEM.clientes = {}; MEM.conectados = {}; MEM.pendientesWa = {}; MEM.codigos = {}; MEM.robot = {}; MEM.dicho = {}; AGRUPA.clear(); ASIS._cat.clear(); BOT.clear(); CONTACTOS.clear(); vinculando.clear(); delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
-module.exports = { _banco, frenoRobot, estadosQueTocan, atenderPedidoWa, sincronizarConectados, renovarQr, telEnAviso, deWaha, esWaha, debeResponder, alEventoConexion, tickPedidosWa, limpiarSinVincular, leerMensaje, atiende, PREGUNTA, numeroWa, ahoraLocal, enFila, yaVisto, quienVeEstados, CFG };
+const _banco = { ASIS, BOT, yaLoDije, memDicho: () => (MEM.dicho = MEM.dicho || {}), memHumano: () => MEM.humano, tickRecordatorios, publicarEstado, alMensaje, alEventoConexion, ultimos, reiniciar() { BOT_LEIDO.clear(); MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; MEM.conv = {}; MEM.clientes = {}; MEM.conectados = {}; MEM.pendientesWa = {}; MEM.codigos = {}; MEM.robot = {}; MEM.dicho = {}; AGRUPA.clear(); ASIS._cat.clear(); BOT.clear(); CONTACTOS.clear(); vinculando.clear(); delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
+module.exports = { _banco, botNormal, frenoRobot, estadosQueTocan, atenderPedidoWa, sincronizarConectados, renovarQr, telEnAviso, deWaha, esWaha, debeResponder, alEventoConexion, tickPedidosWa, limpiarSinVincular, leerMensaje, atiende, PREGUNTA, numeroWa, ahoraLocal, enFila, yaVisto, quienVeEstados, CFG };

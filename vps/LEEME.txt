@@ -1,4 +1,4 @@
-🗓️ AGENDADOR IA · agendador-ia-3.22   (por dentro atiende «Mary», la recepcionista)
+🗓️ AGENDADOR IA · agendador-ia-3.23   (por dentro atiende «Mary», la recepcionista)
 =====================================================================================================
 🚫 REGLA UNIVERSAL N.º 1 — EPIC NO SE TOCA (manda sobre todo lo demás, para Alex, para Claude y para cada script de este paquete)
    Epic (Mary de Epic, Luisa, la tienda, epic-waha, epic-tiendas, Epic Channels…) y CUALQUIER otro proyecto:
@@ -62,6 +62,11 @@ PROBAR EN EL VPS
 AJUSTES POR NEGOCIO (negocios.json)
   "recordatorioMin": 120     ·   "estados": { "activo": true, "hoy": "07:30", "semana": "07:00", "semanaDia": 1 }
   En Firestore (settings/general del negocio) maryAutoCaptura: true → la captura confirma al instante y el dueño revisa después.
+
+NOVEDADES 3.23 · EL PANEL MANDA (aunque Google falle)
+  · Lo que el dueño elige en «WhatsApp Bot» (apagar el asistente, agendar, cupos, pausa, recordatorio, estados…) el VPS lo lee
+    DIRECTO de la base cada minuto como mucho, sin pasar por el servidor de Google. Apagar el asistente → en menos de 1 minuto deja
+    de responder, de recordar y de publicar estados, aunque Google esté caído. (Antes solo se enteraba cuando Google le respondía.)
 
 NOVEDADES 3.22 · FECHAS Y HORAS EN PALABRAS
   · El oído a veces escribe los números en palabras: ahora entiende «el veinte de noviembre», «a las cuatro de la tarde»,
