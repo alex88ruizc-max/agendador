@@ -172,3 +172,37 @@ test('3.7 · Cita rápida SIN WhatsApp (pasar citas de antes): se guarda con el 
   assert.equal(llamadasOriginal.length, 1, 'sin WhatsApp no pasa por la función que lo exige');
   assert.throws(() => A.createManualAppointment(Object.assign({ customer: { whatsapp: '', firstName: '' } }, base), { uid: 'u' }), /nombre o el WhatsApp/);
 });
+
+test('3.20 · 🔒 Bloquear cupos: crea bloqueos de 15 min para todo el equipo, respeta lo ocupado, liberar quita solo esa hora', { skip: !require('fs').existsSync(GS_MARY) && 'dentro de la imagen no está gs/' }, () => {
+  const src = require('fs').readFileSync(GS_MARY, 'utf8');
+  const DB = { 'slotLocks/s1_20261120_1500': { staffId: 's1', date: '2026-11-20', time: '15:00', state: 'booked', appointmentId: 'R-X' } };
+  let admin = { role: 'owner' };
+  const tmin = (t) => { const p = t.split(':'); return +p[0] * 60 + +p[1]; }, mstr = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+  const G = {
+    ACTIONS: {}, PUBLIC_ACTIONS: {}, console,
+    getAdmin: () => Object.assign({ staffId: 's2' }, admin), loadSettings: () => ({ slotDurationMinutes: 30 }),
+    loadStaff: () => [{ _id: 's1', name: 'Lina' }, { _id: 's2', name: 'Andrés' }, { _id: 's3', name: 'Inactivo', active: false }],
+    toDateStr: () => '2026-11-12', lockId: (s, d, t) => s + '_' + d.replace(/-/g, '') + '_' + t.replace(':', ''),
+    unitTimes: (time, occ) => { const o = []; for (let t = tmin(time); t < tmin(time) + occ; t += 15) o.push(mstr(t)); return o; },
+    withLock: (fn) => fn(), bp: (x) => x, addDelta: (d) => d, incWrites: () => [],
+    fsBatchGet: (paths) => Object.fromEntries(paths.filter((p) => DB[p]).map((p) => [p, DB[p]])),
+    fsQuery: () => Object.entries(DB).map(([k, v]) => Object.assign({ _id: k.split('/')[1] }, v)),
+    wCreate: (p, d) => ({ create: p, d }), wDelete: (p) => ({ del: p }),
+    commit: (w) => w.forEach((x) => { if (x.create) DB[x.create] = x.d; if (x.del) delete DB[x.del]; }),
+    fail: (m) => { throw new Error(m); }
+  };
+  const A = new Function(...Object.keys(G), src + '\nreturn ACTIONS;')(...Object.values(G));
+  let r = A.bloquearCupo({ date: '2026-11-20', times: ['15:00'], accion: 'bloquear' }, { uid: 'dueno' });
+  assert.equal(r.bloqueados, 3, '2 profesionales × 2 bloques de 15 min, menos el que ya tenía cita');
+  assert.equal(DB['slotLocks/s1_20261120_1500'].state, 'booked', 'la cita que ya estaba no se toca');
+  assert.equal(DB['slotLocks/s2_20261120_1515'].state, 'block'); assert.equal(DB['slotLocks/s2_20261120_1515'].bloqueo, '15:00');
+  assert.ok(!Object.keys(DB).some((k) => k.includes('s3_')), 'los inactivos no');
+  A.bloquearCupo({ date: '2026-11-20', times: ['16:00', '16:30'], accion: 'bloquear' }, { uid: 'dueno' });
+  r = A.bloquearCupo({ date: '2026-11-20', times: ['15:00'], accion: 'desbloquear' }, { uid: 'dueno' });
+  assert.equal(r.liberados, 3); assert.ok(DB['slotLocks/s1_20261120_1600'], 'liberar las 3:00 no toca las 4:00');
+  assert.ok(DB['slotLocks/s1_20261120_1500'], 'ni la cita');
+  admin = { role: 'staff' };
+  r = A.bloquearCupo({ date: '2026-11-20', times: ['18:00'], accion: 'bloquear' }, { uid: 'andres' });
+  assert.equal(r.bloqueados, 2, 'un profesional solo bloquea lo suyo'); assert.ok(DB['slotLocks/s2_20261120_1800'] && !DB['slotLocks/s1_20261120_1800']);
+  assert.throws(() => A.bloquearCupo({ date: '2026-11-01', times: ['10:00'] }, { uid: 'dueno' }), /ya pasaron/);
+});

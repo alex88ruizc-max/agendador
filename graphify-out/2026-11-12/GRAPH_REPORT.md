@@ -1,17 +1,17 @@
 # Graph Report - agendador  (2026-11-12)
 
 ## Corpus Check
-- 31 files · ~122,781 words
+- 31 files · ~122,934 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 13 file(s) not represented in the graph (top: (none) 7, .css 3, .ejemplo 2)
 
 ## Summary
-- 939 nodes · 2728 edges · 44 communities (39 shown, 5 thin omitted)
+- 939 nodes · 2708 edges · 45 communities (40 shown, 5 thin omitted)
 - Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 102 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `e56f20e2`
+- Built from commit: `fce7637f`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -45,6 +45,7 @@
 - options
 - waha-agendador
 - startUpdateWatcher
+- textos.js
 - actualizar-google.sh script
 - correo.gs
 - instalar.sh script
@@ -69,24 +70,24 @@
 7. `toMillis()` - 34 edges
 8. `renderHome()` - 32 edges
 9. `hora12()` - 31 edges
-10. `seguir()` - 30 edges
+10. `seguir()` - 29 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `maryCupos_()` --indirect_call--> `hora12()`  [INFERRED]
   vps/gs/mary.gs → common.js
 - `llega()` --calls--> `deWaha()`  [EXTRACTED]
   vps/banco/escenarios.js → vps/principal.js
-- `clientHistory()` --calls--> `toMillis()`  [EXTRACTED]
-  admin.js → common.js
 - `closeM()` --calls--> `closeModal()`  [EXTRACTED]
   admin.js → common.js
-- `deleteClient()` --calls--> `toast()`  [EXTRACTED]
+- `manageStory()` --calls--> `bpath()`  [EXTRACTED]
+  admin.js → common.js
+- `manageStory()` --calls--> `esc()`  [EXTRACTED]
   admin.js → common.js
 
 ## Import Cycles
 - None detected.
 
-## Communities (44 total, 5 thin omitted)
+## Communities (45 total, 5 thin omitted)
 
 ### Community 0 - "principal.js"
 Cohesion: 0.06
@@ -161,8 +162,8 @@ Cohesion: 0.29
 Nodes (7): WAHA_API_KEY, WAHA_BASE_URL, WAHA_DASHBOARD_ENABLED, WAHA_PRINT_QR, WHATSAPP_DEFAULT_ENGINE, WHATSAPP_SWAGGER_ENABLED, environment
 
 ### Community 18 - "textos.js"
-Cohesion: 0.08
-Nodes (70): corto(), crear(), agendar(), apartar(), aprender(), cancelarCita(), catalogo(), cliente() (+62 more)
+Cohesion: 0.16
+Nodes (46): corto(), crear(), agendar(), apartar(), aprender(), cancelarCita(), catalogo(), cliente() (+38 more)
 
 ### Community 19 - "agendador-ia"
 Cohesion: 0.18
@@ -203,6 +204,10 @@ Nodes (8): waha-agendador, container_name, image, mem_limit, networks, ports, re
 ### Community 28 - "startUpdateWatcher"
 Cohesion: 0.67
 Nodes (3): readPublishedVersion(), reloadFresh(), startUpdateWatcher()
+
+### Community 29 - "textos.js"
+Cohesion: 0.10
+Nodes (15): asistio(), citaHecha(), conCita(), cop(), cuposDia(), duracion(), enTiempo(), estadoTxt() (+7 more)
 
 ### Community 30 - "actualizar-google.sh script"
 Cohesion: 0.47
@@ -246,7 +251,7 @@ Nodes (6): openStoryViewer(), draw(), go(), tick(), renderStories(), seen()
 
 ## Knowledge Gaps
 - **1 isolated node(s):** `RFC-5545`
-  These have ≤1 connection - possible missing edges. (Counts symbols only; 261 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+  These have ≤1 connection - possible missing edges. (Counts symbols only; 270 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **5 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions

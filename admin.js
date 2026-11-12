@@ -9,9 +9,9 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-11-12f";
-import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-12f";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-12f";
+} from "./common.js?v=2026-11-12g";
+import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-12g";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-12g";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -369,8 +369,12 @@ function renderAgenda() {
     <h2 class="step-title capitalize">${fechaLarga(A.date)}</h2>
     <p class="mb-3 text-sm text-ink/70">${live.length} cita(s). Saldo por cobrar en el local: <b>${cop(caja)}</b></p>
     <section id="agFree" class="mb-6 rounded-2xl border border-line bg-white p-4" aria-label="Cupos libres">
-      <div class="flex flex-wrap items-center justify-between gap-2"><h3 class="font-bold">Cupos libres</h3><span id="agFreeN" class="text-sm text-ink/60">Cargando…</span></div>
+      <div class="flex flex-wrap items-center justify-between gap-2"><h3 class="font-bold">Cupos libres</h3><span class="flex items-center gap-2"><span id="agFreeN" class="text-sm text-ink/60">Cargando…</span>
+        <button id="agBlock" type="button" class="btn-sm" aria-pressed="false">🔒 Bloquear</button></span></div>
+      <p id="agBlockHint" class="mt-2 hidden rounded-xl p-2.5 text-sm" style="background:#FFF1F2;color:#9F1239">Toca una hora para <b>bloquearla</b>: nadie la verá (página, WhatsApp ni estados). Toca una 🔒 para liberarla.
+        <button id="agBlockAll" type="button" class="ml-1 font-bold underline">Bloquear todo el día</button></p>
       <div id="agFreeList" class="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-6"></div>
+      <div id="agBlockedWrap" class="mt-3 hidden"><p class="mb-1.5 text-xs font-bold uppercase tracking-wide text-ink/60">🔒 Bloqueados por ti</p><div id="agBlockedList" class="grid grid-cols-3 gap-2 sm:grid-cols-6"></div></div>
       <button id="agFreeShare" type="button" class="btn-light mt-3 hidden w-full text-sm"><i class="fa-brands fa-whatsapp"></i> Enviar los cupos por WhatsApp</button>
     </section>
     <div class="grid gap-3 md:grid-cols-2">${live.map(aptCard).join("") || `<p class="text-sm text-ink/60">No hay citas este día. Usa “+ Nueva cita” para agendar a alguien que llamó o llegó al local.</p>`}</div>
@@ -383,13 +387,21 @@ let freeTok = 0;
 async function renderFree() {
   const box = $("agFreeList"); if (!box || !A.settings) return;
   const tok = ++freeTok, date = A.date;
-  let L = [];
-  try { L = await freeSlotsFor(date); } catch (e) { console.error(e); }
+  let L = [], locks = [];
+  try { const r = await freeSlotsFor(date, true); L = r.L; locks = r.locks; } catch (e) { console.error(e); }
   if (tok !== freeTok || !$("agFreeList")) return;
   const now = bogNow();
   if (date === now.date) L = L.filter((t) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5)) > now.min);
+  A.freeL = L;
+  // 3.20: cupos bloqueados por el dueño (bloqueos «block» guardan la hora del cupo en «bloqueo»)
+  const bloq = [...new Set(locks.filter((l) => l.state === "block").map((l) => l.bloqueo || l.time))].sort();
+  const modo = !!A.bloqueando;
+  $("agBlock").setAttribute("aria-pressed", modo); $("agBlock").textContent = modo ? "✓ Listo" : "🔒 Bloquear";
+  $("agBlockHint").classList.toggle("hidden", !modo);
   $("agFreeN").textContent = L.length ? `${L.length} ${L.length === 1 ? "hora libre" : "horas libres"}` : "Sin cupos libres este día";
-  box.innerHTML = L.map((t) => `<button type="button" class="btn-sm py-2" data-free="${t}">${hora12(t)}</button>`).join("");
+  box.innerHTML = L.map((t) => `<button type="button" class="btn-sm py-2" data-free="${t}" ${modo ? 'style="border-style:dashed;border-color:#E11D48;color:#9F1239"' : ""}>${modo ? "🔒 " : ""}${hora12(t)}</button>`).join("");
+  $("agBlockedWrap").classList.toggle("hidden", !bloq.length);
+  $("agBlockedList").innerHTML = bloq.map((t) => `<button type="button" class="btn-sm py-2" data-desbloq="${t}" style="background:#F1F5F9;color:#64748B;text-decoration:line-through" title="Toca para liberar">🔒 ${hora12(t)}</button>`).join("");
   const sh = $("agFreeShare"); sh.classList.toggle("hidden", !L.length);
   sh.onclick = () => {
     const dia = date === now.date ? "hoy" : fechaLarga(date);
@@ -399,10 +411,15 @@ async function renderFree() {
 }
 function setAgendaDate(d) { A.date = d; A.dayApts = []; subscribeDay(); renderAgenda(); }
 
-$("tab-agenda").addEventListener("click", (e) => {
+$("tab-agenda").addEventListener("click", async (e) => {
   const d = e.target.closest("[data-day]");
   if (d) { const n = Number(d.dataset.day); setAgendaDate(n === 0 ? bogNow().date : addDays(A.date, n)); return; }
-  if (e.target.closest("#btnNewApt") || e.target.closest("[data-free]")) { openAptModal("new"); return; }
+  if (e.target.closest("#agBlock")) { A.bloqueando = !A.bloqueando; renderFree(); return; }
+  if (e.target.closest("#agBlockAll")) { const L = A.freeL || []; if (!L.length) return; if (await uiConfirm("¿Bloquear todo el día?", `Se bloquean los ${L.length} cupos libres de ${fechaLarga(A.date)}. Las citas que ya tienes se mantienen.`, { okText: "Bloquear todo", danger: true })) bloqueo("bloquear", L, e.target.closest("#agBlockAll")); return; }
+  const fr = e.target.closest("[data-free]"), db2 = e.target.closest("[data-desbloq]");
+  if (db2) { bloqueo("desbloquear", [db2.dataset.desbloq], db2); return; }
+  if (fr && A.bloqueando) { bloqueo("bloquear", [fr.dataset.free], fr); return; }
+  if (e.target.closest("#btnNewApt") || fr) { openAptModal("new"); return; }
   const b = e.target.closest("[data-act]"); if (b) aptAction(b);
 });
 $("tab-agenda").addEventListener("change", (e) => { if (e.target.id === "agDate" && e.target.value) setAgendaDate(e.target.value); });
@@ -1539,10 +1556,20 @@ function renderImages() {
   };
   drawImage();
 }
-async function freeSlotsFor(date) {
+async function freeSlotsFor(date, conLocks) {
   const q = await getDocs(query(collection(db, bpath("slotLocks")), where("date", "==", date)));
-  const slot = Number(A.settings.slotDurationMinutes || 30);
-  return computeSlots({ settings: A.settings, staffList: A.staff.filter((s) => s.active !== false), locks: q.docs.map((d) => d.data()), date, occupied: slot }).map((s) => s.time);
+  const slot = Number(A.settings.slotDurationMinutes || 30), locks = q.docs.map((d) => d.data());
+  const L = computeSlots({ settings: A.settings, staffList: A.staff.filter((s) => s.active !== false), locks, date, occupied: slot }).map((s) => s.time);
+  return conLocks ? { L, locks } : L;
+}
+// 3.20 · 🔒 bloquear / liberar cupos (el servidor pone el bloqueo para todo el equipo; las citas que ya existan no se tocan)
+async function bloqueo(accion, times, btn) {
+  if (btn) setBusy(btn, true, accion === "bloquear" ? "Bloqueando…" : "Liberando…");
+  try {
+    const r = await api("bloquearCupo", { date: A.date, times, accion });
+    toast(accion === "bloquear" ? `🔒 Bloqueado${times.length > 1 ? `s ${times.length} cupos` : ": " + hora12(times[0])}. Nadie lo verá.` : `✓ Liberado${times.length > 1 ? "s" : ""}: ya se puede agendar.`);
+  } catch (err) { toast(err.message, "error"); }
+  finally { if (btn && document.body.contains(btn)) setBusy(btn, false); renderFree(); }
 }
 function loadImg(src) { return new Promise((res) => { if (!src) return res(null); const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = src; }); }
 function roundRect(x, c, y, w, h, r) { x.beginPath(); x.moveTo(c + r, y); x.arcTo(c + w, y, c + w, y + h, r); x.arcTo(c + w, y + h, c, y + h, r); x.arcTo(c, y + h, c, y, r); x.arcTo(c, y, c + w, y, r); x.closePath(); }

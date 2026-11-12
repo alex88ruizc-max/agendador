@@ -14,7 +14,7 @@
  * Instalación: pega este archivo, ejecuta activarMary() una vez, copia la clave que sale en el registro
  * y ponla en el mary.env del VPS (MARY_KEY). Vuelve a implementar la aplicación web (Implementar > Administrar > editar > Nueva versión).
  */
-const MARY_VERSION = 'agendador-ia-3.15';
+const MARY_VERSION = 'agendador-ia-3.20';
 
 // Se registra como acción pública del servidor (sin sesión: entra con la clave de Mary).
 // ⚠️ Este archivo debe quedar DEBAJO del archivo principal en la lista de archivos de Apps Script (los nuevos quedan al final: así está bien).
@@ -577,6 +577,48 @@ function maryCitaManualSinWa_(b, auth) {
   try { if (tgEventOn('panelApt')) tgNotify([apt.staffId], '📝 <b>CITA AGENDADA DESDE EL PANEL</b> (sin WhatsApp)\n' + aptText(apt)); } catch (e) { console.error(e); }
   if (apt.customer.email) emailClient(apt, 'Tu cita está confirmada', 'Agendamos tu cita. Presenta tu número de reserva al llegar.');
   return { appointment: aptPublic(apt) };
+}
+
+// =====================================================================
+//  3.20 · 🔒 BLOQUEAR CUPOS desde el panel: el dueño toca una hora y nadie la ve (página, asistente, estados).
+//  Son bloqueos de 15 min (state 'block') para TODO el equipo (o un profesional), con la hora del cupo en «bloqueo».
+//  Las citas que ya estén en esa hora NO se tocan. Desbloquear borra solo los bloqueos de ese cupo.
+// =====================================================================
+try { ACTIONS.bloquearCupo = maryBloquearCupo_; } catch (e) { console.error('Mary: el archivo "mary" quedó ANTES del principal.'); }
+function maryBloquearCupo_(b, auth) {
+  const admin = getAdmin(auth);
+  const st = loadSettings(), date = String(b.date || ''), slot = Number(st.slotDurationMinutes || 30);
+  const horas = (Array.isArray(b.times) ? b.times : [b.time]).map(String).filter(function (t) { return /^\d{2}:\d{2}$/.test(t); }).slice(0, 96);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !horas.length) fail('Fecha u hora inválida.');
+  if (date < toDateStr(new Date())) fail('No se pueden bloquear días que ya pasaron.');
+  let staff = loadStaff().filter(function (x) { return x.active !== false; });
+  if (admin.role !== 'owner') staff = staff.filter(function (x) { return x._id === admin.staffId; });   // un profesional solo bloquea lo suyo
+  else if (b.staffId) staff = staff.filter(function (x) { return x._id === b.staffId; });
+  if (!staff.length) fail('No hay a quién bloquear.');
+  const ids = function (x, time) { return unitTimes(time, slot).map(function (t) { return { id: lockId(x._id, date, t), t: t }; }); };
+  return withLock(function () {
+    if (b.accion === 'desbloquear') {
+      const L = fsQuery('slotLocks', [['date', 'EQUAL', date]]).filter(function (l) { return l.state === 'block' && horas.indexOf(l.bloqueo) >= 0 && staff.some(function (x) { return x._id === l.staffId; }); });
+      const delta = {}; L.forEach(function (l) { addDelta(delta, date, l.staffId, -1); });
+      if (L.length) commit(L.map(function (l) { return wDelete(bp('slotLocks/' + l._id)); }).concat(incWrites(delta)));
+      return { ok: true, liberados: L.length };
+    }
+    let n = 0; const w = [], delta = {};
+    const vistos = {};
+    horas.forEach(function (time) {
+      staff.forEach(function (x) {
+        const U = ids(x, time).filter(function (u) { return !vistos[u.id]; }), got = fsBatchGet(U.map(function (u) { return bp('slotLocks/' + u.id); }));
+        U.forEach(function (u) {
+          vistos[u.id] = true;
+          if (got[bp('slotLocks/' + u.id)]) return;   // ya ocupado (cita, descanso u otro bloqueo): se deja como está
+          w.push(wCreate(bp('slotLocks/' + u.id), { staffId: x._id, date: date, time: u.t, state: 'block', appointmentId: null, breakId: null, expiresAt: null, bloqueo: time, by: auth.uid }));
+          addDelta(delta, date, x._id, 1); n++;
+        });
+      });
+    });
+    if (w.length) commit(w.concat(incWrites(delta)));
+    return { ok: true, bloqueados: n };
+  });
 }
 
 // =====================================================================

@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-3.19** · Página **2026-11-12f** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-12** · Mary **agendador-ia-3.20** · Página **2026-11-12g** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -113,6 +113,13 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-12 · agendador-ia-3.20 · 🔒 bloquear cupos
+- `mary.gs` `ACTIONS.bloquearCupo` {date, times[], accion}: crea `slotLocks` state `block` (+ `bloqueo` = hora del cupo) para cada
+  profesional activo (o solo el propio si no es dueño), sin pisar lo ocupado; desbloquear borra los `block` de esas horas.
+  Ninguna limpieza del servidor borra estos bloqueos. Página, asistente (GAS `maryLibres_`/`maryCupos_`) y estados ya los respetan.
+- `admin.js` (Agenda › Cupos libres): botón «🔒 Bloquear» (modo), «Bloquear todo el día», sección «🔒 Bloqueados por ti» (toca para liberar).
+- Banco: 108 pruebas (la nueva carga `mary.gs` real con Firestore simulado).
 
 ### 2026-11-12 · agendador-ia-3.19 · ✅ oído funcionando
 - Prueba real: /registro «🎤 escuché: «Hola, tiene cita para mañana a las 2 de la tarde.»» → «Sí, tengo un cupo mañana a las 2:00 p. m.
