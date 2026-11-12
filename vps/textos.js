@@ -70,13 +70,15 @@ const sinServicios = (info) => `Por ahora no hay servicios para agendar por aqu�
 const pideCorreo = () => '📧 ¿Quieres que la cita te quede en tu *calendario*? Escríbeme tu correo (ej. *nombre@gmail.com*) o responde *no*.';
 const parafrasis = (x) => `📝 *Entendí esto:*\n✂️ ${x.servicio || x.servicios} · *${cop(x.total)}* (${duracion(x.min)})\n📅 ${x.dia} a las *${x.hora}*${x.con ? '\n💈 Con ' + x.con : ''}\n🙋 A nombre de ${x.nombre}` +
   (x.abono > 0 ? `\n💳 Abono para apartar: *${cop(x.abono)}*` : '') + '\n\n¿Lo confirmo?';
+// 3.30: al pie de la cita, la invitación a la plataforma (pedido de Alex)
+const PIE_GRATIS = '\n\n💼 ¿Tienes un negocio con citas? Regístrate gratis en https://tuagenda.vip/';
 // 3.29: sin «¿Lo confirmo?»: al final llega el resumen y «✅ Cita confirmada» (pedido de Alex: «con eso basta»)
 function citaHecha(c, info, nombre, conCorreo) {
   const n = nombre1(nombre);
   const precio = info.total ? ' · *' + cop(info.total) + '*' + (info.min ? ' (' + duracion(info.min) + ')' : '') : '';
   const cab = `✂️ ${c.servicio}${precio}${info.comoSiempre ? ' · como siempre' : ''}\n📅 ${c.dia} a las *${c.hora}*${c.con ? '\n💈 Con ' + c.con : ''}${nombre ? '\n🙋 A nombre de ' + nombre : ''}\n🔖 Reserva *${c.code}*`;
-  if (c.status === 'confirmed') return `✅ *¡Cita confirmada${n ? ', ' + n : ''}!*\n${cab}` + (conCorreo ? '\n📧 Te la mandé a tu correo para tu calendario.' : '') + `\n\nPara verla o cambiarla: ${c.link}\n¡Te esperamos! ✨`;
-  return `🗓️ *¡Te aparté el cupo${n ? ', ' + n : ''}!*\n${cab}\n\n` + pagoTxt(info, c) + `\n⏳ Tienes ${info.holdMinutes || 30} minutos; si no, el cupo se libera.`;
+  if (c.status === 'confirmed') return `✅ *¡Cita confirmada${n ? ', ' + n : ''}!*\n${cab}` + (conCorreo ? '\n📧 Te la mandé a tu correo para tu calendario.' : '') + `\n\nPara verla o cambiarla: ${c.link}\n¡Te esperamos! ✨` + PIE_GRATIS;
+  return `🗓️ *¡Te aparté el cupo${n ? ', ' + n : ''}!*\n${cab}\n\n` + pagoTxt(info, c) + `\n⏳ Tienes ${info.holdMinutes || 30} minutos; si no, el cupo se libera.` + PIE_GRATIS;
 }
 const audio = () => '🎤 En este momento no puedo escuchar audios 🙏 ¿Me lo escribes, por favor?';
 

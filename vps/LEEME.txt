@@ -67,6 +67,7 @@ NOVEDADES 3.30 · 💰 MENOS CUPO DE GOOGLE
   Días, horas y cupos los calcula el VPS leyendo la base directo (como la página). Google solo para crear/cancelar/pagos.
   Si la base no deja leer, se usa Google como antes. Para apagarlo: LEER_DIRECTO=no en agendador-ia.env.
   «✅ WhatsApp vinculado» ya no sale en cada reinicio: solo cuando de verdad se vincula.
+  Al pie de la cita confirmada: «Regístrate gratis en https://tuagenda.vip/». Después manda agendador-web-2026-11-12o.zip.
 
 NOVEDADES 3.29 · ✅ SIN «¿LO CONFIRMO?»
   Igual que antes: primero el servicio, luego el día y la hora. Al responder el correo (o «no») la cita queda confirmada

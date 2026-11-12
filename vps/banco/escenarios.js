@@ -270,6 +270,7 @@ test('3.0 · Agendar COMPLETO con listas: 2 servicios, día, hora, profesional, 
   assert.deepEqual(cr.ids, ['c2', 'b1']); assert.equal(cr.date, HOY); assert.equal(cr.time, '15:00'); assert.equal(cr.staffId, 's2');
   assert.equal(cr.nombre, 'Andrés Ruiz'); assert.equal(cr.email, 'andres@gmail.com'); assert.equal(cr.phone, CLIENTE);
   assert.match(ultimo().texto, /R-NUEVA1/); assert.match(ultimo().texto, /calendario/);
+  assert.match(ultimo().texto, /Regístrate gratis en https:\/\/tuagenda\.vip\/$/, '3.30: al pie, la invitación a la plataforma');
   if (process.env.BANCO_VISTA) fs.writeFileSync(process.env.BANCO_VISTA, JSON.stringify(W.enviados, null, 1));   // para dibujar la vista previa
 });
 test('3.0 · Responder ESCRIBIENDO (número o nombre) en vez de tocar la lista también funciona', async () => {

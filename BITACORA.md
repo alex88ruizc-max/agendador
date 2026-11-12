@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-3.30** · Página **2026-11-12n** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-12** · Mary **agendador-ia-3.30** · Página **2026-11-12o** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -122,6 +122,10 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 - **Ahorro 2 (VPS primero, Google de respaldo):** si la base no deja leer o algo falla, se usa Google como antes. Se apaga con `LEER_DIRECTO=no` en agendador-ia.env.
 - **«✅ WhatsApp vinculado» en Telegram salía en cada reinicio del VPS** (cada vez que se instala un zip): los dueños creían que los hackeaban. Ahora solo sale si de verdad se vincula un número nuevo o distinto (mary.gs 3.30).
 - El recordatorio de la cita R-RZP6UR NO fue error: en Telegram, la cancelación aparece después del recordatorio de las 4:54.
+- **Pedidos de Alex en esta misma versión:**
+  - Al pie del mensaje de cita confirmada (o apartada): «💼 ¿Tienes un negocio con citas? Regístrate gratis en https://tuagenda.vip/».
+  - **Página 2026-11-12o:** «🚀 Probar gratis» también ARRIBA, en el encabezado de la página del cliente (además del de abajo). Se oculta si la prueba gratis está apagada.
+- Revisado antes de entregar: `cuposLocal.js` estaba fuera de las listas del Dockerfile y de actualizar.sh. Se agregó y se probó el banco con solo los archivos de la imagen (0 fallas).
 - Banco: 131 pruebas, 0 fallas (unidad + escenario completo sin Google en días/horas + respaldo). Probado con mutaciones.
 - Pendiente de la auditoría: puntos 3-5 (memoria, recordatorios cada 30 min, panel vinculando sin Google).
 

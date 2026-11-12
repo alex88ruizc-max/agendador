@@ -1,17 +1,17 @@
 # Graph Report - agendador  (2026-11-12)
 
 ## Corpus Check
-- 32 files · ~135,436 words
+- 32 files · ~135,616 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 13 file(s) not represented in the graph (top: (none) 7, .css 3, .ejemplo 2)
 
 ## Summary
-- 992 nodes · 2848 edges · 46 communities (41 shown, 5 thin omitted)
+- 992 nodes · 2840 edges · 46 communities (41 shown, 5 thin omitted)
 - Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 115 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `e6003c40`
+- Built from commit: `0abc533d`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -67,8 +67,8 @@
 3. `toast()` - 49 edges
 4. `bpath()` - 47 edges
 5. `crear()` - 38 edges
-6. `cop()` - 34 edges
-7. `toMillis()` - 34 edges
+6. `toMillis()` - 34 edges
+7. `cop()` - 34 edges
 8. `hora12()` - 33 edges
 9. `renderHome()` - 32 edges
 10. `seguir()` - 28 edges
@@ -76,14 +76,14 @@
 ## Surprising Connections (you probably didn't know these)
 - `maryCupos_()` --indirect_call--> `hora12()`  [INFERRED]
   vps/gs/mary.gs → vps/cuposLocal.js
-- `llega()` --calls--> `deWaha()`  [EXTRACTED]
-  vps/banco/escenarios.js → vps/principal.js
-- `renderMonth()` --calls--> `bogNow()`  [EXTRACTED]
-  super.js → common.js
-- `renderMonth()` --calls--> `cop()`  [EXTRACTED]
-  super.js → common.js
-- `renderMonth()` --calls--> `esc()`  [EXTRACTED]
-  super.js → common.js
+- `onErr()` --calls--> `toast()`  [EXTRACTED]
+  admin.js → common.js
+- `start()` --calls--> `bpath()`  [EXTRACTED]
+  admin.js → common.js
+- `start()` --calls--> `setDialogBrand()`  [EXTRACTED]
+  admin.js → common.js
+- `start()` --calls--> `warmServer()`  [EXTRACTED]
+  admin.js → common.js
 
 ## Import Cycles
 - None detected.
@@ -92,7 +92,7 @@
 
 ### Community 0 - "principal.js"
 Cohesion: 0.06
-Nodes (97): llega(), AGRUPA, ahoraLocal(), alEventoConexion(), alMensaje(), anotar(), armarEstado(), arrancarRelojes() (+89 more)
+Nodes (97): AGRUPA, ahoraLocal(), alEventoConexion(), alMensaje(), anotar(), armarEstado(), arrancarRelojes(), asegurarInstancia() (+89 more)
 
 ### Community 1 - "super.js"
 Cohesion: 0.09
@@ -116,7 +116,7 @@ Nodes (31): imapflow, mailparser, @resvg/resvg-js, color(), DCORTO, DIAS, fechaL
 
 ### Community 6 - "escenarios.js"
 Cohesion: 0.08
-Nodes (22): assert, audio(), CATALOGO, CONFIRMADA, delNegocio(), DIR, DOS, filas() (+14 more)
+Nodes (21): assert, audio(), CATALOGO, CONFIRMADA, delNegocio(), DIR, DOS, filas() (+13 more)
 
 ### Community 7 - "esc"
 Cohesion: 0.18
@@ -183,7 +183,7 @@ Cohesion: 0.20
 Nodes (10): container_name, depends_on, env_file, image, mem_limit, networks, ports, restart (+2 more)
 
 ### Community 23 - "reglas.js"
-Cohesion: 0.18
+Cohesion: 0.20
 Nodes (7): assert, fs, NUESTROS, path, RAIZ, scripts, test
 
 ### Community 24 - "handleAct"
@@ -207,7 +207,7 @@ Cohesion: 0.10
 Nodes (46): activeStories(), applyPanelBrand(), buildRecs(), fillAsStory(), firstName(), freeNowStaff(), freeTimes(), goStep() (+38 more)
 
 ### Community 29 - "correo.js"
-Cohesion: 0.31
+Cohesion: 0.27
 Nodes (6): fs, leerPago(), montos(), pagador(), path, revisarBuzon()
 
 ### Community 30 - "actualizar-google.sh script"
@@ -256,7 +256,7 @@ Nodes (9): build, container_name, cpus, image, mem_limit, networks, restart, vol
 
 ## Knowledge Gaps
 - **1 isolated node(s):** `RFC-5545`
-  These have ≤1 connection - possible missing edges. (Counts symbols only; 287 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+  These have ≤1 connection - possible missing edges. (Counts symbols only; 288 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **5 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
@@ -269,7 +269,7 @@ _Questions this graph is uniquely positioned to answer:_
 - **What connects `RFC-5545` to the rest of the system?**
   _1 weakly-connected nodes found - possible missing edges._
 - **Should `principal.js` be split into smaller, more focused modules?**
-  _Cohesion score 0.0597979797979798 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.06 - nodes in this community are weakly interconnected._
 - **Why does `maryCupos_()` connect `mary.gs` to `cuposLocal.js`?**
   _High betweenness centrality (0.028) - this node is a cross-community bridge._
 - **Should `super.js` be split into smaller, more focused modules?**
