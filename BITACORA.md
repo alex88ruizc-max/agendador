@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-3.5** · Página **2026-11-12c** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-12** · Mary **agendador-ia-3.6** · Página **2026-11-12c** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -113,6 +113,13 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-12 · agendador-ia-3.6 · agrupar mensajes y no repetir
+- Prueba real (captura de Alex): las LISTAS ya salen («Ver opciones» ✅). Pero 3 mensajes seguidos dieron 2 respuestas y
+  «Hoy hicimos la inauguración» volvió a recibir el link.
+- `alMensaje`: agrupa los textos seguidos del mismo chat (`AGRUPAR_MS`, 7 s por defecto) y responde una vez; opciones de lista,
+  fotos y audios van al instante. `yaLoDije()`: no manda el mismo texto (o la misma lista) al mismo chat en 15 min.
+- Banco: 81 pruebas (en el banco `AGRUPAR_MS=0` salvo en las pruebas de agrupar; mutación hecha apagando la agrupación).
 
 ### 2026-11-12 · agendador-ia-3.5 · freno anti-bots
 - `frenoRobot()` (pura) en `principal.js`: pausa si el mensaje trae listas/botones, repite uno de las últimas 12 h (≥ 4 letras; en el

@@ -15,7 +15,7 @@ fs.writeFileSync(NEG_F, JSON.stringify([
 Object.assign(process.env, {
   DATOS: DIR, NEGOCIOS: NEG_F, GAS_URL: 'https://gas.prueba/exec', MARY_KEY: 'clave-prueba', EVO_KEY: 'evo-prueba',
   WAHA_URL: 'http://waha-agendador:3000', WAHA_KEY: 'waha-prueba', MARY_MODO: 'todos', MARY_PRUEBA: '573187920386',
-  SILENCIO_MIN: '15', HUMANO_MIN: '15', TZ: 'America/Bogota', ESPERA_MS: '5'
+  SILENCIO_MIN: '15', HUMANO_MIN: '15', TZ: 'America/Bogota', ESPERA_MS: '5', AGRUPAR_MS: '0'
 });
 const P = require('../principal');
 const B = P._banco;
@@ -556,4 +556,46 @@ test('3.5 · frenoRobot (reglas sueltas)', () => {
   assert.equal(F({ texto: 'cuanto vale el corte', hist: { textos: [['cuanto vale el corte', 99000]], pausa: true } }).responder, false);
   assert.equal(F({ texto: 'y la barba?', hist: { textos: [['cuanto vale el corte', 99000]], pausa: true } }).responder, true);
   assert.equal(F({ texto: 'hola', hist: { textos: [['hola', 100000 - 13 * 3600000]], pausa: false } }).responder, true, 'un «hola» de ayer no cuenta');
+});
+
+// =====================================================================
+//  3.6 · Varios mensajes seguidos = UNA respuesta · nunca el mismo mensaje dos veces
+// =====================================================================
+test('3.6 · «Hola» «Papito» «Ya soy 11» seguidos → espera, los lee juntos y responde UNA sola vez', async () => {
+  P.CFG.agruparMs = 60;
+  try {
+    await Promise.all([llega(wahaMsg(CLIENTE, 'Hola')), llega(wahaMsg(CLIENTE, 'Papito')), llega(wahaMsg(CLIENTE, 'Ya soy 11'))]);
+    assert.equal(W.enviados.length, 1, 'una sola respuesta'); assert.match(W.enviados[0].texto, /Soy el asistente de/);
+    assert.ok(B.ultimos.some((x) => /3 mensajes seguidos/.test(x.que)));
+  } finally { P.CFG.agruparMs = 0; }
+});
+test('3.6 · Pregunta por cupos en medio de varios mensajes → responde los cupos (una vez)', async () => {
+  P.CFG.agruparMs = 60;
+  try {
+    await Promise.all([llega(wahaMsg(CLIENTE, 'buenas')), llega(wahaMsg(CLIENTE, 'una pregunta')), llega(wahaMsg(CLIENTE, 'tienen cupo hoy?'))]);
+    assert.equal(W.enviados.length, 1); assert.match(W.enviados[0].texto, /hay cupo a las/);
+  } finally { P.CFG.agruparMs = 0; }
+});
+test('3.6 · Nunca le manda el MISMO mensaje dos veces seguidas («Hoy hicimos la inauguración» después del link)', async () => {
+  await llega(wahaMsg(CLIENTE, 'Hola'));
+  await llega(wahaMsg(CLIENTE, 'necesito info'));          // respuesta sin saludo (ya saludó hoy)
+  const n = W.enviados.length;
+  await llega(wahaMsg(CLIENTE, 'Hoy hicimos la inauguración'));
+  assert.equal(W.enviados.length, n, 'no repite el mismo link'); assert.match(ultimoRegistro(), /no repito|callada/);
+});
+test('3.6 · yaLoDije: el mismo texto otra vez en 15 min = no se manda; otro texto o pasados 15 min = sí', () => {
+  const neg = { bid: 'lina-spa' }, n = CLIENTE;
+  assert.equal(B.yaLoDije(neg, n, 'Hoy quedan 15 cupos. Agenda aquí: L'), false);
+  assert.equal(B.yaLoDije(neg, n, 'Hoy quedan 15 cupos.  Agenda aquí: L'), true, 'igual (aunque cambien espacios)');
+  assert.equal(B.yaLoDije(neg, n, 'Tienes esta cita: viernes'), false, 'otro texto sí se manda');
+  B.memDicho()['lina-spa:' + n].t -= 16 * 60000;
+  assert.equal(B.yaLoDije(neg, n, 'Tienes esta cita: viernes'), false, 'pasados 15 min se puede repetir');
+});
+test('3.6 · Tocar una opción de la lista NO espera (responde al instante)', async () => {
+  P.CFG.agruparMs = 5000;
+  try {
+    await llega(toca('menu:agendar'));   // sin conversación abierta también responde
+    const t0 = Date.now(); await llega(wahaMsg(CLIENTE, '', { _data: { notifyName: 'Camila', Message: { listResponseMessage: { singleSelectReply: { selectedRowID: 'menu:cupos' } } } } }));
+    assert.ok(Date.now() - t0 < 2000, 'no esperó los 5 s');
+  } finally { P.CFG.agruparMs = 0; }
 });

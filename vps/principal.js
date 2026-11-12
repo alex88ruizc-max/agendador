@@ -6,7 +6,7 @@
 const http = require('http'), fs = require('fs'), path = require('path');
 const T = require('./textos'), C = require('./correo'), E = require('./estado'), A = require('./asistente');
 
-const VERSION = 'agendador-ia-3.5';
+const VERSION = 'agendador-ia-3.6';
 const env = (k, d) => (process.env[k] === undefined || process.env[k] === '' ? d : process.env[k]);
 const CFG = {
   puerto: parseInt(env('PUERTO', '3060'), 10),
@@ -18,6 +18,7 @@ const CFG = {
   prueba: String(env('MARY_PRUEBA', '')).split(/[,\s]+/).map((x) => x.replace(/\D/g, '')).filter((x) => x.length >= 10),
   silencioMin: parseInt(env('SILENCIO_MIN', '15'), 10),     // no repite lo mismo en un chat antes de esto (salvo que el cliente diga algo de la lista)
   humanoMin: parseFloat(env('HUMANO_MIN', '30')),           // 3.1: si el dueño escribe a mano en un chat, se calla ahí 30 min (o lo que diga su panel)
+  agruparMs: parseInt(env('AGRUPAR_MS', '7000'), 10),   // 3.6: espera a que el cliente termine de escribir (varios mensajes = UNA respuesta)
   tz: env('TZ', 'America/Bogota'), esperaMs: parseInt(env('ESPERA_MS', '2000'), 10),
   // 2.2 · motor de WhatsApp: evolution (el de siempre) o waha. Cada negocio puede tener el suyo en negocios.json ("motor", "sesion").
   motor: String(env('WA_MOTOR', env('WAHA_KEY', '') ? 'waha' : 'evolution')).toLowerCase(),   // 3.1: con WAHA del agendador, los negocios nuevos van por WAHA
@@ -103,8 +104,17 @@ async function bajarMediaWaha(url) {
 }
 function numeroWa(x) { let d = String(x || '').replace(/\D/g, ''); if (d.length === 10 && /^3/.test(d)) d = '57' + d; return d; }
 const ULT_ENVIO = new Map();   // chat → cuándo le escribió Mary (para no confundir su propio eco con el dueño)
+// 🙊 3.6: nunca se le manda a un cliente el MISMO mensaje dos veces seguidas en 15 min
+function yaLoDije(neg, n, texto) {
+  MEM.dicho = MEM.dicho || {};
+  const k = neg.bid + ':' + n, h = normal(texto), x = MEM.dicho[k];
+  if (x && x.h === h && Date.now() - x.t < 15 * 60000) { anotar({ bid: neg.bid, chat: n.slice(-4), que: '🙊 no repito el mismo mensaje' }); return true; }
+  MEM.dicho[k] = { h, t: Date.now() }; memGuardar();
+  return false;
+}
 async function escribir(neg, numero, texto) {
   const n = numeroWa(numero); if (n.length < 11) { const e = new Error('número inválido'); e.permanente = true; throw e; }
+  if (yaLoDije(neg, n, texto)) return { key: { id: '' }, repetido: true };
   ULT_ENVIO.set(neg.bid + ':' + n, Date.now());
   let r;
   if (esWaha(neg)) {
@@ -127,6 +137,7 @@ async function escribir(neg, numero, texto) {
 //    L = { texto, boton, pie, secciones: [{ titulo, filas: [{ id, titulo, desc }] }] }  (WhatsApp: máximo 10 filas en total)
 async function escribirLista(neg, numero, L) {
   const n = numeroWa(numero); if (n.length < 11) { const e = new Error('número inválido'); e.permanente = true; throw e; }
+  if (yaLoDije(neg, n, L.texto + '|' + L.secciones.map((x) => x.filas.map((f) => f.id).join(',')).join(';'))) return { key: { id: '' }, repetido: true };
   // 3.3: WAHA EXIGE título en la lista y en cada sección (si va vacío la rechaza y salía el texto con números).
   //      Título = primera línea del mensaje (sin *), como «🎬 Elige tu Amazon» en Epic; el resto va de descripción.
   const lineas = String(L.texto || '').split('\n'), i0 = lineas.findIndex((x) => x.trim());
@@ -148,6 +159,7 @@ async function escribirLista(neg, numero, L) {
   } catch (e) {
     if (/número inválido/.test(e.message)) throw e;
     log('lista → texto:', e.message);
+    if (MEM.dicho) delete MEM.dicho[neg.bid + ':' + n];
     let i = 0; const op = L.secciones.map((x) => x.filas.map((f) => `${++i}. ${f.titulo}`).join('\n')).join('\n');
     return escribir(neg, numero, L.texto + '\n\n' + op + '\n\nResponde con el número 👆');
   }
@@ -240,11 +252,28 @@ const FILAS = new Map();
 function enFila(k, fn) { const antes = FILAS.get(k) || Promise.resolve(); const p = antes.then(fn, fn); const fin = p.catch(() => {}); FILAS.set(k, fin); fin.then(() => { if (FILAS.get(k) === fin) FILAS.delete(k); }); return p; }
 const VISTOS_ID = new Map();
 function yaVisto(id) { if (!id) return false; if (VISTOS_ID.has(id)) return true; VISTOS_ID.set(id, Date.now()); if (VISTOS_ID.size > 2000) { const lim = Date.now() - 3600000; for (const [k, t] of VISTOS_ID) if (t < lim) VISTOS_ID.delete(k); } return false; }
+// 🧺 3.6: si el cliente manda varios mensajes seguidos («Hola» «Papito» «Ya soy 11»), se espera a que termine y se responde UNA vez
+const AGRUPA = new Map();
 function alMensaje(b) {
   const c = leerMensaje(b);
   if (!/^messages\.upsert$/.test(c.evento) || !c.jid || c.grupo || c.estado || yaVisto(c.id)) return Promise.resolve();
   const neg = negDe(c.inst); if (!neg) { if (!c.deMi) anotar({ que: '⚠️ mensaje de «' + c.inst + '», que no está en negocios.json: no respondo' }); return Promise.resolve(); }
-  return enFila(neg.bid + ':' + (c.tel || c.jid), () => atenderMensaje(c, neg));
+  const k = neg.bid + ':' + (c.tel || c.jid);
+  c.llegada = Date.now();
+  const agrupar = CFG.agruparMs > 0 && !c.deMi && !c.media && !c.rowId && !c.audio && !!c.texto;
+  if (!agrupar) return enFila(k, () => atenderMensaje(c, neg));
+  return new Promise((listo) => {
+    const g = AGRUPA.get(k) || { lista: [], avisar: [] };
+    g.lista.push(c); g.avisar.push(listo); clearTimeout(g.timer);
+    g.timer = setTimeout(() => {
+      AGRUPA.delete(k);
+      const textos = [...new Set(g.lista.map((x) => x.texto.trim()).filter(Boolean))];
+      const junto = Object.assign({}, g.lista[g.lista.length - 1], { texto: textos.join('\n'), llegada: g.lista[0].llegada, varios: g.lista.length });
+      if (g.lista.length > 1) anotar({ bid: neg.bid, chat: (junto.tel || '').slice(-4), que: '🧺 ' + g.lista.length + ' mensajes seguidos: una sola respuesta' });
+      enFila(k, () => atenderMensaje(junto, neg)).catch((e) => { est.errores++; log('❌ mensaje', e.message); }).finally(() => g.avisar.forEach((f) => f()));
+    }, CFG.agruparMs);
+    AGRUPA.set(k, g);
+  });
 }
 async function atenderMensaje(c, neg) {
   const k = neg.bid + ':' + (c.tel || c.jid);
@@ -284,7 +313,7 @@ async function atenderMensaje(c, neg) {
     h.textos = (h.textos || []).filter((x) => Array.isArray(x) && Date.now() - x[1] < 12 * 3600000);
     if (!h.textos.length) h.pausa = false;
     const enFlujo = !!(MEM.conv && MEM.conv[k] && MEM.conv[k].paso !== 'menu');
-    const f = frenoRobot({ texto: c.texto, rowId: c.rowId, interactivo: c.interactivo, enFlujo, ultimoEnvio: ULT_ENVIO.get(k), ahora: Date.now(), hist: h });
+    const f = frenoRobot({ texto: c.texto, rowId: c.rowId, interactivo: c.interactivo, enFlujo, ultimoEnvio: ULT_ENVIO.get(k), ahora: c.llegada || Date.now(), hist: h });   // 3.6: la hora en que LLEGÓ (no después de esperar)
     const tn = normal(c.texto);
     if (tn && !h.textos.some((x) => x[0] === tn)) { h.textos.push([tn, Date.now()]); if (h.textos.length > 15) h.textos.shift(); }
     h.t = Date.now(); h.pausa = f.pausa; memGuardar();
@@ -649,5 +678,5 @@ if (require.main === module) {
   servidor.listen(CFG.puerto, () => { log('👩‍💼 ' + VERSION + ' escuchando en ' + CFG.puerto + ' · modo ' + CFG.modo); negocios(); arrancarRelojes(); });
 }
 // 🧪 solo para el banco de escenarios (banco/escenarios.js): deja a Mary como recién encendida
-const _banco = { ASIS, BOT, memHumano: () => MEM.humano, tickRecordatorios, publicarEstado, alMensaje, alEventoConexion, ultimos, reiniciar() { MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; MEM.conv = {}; MEM.clientes = {}; MEM.conectados = {}; MEM.pendientesWa = {}; MEM.codigos = {}; MEM.robot = {}; ASIS._cat.clear(); BOT.clear(); CONTACTOS.clear(); vinculando.clear(); delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
+const _banco = { ASIS, BOT, yaLoDije, memDicho: () => (MEM.dicho = MEM.dicho || {}), memHumano: () => MEM.humano, tickRecordatorios, publicarEstado, alMensaje, alEventoConexion, ultimos, reiniciar() { MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; MEM.conv = {}; MEM.clientes = {}; MEM.conectados = {}; MEM.pendientesWa = {}; MEM.codigos = {}; MEM.robot = {}; MEM.dicho = {}; AGRUPA.clear(); ASIS._cat.clear(); BOT.clear(); CONTACTOS.clear(); vinculando.clear(); delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
 module.exports = { _banco, frenoRobot, estadosQueTocan, atenderPedidoWa, sincronizarConectados, renovarQr, telEnAviso, deWaha, esWaha, debeResponder, alEventoConexion, tickPedidosWa, limpiarSinVincular, leerMensaje, atiende, PREGUNTA, numeroWa, ahoraLocal, enFila, yaVisto, quienVeEstados, CFG };
