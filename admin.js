@@ -9,9 +9,9 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-11-12o";
-import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-12o";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-12o";
+} from "./common.js?v=2026-11-12p";
+import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-12p";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-12p";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -374,6 +374,7 @@ function renderAgenda() {
         <button id="agBlock" type="button" class="btn-sm" aria-pressed="false">🔒 Bloquear</button></span></div>
       <p id="agBlockHint" class="mt-2 hidden rounded-xl p-2.5 text-sm" style="background:#FFF1F2;color:#9F1239">Toca una hora para <b>bloquearla</b>: nadie la verá (página, WhatsApp ni estados). Toca una 🔒 para liberarla.
         <button id="agBlockAll" type="button" class="ml-1 font-bold underline">Bloquear todo el día</button></p>
+      <div id="agBlockWho" class="mt-2"></div>
       <div id="agFreeList" class="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-6"></div>
       <div id="agBlockedWrap" class="mt-3 hidden"><p class="mb-1.5 text-xs font-bold uppercase tracking-wide text-ink/60">🔒 Bloqueados por ti</p><div id="agBlockedList" class="grid grid-cols-3 gap-2 sm:grid-cols-6"></div></div>
       <button id="agFreeShare" type="button" class="btn-light mt-3 hidden w-full text-sm"><i class="fa-brands fa-whatsapp"></i> Enviar los cupos por WhatsApp</button>
@@ -399,6 +400,7 @@ async function renderFree() {
   const modo = !!A.bloqueando;
   $("agBlock").setAttribute("aria-pressed", modo); $("agBlock").textContent = modo ? "✓ Listo" : "🔒 Bloquear";
   $("agBlockHint").classList.toggle("hidden", !modo);
+  if ($("agBlockWho")) $("agBlockWho").innerHTML = modo ? quienBloq() : "";
   $("agFreeN").textContent = L.length ? `${L.length} ${L.length === 1 ? "hora libre" : "horas libres"}` : "Sin cupos libres este día";
   box.innerHTML = L.map((t) => `<button type="button" class="btn-sm py-2" data-free="${t}" ${modo ? 'style="border-style:dashed;border-color:#E11D48;color:#9F1239"' : ""}>${modo ? "🔒 " : ""}${hora12(t)}</button>`).join("");
   $("agBlockedWrap").classList.toggle("hidden", !bloq.length);
@@ -420,7 +422,17 @@ $("tab-agenda").addEventListener("click", async (e) => {
   const fr = e.target.closest("[data-free]"), db2 = e.target.closest("[data-desbloq]");
   if (db2) { bloqueo("desbloquear", [db2.dataset.desbloq], db2); return; }
   if (fr && A.bloqueando) { bloqueo("bloquear", [fr.dataset.free], fr); return; }
-  if (e.target.closest("#btnNewApt") || fr) { openAptModal("new"); return; }
+  if (fr) {   // 3.30: tocar una hora libre → «Agendar aquí» o «🔒 Bloquear esta hora» (sola, para todo el equipo o un barbero)
+    const t = fr.dataset.free;
+    openM("🕐 " + hora12(t) + " · " + fechaLarga(A.date), `${quienBloq()}<div class="grid gap-2">
+      <button type="button" id="hrBloq" class="btn-light w-full" style="color:#9F1239;border-color:#E11D48">🔒 Bloquear esta hora</button>
+      <button type="button" id="hrAgendar" class="btn-primary w-full">➕ Agendar una cita</button></div>
+      <p class="soft mt-2 text-xs">Bloqueada, nadie la ve (página, WhatsApp ni estados). Para liberarla, tócala en «🔒 Bloqueados por ti».</p>`);
+    $("hrBloq").onclick = async () => { await bloqueo("bloquear", [t], $("hrBloq")); closeM(); };
+    $("hrAgendar").onclick = () => { closeM(); openAptModal("new"); };
+    return;
+  }
+  if (e.target.closest("#btnNewApt")) { openAptModal("new"); return; }
   const b = e.target.closest("[data-act]"); if (b) aptAction(b);
 });
 $("tab-agenda").addEventListener("change", (e) => { if (e.target.id === "agDate" && e.target.value) setAgendaDate(e.target.value); });
@@ -1600,8 +1612,9 @@ async function freeSlotsFor(date, conLocks) {
 async function bloqueo(accion, times, btn, fecha) {
   if (btn) setBusy(btn, true, accion === "bloquear" ? "Bloqueando…" : "Liberando…");
   try {
-    const r = await api("bloquearCupo", { date: fecha || A.date, times, accion });
-    toast(accion === "bloquear" ? `🔒 Bloqueado${times.length > 1 ? `s ${times.length} cupos` : ": " + hora12(times[0])}. Nadie lo verá.` : `✓ Liberado${times.length > 1 ? "s" : ""}: ya se puede agendar.`);
+    const quien = A.cupStaff ? (A.staff.find((x) => x.id === A.cupStaff) || {}).name : "";
+    const r = await api("bloquearCupo", Object.assign({ date: fecha || A.date, times, accion }, A.cupStaff ? { staffId: A.cupStaff } : {}));
+    toast(accion === "bloquear" ? `🔒 Bloqueado${times.length > 1 ? `s ${times.length} cupos` : ": " + hora12(times[0])}${quien ? " para " + quien : ""}. ${quien ? "Los demás siguen atendiendo." : "Nadie lo verá."}` : `✓ Liberado${times.length > 1 ? "s" : ""}: ya se puede agendar.`);
   } catch (err) { toast(err.message, "error"); }
   finally { if (btn && document.body.contains(btn)) setBusy(btn, false); renderFree(); if (A.tab === "cupos") renderCupos(); }
 }
@@ -1622,8 +1635,8 @@ function abrirCupos() {
   renderCupos();
 }
 function estadoCupos() {
-  const fecha = A.cuposDate, slot = Number(A.settings?.slotDurationMinutes || 30), equipo = myStaff();
-  const locks = A.cuposLocks || [], apts = (A.cuposApts || []).filter((a) => ACTIVE.includes(a.status) && (isOwner() || a.staffId === A.me?.staffId));
+  const fecha = A.cuposDate, slot = Number(A.settings?.slotDurationMinutes || 30), equipo = myStaff().filter((x) => !A.cupStaff || x.id === A.cupStaff);
+  const locks = (A.cuposLocks || []).filter((l) => !A.cupStaff || l.staffId === A.cupStaff), apts = (A.cuposApts || []).filter((a) => ACTIVE.includes(a.status) && (isOwner() || a.staffId === A.me?.staffId) && (!A.cupStaff || a.staffId === A.cupStaff));
   const mm = (t) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5)), hh = (m) => String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
   const libres = new Map(computeSlots({ settings: A.settings, staffList: equipo, locks, date: fecha, occupied: slot, forAdmin: true }).map((x) => [x.time, x.staffIds.length]));
   const horas = new Set();
@@ -1640,6 +1653,18 @@ function estadoCupos() {
     return { t, est, quienes, nLibres: libres.get(t) || 0, total: equipo.length, bloq };
   });
 }
+// 3.30: bloquear a UN profesional (pedido de Alex: «no me permite bloquear individual, sino completo»)
+function quienBloq() {
+  const eq = (A.staff || []).filter((x) => x.active !== false);
+  if (!isOwner() || eq.length < 2) { A.cupStaff = ""; return ""; }
+  if (A.cupStaff && !eq.some((x) => x.id === A.cupStaff)) A.cupStaff = "";
+  return `<div class="mb-3 flex flex-wrap items-center gap-1.5"><span class="text-xs font-bold text-ink/70">🔒 ¿A quién?</span>
+    <button type="button" class="chip" data-cupst="" aria-pressed="${!A.cupStaff}">Todo el equipo</button>
+    ${eq.map((x) => `<button type="button" class="chip" data-cupst="${esc(x.id)}" aria-pressed="${A.cupStaff === x.id}">${esc(x.name)}</button>`).join("")}</div>`;
+}
+document.addEventListener("click", (e) => { const b = e.target.closest("[data-cupst]"); if (!b) return; A.cupStaff = b.dataset.cupst;
+  document.querySelectorAll("[data-cupst]").forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.cupst === A.cupStaff)));
+  if (A.tab === "cupos") renderCupos(); else renderFree(); });
 function renderCupos() {
   const el = $("tab-cupos"); if (!el || !A.settings) return;
   const fecha = A.cuposDate, hoy = bogNow().date;
@@ -1659,6 +1684,7 @@ function renderCupos() {
     <div class="sp-h"><h2>🗓️ Cupos</h2><span>toca para bloquear o liberar</span></div>
     <div class="mb-2 flex gap-2 overflow-x-auto pb-1">${dias.map((d, i) => { const [y, m, dd] = d.split("-").map(Number), dt = new Date(Date.UTC(y, m - 1, dd));
       return `<button class="q-day" data-cd="${d}" aria-pressed="${d === fecha}"><small>${i === 0 ? "Hoy" : i === 1 ? "Mañana" : dt.toLocaleDateString("es-CO", { timeZone: "UTC", weekday: "short" }).replace(".", "")}</small><b>${dd}</b></button>`; }).join("")}</div>
+    ${quienBloq()}
     <label class="mb-3 flex items-center gap-2 text-xs font-bold text-ink/70">📅 Otra fecha <input id="cupDate" type="date" min="${hoy}" value="${fecha}" class="rounded-lg border border-line px-2 py-1 text-sm"></label>
     <div class="sp-card">
       <p class="text-[15px] font-extrabold capitalize">${fecha === hoy ? "Hoy · " : fecha === addDays(hoy, 1) ? "Mañana · " : ""}${fechaLarga(fecha)}</p>

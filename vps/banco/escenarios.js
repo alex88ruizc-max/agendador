@@ -52,8 +52,9 @@ global.fetch = async (url, o) => {
     if (b.op === 'waPedido') { const p = W.pedido; W.pedido = null; return resp({ ok: true, data: { pedido: p } }); }
     if (b.op === 'waResultado') { W.resultados.push(b); return resp({ ok: true, data: { ok: true } }); }
     if (W.gasFalla && b.op === 'chat') return resp({ ok: false, error: 'Servicio invocado demasiadas veces' });
+    if (b.op === 'chat' && b.conNombre && W.nombreBase) { W.pidioNombre = (W.pidioNombre || 0) + 1; }
     if (W.falla === b.op) return resp({ ok: false, error: 'Tiempo de espera agotado' });   // 3.28: Google falla en un paso
-    if (b.op === 'chat') return ok(Object.assign({}, NEGOCIO, { activo: W.activo, citas: W.citas[b.phone] || [] }));
+    if (b.op === 'chat') return ok(Object.assign({}, NEGOCIO, { activo: W.activo, citas: W.citas[b.phone] || [] }, b.conNombre && W.nombreBase ? { cliente: W.nombreBase } : {}));
     if (b.op === 'info') return ok(NEGOCIO);
     if (b.op === 'proof') return ok(W.proof || { ok: false, motivo: 'sin_cita_pendiente' });
     if (b.op === 'catalogo') return ok(Object.assign({}, CATALOGO, { abono: W.abono, activo: W.activo }));
@@ -1022,4 +1023,17 @@ test('3.30 · Si la base no deja leer, se usa Google como antes (nada se rompe)'
   W.fsDirecto = null;
   await llega(wahaMsg(CLIENTE, 'quiero agendar')); await llega(toca('cat:2')); await llega(toca('svc:e1')); await llega(toca('mas:no'));
   assert.equal(ultimo().lista.button, 'Elegir día'); assert.ok(W.gas.includes('dias'), 'cayó a Google');
+});
+
+test('3.30 · El saludo usa el NOMBRE que el cliente ya tiene en el negocio (aunque WhatsApp no lo mande) y no lo vuelve a buscar', async () => {
+  W.nombreBase = 'Jeferson Villalobos';
+  await llega(wahaMsg(CLIENTE, 'Q es eso mano', { _data: {} }));
+  assert.match(W.enviados[0].texto, /^Hola Jeferson 👋 Soy el asistente de/);
+  assert.equal(B.ASIS.cliente('lina-spa:' + CLIENTE).nombre, 'Jeferson Villalobos');
+  const n = W.pidioNombre; await llega(wahaMsg(CLIENTE, 'tienen cupo?'));
+  assert.equal(W.pidioNombre, n, 'ya lo sabe: no se lo pide otra vez a Google');
+});
+test('3.30 · WAHA (GOWS) manda el nombre en Info.PushName → también se usa', async () => {
+  await llega(wahaMsg(CLIENTE, 'hola', { _data: { Info: { PushName: 'Mateo Gil' } } }));
+  assert.match(W.enviados[0].texto, /^Hola Mateo 👋/);
 });

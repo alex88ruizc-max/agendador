@@ -201,6 +201,8 @@ test('3.20 · 🔒 Bloquear cupos: crea bloqueos de 15 min para todo el equipo, 
   r = A.bloquearCupo({ date: '2026-11-20', times: ['15:00'], accion: 'desbloquear' }, { uid: 'dueno' });
   assert.equal(r.liberados, 3); assert.ok(DB['slotLocks/s1_20261120_1600'], 'liberar las 3:00 no toca las 4:00');
   assert.ok(DB['slotLocks/s1_20261120_1500'], 'ni la cita');
+  r = A.bloquearCupo({ date: '2026-11-20', times: ['19:00'], accion: 'bloquear', staffId: 's1' }, { uid: 'dueno' });
+  assert.equal(r.bloqueados, 2, '3.30: el dueño bloquea a UN profesional (Lina) y Andrés sigue libre'); assert.ok(DB['slotLocks/s1_20261120_1900'] && !DB['slotLocks/s2_20261120_1900']);
   admin = { role: 'staff' };
   r = A.bloquearCupo({ date: '2026-11-20', times: ['18:00'], accion: 'bloquear' }, { uid: 'andres' });
   assert.equal(r.bloqueados, 2, 'un profesional solo bloquea lo suyo'); assert.ok(DB['slotLocks/s2_20261120_1800'] && !DB['slotLocks/s1_20261120_1800']);
@@ -317,4 +319,13 @@ test('3.30 · horas / días / cupos salen de la base (sin Google) con el formato
 test('3.30 · Si la base no deja leer → falla (y el VPS usa Google como antes)', async () => {
   const L = CL.crear({ fetch: async () => ({ ok: false, status: 403, json: async () => ({}) }), url: 'https://fs', proyecto: 'p', llave: 'k', ahora: AHORA });
   await assert.rejects(() => L.horas('elbarba', { ids: ['c1'], date: '2030-01-01' }), /403/);
+});
+test('3.30 · Servidor: el nombre del cliente sale de sus datos en el negocio (por WhatsApp o registrado en la página con +57…)', { skip: !require('fs').existsSync(GS_MARY) && 'dentro de la imagen no está gs/' }, () => {
+  const src = require('fs').readFileSync(GS_MARY, 'utf8');
+  const DB = { 'customers/wa3001112233': { firstName: 'Cliente' } }, Q = { '+573136320094': [{ firstName: 'Nicolas', lastName: 'Camacho Pérez' }] };
+  const G = { ACTIONS: {}, PUBLIC_ACTIONS: {}, console, bp: (x) => x, fsGet: (p) => DB[p] || null, fsQuery: (col, f) => (col === 'customers' ? Q[f[0][2]] || [] : []), fail: (m) => { throw new Error(m); } };
+  const F = new Function(...Object.keys(G), src + '\nreturn { maryNombreCliente_ };')(...Object.values(G));
+  assert.equal(F.maryNombreCliente_('573136320094'), 'Nicolas Camacho');
+  assert.equal(F.maryNombreCliente_('573001112233'), '', '«Cliente» no es un nombre');
+  DB['customers/wa3001112233'] = { firstName: 'Ana', lastName: 'Ruiz' }; assert.equal(F.maryNombreCliente_('3001112233'), 'Ana Ruiz');
 });

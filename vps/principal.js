@@ -6,7 +6,7 @@
 const http = require('http'), fs = require('fs'), path = require('path');
 const T = require('./textos'), C = require('./correo'), E = require('./estado'), A = require('./asistente');
 
-const VERSION = 'agendador-ia-3.30';
+const VERSION = 'agendador-ia-3.31';
 const env = (k, d) => (process.env[k] === undefined || process.env[k] === '' ? d : process.env[k]);
 const CFG = {
   puerto: parseInt(env('PUERTO', '3060'), 10),
@@ -95,7 +95,7 @@ function deWaha(b) {
   const message = interactivo && !fila ? { conversation: String(p.body || ''), _interactivo: true } : fila ? { listResponseMessage: { title: String(p.body || ''), singleSelectReply: { selectedRowId: String(fila) } } }
     : esAudio ? { audioMessage: { mimetype: mime || 'audio/ogg' } }
     : p.hasMedia && /image|pdf/.test(mime) ? (/pdf/.test(mime) ? { documentMessage: { mimetype: mime } } : { imageMessage: { mimetype: mime, caption: p.body || '' } }) : { conversation: String(p.body || '') };
-  return { event: 'messages.upsert', instance: neg.instancia, data: { key: { remoteJid: jid, remoteJidAlt: /@/.test(alt) ? alt : '', fromMe: p.fromMe === true, id: String(p.id || '') }, pushName: String(d.notifyName || d.pushName || ''), message, mediaUrl: String((p.media && p.media.url) || ''), mediaError: p.hasMedia && !(p.media && p.media.url) ? String((p.media && p.media.error) || 'hasMedia sin url') : '' } };
+  return { event: 'messages.upsert', instance: neg.instancia, data: { key: { remoteJid: jid, remoteJidAlt: /@/.test(alt) ? alt : '', fromMe: p.fromMe === true, id: String(p.id || '') }, pushName: String(d.notifyName || d.pushName || (d.Info && (d.Info.PushName || d.Info.pushName)) || ''),   /* 3.30: GOWS manda el nombre en Info.PushName */ message, mediaUrl: String((p.media && p.media.url) || ''), mediaError: p.hasMedia && !(p.media && p.media.url) ? String((p.media && p.media.error) || 'hasMedia sin url') : '' } };
 }
 async function bajarMediaWaha(url) {
   if (!url) return '';
@@ -445,11 +445,14 @@ async function atenderMensaje(c, neg) {
   const reciente = prev.t && Date.now() - prev.t < CFG.silencioMin * 60000;
   if (reciente && !PREGUNTA.test(c.texto)) { anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: 'callada (ya le respondí hace poco)' }); return; }   // atajo: ni se consulta a Google (no va a responder)
   let info;
-  try { info = await gas(neg, 'chat', { phone: c.tel }); }
+  const cl0 = ASIS.cliente(k), buscarNombre = !cl0.nombre && cl0.nombreBuscado !== ahoraLocal().fecha;   // una vez al día como mucho (no gasta Google de más)
+  if (buscarNombre) { cl0.nombreBuscado = ahoraLocal().fecha; memGuardar(); }
+  try { info = await gas(neg, 'chat', Object.assign({ phone: c.tel }, buscarNombre ? { conNombre: 1 } : {})); }   // 3.30: si no sabemos su nombre, Google lo busca en los clientes del negocio
   catch (e) { est.errores++; log('❌ chat', neg.bid, e.message); if (!reciente) { try { const i2 = await gas(neg, 'info'); await escribir(neg, c.tel, T.problema(i2)); } catch (e2) { /* nada */ } } return; }
   if (!info.activo) { anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: 'agenda suspendida: no respondo' }); return; }   // agenda suspendida: el dueño atiende
   const firma = (info.citas || []).map((x) => x.code + x.status).join(',') || 'sin';
   if (!debeResponder({ texto: c.texto, pausadoPorDueno, reciente, citas: info.citas, repetido: prev.firma === firma && prev.n >= 2 })) { anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: 'callada (' + (info.citas.length ? 'ya tiene su cita' : 'ya le respondí') + ')' }); return; }
+  if (info.cliente && !ASIS.cliente(k).nombre && /^[\p{L}][\p{L} .'-]{1,40}$/u.test(info.cliente)) { ASIS.cliente(k).nombre = info.cliente; memGuardar(); }   // 3.30: el nombre que ya tiene en el negocio
   const sal = ASIS.saludo(k, info.negocio, c.nombre, !botDe(neg).saludoDiario);   // «Hola 👋 Soy el asistente de…» solo la primera vez del día (o siempre, si el dueño lo apaga)
   if (info.citas && info.citas.length) await escribir(neg, c.tel, T.conCita(info, sal));
   else if (botDe(neg).agendar || botDe(neg).cupos) await ASIS.menu(neg, { k, tel: c.tel, texto: c.texto }, T.sinCita(info, sal), info.negocio);

@@ -1,4 +1,4 @@
-🗓️ AGENDADOR IA · agendador-ia-3.30   (por dentro atiende «Mary», la recepcionista)
+🗓️ AGENDADOR IA · agendador-ia-3.31   (por dentro atiende «Mary», la recepcionista)
 =====================================================================================================
 🚫 REGLA UNIVERSAL N.º 1 — EPIC NO SE TOCA (manda sobre todo lo demás, para Alex, para Claude y para cada script de este paquete)
    Epic (Mary de Epic, Luisa, la tienda, epic-waha, epic-tiendas, Epic Channels…) y CUALQUIER otro proyecto:
@@ -62,6 +62,10 @@ PROBAR EN EL VPS
 AJUSTES POR NEGOCIO (negocios.json)
   "recordatorioMin": 120     ·   "estados": { "activo": true, "hoy": "07:30", "semana": "07:00", "semanaDia": 1 }
   En Firestore (settings/general del negocio) maryAutoCaptura: true → la captura confirma al instante y el dueño revisa después.
+
+NOVEDADES 3.31 · 👋 SALUDO CON EL NOMBRE DEL CLIENTE
+  Si el cliente ya está en el negocio (o WhatsApp manda su nombre), el saludo dice «Hola Jeferson 👋».
+  Después de este zip manda agendador-web-2026-11-12p.zip (bloquear una hora y a un barbero).
 
 NOVEDADES 3.30 · 💰 MENOS CUPO DE GOOGLE
   Días, horas y cupos los calcula el VPS leyendo la base directo (como la página). Google solo para crear/cancelar/pagos.

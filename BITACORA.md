@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-3.30** · Página **2026-11-12o** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-12** · Mary **agendador-ia-3.31** · Página **2026-11-12p** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -113,6 +113,15 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-12 · agendador-ia-3.31 · página 2026-11-12p · bloquear UNA hora y a UN barbero · saludo con el nombre
+- Pedido de Alex: «no me permite bloquear individual, sino completo».
+  - **Página 12p · Agenda:** tocar una hora libre abre «🔒 Bloquear esta hora» o «➕ Agendar una cita». Antes había que activar «Bloquear» primero y no se notaba.
+  - **¿A quién?:** Todo el equipo, o un solo barbero (Gabriel, Yeferson…). Está en la Agenda y en la pestaña Cupos (ahí el tablero muestra los cupos de esa persona). El servidor ya lo permitía; ahora hay prueba de que bloquear a uno deja libre al otro.
+- **El saludo no decía el nombre del cliente:**
+  - Con WAHA (GOWS) el nombre de WhatsApp viene en `Info.PushName`; ahora también se lee de ahí.
+  - Si no lo sabemos, Google lo busca UNA vez al día en los clientes del negocio (customers/wa…, o registrado en la página con +57…). Queda guardado y no se vuelve a pedir.
+- Banco: 134 pruebas, 0 fallas.
 
 ### 2026-11-12 · agendador-ia-3.30 · 💰 ahorro de Google (auditoría, puntos 1 y 2) · «WhatsApp vinculado» solo cuando cambia
 - **Auditoría de cupo de Google** (solo lectura; de Epic solo se leyó su página, sin tocar nada): por cada agendamiento por WhatsApp se hacían 4-5 llamadas a Google (catálogo, días, horas, crear). Recordatorios: 1 llamada cada 15 min. Panel vinculando: 1 cada 3 s.

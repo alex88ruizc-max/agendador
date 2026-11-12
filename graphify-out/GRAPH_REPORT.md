@@ -1,17 +1,17 @@
 # Graph Report - agendador  (2026-11-12)
 
 ## Corpus Check
-- 32 files · ~135,616 words
+- 32 files · ~136,653 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 13 file(s) not represented in the graph (top: (none) 7, .css 3, .ejemplo 2)
 
 ## Summary
-- 992 nodes · 2840 edges · 46 communities (41 shown, 5 thin omitted)
+- 994 nodes · 2855 edges · 55 communities (50 shown, 5 thin omitted)
 - Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 115 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `0abc533d`
+- Built from commit: `9ee2e90a`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -29,10 +29,10 @@
 - mary.gs
 - drawStory
 - textos.js
-- isKeyMethod
+- bogNow
 - bpath
 - cuposLocal.js
-- openStoryViewer
+- openModal
 - environment
 - textos.js
 - agendador-ia
@@ -41,7 +41,7 @@
 - evolution-agendador
 - reglas.js
 - handleAct
-- openWizard
+- esc
 - options
 - waha-agendador
 - toMillis
@@ -55,72 +55,81 @@
 - conectar.sh
 - web.js
 - pruebas.js
-- plansOf
-- config.js
+- handleAct
+- atenderMensaje
+- cop
+- atenderPedidoWa
 - esc
 - environment
 - oido-agendador
+- boot
+- log
+- doHold
+- servidor
+- guideSteps
+- render
+- publicarEstado
 
 ## God Nodes (most connected - your core abstractions)
-1. `esc()` - 83 edges
+1. `esc()` - 84 edges
 2. `bogNow()` - 50 edges
 3. `toast()` - 49 edges
 4. `bpath()` - 47 edges
 5. `crear()` - 38 edges
-6. `toMillis()` - 34 edges
-7. `cop()` - 34 edges
-8. `hora12()` - 33 edges
+6. `hora12()` - 34 edges
+7. `toMillis()` - 34 edges
+8. `cop()` - 34 edges
 9. `renderHome()` - 32 edges
 10. `seguir()` - 28 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `maryCupos_()` --indirect_call--> `hora12()`  [INFERRED]
-  vps/gs/mary.gs → vps/cuposLocal.js
+  vps/gs/mary.gs → common.js
 - `onErr()` --calls--> `toast()`  [EXTRACTED]
   admin.js → common.js
 - `start()` --calls--> `bpath()`  [EXTRACTED]
   admin.js → common.js
 - `start()` --calls--> `setDialogBrand()`  [EXTRACTED]
   admin.js → common.js
-- `start()` --calls--> `warmServer()`  [EXTRACTED]
+- `start()` --calls--> `toMillis()`  [EXTRACTED]
   admin.js → common.js
 
 ## Import Cycles
 - None detected.
 
-## Communities (46 total, 5 thin omitted)
+## Communities (55 total, 5 thin omitted)
 
 ### Community 0 - "principal.js"
 Cohesion: 0.06
-Nodes (97): AGRUPA, ahoraLocal(), alEventoConexion(), alMensaje(), anotar(), armarEstado(), arrancarRelojes(), asegurarInstancia() (+89 more)
+Nodes (31): AGRUPA, atendidos, _banco, BOT, BOT_DEF, BOT_LEIDO, botDesdeBase(), botNormal() (+23 more)
 
 ### Community 1 - "super.js"
 Cohesion: 0.09
-Nodes (25): auth, BIZ_TYPES, RULES_VERSION, salirAlNavegador(), SERVER_VERSION, FILTERS, HIDDEN, hideOrder() (+17 more)
+Nodes (23): pmProblem(), APP_VERSION, DEFAULT_PAY_WARNING, isKeyMethod(), payAccountInput(), PLAN_KEYS, pushNav(), TG_EVENTS (+15 more)
 
 ### Community 2 - "app.js"
-Cohesion: 0.05
-Nodes (111): aptCard(), bloqueo(), citasCliente(), citasDeClientes(), citasHtml(), estadoCupos(), freeSlotsFor(), h12s() (+103 more)
+Cohesion: 0.09
+Nodes (34): APP, BIZ_ID, busyUntilLabel(), checkPhone(), CITA_LINK, connectTg(), COUNTRIES, country() (+26 more)
 
 ### Community 3 - "admin.js"
 Cohesion: 0.04
-Nodes (59): A, ACT, ACTIVE, actStats(), ALL_TABS, bogDay(), bogHour(), BOT_DEF (+51 more)
+Nodes (65): A, ACT, ACTIVE, ALL_TABS, BOT_DEF, BOT_OPTS, citasCliente(), CLIENT_FILTERS (+57 more)
 
 ### Community 4 - "common.js"
-Cohesion: 0.06
-Nodes (34): app, APP_VERSION, BID, BRAND, brandRow(), businessFromUrl(), categoriaAuto(), db (+26 more)
+Cohesion: 0.05
+Nodes (37): app, auth, BID, BIZ_TYPES, BRAND, brandRow(), businessFromUrl(), categoriaAuto() (+29 more)
 
 ### Community 5 - "estado.js"
-Cohesion: 0.09
-Nodes (31): imapflow, mailparser, @resvg/resvg-js, color(), DCORTO, DIAS, fechaLarga(), inicial() (+23 more)
+Cohesion: 0.08
+Nodes (32): imapflow, mailparser, @resvg/resvg-js, revisarBuzon(), color(), DCORTO, DIAS, fechaLarga() (+24 more)
 
 ### Community 6 - "escenarios.js"
 Cohesion: 0.08
-Nodes (21): assert, audio(), CATALOGO, CONFIRMADA, delNegocio(), DIR, DOS, filas() (+13 more)
+Nodes (22): assert, audio(), CATALOGO, CONFIRMADA, delNegocio(), DIR, DOS, filas() (+14 more)
 
 ### Community 7 - "esc"
 Cohesion: 0.18
-Nodes (32): aptAction(), brPreview(), closeM(), connectWhatsApp(), custName(), manageStory(), openAptModal(), openBreak() (+24 more)
+Nodes (31): aptAction(), bloqueo(), brPreview(), closeM(), connectWhatsApp(), custName(), goStep(), manageStory() (+23 more)
 
 ### Community 8 - "esc"
 Cohesion: 0.33
@@ -132,7 +141,7 @@ Nodes (26): atender(), auditoria(), puertos(), bajar(), banco_web(), cmd_modo(),
 
 ### Community 10 - "mary.gs"
 Cohesion: 0.12
-Nodes (41): maryAgenda(), maryAsistencia_(), maryAvisada_(), maryBotCfg_(), maryCancelar_(), maryCatalogo_(), maryCatAuto_(), maryCategorias_() (+33 more)
+Nodes (42): maryAgenda(), maryAsistencia_(), maryAvisada_(), maryBotCfg_(), maryCancelar_(), maryCatalogo_(), maryCatAuto_(), maryCategorias_() (+34 more)
 
 ### Community 11 - "drawStory"
 Cohesion: 0.17
@@ -142,21 +151,21 @@ Nodes (20): apInitials(), darkenIfLight(), drawImage(), drawOwnStory(), drawRich
 Cohesion: 0.10
 Nodes (15): asistio(), citaHecha(), conCita(), cop(), cuposDia(), duracion(), enTiempo(), estadoTxt() (+7 more)
 
-### Community 13 - "isKeyMethod"
-Cohesion: 0.22
-Nodes (9): pmProblem(), isKeyMethod(), payAccountInput(), pushNav(), goMoney(), goSV(), loadPlanCfg(), renderDisc() (+1 more)
+### Community 13 - "bogNow"
+Cohesion: 0.15
+Nodes (29): estadoCupos(), freeSlotsFor(), renderCupos(), renderQDays(), dayBookable(), dayGrid(), dayRatio(), firstOpenDay() (+21 more)
 
 ### Community 14 - "bpath"
-Cohesion: 0.17
-Nodes (20): abrirCupos(), clientHistory(), deleteClient(), geoSkipKey(), loadLost(), loadModalLocks(), loadUsers(), onErr() (+12 more)
+Cohesion: 0.21
+Nodes (16): citasDeClientes(), clientHistory(), deleteClient(), geoSkipKey(), loadLost(), loadUsers(), openClient(), publicUrl() (+8 more)
 
 ### Community 15 - "cuposLocal.js"
 Cohesion: 0.23
 Nodes (17): crear(), cupos(), datos(), dias(), horas(), DIAS, diaTxt(), dow() (+9 more)
 
-### Community 16 - "openStoryViewer"
-Cohesion: 0.60
-Nodes (6): openStoryViewer(), draw(), go(), tick(), renderStories(), seen()
+### Community 16 - "openModal"
+Cohesion: 0.23
+Nodes (13): openConsent(), openStoryViewer(), draw(), go(), tick(), renderStories(), seen(), closeModal() (+5 more)
 
 ### Community 17 - "environment"
 Cohesion: 0.29
@@ -183,16 +192,16 @@ Cohesion: 0.20
 Nodes (10): container_name, depends_on, env_file, image, mem_limit, networks, ports, restart (+2 more)
 
 ### Community 23 - "reglas.js"
-Cohesion: 0.20
+Cohesion: 0.18
 Nodes (7): assert, fs, NUESTROS, path, RAIZ, scripts, test
 
 ### Community 24 - "handleAct"
-Cohesion: 0.22
-Nodes (16): adminUrl(), daysLeft(), dm(), initials(), logoOf(), msgFor(), openM(), openStore() (+8 more)
+Cohesion: 0.24
+Nodes (15): adminUrl(), daysLeft(), dm(), initials(), logoOf(), msgFor(), openStore(), phoneOf() (+7 more)
 
-### Community 25 - "openWizard"
-Cohesion: 0.19
-Nodes (14): closeWizard(), drawWizard(), imgToDataUrl(), openWizard(), readPM(), renderAppearance(), renderPanelOrder(), saveSettings() (+6 more)
+### Community 25 - "esc"
+Cohesion: 0.17
+Nodes (19): applyPanelBrand(), imgToDataUrl(), loadModalLocks(), openAptModal(), panelPrefs(), quienBloq(), renderAppearance(), renderExtras() (+11 more)
 
 ### Community 26 - "options"
 Cohesion: 0.33
@@ -203,12 +212,12 @@ Cohesion: 0.25
 Nodes (8): waha-agendador, container_name, image, mem_limit, networks, ports, restart, volumes
 
 ### Community 28 - "toMillis"
-Cohesion: 0.10
-Nodes (46): activeStories(), applyPanelBrand(), buildRecs(), fillAsStory(), firstName(), freeNowStaff(), freeTimes(), goStep() (+38 more)
+Cohesion: 0.09
+Nodes (47): abrirCupos(), activeStories(), actStats(), bogDay(), bogHour(), buildRecs(), fillAsStory(), firstName() (+39 more)
 
 ### Community 29 - "correo.js"
-Cohesion: 0.27
-Nodes (6): fs, leerPago(), montos(), pagador(), path, revisarBuzon()
+Cohesion: 0.32
+Nodes (5): fs, leerPago(), montos(), pagador(), path
 
 ### Community 30 - "actualizar-google.sh script"
 Cohesion: 0.47
@@ -231,20 +240,28 @@ Cohesion: 0.13
 Nodes (10): archivos, avisos, DEL_SITIO, fallas, fs, os, path, { spawnSync } (+2 more)
 
 ### Community 40 - "pruebas.js"
-Cohesion: 0.15
-Nodes (7): assert, baseFalsa(), fsVal(), GS_MARY, INFO, SEMANA, test
+Cohesion: 0.12
+Nodes (13): assert, baseFalsa(), fsVal(), GS_MARY, INFO, SEMANA, test, alMensaje() (+5 more)
 
-### Community 41 - "plansOf"
+### Community 41 - "handleAct"
+Cohesion: 0.25
+Nodes (9): planPrice(), planOfBiz(), planPriceOf(), plansOf(), addMonths(), handleAct(), openM(), planForm() (+1 more)
+
+### Community 42 - "atenderMensaje"
+Cohesion: 0.25
+Nodes (19): anotar(), ASIS, atenderMensaje(), atiende(), bajarMediaWaha(), escribir(), escribirLista(), escuchar() (+11 more)
+
+### Community 43 - "cop"
+Cohesion: 0.25
+Nodes (18): aptCard(), citasHtml(), renderAgenda(), renderFree(), apptCard(), canChange(), openResched(), renderMine() (+10 more)
+
+### Community 44 - "atenderPedidoWa"
 Cohesion: 0.40
-Nodes (6): planPrice(), renderTrialPlans(), showTrialForm(), planBenefitsIntro(), planPriceOf(), plansOf()
-
-### Community 42 - "config.js"
-Cohesion: 0.33
-Nodes (5): API_URL, DEFAULT_BUSINESS_ID, firebaseConfig, META_APP_ID, META_CONFIG_ID
+Nodes (15): asegurarInstancia(), atenderPedidoWa(), estadoInstancia(), evo(), guardarNegocio(), limpiarSinVincular(), motorBid(), numeroInstancia() (+7 more)
 
 ### Community 45 - "esc"
-Cohesion: 0.12
-Nodes (31): botCfg(), botGuardar(), guideCard(), guideProgress(), isTrial(), lockCard(), maryWaCard(), mwCuenta() (+23 more)
+Cohesion: 0.15
+Nodes (21): botCfg(), botGuardar(), isTrial(), lockCard(), maryWaCard(), mwCuenta(), mwEsperar(), mwPintar() (+13 more)
 
 ### Community 46 - "environment"
 Cohesion: 0.22
@@ -254,25 +271,53 @@ Nodes (9): environment, EVO_URL, HILOS, IDIOMA, MODELO, PUBLICO, PUERTO, TZ (+1 
 Cohesion: 0.22
 Nodes (9): build, container_name, cpus, image, mem_limit, networks, restart, volumes (+1 more)
 
+### Community 48 - "boot"
+Cohesion: 0.24
+Nodes (13): afterGoogle(), boot(), loadProfile(), onErr(), renderAll(), renderCalendar(), renderSlots(), selectDate() (+5 more)
+
+### Community 49 - "log"
+Cohesion: 0.29
+Nodes (13): ahoraLocal(), armarEstado(), arrancarRelojes(), botAlDia(), botDe(), botFresco(), cada(), gas() (+5 more)
+
+### Community 50 - "doHold"
+Cohesion: 0.29
+Nodes (10): h12s(), hoursSummary(), renderClosed(), bookingStaff(), doHold(), expectedDeposit(), renderSummary(), selection() (+2 more)
+
+### Community 51 - "servidor"
+Cohesion: 0.22
+Nodes (9): llega(), alEventoConexion(), buscarClave(), deWaha(), json(), leerCuerpo(), negocioRegistrado(), servidor (+1 more)
+
+### Community 52 - "guideSteps"
+Cohesion: 0.36
+Nodes (8): guideCard(), guideDone(), guideProgress(), guideSteps(), markGuide(), openGuide(), stepDone(), wizPassed()
+
+### Community 53 - "render"
+Cohesion: 0.38
+Nodes (7): hideOrder(), render(), renderNewsAdmin(), renderOrders(), renderTodo(), start(), unhideOrder()
+
+### Community 54 - "publicarEstado"
+Cohesion: 0.50
+Nodes (4): contactosDe(), guardarImg(), publicarEstado(), quienVeEstados()
+
 ## Knowledge Gaps
 - **1 isolated node(s):** `RFC-5545`
-  These have ≤1 connection - possible missing edges. (Counts symbols only; 288 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+  These have ≤1 connection - possible missing edges. (Counts symbols only; 287 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **5 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `hora12()` connect `cuposLocal.js` to `mary.gs`?**
-  _High betweenness centrality (0.029) - this node is a cross-community bridge._
+- **Why does `hora12()` connect `cop` to `app.js`, `admin.js`, `common.js`, `esc`, `esc`, `mary.gs`, `drawStory`, `bogNow`, `bpath`, `esc`, `boot`, `doHold`, `esc`, `toMillis`?**
+  _High betweenness centrality (0.046) - this node is a cross-community bridge._
 - **Are the 7 inferred relationships involving `crear()` (e.g. with `asistente.js` and `cliente()`) actually correct?**
   _`crear()` has 7 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `RFC-5545` to the rest of the system?**
   _1 weakly-connected nodes found - possible missing edges._
 - **Should `principal.js` be split into smaller, more focused modules?**
-  _Cohesion score 0.06 - nodes in this community are weakly interconnected._
-- **Why does `maryCupos_()` connect `mary.gs` to `cuposLocal.js`?**
-  _High betweenness centrality (0.028) - this node is a cross-community bridge._
+  _Cohesion score 0.062388591800356503 - nodes in this community are weakly interconnected._
+- **Why does `maryCupos_()` connect `mary.gs` to `cop`?**
+  _High betweenness centrality (0.043) - this node is a cross-community bridge._
 - **Should `super.js` be split into smaller, more focused modules?**
-  _Cohesion score 0.08602150537634409 - nodes in this community are weakly interconnected._
-- **Why does `esc()` connect `esc` to `super.js`, `app.js`, `admin.js`, `common.js`, `esc`, `esc`, `plansOf`, `drawStory`, `isKeyMethod`, `bpath`, `openStoryViewer`, `handleAct`, `openWizard`, `toMillis`?**
-  _High betweenness centrality (0.018) - this node is a cross-community bridge._
+  _Cohesion score 0.08620689655172414 - nodes in this community are weakly interconnected._
+- **Why does `esc()` connect `esc` to `super.js`, `app.js`, `admin.js`, `common.js`, `esc`, `esc`, `handleAct`, `cop`, `drawStory`, `esc`, `bpath`, `bogNow`, `openModal`, `doHold`, `guideSteps`, `render`, `handleAct`, `toMillis`?**
+  _High betweenness centrality (0.019) - this node is a cross-community bridge._

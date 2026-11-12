@@ -14,7 +14,7 @@
  * Instalación: pega este archivo, ejecuta activarMary() una vez, copia la clave que sale en el registro
  * y ponla en el mary.env del VPS (MARY_KEY). Vuelve a implementar la aplicación web (Implementar > Administrar > editar > Nueva versión).
  */
-const MARY_VERSION = 'agendador-ia-3.30';
+const MARY_VERSION = 'agendador-ia-3.31';
 
 // Se registra como acción pública del servidor (sin sesión: entra con la clave de Mary).
 // ⚠️ Este archivo debe quedar DEBAJO del archivo principal en la lista de archivos de Apps Script (los nuevos quedan al final: así está bien).
@@ -225,7 +225,19 @@ function maryChat_(st, b) {
   const out = maryInfo_(st);
   out.citas = citas;
   if (!citas.length) { const c = maryCupos_(st, { dias: 1 }); out.cuposHoy = c.dias.length ? c.dias[0].libres.length : 0; }
+  if (b.conNombre) out.cliente = maryNombreCliente_(b.phone);   // 3.30: para saludarlo por su nombre
   return out;
+}
+// 3.30 · el nombre del cliente en ESTE negocio (registrado en la página o guardado por WhatsApp)
+function maryNombreCliente_(phone) {
+  const d10 = maryLast10_(phone); if (d10.length < 10) return '';
+  const bueno = function (n) { n = String(n || '').trim(); return n && n !== 'Cliente' ? n.split(/\s+/).slice(0, 2).join(' ') : ''; };
+  try {
+    const wa = fsGet(bp('customers/wa' + d10)); if (wa && bueno(wa.firstName)) return bueno(wa.firstName + ' ' + (wa.lastName || ''));
+    const formas = ['+57' + d10, '57' + d10, d10];
+    for (let i = 0; i < formas.length; i++) { const L = fsQuery('customers', [['whatsapp', 'EQUAL', formas[i]]]); if (L.length && bueno(L[0].firstName)) return bueno(L[0].firstName + ' ' + (L[0].lastName || '')); }
+  } catch (e) { console.error('nombre: ' + e); }
+  return '';
 }
 
 // ---------- foto del pago por WhatsApp ----------
