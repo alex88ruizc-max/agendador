@@ -1,6 +1,6 @@
 // Página pública: ver cupos, registrarse, apartar, pagar con screenshot, mis cupos
-import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro } from "./common.js?v=2026-11-12n";
-import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-12n";
+import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro } from "./common.js?v=2026-11-12o";
+import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-12o";
 import {
   onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, sendPasswordResetEmail,
   GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult
@@ -12,7 +12,7 @@ import {
   startUpdateWatcher, applyBrandColors, warmServer, uiConfirm, setDialogBrand, viewImage, pushOverlay, dropOverlay, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, dow, hora12, fechaLarga, fechaCorta, toMillis, cop, esc,
   normalizePhone, waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, computeSlots, dayCapacityUnits, staffHours, mapLinks, headerBgCss,
   toast, openModal, closeModal, setBusy, copyText, tmin, mstr, UNIT
-} from "./common.js?v=2026-11-12n";
+} from "./common.js?v=2026-11-12o";
 
 const $ = (id) => document.getElementById(id);
 const S = {
@@ -1139,9 +1139,10 @@ getDoc(doc(db, "platform", "public")).then((d) => {
   if (S.settings) renderAll();
   const on = PLAT.trialEnabled !== false;
   $("trialCta").classList.toggle("hidden", !on);
+  $("trialTop").classList.toggle("hidden", !on); $("trialTop").classList.toggle("inline-flex", on);   // 3.30: «Probar gratis» también arriba
   $("trialDaysTxt").textContent = `${Number(plansOf(PLAT).free.days || 30)} días gratis`;
   document.querySelectorAll(".lp-dias").forEach((x) => { x.textContent = String(Number(plansOf(PLAT).free.days || 15)); });
-  if (document.body.classList.contains("is-landing")) $("trialCta").classList.add("hidden");
+  if (document.body.classList.contains("is-landing")) { $("trialCta").classList.add("hidden"); $("trialTop").classList.add("hidden"); }
 }).catch(() => {});
 const PSTYLE = { free: ["linear-gradient(140deg,#5B6782,#2b3446)", "#fff", "🎁"], basic: ["linear-gradient(140deg,#2B59C3,#14213D)", "#fff", "⭐"], gold: ["linear-gradient(140deg,#f5c542,#b8860b)", "#1a1200", "👑"] };
 let T_PLAN = null;
@@ -1181,6 +1182,7 @@ function showTrialForm() {
   $("trialForm").querySelector("button[type=submit]").textContent = T_PLAN === "free" ? "Crear mi agenda gratis" : "Crear mi agenda y pagar";
   $("trialFoot").textContent = T_PLAN === "free" ? "Al terminar la prueba eliges un plan para seguir." : "En el siguiente paso pagas con Bre-B y tu plan se activa solo.";
 }
+$("trialTop").onclick = () => $("btnTrial").click();
 $("btnTrial").onclick = () => {
   const logged = !!auth.currentUser;
   $("trialTitle").textContent = "Crea tu agenda";
