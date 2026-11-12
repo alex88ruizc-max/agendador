@@ -9,9 +9,9 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-11-12c";
-import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-12c";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-12c";
+} from "./common.js?v=2026-11-12e";
+import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-12e";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-12e";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -2150,20 +2150,24 @@ function openQuick(preset = {}) {
   openM("Cita rápida", `
     <div id="qNow"></div>
     <p class="soft -mt-1 mb-3 text-sm">O agenda para más tarde: toca una hora.</p>
-    <div id="qDays" class="mb-3 flex gap-2 overflow-x-auto pb-1"></div>
+    <div id="qDays" class="mb-2 flex gap-2 overflow-x-auto pb-1"></div>
+    <label class="mb-3 flex items-center gap-2 text-xs font-bold text-ink/70">📅 Otra fecha (para pasar tus citas de antes) <input id="qDate" type="date" class="rounded-lg border border-line px-2 py-1 text-sm"></label>
     <div class="mb-2 flex items-baseline justify-between"><p id="qSlotsTitle" class="text-sm font-bold"></p><p id="qService" class="soft truncate pl-2 text-xs"></p></div>
     <div id="qSlots" class="grid grid-cols-3 gap-2"></div>
     <div id="qAfter" class="mt-4 hidden border-t border-line pt-4">
-      <label class="field"><span>WhatsApp del cliente</span>
+      <label class="field"><span>WhatsApp del cliente <span class="soft font-normal">(opcional: si lo pones, le llegan la confirmación y el recordatorio)</span></span>
         <div class="flex items-center gap-2 rounded-xl border border-line bg-white px-3"><span class="soft text-sm">🇨🇴 +57</span><input id="qPhone" type="tel" inputmode="numeric" autocomplete="off" placeholder="300 123 4567" class="w-full border-0 py-3 text-[16px] outline-none"></div></label>
       <p id="qKnown" class="mt-1.5 min-h-[18px] text-xs font-semibold"></p>
-      <label id="qNameWrap" class="field mt-1 hidden"><span>Nombre (opcional)</span><input id="qName" maxlength="40" placeholder="Para saludarlo por su nombre"></label>
+      <label id="qNameWrap" class="field mt-1"><span id="qNameLbl">Nombre del cliente</span><input id="qName" maxlength="40" placeholder="Ej. Andrés Ruiz"></label>
       <p class="mb-1.5 mt-3 text-sm font-bold">Servicio</p><div id="qMains" class="flex flex-wrap gap-2"></div>
       <div id="qExtrasWrap"><p class="mb-1.5 mt-3 text-sm font-bold">Agregar</p><div id="qExtras" class="flex flex-wrap gap-2"></div></div>
       <div id="qStaffWrap" class="hidden"><p class="mb-1.5 mt-3 text-sm font-bold">Con quién</p><div id="qStaff" class="flex flex-wrap gap-2"></div></div>
-      <button id="qSave" class="btn-primary mt-4 w-full py-3.5 text-base" disabled>Agendar y enviar por WhatsApp</button>
+      <button id="qSave" class="btn-primary mt-4 w-full py-3.5 text-base" disabled>Agendar</button>
     </div>`);
   renderQDays(); renderQMains(); loadQLocks(); renderQNow();
+  $("qDate").min = bogNow().date;
+  $("qDate").onchange = (e) => { if (!e.target.value || e.target.value < bogNow().date) return; Q.date = e.target.value; Q.time = null; renderQDays(); loadQLocks(); };
+  $("qName").oninput = updQSave;
   $("qNow").onclick = (e) => { if (e.target.closest("[data-walkin]")) openWalkIn(); };
   $("qDays").onclick = (e) => { const b = e.target.closest("[data-qd]"); if (!b) return; Q.date = b.dataset.qd; Q.time = null; renderQDays(); loadQLocks(); };
   $("qSlots").onclick = (e) => {
@@ -2227,7 +2231,7 @@ function lookupPhone() {
   clearTimeout(qLookT);
   const phone = normalizePhone($("qPhone").value);
   Q.known = null; Q.phone = phone || "";
-  if (!phone) { $("qKnown").textContent = ""; $("qNameWrap").classList.add("hidden"); return; }
+  if (!phone) { $("qKnown").textContent = ""; $("qNameWrap").classList.remove("hidden"); $("qNameLbl").textContent = "Nombre del cliente"; return; }
   $("qKnown").innerHTML = `<span class="soft">Buscando…</span>`;
   qLookT = setTimeout(async () => {
     try {
@@ -2240,33 +2244,39 @@ function lookupPhone() {
         const blocked = list.filter((a) => a.status === "no_show").length;
         $("qKnown").innerHTML = `<span style="color:var(--mint)">✓ ${esc(`${Q.known.firstName} ${Q.known.lastName || ""}`.trim())}</span><span class="soft">${visits ? `, ha venido ${visits} ${visits === 1 ? "vez" : "veces"}` : ", ya tenía reservas"}${blocked ? `, ${blocked} falta${blocked === 1 ? "" : "s"}` : ""}</span>`;
         $("qNameWrap").classList.add("hidden");
-      } else { $("qKnown").innerHTML = `<span class="soft">Cliente nuevo.</span>`; $("qNameWrap").classList.remove("hidden"); }
+      } else { $("qKnown").innerHTML = `<span class="soft">Cliente nuevo.</span>`; $("qNameWrap").classList.remove("hidden"); $("qNameLbl").textContent = "Nombre (opcional)"; }
     } catch { $("qKnown").textContent = ""; $("qNameWrap").classList.remove("hidden"); }
   }, 350);
 }
-function updQSave() { if ($("qSave")) $("qSave").disabled = !(Q.time && normalizePhone($("qPhone")?.value)); }
+// 3.7: el WhatsApp es opcional (para pasar citas de antes): sin WhatsApp basta el nombre, y no se manda nada
+function updQSave() {
+  if (!$("qSave")) return;
+  const tel = normalizePhone($("qPhone")?.value), nom = ($("qName")?.value || "").trim();
+  $("qSave").disabled = !(Q.time && (tel || nom.length >= 2));
+  $("qSave").textContent = tel ? "Agendar y enviar por WhatsApp" : "Agendar";
+}
 async function saveQuick() {
-  const btn = $("qSave"), phone = normalizePhone($("qPhone").value);
-  if (!Q.time || !phone) return;
+  const btn = $("qSave"), phone = normalizePhone($("qPhone").value) || "";
+  if (!Q.time || (!phone && ($("qName").value || "").trim().length < 2)) return;
   const staffId = Q.staffId || qSlotsFor(Q.date, Q.locks).find((s) => s.time === Q.time)?.staffIds[0];
   const name = ($("qName").value || "").trim().split(/\s+/);
   const customer = Q.known ? { firstName: Q.known.firstName, lastName: Q.known.lastName || "", whatsapp: phone, email: Q.known.email || "" }
     : { firstName: name[0] || "", lastName: name.slice(1).join(" "), whatsapp: phone, email: "" };
-  // la ventana de WhatsApp se abre ya para que el navegador no la bloquee
-  const win = window.open("about:blank", "_blank");
+  // la ventana de WhatsApp se abre ya para que el navegador no la bloquee (solo si hay WhatsApp)
+  const win = phone ? window.open("about:blank", "_blank") : null;
   setBusy(btn, true, "Agendando…");
   try {
     const r = await api("createManualAppointment", { mainId: Q.mainId, extraIds: [...Q.extras], staffId, date: Q.date, time: Q.time, customer, paymentMethod: "local", depositPaidCOP: 0 });
     const apt = r.appointment;
-    const link = waLink(apt.customer.whatsapp, fillTemplate(A.settings.waConfirmTemplate || DEFAULT_WA_CONFIRM, apt, A.settings));
-    if (win) win.location.href = link;
+    const link = apt.customer.whatsapp ? waLink(apt.customer.whatsapp, fillTemplate(A.settings.waConfirmTemplate || DEFAULT_WA_CONFIRM, apt, A.settings)) : "";
+    if (win && link) win.location.href = link;
     Q.unsub?.();
     openM("¡Cita agendada!", `
       <div class="q-pop text-center"><p class="text-5xl">✅</p>
         <p class="disp mt-2 text-2xl font-extrabold">${esc(apt.customer.firstName)}, ${hora12(apt.startTime)}</p>
         <p class="soft mt-1 text-sm capitalize">${fechaLarga(apt.date)} con ${esc(apt.staffName)}</p>
         <p class="ticket-code mx-auto my-4 w-fit">${esc(apt.code)}</p>
-        <a class="btn-primary block w-full py-3" target="_blank" rel="noopener" href="${link}">Enviar confirmación por WhatsApp</a>
+        ${link ? `<a class="btn-primary block w-full py-3" target="_blank" rel="noopener" href="${link}">Enviar confirmación por WhatsApp</a>` : `<p class="soft mb-2 text-sm">Guardada sin WhatsApp: no se le manda nada.</p>`}
         <button class="btn-light mt-2 w-full" id="qAgain">Agendar otra</button></div>`);
     $("qAgain").onclick = () => openQuick();
   } catch (err) { win?.close(); toast(err.message, "error"); setBusy(btn, false); }
@@ -3769,7 +3779,7 @@ document.addEventListener("click", async (e) => {
 });
 
 // Opciones del asistente (settings.maryBot). Los valores por defecto son los mismos del servidor (maryBotCfg_).
-const BOT_DEF = { activo: true, agendar: true, cupos: true, saludoDiario: true, pedirNombre: true, pedirCorreo: true, loDeSiempre: true, recordatorioMin: 120, recordatorioConfirmar: true, cambios: true, pausaMin: 30, estados: { activo: true, horas: ["11:00"], manana: true, semanal: false } };
+const BOT_DEF = { audios: true, activo: true, agendar: true, cupos: true, saludoDiario: true, pedirNombre: true, pedirCorreo: true, loDeSiempre: true, recordatorioMin: 120, recordatorioConfirmar: true, cambios: true, pausaMin: 30, estados: { activo: true, horas: ["11:00"], manana: true, semanal: false } };
 function botCfg() {
   const s = A.settings || {}, b = s.maryBot || {};
   const c = { ...BOT_DEF, ...b, estados: { ...BOT_DEF.estados, ...(b.estados || {}) } };
@@ -3782,6 +3792,7 @@ const BOT_OPTS = [
   ["activo", "🤖", "Asistente encendido", "Apagado, no responde nada por WhatsApp (tú atiendes todo)."],
   ["agendar", "📋", "Agendar por WhatsApp con listas", "Categoría → servicio → día → hora → «¿Lo confirmo?». Apagado, solo manda tu link."],
   ["cupos", "🕐", "Responder «¿hay cupos?»", "Dice las horas libres del día que pregunten (o los próximos días) y siempre manda tu link."],
+  ["audios", "🎤", "Escuchar notas de voz", "Pasa el audio a texto y responde igual que si lo hubieran escrito. Apagado: pide que lo escriban."],
   ["saludoDiario", "👋", "Saludar una sola vez al día", "«Hola 👋 Soy el asistente de tu negocio» solo en el primer mensaje del día de cada cliente."],
   ["pedirNombre", "🙋", "Preguntar el nombre", "La primera vez pregunta «¿A nombre de quién agendo?» y lo recuerda. Apagado, usa el nombre de WhatsApp."],
   ["pedirCorreo", "📧", "Pedir el correo para su calendario", "Con el correo, la cita le queda en su calendario y se mueve o se borra sola si cambia."],
