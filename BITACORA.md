@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-3.27** · Página **2026-11-12k** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-12** · Mary **agendador-ia-3.27** · Página **2026-11-12l** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -113,6 +113,12 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-12 · página 2026-11-12l · Clientes con fecha y hora de sus citas
+- Pedido de Alex: en **Clientes** deben salir las fechas y horas de las citas.
+- Cada cliente muestra sus citas próximas activas: «📅 Hoy/Mañana/viernes 14 de noviembre · 3:00 p. m. · servicio con profesional», y si falta el abono o revisan el pago. Si no tiene próximas: «Sin citas próximas · última: …».
+- Las citas se buscan por su cuenta y por su WhatsApp (últimos 10 dígitos), del último año, con una sola consulta.
+- Probado con datos de muestra (próxima, pendiente de abono, solo pasada, sin citas, cargando).
 
 ### 2026-11-12 · agendador-ia-3.27 · página 2026-11-12k · vincular con cuenta regresiva de 3 minutos
 - Pedido de Alex: si toca «Vincular» y no vincula, que haya un contador y que al terminar se borre el puente de WAHA para que no quede gastando.

@@ -4,14 +4,14 @@ import {
   doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, collection, query, where, onSnapshot, serverTimestamp, Timestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
-  startUpdateWatcher, applyBrandColors, uiConfirm, uiPrompt, setDialogBrand, viewImage, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, hora12, fechaLarga, fechaCorta, toMillis, cop, esc, normalizePhone,
+  startUpdateWatcher, applyBrandColors, uiConfirm, uiPrompt, setDialogBrand, viewImage, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, hora12, tmin, fechaLarga, fechaCorta, toMillis, cop, esc, normalizePhone,
   waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, DEFAULT_WA_RESCHEDULE, computeSlots, staffHours, mapLinks, headerBgCss, onColor, darken,
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-11-12k";
-import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-12k";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-12k";
+} from "./common.js?v=2026-11-12l";
+import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-12l";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-12l";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -808,7 +808,39 @@ async function loadUsers() {
     const q = await getDocs(collection(db, bpath("customers")));
     A.users = q.docs.map((d) => ({ uid: d.id, ...d.data() })).sort((a, b) => (a.firstName || "").localeCompare(b.firstName || ""));
     renderClients();
+    await citasDeClientes(); renderClients();
   } catch (err) { onErr(err); }
+}
+// 3.28: en cada cliente se ven sus citas (fecha y hora): las próximas activas y, si no tiene, la última
+const k10 = (w) => String(w || "").replace(/\D/g, "").slice(-10);
+async function citasDeClientes() {
+  try {
+    const hoy = bogNow().date;
+    const snap = await getDocs(query(collection(db, bpath("appointments")), where("date", ">=", addDays(hoy, -365))));
+    const por = {};
+    snap.docs.map((d) => d.data()).forEach((a) => {
+      const llaves = new Set([a.customerUid && "u:" + a.customerUid, k10(a.customer?.whatsapp) && "w:" + k10(a.customer?.whatsapp)].filter(Boolean));
+      llaves.forEach((k) => (por[k] = por[k] || []).push(a));
+    });
+    A.citasCli = por; A.citasHoy = hoy;
+  } catch (err) { console.error(err); A.citasCli = A.citasCli || {}; }
+}
+function citasCliente(u) {
+  const por = A.citasCli; if (!por) return null;
+  const m = new Map();
+  [...(por["u:" + u.uid] || []), ...(k10(u.whatsapp) ? por["w:" + k10(u.whatsapp)] || [] : [])].forEach((a) => m.set(a.code || a.date + a.startTime, a));
+  return [...m.values()];
+}
+function citasHtml(u) {
+  const L = citasCliente(u);
+  if (!L) return `<p class="mt-1 text-xs text-ink/50">Cargando citas…</p>`;
+  const hoy = A.citasHoy || bogNow().date, ahora = bogNow();
+  const cuando = (a) => `${a.date === hoy ? "Hoy" : a.date === addDays(hoy, 1) ? "Mañana" : `<span class="capitalize">${fechaLarga(a.date)}</span>`} · ${hora12(a.startTime)}`;
+  const serv = (a) => (a.items || []).map((i) => esc(i.name)).join(" + ");
+  const prox = L.filter((a) => ACTIVE.includes(a.status) && (a.date > ahora.date || (a.date === ahora.date && tmin(a.endTime || a.startTime) >= ahora.min))).sort((x, y) => (x.date + x.startTime).localeCompare(y.date + y.startTime));
+  if (prox.length) return `<div class="mt-2 space-y-1">${prox.map((a) => `<p class="rounded-lg px-2 py-1.5 text-[13px] font-semibold" style="background:color-mix(in srgb,var(--mint) 12%,white)">📅 ${cuando(a)}${serv(a) ? ` <span class="font-normal text-ink/70">· ${serv(a)}${a.staffName ? " con " + esc(a.staffName) : ""}</span>` : ""}${a.status !== "confirmed" ? ` <span class="font-normal text-amber-700">(${a.status === "pending_payment" ? "falta el abono" : "revisando pago"})</span>` : ""}</p>`).join("")}</div>`;
+  const ult = L.filter((a) => a.date <= hoy).sort((x, y) => (y.date + y.startTime).localeCompare(x.date + x.startTime))[0];
+  return ult ? `<p class="mt-1 text-xs text-ink/60">Sin citas próximas · última: ${cuando(ult)}${serv(ult) ? " · " + serv(ult) : ""}</p>` : `<p class="mt-1 text-xs text-ink/50">Sin citas.</p>`;
 }
 const MODE_LABEL = { deposit: "Normal (paga abono)", preferential: "⭐ Preferencial (sin pago previo)", full: "Paga el total por adelantado" };
 const CLIENT_FILTERS = {
@@ -830,6 +862,7 @@ function renderClients() {
           <p class="truncate font-semibold">${esc(u.firstName)} ${esc(u.lastName)}${u.paymentMode === "preferential" ? " ⭐" : ""}${u.blocked ? ` <span class="ml-1 rounded bg-rose-100 px-1.5 text-xs text-rose-900">Bloqueado</span>` : ""}</p>
           <p class="truncate text-sm text-ink/70">${esc(u.whatsapp)} · ${esc(u.email)}</p>
           <p class="text-xs text-ink/60">${u.totalAppointments || 0} visita(s) · ${u.noShowCount || 0} falta(s) · ${MODE_LABEL[u.paymentMode] || MODE_LABEL.deposit}</p>
+          ${citasHtml(u)}
         </div>
       </div>
       <div class="mt-2 flex flex-wrap gap-2">
