@@ -2,7 +2,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js?v=2026-11-12b";
+import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js?v=2026-11-12c";
 
 export const app = initializeApp(firebaseConfig);
 // Caché en el dispositivo: muestra al instante lo último que se vio y luego actualiza en vivo
@@ -21,7 +21,7 @@ export function businessFromUrl() {
 export const bpath = (...parts) => ["businesses", BID, ...parts].join("/");
 
 // Versión de la página: cámbiala en cada actualización para comprobar que se publicó
-export const APP_VERSION = '2026-11-12b';
+export const APP_VERSION = '2026-11-12c';
 // Versiones que esta página espera del servidor y de las reglas de Firebase
 export const SERVER_VERSION = '2026-10-10n';
 export const RULES_VERSION = '2026-10-10l';
@@ -573,4 +573,19 @@ export function salirAlNavegador() {
     <button type="button" class="btn-primary w-full">Entendido</button></div>`;
   document.body.appendChild(d);
   d.onclick = (e) => { if (e.target === d || e.target.closest("button")) d.remove(); };
+}
+
+// 🗂️ Categoría sugerida por el nombre del servicio (cuando el dueño no le puso una). La misma regla usa el asistente de WhatsApp.
+export function categoriaAuto(nombre) {
+  const n = String(nombre || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  if (/\+|\bcombo\b|\by\b.*\b(barba|ceja|corte)/.test(n)) return "Combos";
+  if (/barba/.test(n)) return "Barba";
+  if (/ceja/.test(n)) return "Cejas";
+  if (/pestan|lifting/.test(n)) return "Pestañas";
+  if (/disen|linea|tatuaje capilar/.test(n)) return "Diseños";
+  if (/una|manicur|pedicur|semiperman|acril|gel|esmalt|press on/.test(n)) return "Uñas";
+  if (/masaj|facial|limpieza|spa|depil|cera/.test(n)) return "Spa";
+  if (/tinte|color|mechas|balayage|keratin|alisad|cepillad|peinad|tratamiento|ondul/.test(n)) return "Cabello";
+  if (/corte|tijera|degrad|fade|motil|rapad|cabello|pelo|nino/.test(n)) return "Cortes";
+  return "Otros";
 }

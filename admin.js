@@ -9,9 +9,9 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-11-12b";
-import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-12b";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-12b";
+} from "./common.js?v=2026-11-12c";
+import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-12c";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-12c";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -951,6 +951,9 @@ function renderServices() {
       <p class="text-sm text-ink/70"><b class="text-ink">${list.length}</b> servicio(s)${hidden ? ` · ${hidden} oculto(s)` : ""}</p>
       <div class="flex flex-wrap gap-2"><button class="btn-light text-sm" data-tpl="1">Cargar plantilla</button><button class="btn-primary text-sm" data-svc="">+ Nuevo servicio</button></div>
     </div>
+    ${list.some((s) => !(s.category || "").trim()) ? `<div class="mb-4 rounded-xl border p-3 text-sm" style="background:#FFF8E6;border-color:#F3D58B">
+      <p><b>🗂️ ${list.filter((s) => !(s.category || "").trim()).length} servicio(s) sin categoría.</b> Las categorías ordenan tu página y la lista del asistente de WhatsApp (Cortes, Barba, Cejas…).</p>
+      <button class="btn-primary mt-2 text-sm" data-svcat="1"><i class="fa-solid fa-wand-magic-sparkles"></i> Organizar por categorías</button></div>` : ""}
     <details class="mb-4 rounded-xl border border-line bg-white p-3 text-sm">
       <summary class="cursor-pointer font-semibold">¿Qué es principal, agregado y especial?</summary>
       <p class="mt-2 text-ink/70"><b>Principal:</b> el cliente elige uno (corte, manicure…). <b>Agregado:</b> solo se suma a un principal (barba, cejas…). <b>Especial:</b> puede ser principal o agregado (color, keratina…). La <b>categoría</b> agrupa los servicios en la página del cliente.</p>
@@ -962,6 +965,14 @@ function renderServices() {
 }
 $("tab-services").addEventListener("click", async (e) => {
   if (e.target.closest("[data-tpl]")) return openTemplates();
+  if (e.target.closest("[data-svcat]")) {   // pone una categoría a cada servicio que no tiene (según su nombre); después se puede cambiar en «Editar»
+    const sin = A.services.filter((s) => !(s.category || "").trim()), plan = sin.map((s) => [s, categoriaAuto(s.name)]);
+    const res = Object.entries(plan.reduce((o, [, c]) => (o[c] = (o[c] || 0) + 1, o), {})).map(([c, n]) => `${c} (${n})`).join(" · ");
+    if (!(await uiConfirm("¿Organizar por categorías?", `Quedarían así: ${res}. Después puedes cambiar cualquiera en «Editar».`, { okText: "Organizar" }))) return;
+    try { await Promise.all(plan.map(([s, c]) => updateDoc(doc(db, bpath("services", s.id)), { category: c }))); toast("✓ Servicios organizados por categorías."); }
+    catch (err) { toast("No se pudo: " + err.message, "error"); }
+    return;
+  }
   const ed = e.target.closest("[data-svc]");
   if (ed) return openService(A.services.find((x) => x.id === ed.dataset.svc));
   const vis = e.target.closest("[data-svis]"), dup = e.target.closest("[data-sdup]"), mv = e.target.closest("[data-smove]");
@@ -3219,7 +3230,7 @@ const STEPS = [
       const keep = new Set(list.map((x) => x.id).filter(Boolean));
       const ops = list.map((x, i) => x.id
         ? setDoc(doc(db, bpath("services", x.id)), { name: x.name.trim(), minutes: x.minutes, priceCOP: x.price, active: true, order: i }, { merge: true })
-        : setDoc(doc(db, bpath("services", "s" + Date.now().toString(36) + i)), { name: x.name.trim(), minutes: x.minutes, priceCOP: x.price, type: "base", active: true, order: i, category: "", description: "" }));
+        : setDoc(doc(db, bpath("services", "s" + Date.now().toString(36) + i)), { name: x.name.trim(), minutes: x.minutes, priceCOP: x.price, type: "base", active: true, order: i, category: categoriaAuto(x.name), description: "" }));
       A.services.filter((x) => x.active !== false && !keep.has(x.id)).forEach((x) => ops.push(setDoc(doc(db, bpath("services", x.id)), { active: false }, { merge: true })));
       await Promise.all(ops);
     } },
