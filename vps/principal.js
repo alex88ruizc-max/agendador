@@ -6,7 +6,7 @@
 const http = require('http'), fs = require('fs'), path = require('path');
 const T = require('./textos'), C = require('./correo'), E = require('./estado'), A = require('./asistente');
 
-const VERSION = 'agendador-ia-3.33';
+const VERSION = 'agendador-ia-3.34';
 const env = (k, d) => (process.env[k] === undefined || process.env[k] === '' ? d : process.env[k]);
 const CFG = {
   puerto: parseInt(env('PUERTO', '3060'), 10),
@@ -428,6 +428,7 @@ async function atenderMensaje(c, neg) {
   }
   // 🤖 3.0: agendamiento en curso, «¿hay cupos?», «quiero una cita», opción de lista o audio → lo atiende el asistente
   if (c.texto || c.rowId || c.audio) {
+    if (c.nombre && /^[\p{L}][\p{L} .'-]{1,40}$/u.test(String(c.nombre).trim())) { const cl = ASIS.cliente(k); if (cl.nombreWa !== c.nombre) { cl.nombreWa = String(c.nombre).trim(); memGuardar(); } }   // 3.33: el nombre de WhatsApp queda guardado (para el «¿Seguimos?» y el recordatorio)
     const ca = { k, tel: c.tel, texto: c.texto, rowId: c.rowId, audio: c.audio, nombre: c.nombre };
     let r = null;
     try { r = await ASIS.manejar(neg, ca); }

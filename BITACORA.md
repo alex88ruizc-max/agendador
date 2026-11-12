@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-3.33** · Página **2026-11-12q** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-12** · Mary **agendador-ia-3.34** · Página **2026-11-12q** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -113,6 +113,14 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-12 · agendador-ia-3.34 · el «¿Seguimos con tu cita?» saluda por el nombre
+- Reporte de Alex: «Hola 👋 ¿Seguimos con tu cita?» salió sin el nombre de Oscar.
+- Causa: el mensaje solo usaba el nombre guardado al agendar antes por WhatsApp, y Oscar nunca había agendado.
+- **Ahora:**
+  - El nombre de WhatsApp de cada mensaje queda guardado (`nombreWa`) y se usa en el saludo, en el «¿Seguimos?» y en el recordatorio de servicio.
+  - Si no hay ninguno, el «¿Seguimos?» lo busca UNA vez al día en los clientes del negocio.
+- Banco: 145 pruebas, 0 fallas.
 
 ### 2026-11-12 · agendador-ia-3.33 · ⏰ retomar al cliente que dejó el agendamiento a medias
 - Pedido de Alex: si el cliente empezó a agendar y no eligió nada en 30 min, retomarlo.

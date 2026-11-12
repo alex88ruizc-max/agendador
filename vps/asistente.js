@@ -113,7 +113,7 @@ function crear(dep) {
     const cl = cliente(k), h = hoy();
     if (cl.saludo === h && !siempre) return '';
     cl.saludo = h; dep.guardar();
-    return T.saludo(negocio, cl.nombre || nombreWa);
+    return T.saludo(negocio, cl.nombre || nombreWa || cl.nombreWa);
   }
   // Manda una lista y guarda sus opciones (para entender si tocan la lista, escriben el número o el nombre)
   async function lista(neg, c, conv, L) {
@@ -616,8 +616,12 @@ function crear(dep) {
   async function retomar(neg, tel, conv) {
     const k = neg.bid + ':' + tel, cl = cliente(k), cat = await catalogo(neg).catch(() => ({ negocio: '' }));
     const quedo = QUEDO[conv.paso];
+    if (!cl.nombre && !cl.nombreWa && cl.nombreBuscado !== hoy()) {   // 3.33: sin nombre → se busca en los clientes del negocio (una vez al día)
+      cl.nombreBuscado = hoy(); dep.guardar();
+      try { const r = await dep.gas(neg, 'chat', { phone: tel, conNombre: 1 }); if (r && r.cliente && /^[\p{L}][\p{L} .'-]{1,40}$/u.test(r.cliente)) { cl.nombre = r.cliente; dep.guardar(); } } catch (e) { /* sin nombre */ }
+    }
     conv.pasoAntes = conv.paso; conv.opcionesAntes = conv.opciones; conv.paso = 'retomar'; conv.retomado = true; conv.vence = 3 * 3600000;
-    const n = nombre1(cl.nombre);
+    const n = nombre1(cl.nombre || cl.nombreWa);
     return lista(neg, { k, tel }, conv, { texto: 'Hola' + (n ? ' ' + n : '') + ' 👋 ¿Seguimos con tu cita?\nTe quedaste en *' + quedo + '*.', boton: 'Ver opciones', pie: (cat.negocio || '') + ' · asistente virtual',
       secciones: [{ titulo: '¿Seguimos?', filas: [{ id: 'ret:si', titulo: '✅ Seguir', desc: 'Donde quedamos' }, { id: 'ret:no', titulo: '🙅 Ya no', desc: '' }] }] });
   }
@@ -625,7 +629,7 @@ function crear(dep) {
   async function ofrecerVolver(neg, tel, x, negocio) {
     const k = neg.bid + ':' + tel, cl = cliente(k);
     if (!cl.nombre && x.nombre && x.nombre !== 'Cliente') { cl.nombre = x.nombre; dep.guardar(); }
-    const n = nombre1(cl.nombre || x.nombre), sem = Math.round(Number(x.diasDesde || 0) / 7);
+    const n = nombre1(cl.nombre || cl.nombreWa || x.nombre), sem = Math.round(Number(x.diasDesde || 0) / 7);
     const cuanto = sem >= 2 ? sem + ' semanas' : (x.diasDesde || 0) + ' días';
     const conv = { paso: 'volver', ids: (x.ids || []).slice(), staffId: x.staffId || '', volver: true, otraOk: true, vence: 2 * 86400000 };
     return lista(neg, { k, tel }, conv, { texto: 'Hola' + (n ? ' ' + n : '') + ' 👋 Te escribe el asistente de *' + negocio + '*.\nYa van ' + cuanto + ' desde tu último *' + x.servicio + '*' + (x.con ? ' con ' + x.con : '') + '. ¿Te agendo de nuevo? 😊',

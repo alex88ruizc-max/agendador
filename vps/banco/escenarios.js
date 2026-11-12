@@ -1115,3 +1115,16 @@ test('3.33 · ⏰ NO retoma: el saludo que nunca tocó, si el dueño habla en el
   B.memHumano()['lina-spa:' + CLIENTE] = Date.now();
   envejecer(31); const n1 = W.enviados.length; await B.tickRetomar(true); assert.equal(W.enviados.length, n1, 'el dueño está hablando');
 });
+
+test('3.33 · ⏰ El «¿Seguimos con tu cita?» saluda por el NOMBRE: el de WhatsApp, o el que tiene en el negocio', async () => {
+  const sinNombre = (row) => wahaMsg(CLIENTE, row, { _data: { Message: { listResponseMessage: { singleSelectReply: { selectedRowID: row } } } } });
+  await llega(wahaMsg(CLIENTE, 'quiero agendar', { _data: { Info: { PushName: 'Oscar Pérez' } } })); await llega(sinNombre('cat:2'));
+  envejecer(31); await B.tickRetomar(true);
+  assert.match(ultimo().texto, /^Hola Oscar 👋 ¿Seguimos con tu cita\?/);
+});
+test('3.33 · ⏰ Sin nombre de WhatsApp → lo busca en los clientes del negocio (una vez) y saluda con él', async () => {
+  W.nombreBase = 'Oscar Ruiz';
+  await llega(wahaMsg(CLIENTE, 'quiero agendar', { _data: {} })); await llega(wahaMsg(CLIENTE, 'cat:2', { _data: { Message: { listResponseMessage: { singleSelectReply: { selectedRowID: 'cat:2' } } } } }));
+  envejecer(31); await B.tickRetomar(true);
+  assert.match(ultimo().texto, /^Hola Oscar 👋 ¿Seguimos/);
+});
