@@ -1,4 +1,4 @@
-🗓️ AGENDADOR IA · agendador-ia-2.9   (por dentro atiende «Mary», la recepcionista)
+🗓️ AGENDADOR IA · agendador-ia-3.0   (por dentro atiende «Mary», la recepcionista)
 =====================================================================================================
 🚫 REGLA UNIVERSAL N.º 1 — EPIC NO SE TOCA (manda sobre todo lo demás, para Alex, para Claude y para cada script de este paquete)
    Epic (Mary de Epic, Luisa, la tienda, epic-waha, epic-tiendas, Epic Channels…) y CUALQUIER otro proyecto:
@@ -62,6 +62,20 @@ PROBAR EN EL VPS
 AJUSTES POR NEGOCIO (negocios.json)
   "recordatorioMin": 120     ·   "estados": { "activo": true, "hoy": "07:30", "semana": "07:00", "semanaDia": 1 }
   En Firestore (settings/general del negocio) maryAutoCaptura: true → la captura confirma al instante y el dueño revisa después.
+
+NOVEDADES 3.0 · EL ASISTENTE
+  · Ya no dice «Mary»: «Hola 👋 Soy el asistente de *Negocio*», y saluda UNA sola vez al día por cliente.
+  · ¿Hay cupos? → las horas de ese día (o «hoy no, pero sí mañana y el viernes… ¿qué día te sirve?»), SIEMPRE con el link,
+    y la lista de días para elegir. Entiende hoy, mañana, pasado mañana, «el viernes», «el 20», «20 de diciembre».
+  · AGENDA POR WHATSAPP CON LISTAS («Ver opciones»): categoría → servicio (con precio y duración) → «¿agregar otro?» (se suman
+    tiempo y precio) → día → hora (mañana/tarde) → profesional → nombre (una vez) → correo (una vez) → «Entendí esto… ¿Lo confirmo?».
+    Mismas reglas de la página. El abono es el que configuró el dueño (sin abono = confirmada de una).
+  · Aprende: nombre, correo y la combinación habitual → «¿Lo de siempre? Degradado + barba con Lina».
+  · Correo con INVITACIÓN DE CALENDARIO: al confirmar queda en el calendario del cliente; si cambia la hora se mueve; si se cancela,
+    desaparece (también cuando cancela el cliente desde la página).
+  · Recordatorio según el panel del dueño (Ajustes › Recordatorio al cliente por WhatsApp): «Recuerda que tu cita es en 1 hora».
+  · Audios: «En este momento no puedo escuchar audios 🙏 ¿Me lo escribes?».
+  · Banco: 55 pruebas (19 escenarios nuevos del asistente). Página: agendador-web-2026-11-12a.zip (el campo del recordatorio).
 
 NOVEDADES 2.9
   · Arreglo: al vincular por WAHA aparecía un negocio falso «default». Ya no se crea y la actualización borra el que quedó.

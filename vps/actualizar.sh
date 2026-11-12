@@ -15,7 +15,7 @@ if isinstance(L, list):
     N = [x for x in L if not (x.get('bid') == 'default' and x.get('instancia') == 'default')]
     if len(N) != len(L): json.dump(N, open('negocios.json', 'w'), ensure_ascii=False, indent=2); print('🧹 Quité el negocio falso «default» de negocios.json')
 EOL
-CODIGOS="principal.js textos.js correo.js estado.js package.json package-lock.json Dockerfile docker-compose.yml banco"
+CODIGOS="principal.js textos.js correo.js estado.js asistente.js package.json package-lock.json Dockerfile docker-compose.yml banco"
 volver(){ for f in $CODIGOS; do [ -e "respaldo/$f" ] && cp -rf "respaldo/$f" .; done
   sudo docker image inspect $IMG:buena >/dev/null 2>&1 && sudo docker tag $IMG:buena $IMG:latest; }   # 1.1: la imagen vuelve a la buena (no queda la que falló)
 sudo docker image inspect $IMG:latest >/dev/null 2>&1 && sudo docker tag $IMG:latest $IMG:buena

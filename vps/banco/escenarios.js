@@ -21,26 +21,52 @@ const P = require('../principal');
 const B = P._banco;
 
 // ---------- el mundo simulado ----------
-const NEGOCIO = { negocio: 'Lina Spa', link: 'https://tuagenda.vip/?b=lina-spa', cuposHoy: 4 };
+const NEGOCIO = { negocio: 'Lina Spa', link: 'https://tuagenda.vip/?b=lina-spa', cuposHoy: 4, activo: true, medios: [{ label: 'Nequi', account: '3001112233', holder: 'Lina' }] };
+const HOY = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+const masDias = (n) => { const [y, m, d] = HOY.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10); };
+const CATALOGO = Object.assign({}, NEGOCIO, { staffLabel: 'Profesional', abono: 0,
+  categorias: [
+    { nombre: 'Cortes', desde: 20000, servicios: [{ id: 'c1', nombre: 'Corte clásico', precio: 20000, min: 40 }, { id: 'c2', nombre: 'Degradado', precio: 25000, min: 45 }] },
+    { nombre: 'Barba', desde: 12000, servicios: [{ id: 'b1', nombre: 'Perfilado de barba', precio: 12000, min: 20 }] },
+    { nombre: 'Cejas', desde: 8000, servicios: [{ id: 'e1', nombre: 'Cejas', precio: 8000, min: 15 }] }
+  ],
+  staff: [{ id: 's1', nombre: 'Lina', servicios: [] }, { id: 's2', nombre: 'Andrés', servicios: [] }] });
 let W;
 function mundoNuevo() {
-  W = { enviados: [], gas: [], citas: {}, activo: true, gasFalla: false, proof: null };
+  W = { enviados: [], gas: [], llamadas: [], citas: {}, activo: true, gasFalla: false, proof: null, listaFalla: false, abono: 0, crearFalla: null,
+    cupos: [{ date: HOY, dia: 'Hoy', horas: ['3:00 p. m.', '4:30 p. m.', '6:00 p. m.'], libres: ['15:00', '16:30', '18:00'] }, { date: masDias(1), dia: 'Mañana', horas: ['9:00 a. m.'], libres: ['09:00'] }, { date: masDias(2), dia: 'Pasado', horas: ['10:00 a. m.', '11:00 a. m.'], libres: ['10:00', '11:00'] }] };
   B.reiniciar(); P.CFG.modo = 'todos';
 }
 const resp = (o, code) => new Response(JSON.stringify(o), { status: code || 200, headers: { 'Content-Type': 'application/json' } });
 global.fetch = async (url, o) => {
   const u = String(url), b = o && o.body ? JSON.parse(o.body) : null;
   if (u.startsWith('https://gas.prueba')) {
-    W.gas.push(b.op);
+    W.gas.push(b.op); W.llamadas.push(b);
+    const ok = (data) => resp({ ok: true, data });
     if (W.gasFalla && b.op === 'chat') return resp({ ok: false, error: 'Servicio invocado demasiadas veces' });
-    if (b.op === 'chat') return resp({ ok: true, data: Object.assign({ activo: W.activo, citas: W.citas[b.phone] || [] }, NEGOCIO) });
-    if (b.op === 'info') return resp({ ok: true, data: NEGOCIO });
-    if (b.op === 'proof') return resp({ ok: true, data: W.proof || { ok: false, motivo: 'sin_cita_pendiente' } });
-    return resp({ ok: true, data: {} });
+    if (b.op === 'chat') return ok(Object.assign({}, NEGOCIO, { activo: W.activo, citas: W.citas[b.phone] || [] }));
+    if (b.op === 'info') return ok(NEGOCIO);
+    if (b.op === 'proof') return ok(W.proof || { ok: false, motivo: 'sin_cita_pendiente' });
+    if (b.op === 'catalogo') return ok(Object.assign({}, CATALOGO, { abono: W.abono, activo: W.activo }));
+    if (b.op === 'cupos') return ok(Object.assign({ dias: W.cupos }, NEGOCIO));
+    if (b.op === 'dias') return ok({ dias: W.cupos.map((x) => ({ date: x.date, dia: x.dia, n: x.horas.length })), link: NEGOCIO.link });
+    if (b.op === 'horas') { const d = W.cupos.find((x) => x.date === b.date) || { horas: [], libres: [] }; return ok({ date: b.date, dia: d.dia, horas: d.libres.map((t, i) => ({ time: t, hora: d.horas[i], staff: b.staffId ? [{ id: b.staffId, nombre: b.staffId === 's1' ? 'Lina' : 'Andrés' }] : [{ id: 's1', nombre: 'Lina' }, { id: 's2', nombre: 'Andrés' }] })), link: NEGOCIO.link }); }
+    if (b.op === 'crear') {
+      if (W.crearFalla) { const m = W.crearFalla; W.crearFalla = null; return ok({ ok: false, motivo: m }); }
+      const todos = [].concat(...CATALOGO.categorias.map((x) => x.servicios)), sel = b.ids.map((id) => todos.find((x) => x.id === id));
+      const d = W.cupos.find((x) => x.date === b.date), tot = sel.reduce((a, x) => a + x.precio, 0);
+      return ok({ ok: true, medios: NEGOCIO.medios, holdMinutes: 30, cita: { code: 'R-NUEVA1', status: W.abono ? 'pending_payment' : 'confirmed', dia: d.dia, hora: d.horas[d.libres.indexOf(b.time)], servicio: sel.map((x) => x.nombre).join(' + '), con: b.staffId === 's2' ? 'Andrés' : 'Lina', abono: Math.min(W.abono, tot), total: tot, link: NEGOCIO.link + '&cita=R-NUEVA1' } });
+    }
+    return ok({});
   }
-  if (/\/api\/sendText$/.test(u)) { const id = 'W' + W.enviados.length; W.enviados.push({ motor: 'waha', a: b.chatId.split('@')[0], texto: b.text, sesion: b.session }); return resp({ id }); }
+  if (/\/api\/sendText$/.test(u)) { const id = 'W' + W.enviados.length; W.enviados.push({ id, motor: 'waha', a: b.chatId.split('@')[0], texto: b.text, sesion: b.session }); return resp({ id }); }
+  if (/\/api\/sendList$/.test(u)) {
+    if (W.listaFalla) return resp({ error: 'no soportado' }, 501);
+    const id = 'WL' + W.enviados.length; W.enviados.push({ id, motor: 'waha', a: b.chatId.split('@')[0], texto: b.message.description, lista: b.message, sesion: b.session }); return resp({ id });
+  }
   if (/\/api\/(start|stop)Typing$/.test(u)) return resp({});
   if (/\/message\/sendText\//.test(u)) { const id = 'E' + W.enviados.length; W.enviados.push({ motor: 'evolution', a: String(b.number), texto: b.text }); return resp({ key: { id } }, 201); }
+  if (/\/message\/sendList\//.test(u)) { const id = 'EL' + W.enviados.length; W.enviados.push({ motor: 'evolution', a: String(b.number), texto: b.description, lista: b }); return resp({ key: { id } }, 201); }
   if (/\/chat\/sendPresence\//.test(u)) return resp({}, 201);
   return resp({}, 404);
 };
@@ -124,7 +150,7 @@ test('El dueño escribe a mano → Mary se calla en ese chat', async () => {
 });
 test('El eco del mensaje de Mary NO la calla', async () => {
   await llega(wahaMsg(CLIENTE, 'hola'));
-  await llega(wahaMsg('x', W.enviados[0].texto, { id: 'W0', from: '573110000000@c.us', to: CLIENTE + '@c.us', fromMe: true }));
+  await llega(wahaMsg('x', W.enviados[0].texto, { id: W.enviados[0].id, from: '573110000000@c.us', to: CLIENTE + '@c.us', fromMe: true }));
   W.citas[CLIENTE] = [];
   await llega(wahaMsg(CLIENTE, 'cuánto vale el manicure?'));
   assert.equal(W.enviados.length, 2);
@@ -155,4 +181,171 @@ test('2.9 · Al vincular por WAHA, la sesión «default» NO se vuelve un negoci
   const L = JSON.parse(fs.readFileSync(NEG_F, 'utf8'));
   assert.equal(L.some((n) => n.bid === 'otra-sesion'), false, 'no debió crear un negocio');
   assert.match(ultimoRegistro(), /no es ningún negocio/);
+});
+
+// =====================================================================
+//  3.0 · ASISTENTE: saludo una vez al día, cupos, agendar con listas, nombre, correo, gustos, abono, audios
+// =====================================================================
+const toca = (rowId, titulo) => wahaMsg(CLIENTE, titulo || rowId, { _data: { notifyName: 'Camila', Message: { listResponseMessage: { singleSelectReply: { selectedRowID: rowId } } } } });
+const ultimo = () => W.enviados[W.enviados.length - 1] || {};
+const filas = (e) => [].concat(...((e.lista || {}).sections || []).map((s) => s.rows));
+const ids = (e) => filas(e).map((r) => r.rowId);
+
+test('3.0 · Saludo «Soy el asistente de…» (sin «Mary») y UNA sola vez al día', async () => {
+  await llega(wahaMsg(CLIENTE, 'hola'));
+  assert.match(W.enviados[0].texto, /Soy el asistente de \*Lina Spa\*/); assert.doesNotMatch(W.enviados[0].texto, /Mary/);
+  assert.ok(W.enviados[0].lista, 'la respuesta lleva la lista Ver opciones');
+  await llega(wahaMsg(CLIENTE, 'hay cupos hoy?'));
+  assert.doesNotMatch(ultimo().texto, /Soy el asistente/, 'el segundo mensaje del día ya no saluda');
+});
+test('3.0 · «¿hay cupos?» → las horas de hoy + el link + la lista de días (SIEMPRE el link)', async () => {
+  await llega(wahaMsg(CLIENTE, 'buenas, tienen cupo hoy?'));
+  const e = ultimo();
+  assert.match(e.texto, /Hoy\* hay cupo a las 3:00 p\. m\., 4:30 p\. m\. y 6:00 p\. m\./); assert.match(e.texto, /tuagenda\.vip/);
+  assert.equal(e.lista.button, 'Elegir día'); assert.ok(ids(e).includes('dia:' + HOY));
+  await llega(wahaMsg(CLIENTE, 'y cupos mañana?'));
+  assert.match(ultimo().texto, /Mañana\* hay cupo a las 9:00 a\. m\./); assert.match(ultimo().texto, /tuagenda\.vip/);
+});
+test('3.0 · Hoy sin cupos → «pero sí hay mañana…» y pregunta qué día le sirve', async () => {
+  W.cupos[0].horas = []; W.cupos[0].libres = [];
+  await llega(wahaMsg(CLIENTE, 'hay disponibilidad hoy?'));
+  assert.match(ultimo().texto, /Hoy ya no hay cupos, pero sí hay mañana y pasado/); assert.match(ultimo().texto, /Qué día te sirve/);
+  assert.match(ultimo().texto, /tuagenda\.vip/);
+});
+test('3.0 · Agendar COMPLETO con listas: 2 servicios, día, hora, profesional, nombre, correo, paráfrasis y SÍ', async () => {
+  await llega(wahaMsg(CLIENTE, 'quiero agendar una cita'));
+  assert.deepEqual(ids(ultimo()), ['cat:0', 'cat:1', 'cat:2']); assert.match(filas(ultimo())[0].description, /desde \$20\.000/);
+  await llega(toca('cat:0', 'Cortes'));
+  assert.ok(ids(ultimo()).includes('svc:c2')); assert.match(filas(ultimo()).find((r) => r.rowId === 'svc:c2').description, /\$25\.000 · 45 min/);
+  await llega(toca('svc:c2', 'Degradado'));
+  assert.match(ultimo().texto, /Anotado: \*Degradado\*/); assert.deepEqual(ids(ultimo()), ['mas:si', 'mas:no']);
+  await llega(toca('mas:si', '➕ Agregar otro'));
+  await llega(toca('cat:1', 'Barba'));
+  await llega(toca('svc:b1', 'Perfilado de barba'));
+  assert.match(ultimo().texto, /Degradado \+ Perfilado de barba\* \(\$37\.000\)/);
+  await llega(toca('mas:no', '✅ No, solo eso'));
+  assert.equal(ultimo().lista.button, 'Elegir día');
+  await llega(toca('dia:' + HOY, 'Hoy'));
+  assert.equal(ultimo().lista.button, 'Elegir hora'); assert.ok(ids(ultimo()).includes('hora:15:00'));
+  assert.deepEqual(ultimo().lista.sections.map((x) => x.title), ['🌇 Tarde', 'Más']);
+  await llega(toca('hora:15:00', '3:00 p. m.'));
+  assert.deepEqual(ids(ultimo()), ['pro:s1', 'pro:s2', 'pro:'], 'dos profesionales libres: pregunta con quién');
+  await llega(toca('pro:s2', 'Andrés'));
+  assert.match(ultimo().texto, /A nombre de quién/);
+  await llega(wahaMsg(CLIENTE, 'andrés ruiz'));
+  assert.match(ultimo().texto, /calendario/);
+  await llega(wahaMsg(CLIENTE, 'Andres@Gmail.com'));
+  const par = ultimo().texto;
+  assert.match(par, /Entendí esto/); assert.match(par, /Degradado \+ Perfilado de barba · \*\$37\.000\* \(1 h 5 min\)/); assert.match(par, /Hoy a las \*3:00 p\. m\.\*/);
+  assert.match(par, /Con Andrés/); assert.match(par, /A nombre de Andrés Ruiz/); assert.deepEqual(ids(ultimo()), ['ok:si', 'ok:no']);
+  await llega(toca('ok:si', '✅ Sí, confirmar'));
+  const cr = W.llamadas.find((x) => x.op === 'crear');
+  assert.deepEqual(cr.ids, ['c2', 'b1']); assert.equal(cr.date, HOY); assert.equal(cr.time, '15:00'); assert.equal(cr.staffId, 's2');
+  assert.equal(cr.nombre, 'Andrés Ruiz'); assert.equal(cr.email, 'andres@gmail.com'); assert.equal(cr.phone, CLIENTE);
+  assert.match(ultimo().texto, /Listo, Andrés! Tu cita quedó confirmada/); assert.match(ultimo().texto, /R-NUEVA1/); assert.match(ultimo().texto, /calendario/);
+  if (process.env.BANCO_VISTA) fs.writeFileSync(process.env.BANCO_VISTA, JSON.stringify(W.enviados, null, 1));   // para dibujar la vista previa
+});
+test('3.0 · Responder ESCRIBIENDO (número o nombre) en vez de tocar la lista también funciona', async () => {
+  await llega(wahaMsg(CLIENTE, 'quiero una cita'));
+  await llega(wahaMsg(CLIENTE, '2'));                       // 2 = Barba
+  assert.match(ultimo().texto, /\*Barba\*/);
+  await llega(wahaMsg(CLIENTE, 'perfilado de barba'));
+  assert.match(ultimo().texto, /Anotado: \*Perfilado de barba\*/);
+  await llega(wahaMsg(CLIENTE, 'no, solo eso'));
+  assert.equal(ultimo().lista.button, 'Elegir día');
+  await llega(wahaMsg(CLIENTE, 'mañana'));
+  assert.match(ultimo().texto, /Horas libres · Mañana/);
+});
+test('3.0 · «quiero corte y barba»: reconoce los servicios escritos de una', async () => {
+  await llega(wahaMsg(CLIENTE, 'quiero degradado y perfilado de barba'));
+  assert.match(ultimo().texto, /Anotado: \*Degradado \+ Perfilado de barba\*/);
+});
+test('3.0 · Con abono del dueño → queda apartada con el monto y los datos de pago', async () => {
+  W.abono = 10000;
+  B.ASIS.cliente(P.CFG && 'lina-spa:' + CLIENTE).nombre = 'Camila'; B.ASIS.cliente('lina-spa:' + CLIENTE).correo = '';
+  await llega(wahaMsg(CLIENTE, 'quiero agendar'));
+  await llega(toca('cat:2', 'Cejas'));
+  await llega(toca('svc:e1', 'Cejas')); await llega(toca('mas:no'));
+  await llega(toca('dia:' + masDias(2), 'Pasado')); await llega(toca('hora:10:00', '10:00 a. m.')); await llega(toca('pro:', 'El que esté libre'));
+  assert.match(ultimo().texto, /Abono para apartar: \*\$8\.000\*/, 'el abono nunca pasa del total');
+  await llega(wahaMsg(CLIENTE, 'si'));
+  assert.match(ultimo().texto, /Te aparté el cupo, Camila/); assert.match(ultimo().texto, /exactamente \$8\.000/); assert.match(ultimo().texto, /Nequi: \*3001112233\*/);
+});
+test('3.0 · «¿Lo de siempre?»: aprende la combinación y la ofrece la próxima vez', async () => {
+  const cl = B.ASIS.cliente('lina-spa:' + CLIENTE); cl.nombre = 'Camila'; cl.correo = '';
+  cl.combos = { 'b1+c2|Lina': { n: 3, ids: ['c2', 'b1'], staffId: 's1', servicio: 'Degradado + Perfilado de barba', con: 'Lina' } };
+  await llega(wahaMsg(CLIENTE, 'quiero agendar'));
+  assert.match(ultimo().texto, /Lo de siempre\? \*Degradado \+ Perfilado de barba\* con \*Lina\*/);
+  await llega(toca('fav:si'));
+  assert.equal(ultimo().lista.button, 'Elegir día');
+  assert.deepEqual(W.llamadas.filter((x) => x.op === 'dias').pop().ids, ['c2', 'b1']); assert.equal(W.llamadas.filter((x) => x.op === 'dias').pop().staffId, 's1');
+});
+test('3.0 · Si otro tomó la hora justo antes → «la acaban de tomar» y muestra las que quedan', async () => {
+  const cl = B.ASIS.cliente('lina-spa:' + CLIENTE); cl.nombre = 'Camila'; cl.correo = '';
+  W.crearFalla = 'ocupada';
+  await llega(wahaMsg(CLIENTE, 'quiero agendar')); await llega(toca('cat:2')); await llega(toca('svc:e1')); await llega(toca('mas:no'));
+  await llega(toca('dia:' + HOY)); await llega(toca('hora:16:30')); await llega(toca('pro:s1')); await llega(toca('ok:si'));
+  assert.match(ultimo().texto, /la acaban de tomar/); assert.equal(ultimo().lista.button, 'Elegir hora');
+});
+test('3.0 · Desde «¿hay cupos?» elige el día → elige servicio → va directo a las horas de ESE día', async () => {
+  await llega(wahaMsg(CLIENTE, 'hay cupos?'));
+  await llega(toca('dia:' + masDias(1), 'Mañana'));
+  assert.deepEqual(ids(ultimo()), ['cat:0', 'cat:1', 'cat:2']);
+  await llega(toca('cat:2')); await llega(toca('svc:e1')); await llega(toca('mas:no'));
+  assert.match(ultimo().texto, /Horas libres · Mañana/); assert.ok(!W.gas.includes('dias'), 'no volvió a preguntar el día');
+});
+test('3.0 · «cancelar» a mitad de camino → lo deja y no insiste', async () => {
+  await llega(wahaMsg(CLIENTE, 'quiero agendar')); await llega(toca('cat:0'));
+  await llega(wahaMsg(CLIENTE, 'cancelar'));
+  assert.match(ultimo().texto, /lo dejamos así/);
+});
+test('3.0 · Algo que no está en la lista → «No te entendí» y la misma lista otra vez', async () => {
+  await llega(wahaMsg(CLIENTE, 'quiero agendar'));
+  await llega(wahaMsg(CLIENTE, 'jajaja'));
+  assert.match(ultimo().texto, /No te entendí/); assert.deepEqual(ids(ultimo()), ['cat:0', 'cat:1', 'cat:2']);
+});
+test('3.0 · Audio → «En este momento no puedo escuchar audios», sin romper nada', async () => {
+  await llega(wahaMsg(CLIENTE, '', { hasMedia: true, media: { url: 'http://waha-agendador:3000/api/files/x.oga', mimetype: 'audio/ogg; codecs=opus' } }));
+  assert.match(ultimo().texto, /no puedo escuchar audios/); assert.match(ultimo().texto, /Soy el asistente de/);
+  assert.ok(!W.gas.includes('proof'), 'un audio no es una foto de pago');
+});
+test('3.0 · Si WhatsApp no acepta la lista → llega igual como texto con números', async () => {
+  W.listaFalla = true;
+  await llega(wahaMsg(CLIENTE, 'quiero agendar'));
+  assert.match(ultimo().texto, /1\. Cortes\n2\. Barba\n3\. Cejas/); assert.match(ultimo().texto, /Responde con el número/);
+  await llega(wahaMsg(CLIENTE, '3'));
+  assert.match(ultimo().texto, /\*Cejas\*/);
+});
+test('3.0 · Evolution también manda listas y entiende la opción elegida', async () => {
+  await llega(evoMsg(CLIENTE, 'quiero agendar'));
+  assert.equal(ultimo().motor, 'evolution'); assert.ok(ultimo().lista.sections);
+  await llega(evoMsg(CLIENTE, '', { message: { listResponseMessage: { title: 'Barba', singleSelectReply: { selectedRowId: 'cat:1' } } } }));
+  assert.match(ultimo().texto, /\*Barba\*/);
+});
+test('3.0 · Fechas: hoy, mañana, pasado mañana, «el viernes», «el 20», «20 de diciembre», «20/12»', () => {
+  const A = require('../asistente');
+  assert.equal(A.fechaPedida('hay cupo hoy?', '2026-11-12'), '2026-11-12');
+  assert.equal(A.fechaPedida('para mañana', '2026-11-12'), '2026-11-13');
+  assert.equal(A.fechaPedida('mañana en la mañana', '2026-11-12'), '2026-11-13');
+  assert.equal(A.fechaPedida('pasado mañana', '2026-11-12'), '2026-11-14');
+  assert.equal(A.fechaPedida('el viernes', '2026-11-12'), '2026-11-13');   // 12-nov-2026 es jueves
+  assert.equal(A.fechaPedida('el jueves', '2026-11-12'), '2026-11-12');
+  assert.equal(A.fechaPedida('para el 20', '2026-11-12'), '2026-11-20');
+  assert.equal(A.fechaPedida('el 5', '2026-11-12'), '2026-12-05');
+  assert.equal(A.fechaPedida('20 de diciembre', '2026-11-12'), '2026-12-20');
+  assert.equal(A.fechaPedida('20/12', '2026-11-12'), '2026-12-20');
+  assert.equal(A.fechaPedida('3 de enero', '2026-11-12'), '2027-01-03');
+  assert.equal(A.fechaPedida('hay cupos?', '2026-11-12'), null);
+});
+test('3.0 · Recordatorio según el panel: «Recuerda que tu cita es en 1 hora» (y 2 horas, 30 min…)', () => {
+  const T = require('../textos'), c = { nombre: 'andrés', dia: 'Hoy', hora: '3:00 p. m.', servicio: 'Degradado', con: 'Lina', link: 'L', saldo: 0 };
+  assert.match(T.recordatorio(c, { negocio: 'El Barba', recordatorioMin: 60 }), /Hola Andrés 👋 Recuerda que tu cita en \*El Barba\* es en \*1 hora\*/);
+  assert.match(T.recordatorio(c, { negocio: 'El Barba', recordatorioMin: 120 }), /es en \*2 horas\*/);
+  assert.match(T.recordatorio(c, { negocio: 'El Barba', recordatorioMin: 30 }), /es en \*30 minutos\*/);
+  assert.match(T.recordatorio(c, { negocio: 'El Barba', recordatorioMin: 90 }), /es en \*1 hora y 30 minutos\*/);
+});
+test('3.0 · Agenda suspendida → tampoco agenda ni muestra cupos', async () => {
+  W.activo = false;
+  await llega(wahaMsg(CLIENTE, 'quiero agendar')); await llega(wahaMsg(CLIENTE, 'hay cupos?'));
+  assert.equal(W.enviados.length, 0);
 });

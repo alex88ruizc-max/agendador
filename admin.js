@@ -9,9 +9,9 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-11-07n";
-import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-07n";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-07n";
+} from "./common.js?v=2026-11-12a";
+import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-12a";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-12a";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -1117,7 +1117,9 @@ function renderSettings() {
         ${num("stMaxResched", "Máximo de cambios por cita", s.maxReschedules ?? 2, 'min="0"')}
         ${num("stNoShow", "Faltas seguidas antes de exigir pago total", s.noShowThreshold ?? 2, 'min="1"')}
         ${num("stReminder", "Aviso de próxima cita por Telegram (minutos antes)", s.reminderMinutesBefore ?? 15, 'min="0"')}
+        <label class="field"><span>Recordatorio al cliente por WhatsApp</span><select id="stMaryRem">${[[0, "Sin recordatorio"], [30, "30 minutos antes"], [60, "1 hora antes"], [120, "2 horas antes"], [180, "3 horas antes"], [1440, "1 día antes"]].map(([v, t]) => `<option value="${v}" ${Number(s.maryReminderMinutes ?? 120) === v ? "selected" : ""}>${t}</option>`).join("")}</select></label>
       </div>
+      <p class="mt-2 text-xs text-ink/60">El asistente de WhatsApp le escribe al cliente: «Hola 👋 Recuerda que tu cita es en 1 hora». También queda como aviso en la cita de su calendario.</p>
     </fieldset>
 
     <fieldset class="rounded-xl border border-line bg-white p-4"><legend class="px-1 font-narrow text-xl font-bold">Telegram</legend>
@@ -1248,7 +1250,7 @@ async function saveSettings(e) {
     autoConfirmProof: $("stAuto").checked, businessHours: hours, closedDates: A.closedDraft,
     paymentMethods: A.pmDraft.filter((m) => m.label && m.account).map((m) => ({ label: m.label, account: m.account, holder: m.holder || "", qr: m.qr || "" })), paymentInstructions: $("stPayInstr").value.trim(),
     rescheduleMinHours: n("stReschedH"), maxReschedules: n("stMaxResched"), noShowThreshold: Math.max(1, n("stNoShow")),
-    reminderMinutesBefore: n("stReminder"),
+    reminderMinutesBefore: n("stReminder"), maryReminderMinutes: Number($("stMaryRem").value),
     waConfirmTemplate: $("stWaConf").value, waRescheduleTemplate: $("stWaRes").value, habeasDataText: $("stHabeas").value.trim(),
     updatedAt: serverTimestamp(), updatedBy: A.me.uid
   };

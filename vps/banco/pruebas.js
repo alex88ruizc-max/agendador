@@ -47,8 +47,8 @@ test('detecta preguntas concretas', () => {
 });
 const INFO = { negocio: 'Studio Lúa', link: 'https://tuagenda.vip/index.html?b=studio-lua', medios: [{ label: 'Bre-B', account: '@studiolua', holder: 'Laura Gómez' }], color: '#5B3FE0', categorias: ['Uñas', 'Pestañas', 'Cejas'] };
 test('textos: sin cita lleva el link, con cita el link de la cita y el pago', () => {
-  const s = T.sinCita(Object.assign({ cuposHoy: 6 }, INFO), 'camila rodriguez');
-  assert.match(s, /Hola Camila/); assert.match(s, /6 cupos/); assert.ok(s.includes(INFO.link));
+  const s = T.sinCita(Object.assign({ cuposHoy: 6 }, INFO), T.saludo(INFO.negocio, 'camila rodriguez'));
+  assert.match(s, /Hola Camila/); assert.match(s, /Soy el asistente de/); assert.doesNotMatch(s, /Mary/); assert.match(s, /6 cupos/); assert.ok(s.includes(INFO.link));
   const cita = { code: 'R-AAAAAA', status: 'pending_payment', dia: 'Hoy', hora: '3:30 p. m.', servicio: 'Semipermanente', con: 'Daniela', abono: 15000, saldo: 30000, link: INFO.link + '&cita=R-AAAAAA' };
   const c = T.conCita(Object.assign({ citas: [cita] }, INFO), '');
   assert.match(c, /\$15\.000/); assert.match(c, /@studiolua/); assert.ok(c.includes('&cita=R-AAAAAA'));

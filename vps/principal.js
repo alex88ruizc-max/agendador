@@ -4,9 +4,9 @@
 //   · Estados de WhatsApp con los cupos de hoy (cada mañana) y de la semana (un día a la semana).   · Recordatorio antes de la cita.
 'use strict';
 const http = require('http'), fs = require('fs'), path = require('path');
-const T = require('./textos'), C = require('./correo'), E = require('./estado');
+const T = require('./textos'), C = require('./correo'), E = require('./estado'), A = require('./asistente');
 
-const VERSION = 'agendador-ia-2.9';
+const VERSION = 'agendador-ia-3.0';
 const env = (k, d) => (process.env[k] === undefined || process.env[k] === '' ? d : process.env[k]);
 const CFG = {
   puerto: parseInt(env('PUERTO', '3060'), 10),
@@ -70,6 +70,11 @@ function telEnAviso(p, me) {
   })(p, 0);
   return hallado;
 }
+function buscarClave(o, re, prof) {
+  if (o == null || typeof o !== 'object' || (prof || 0) > 7) return '';
+  for (const [k, v] of Object.entries(o)) { if (re.test(k) && (typeof v === 'string' || typeof v === 'number') && String(v)) return String(v); const r = buscarClave(v, re, (prof || 0) + 1); if (r) return r; }
+  return '';
+}
 // Convierte lo que manda WAHA al mismo formato que ya entiende Mary (el de Evolution)
 function deWaha(b) {
   const ev = String(b.event || ''), p = b.payload || {};
@@ -81,7 +86,11 @@ function deWaha(b) {
   let alt = String((d.key && d.key.remoteJidAlt) || d.senderPn || p.participant || '').replace(/@c\.us$/, '@s.whatsapp.net');
   if (!/@(s\.whatsapp\.net|c\.us)$/.test(jid) && !/@s\.whatsapp\.net$/.test(alt)) alt = telEnAviso(p, b.me) || alt;   // 2.6: WhatsApp oculta el número (…@lid): se busca el real
   const mime = String((p.media && p.media.mimetype) || '');
-  const message = p.hasMedia && /image|pdf/.test(mime) ? (/pdf/.test(mime) ? { documentMessage: { mimetype: mime } } : { imageMessage: { mimetype: mime, caption: p.body || '' } }) : { conversation: String(p.body || '') };
+  const fila = buscarClave(p, /^selectedrowid$/i);   // 3.0: tocó una opción de una lista
+  const esAudio = (p.hasMedia && /audio|ogg|opus/.test(mime)) || /^(ptt|audio|voice)$/i.test(String(p.type || d.type || ''));
+  const message = fila ? { listResponseMessage: { title: String(p.body || ''), singleSelectReply: { selectedRowId: String(fila) } } }
+    : esAudio ? { audioMessage: { mimetype: mime || 'audio/ogg' } }
+    : p.hasMedia && /image|pdf/.test(mime) ? (/pdf/.test(mime) ? { documentMessage: { mimetype: mime } } : { imageMessage: { mimetype: mime, caption: p.body || '' } }) : { conversation: String(p.body || '') };
   return { event: 'messages.upsert', instance: neg.instancia, data: { key: { remoteJid: jid, remoteJidAlt: /@/.test(alt) ? alt : '', fromMe: p.fromMe === true, id: String(p.id || '') }, pushName: String(d.notifyName || d.pushName || ''), message, mediaUrl: String((p.media && p.media.url) || '') } };
 }
 async function bajarMediaWaha(url) {
@@ -113,6 +122,29 @@ async function escribir(neg, numero, texto) {
   return r;
 }
 
+// 📋 3.0 · LISTA de WhatsApp («Ver opciones»): por WAHA o por Evolution. Si el motor no la acepta, va como texto con números.
+//    L = { texto, boton, pie, secciones: [{ titulo, filas: [{ id, titulo, desc }] }] }  (WhatsApp: máximo 10 filas en total)
+async function escribirLista(neg, numero, L) {
+  const n = numeroWa(numero); if (n.length < 11) { const e = new Error('número inválido'); e.permanente = true; throw e; }
+  const sec = L.secciones.map((x) => ({ title: String(x.titulo || '').slice(0, 24), rows: x.filas.map((f) => ({ title: String(f.titulo).slice(0, 24), rowId: f.id, description: String(f.desc || '').slice(0, 72) })) }));
+  ULT_ENVIO.set(neg.bid + ':' + n, Date.now());
+  try {
+    let r;
+    if (esWaha(neg)) {
+      r = await waha('post', '/api/sendList', { session: sesionDe(neg), chatId: n + '@c.us', message: { title: '', description: L.texto, footer: L.pie || '', button: String(L.boton || 'Ver opciones').slice(0, 20), sections: sec }, reply_to: null });
+      const idw = r && (r.id && (r.id._serialized || r.id.id || r.id)) || (r && r.key && r.key.id); r = { key: { id: typeof idw === 'string' ? idw : '' } };
+    } else r = await evo('post', '/message/sendList/' + encodeURIComponent(neg.instancia), { number: n, title: '', description: L.texto, buttonText: String(L.boton || 'Ver opciones').slice(0, 20), footerText: L.pie || '', sections: sec });
+    const id = r && r.key && r.key.id; if (id) { MEM.enviados.push(id); if (MEM.enviados.length > 500) MEM.enviados.splice(0, 100); memGuardar(); }
+    est.respondidos++;
+    return r;
+  } catch (e) {
+    if (/número inválido/.test(e.message)) throw e;
+    log('lista → texto:', e.message);
+    let i = 0; const op = L.secciones.map((x) => x.filas.map((f) => `${++i}. ${f.titulo}`).join('\n')).join('\n');
+    return escribir(neg, numero, L.texto + '\n\n' + op + '\n\nResponde con el número 👆');
+  }
+}
+
 // ---------- servidor del agendador (Apps Script, acción "mary") ----------
 async function gas(neg, op, datos) {
   if (!CFG.gas || !CFG.maryKey) throw new Error('Falta GAS_URL o MARY_KEY en agendador-ia.env');
@@ -122,16 +154,22 @@ async function gas(neg, op, datos) {
   return j.data;
 }
 
+// ---------- 🤖 3.0 · el asistente (agendar por listas, cupos, saludo una vez al día, nombre y gustos) ----------
+const ASIS = A.crear({ gas: (neg, op, d) => gas(neg, op, d), texto: (neg, tel, t) => escribir(neg, tel, t), lista: (neg, tel, L) => escribirLista(neg, tel, L),
+  get mem() { return MEM; }, guardar: () => memGuardar(), anotar: (x) => anotar(x), tz: CFG.tz });
+
 // ---------- ¿quién escribe? ----------
 function leerMensaje(b) {
   const d = (b && b.data) || {}, k = d.key || {}, jid = String(k.remoteJid || '');
   const alt = String(k.remoteJidAlt || d.senderPn || k.senderPn || '');
   const tel = [jid, alt].map((x) => (/@(s\.whatsapp\.net|c\.us)$/.test(x) ? x.split('@')[0].replace(/\D/g, '') : '')).find((x) => x.length >= 10) || '';
   const m = d.message || {};
-  const texto = String(m.conversation || (m.extendedTextMessage && m.extendedTextMessage.text) || (m.imageMessage && m.imageMessage.caption) || (m.buttonsResponseMessage && m.buttonsResponseMessage.selectedDisplayText) || '').trim();
+  const lr = m.listResponseMessage || {};
+  const texto = String(m.conversation || (m.extendedTextMessage && m.extendedTextMessage.text) || (m.imageMessage && m.imageMessage.caption) || (m.buttonsResponseMessage && m.buttonsResponseMessage.selectedDisplayText) || lr.title || '').trim();
+  const rowId = String((lr.singleSelectReply && lr.singleSelectReply.selectedRowId) || '');
   const media = m.imageMessage ? 'image' : (m.documentMessage && /image|pdf/.test(String(m.documentMessage.mimetype || ''))) ? 'document' : '';
   return {
-    evento: String(b && b.event || '').toLowerCase().replace(/_/g, '.'), inst: String(b && b.instance || ''), jid, tel, texto, media, id: String(k.id || ''),
+    evento: String(b && b.event || '').toLowerCase().replace(/_/g, '.'), inst: String(b && b.instance || ''), jid, tel, texto, media, id: String(k.id || ''), rowId, audio: !!m.audioMessage,
     nombre: String(d.pushName || ''), deMi: k.fromMe === true, grupo: /@g\.us$/.test(jid), estado: /status@broadcast/.test(jid),
     base64: String(m.base64 || d.base64 || ''), mediaUrl: String(d.mediaUrl || ''), mime: String((m.imageMessage && m.imageMessage.mimetype) || (m.documentMessage && m.documentMessage.mimetype) || 'image/jpeg')
   };
@@ -200,6 +238,15 @@ async function atenderMensaje(c, neg) {
     MEM.chats[k] = { t: Date.now(), firma: 'foto' }; memGuardar();
     return;
   }
+  // 🤖 3.0: agendamiento en curso, «¿hay cupos?», «quiero una cita», opción de lista o audio → lo atiende el asistente
+  if (c.texto || c.rowId || c.audio) {
+    const ca = { k, tel: c.tel, texto: c.texto, rowId: c.rowId, audio: c.audio, nombre: c.nombre };
+    let r = null;
+    try { r = await ASIS.manejar(neg, ca); }
+    catch (e) { est.errores++; log('❌ asistente', neg.bid, e.message); if (!(prev.t && Date.now() - prev.t < CFG.silencioMin * 60000)) { try { const i2 = await gas(neg, 'info'); await escribir(neg, c.tel, T.problema(i2)); } catch (e2) { /* nada */ } } MEM.chats[k] = { t: Date.now(), firma: 'error' }; memGuardar(); return; }
+    if (r === 'suspendida') { anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: 'agenda suspendida: no respondo' }); return; }
+    if (r) { MEM.chats[k] = { t: Date.now(), firma: r, n: 1 }; memGuardar(); anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: { flujo: 'agendando por WhatsApp', cupos: 'le mostré los cupos', agendar: 'empezó a agendar', audio: 'audio: le pedí que escriba' }[r] || r }); return; }
+  }
   if (!c.texto) return;
   const reciente = prev.t && Date.now() - prev.t < CFG.silencioMin * 60000;
   if (reciente && !PREGUNTA.test(c.texto)) { anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: 'callada (ya le respondí hace poco)' }); return; }   // atajo: ni se consulta a Google (no va a responder)
@@ -207,10 +254,11 @@ async function atenderMensaje(c, neg) {
   try { info = await gas(neg, 'chat', { phone: c.tel }); }
   catch (e) { est.errores++; log('❌ chat', neg.bid, e.message); if (!reciente) { try { const i2 = await gas(neg, 'info'); await escribir(neg, c.tel, T.problema(i2)); } catch (e2) { /* nada */ } } return; }
   if (!info.activo) { anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: 'agenda suspendida: no respondo' }); return; }   // agenda suspendida: el dueño atiende
-  const texto = info.citas && info.citas.length ? T.conCita(info, c.nombre) : T.sinCita(info, c.nombre);
   const firma = (info.citas || []).map((x) => x.code + x.status).join(',') || 'sin';
   if (!debeResponder({ texto: c.texto, pausadoPorDueno, reciente, citas: info.citas, repetido: prev.firma === firma && prev.n >= 2 })) { anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: 'callada (' + (info.citas.length ? 'ya tiene su cita' : 'ya le respondí') + ')' }); return; }
-  await escribir(neg, c.tel, texto);
+  const sal = ASIS.saludo(k, info.negocio, c.nombre);   // «Hola 👋 Soy el asistente de…» solo la primera vez del día
+  if (info.citas && info.citas.length) await escribir(neg, c.tel, T.conCita(info, sal));
+  else await ASIS.menu(neg, { k, tel: c.tel, texto: c.texto }, T.sinCita(info, sal), info.negocio);
   MEM.chats[k] = { t: Date.now(), firma, n: prev.firma === firma ? (prev.n || 1) + 1 : 1 }; memGuardar();
   anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: info.citas.length ? 'tiene ' + info.citas.length + ' cita(s)' : 'link para agendar' });
 }
@@ -484,5 +532,5 @@ if (require.main === module) {
   servidor.listen(CFG.puerto, () => { log('👩‍💼 ' + VERSION + ' escuchando en ' + CFG.puerto + ' · modo ' + CFG.modo); negocios(); arrancarRelojes(); });
 }
 // 🧪 solo para el banco de escenarios (banco/escenarios.js): deja a Mary como recién encendida
-const _banco = { alMensaje, alEventoConexion, ultimos, reiniciar() { MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
+const _banco = { ASIS, alMensaje, alEventoConexion, ultimos, reiniciar() { MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; MEM.conv = {}; MEM.clientes = {}; ASIS._cat.clear(); delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
 module.exports = { _banco, telEnAviso, deWaha, esWaha, debeResponder, alEventoConexion, tickPedidosWa, limpiarSinVincular, leerMensaje, atiende, PREGUNTA, numeroWa, ahoraLocal, enFila, yaVisto, quienVeEstados, CFG };

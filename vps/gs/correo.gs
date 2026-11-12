@@ -6,7 +6,7 @@
  *  · Texto ordenado: «Hola Luisa,» y el mensaje en su propio párrafo, con puntuación.
  *  · Etiqueta de estado de color, código grande, datos, botón «Ver mi cita», dirección y pie de Tu Agenda.
  */
-const CORREO_VERSION = 'correo-premium-1';
+const CORREO_VERSION = 'correo-premium-2';   // 3.0: invitación de calendario (.ics) que se mueve y se borra sola
 
 function correoSinEmoji_(s) {
   return String(s == null ? '' : s)
@@ -84,6 +84,63 @@ function emailClient(a, subject, intro) {
       ' minutos. Para cancelar o cambiar tu cita, hazlo con al menos ' + Number(st.rescheduleMinHours != null ? st.rescheduleMinHours : 2) + ' horas de anticipación.</p>' +
       '</div></div>' +
       '<p style="max-width:520px;margin:14px auto 0;text-align:center;font-size:11.5px;color:#A3A3AB">Enviado con Tu Agenda · tuagenda.vip</p></div>';
-    sendMail(to, correoSinEmoji_(subject + ' · ' + biz + ' · ' + a.code), correoEntidades_(html), biz, st.email || '');
+    // 📅 3.0 · invitación de calendario: al confirmar o cambiar de hora (misma cita = mismo UID, el calendario la MUEVE)
+    //    y al cancelar se manda la cancelación de ESA invitación (desaparece del calendario del cliente)
+    let ics = null;
+    try {
+      if (cancel && a.icsSeq != null && !a.icsCancelada) {
+        ics = correoIcs_(a, 'CANCEL', Number(a.icsSeq) + 1, st, biz, dir, link);
+        commit([wPatch(bp('appointments/' + a.code), { icsSeq: Number(a.icsSeq) + 1, icsCancelada: true })]);
+      } else if (!cancel && a.status === 'confirmed' && /confirmad|cambi[oó] de horario|reagend/i.test(subject)) {
+        const seq = a.icsSeq == null ? 0 : Number(a.icsSeq) + 1;
+        ics = correoIcs_(a, 'REQUEST', seq, st, biz, dir, link);
+        commit([wPatch(bp('appointments/' + a.code), { icsSeq: seq, icsCancelada: false })]);
+      }
+    } catch (e) { console.error('Invitación: ' + e); ics = null; }
+    correoEnviar_(to, correoSinEmoji_(subject + ' · ' + biz + ' · ' + a.code), correoEntidades_(html), biz, st.email || '', ics);
   } catch (e) { console.error('Correo: ' + e); }
 }
+
+// Envía igual que sendMail() del servidor, pero puede llevar la invitación .ics
+function correoEnviar_(to, subject, html, name, replyTo, ics) {
+  if (!ics) return sendMail(to, subject, html, name, replyTo);
+  const adj = [Utilities.newBlob(ics.texto, 'text/calendar; charset=UTF-8; method=' + ics.metodo, ics.metodo === 'CANCEL' ? 'cancelacion.ics' : 'invitacion.ics')];
+  const from = mailFrom();
+  let aliases = []; try { aliases = GmailApp.getAliases().map(function (x) { return String(x).toLowerCase(); }); } catch (e) { aliases = []; }
+  if (from && aliases.indexOf(from) >= 0) GmailApp.sendEmail(to, subject, 'Abre este correo en un programa que muestre HTML.', { htmlBody: html, name: name, replyTo: replyTo || undefined, from: from, attachments: adj });
+  else MailApp.sendEmail({ to: to, subject: subject, htmlBody: html, name: name, replyTo: replyTo || undefined, attachments: adj });
+}
+// iCalendar (RFC 5545): líneas CRLF, textos escapados, líneas largas dobladas
+function correoIcs_(a, metodo, seq, st, biz, dir, link) {
+  const utc = function (d) { return Utilities.formatDate(d, 'UTC', "yyyyMMdd'T'HHmmss'Z'"); };
+  const txt = function (x) { return String(x == null ? '' : x).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n'); };
+  const doblar = function (l) { const out = []; while (l.length > 74) { out.push(l.slice(0, 74)); l = ' ' + l.slice(74); } out.push(l); return out.join('\r\n'); };
+  const ini = a.startAt instanceof Date ? a.startAt : mkDate(a.date, a.startTime);
+  const fin = new Date(ini.getTime() + Number(a.occupiedMinutes || a.totalMinutes || 30) * 60000);
+  let yo = ''; try { yo = mailFrom(); const al = GmailApp.getAliases().map(function (x) { return String(x).toLowerCase(); }); if (al.indexOf(yo) < 0) yo = Session.getEffectiveUser().getEmail(); } catch (e) { yo = yo || 'citas@tuagenda.vip'; }
+  const nom = [((a.customer || {}).firstName || ''), ((a.customer || {}).lastName || '')].join(' ').trim();
+  const aviso = Number(st.maryReminderMinutes != null && st.maryReminderMinutes !== '' ? st.maryReminderMinutes : 120);
+  const servicios = (a.items || []).map(function (i) { return i.name; }).join(' + ');
+  const L = ['BEGIN:VCALENDAR', 'PRODID:-//Tu Agenda//tuagenda.vip//ES', 'VERSION:2.0', 'CALSCALE:GREGORIAN', 'METHOD:' + metodo, 'BEGIN:VEVENT',
+    'UID:' + a.code + '-' + BID + '@tuagenda.vip', 'SEQUENCE:' + seq, 'DTSTAMP:' + utc(new Date()), 'DTSTART:' + utc(ini), 'DTEND:' + utc(fin),
+    'SUMMARY:' + txt(servicios + ' · ' + biz), 'LOCATION:' + txt(dir || ''),
+    'DESCRIPTION:' + txt('Reserva ' + a.code + (a.staffName ? ' · con ' + a.staffName : '') + '\nVer o cambiar tu cita: ' + link),
+    'ORGANIZER;CN=' + txt(biz) + ':mailto:' + yo,
+    'ATTENDEE;CN=' + txt(nom || 'Cliente') + ';ROLE=REQ-PARTICIPANT;PARTSTAT=ACCEPTED;RSVP=FALSE:mailto:' + a.customer.email,
+    'STATUS:' + (metodo === 'CANCEL' ? 'CANCELLED' : 'CONFIRMED'), 'TRANSP:OPAQUE'];
+  if (metodo !== 'CANCEL' && aviso > 0) L.push('BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:' + txt('Tu cita en ' + biz), 'TRIGGER:-PT' + Math.round(aviso) + 'M', 'END:VALARM');
+  L.push('END:VEVENT', 'END:VCALENDAR');
+  return { metodo: metodo, texto: L.map(doblar).join('\r\n') + '\r\n' };
+}
+// Si el CLIENTE cancela desde la página, el servidor no le manda correo: igual se le borra la cita de su calendario
+try {
+  const correoCancelarOriginal_ = ACTIONS.cancelAppointment;
+  ACTIONS.cancelAppointment = function (b, auth) {
+    const r = correoCancelarOriginal_(b, auth);
+    try {
+      const a = fsGet(bp('appointments/' + String(b.code || '').toUpperCase().trim()));
+      if (a && a.status === 'cancelled' && a.icsSeq != null && !a.icsCancelada) emailClient(a, 'Tu cita fue cancelada', 'Cancelaste tu cita. La quitamos de tu calendario. Escríbenos si quieres agendar de nuevo.');
+    } catch (e) { console.error('Invitación (cancelar): ' + e); }
+    return r;
+  };
+} catch (e) { console.error('correo: el archivo quedó ANTES del principal.'); }

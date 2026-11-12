@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-2.9** · Página **2026-11-07n** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-12** · Mary **agendador-ia-3.0** · Página **2026-11-12a** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -96,7 +96,10 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## ⏳ Pendientes
-1. Seguir probando a Mary con El Barba (tu 318) desde un número aparte en `MARY_PRUEBA`. Luego pasar a `MARY_MODO=todos`.
+1. Instalar 3.0 + página 2026-11-12a y probar el agendamiento por listas con El Barba (tu 318) desde el número aparte. Luego `MARY_MODO=todos`.
+   Verificar en un celular real: que la lista llegue por WAHA (si no, sale el texto con números) y que la invitación entre al calendario.
+   El panel guarda `maryReminderMinutes` en settings: confirmar que las reglas de Firestore lo dejan guardar.
+8. Futuro: «oído» propio del agendador para escuchar audios (copia del de Epic: Whisper/Speaches, contenedor `oido-agendador`).
 2. Que el panel conecte por WAHA (hoy conecta por Evolution). WAHA gratis = 1 WhatsApp: para varios negocios, arreglar Evolution o WAHA Plus.
 3. Generar la APK con `/apk` en el bot. Falta confirmar si ya se hizo.
 4. **Rotar secretos** que quedaron expuestos en chats anteriores:
@@ -110,6 +113,20 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-12 · agendador-ia-3.0 · 🤖 El asistente (agendar por WhatsApp)
+- Saludo «Soy el asistente de {negocio}» (sin «Mary»), una vez al día por cliente (`MEM.clientes[bid:tel].saludo`).
+- Cupos con fechas pedidas (hoy/mañana/viernes/el 20…), siempre con link + lista de días.
+- Agendar con listas de WhatsApp: `vps/asistente.js` (pasos cat → svc → mas → dia → hora → pro → nombre → correo → confirmar).
+  Varios servicios en una cita (se suman). Si la lista no se puede mandar, va como texto con números.
+- Servidor (`vps/gs/mary.gs`): ops `catalogo`, `dias`, `horas`, `crear` (abono = `depositAmountCOP` del dueño). `proximas` usa
+  `settings.maryReminderMinutes` (panel). `cupos` hasta 14 días.
+- Correo (`vps/gs/correo.gs`): invitación `.ics` (REQUEST al confirmar/reagendar con el mismo UID y SEQUENCE; CANCEL al cancelar,
+  también si cancela el cliente: se envuelve `ACTIONS.cancelAppointment`). Campos nuevos en la cita: `icsSeq`, `icsCancelada`.
+- Panel (`admin.js`): «Recordatorio al cliente por WhatsApp» (0/30/60/120/180/1440 min) → `maryReminderMinutes`.
+- Aprende nombre, correo y combos (`combos`) → «¿Lo de siempre?».
+- Audios: responde que por ahora no los escucha.
+- Banco: 55 pruebas, 0 fallas (prueba de mutación hecha con el saludo).
 
 ### 2026-11-12 · agendador-ia-2.9 · ✅ Mary responde por WAHA
 - Tu 318 quedó vinculado como «El Barba» (`elbarba`) en `waha-agendador` (código de 8 letras). Primera prueba: Mary mandó el link para agendar.

@@ -14,7 +14,7 @@
  * Instalación: pega este archivo, ejecuta activarMary() una vez, copia la clave que sale en el registro
  * y ponla en el mary.env del VPS (MARY_KEY). Vuelve a implementar la aplicación web (Implementar > Administrar > editar > Nueva versión).
  */
-const MARY_VERSION = 'agendador-ia-2.5';
+const MARY_VERSION = 'agendador-ia-3.0';
 
 // Se registra como acción pública del servidor (sin sesión: entra con la clave de Mary).
 // ⚠️ Este archivo debe quedar DEBAJO del archivo principal en la lista de archivos de Apps Script (los nuevos quedan al final: así está bien).
@@ -47,6 +47,10 @@ function maryAgenda(b) {
     case 'info': return maryInfo_(st);
     case 'waPedido': return maryWaPedido_();
     case 'waResultado': return maryWaResultado_(b);
+    case 'catalogo': return maryCatalogo_(st);   // 3.0 · agendar por WhatsApp (listas)
+    case 'dias': return maryDias_(st, b);
+    case 'horas': return maryHoras_(st, b);
+    case 'crear': return maryCrear_(st, b);
   }
   fail('Operación no válida.');
 }
@@ -207,7 +211,7 @@ function maryPago_(st, b) {
 // ---------- cupos libres (para los estados) ----------
 // Un cupo = una hora de inicio (cada "duración del turno") en la que al menos un profesional está libre.
 function maryCupos_(st, b) {
-  const dias = Math.max(1, Math.min(7, Number(b.dias || 1)));
+  const dias = Math.max(1, Math.min(14, Number(b.dias || 1)));
   const slot = Number(st.slotDurationMinutes || 30);
   const staff = loadStaff().filter(function (s) { return s.active !== false; });
   const now = Date.now() + Number(st.minAdvanceMinutes || 0) * 60000;
@@ -241,7 +245,10 @@ function maryCupos_(st, b) {
 
 // ---------- recordatorio por WhatsApp ----------
 function maryProximas_(st, b) {
-  const min = Math.max(10, Math.min(24 * 60, Number(b.minutos || 120)));
+  // 3.0: lo decide el dueño en su panel (Ajustes › «Recordatorio al cliente por WhatsApp»). 0 = sin recordatorio.
+  const conf = st.maryReminderMinutes;
+  if (conf !== undefined && conf !== null && conf !== '' && Number(conf) === 0) return { citas: [], info: Object.assign(maryInfo_(st), { recordatorioMin: 0 }) };
+  const min = Math.max(10, Math.min(24 * 60, Number(conf != null && conf !== '' ? conf : (b.minutos || 120))));
   const now = Date.now(), hoy = toDateStr(new Date()), man = toDateStr(new Date(now + 86400000));
   let L = fsQuery('appointments', [['date', 'EQUAL', hoy]]).concat(hoy === man ? [] : fsQuery('appointments', [['date', 'EQUAL', man]]));
   L = L.filter(function (a) {
@@ -249,12 +256,124 @@ function maryProximas_(st, b) {
     const m = (a.startAt.getTime() - now) / 60000;
     return m > 0 && m <= min && maryLast10_((a.customer || {}).whatsapp).length === 10;
   });
-  return { citas: L.map(function (a) { const o = maryCitaOut_(a); o.whatsapp = (a.customer || {}).whatsapp || ''; o.nombre = (a.customer || {}).firstName || ''; return o; }), info: maryInfo_(st) };
+  return { citas: L.map(function (a) { const o = maryCitaOut_(a); o.whatsapp = (a.customer || {}).whatsapp || ''; o.nombre = (a.customer || {}).firstName || ''; return o; }), info: Object.assign(maryInfo_(st), { recordatorioMin: min }) };
 }
 function maryRecordada_(b) {
   const a = getApt(b.code);
   commit([wPatch(bp('appointments/' + a.code), { maryReminded: true })]);
   return { ok: true };
+}
+
+// =====================================================================
+//  3.0 · AGENDAR POR WHATSAPP CON LISTAS (categorías → servicios → días → horas → profesional → confirmar)
+//  Usa las MISMAS reglas que la página: horario, profesionales, bloqueos de 15 min, anticipación, ventana de días y abono del dueño.
+//  Diferencia: se pueden juntar varios servicios principales en una cita (corte + barba + cejas): se suman tiempo y precio.
+// =====================================================================
+function maryServicios_() {
+  return loadServices().filter(function (s) { return s.active !== false; })
+    .sort(function (a, b) { return (a.order || 99) - (b.order || 99) || String(a.name).localeCompare(String(b.name)); });
+}
+function maryCatalogo_(st) {
+  const cats = {}, orden = [];
+  maryServicios_().forEach(function (s) {
+    const c = String(s.category || '').trim() || 'Servicios';
+    if (!cats[c]) { cats[c] = []; orden.push(c); }
+    cats[c].push({ id: s._id, nombre: s.name, precio: Number(s.priceCOP || 0), min: Number(s.minutes || 0), tipo: s.type || '' });
+  });
+  const staff = loadStaff().filter(function (x) { return x.active !== false; }).map(function (x) { return { id: x._id, nombre: x.name, servicios: x.serviceIds || [] }; });
+  const out = maryInfo_(st);
+  out.categorias = orden.map(function (c) { return { nombre: c, desde: Math.min.apply(null, cats[c].map(function (x) { return x.precio; })), servicios: cats[c] }; });
+  out.staff = staff; out.staffLabel = st.staffLabel || 'Profesional';
+  out.abono = Number(st.depositAmountCOP || 0);
+  return out;
+}
+function maryCompute_(ids) {
+  const by = {}; maryServicios_().forEach(function (s) { by[s._id] = s; });
+  const items = [];
+  (ids || []).forEach(function (id) { const s = by[id]; if (s && items.indexOf(s) < 0) items.push(s); });
+  if (!items.length) fail('Elige un servicio válido.');
+  return {
+    items: items.map(function (s) { return { id: s._id, name: s.name, type: s.type, priceCOP: Number(s.priceCOP || 0), minutes: Number(s.minutes || 0) }; }),
+    totalMinutes: items.reduce(function (a, s) { return a + Number(s.minutes || 0); }, 0),
+    totalCOP: items.reduce(function (a, s) { return a + Number(s.priceCOP || 0); }, 0)
+  };
+}
+function maryStaffPara_(ids) {
+  return loadStaff().filter(function (x) { return x.active !== false && (!x.serviceIds || !x.serviceIds.length || (ids || []).every(function (id) { return x.serviceIds.indexOf(id) >= 0; })); });
+}
+// Horas libres de un día para esos servicios juntos: [{ time, staffIds }]
+function maryLibres_(st, date, ids, staffId, locks) {
+  const sel = maryCompute_(ids);
+  const slot = Number(st.slotDurationMinutes || 30), occ = occupiedFor(sel.totalMinutes, slot);
+  if ((st.closedDates || []).indexOf(date) >= 0) return [];
+  const taken = {}; (locks || fsQuery('slotLocks', [['date', 'EQUAL', date]])).forEach(function (l) { if (l.date === date) taken[l.staffId + '_' + l.time] = true; });
+  const now = Date.now() + Number(st.minAdvanceMinutes || 0) * 60000, out = {};
+  maryStaffPara_(ids).filter(function (x) { return !staffId || x._id === staffId; }).forEach(function (sf) {
+    staffHoursFor(st, sf, date).forEach(function (h) {
+      for (let t = tmin(h.open); t + occ <= tmin(h.close); t += slot) {
+        const time = mstr(t);
+        if (mkDate(date, time).getTime() < now) continue;
+        if (unitTimes(time, occ).some(function (u) { return taken[sf._id + '_' + u]; })) continue;
+        (out[time] = out[time] || []).push(sf._id);
+      }
+    });
+  });
+  return Object.keys(out).sort().map(function (k) { return { time: k, staffIds: out[k] }; });
+}
+function maryVentana_(st) { return Math.min(Number(plansCfg()[bizPlan()].daysAhead || 30), Number(st.bookingWindowDays || 30), 21); }
+function maryDias_(st, b) {
+  const win = maryVentana_(st), dias = [];
+  for (let i = 0; i <= win && dias.length < 10; i++) {
+    const date = toDateStr(new Date(Date.now() + i * 86400000));
+    const n = maryLibres_(st, date, b.ids, b.staffId).length;
+    if (n) dias.push({ date: date, dia: waDayLabel(date), n: n });
+  }
+  return { dias: dias, link: maryLinkAgenda_() };
+}
+function maryHoras_(st, b) {
+  const L = maryLibres_(st, String(b.date || ''), b.ids, b.staffId);
+  const nombres = {}; loadStaff().forEach(function (x) { nombres[x._id] = x.name; });
+  return { date: b.date, dia: waDayLabel(String(b.date || '')), horas: L.map(function (x) { return { time: x.time, hora: hora12(x.time), staff: x.staffIds.map(function (id) { return { id: id, nombre: nombres[id] || '' }; }) }; }), link: maryLinkAgenda_() };
+}
+function maryCrear_(st, b) {
+  try {
+    if (BIZ.status !== 'active') return { ok: false, motivo: 'La agenda no está recibiendo citas en este momento.' };
+    const phone = String(b.phone || '').replace(/\D/g, '');
+    if (maryLast10_(phone).length < 10) return { ok: false, motivo: 'número inválido' };
+    if (maryCitasDe_(phone).filter(function (a) { return a.status === 'pending_payment'; }).length >= 2) return { ok: false, motivo: 'Tienes 2 citas esperando pago. Paga o cancela una antes de apartar otra.' };
+    const sel = maryCompute_(b.ids), slot = Number(st.slotDurationMinutes || 30), occ = occupiedFor(sel.totalMinutes, slot);
+    const libres = maryLibres_(st, b.date, b.ids, b.staffId).filter(function (x) { return x.time === b.time; })[0];
+    if (!libres) return { ok: false, motivo: 'ocupada' };
+    const staffId = b.staffId && libres.staffIds.indexOf(b.staffId) >= 0 ? b.staffId : libres.staffIds[0];
+    const staff = loadStaff().filter(function (x) { return x._id === staffId; })[0];
+    checkSlot(st, b.date, b.time, occ, true, staff);
+    const deposit = Math.min(Number(st.depositAmountCOP || 0), sel.totalCOP);   // el abono que configuró el dueño (0 = sin abono)
+    const nombre = String(b.nombre || '').trim().slice(0, 60) || 'Cliente', email = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(b.email || '')) ? String(b.email).trim().toLowerCase() : '';
+    const apt = withLock(function () {
+      const r = reserveLocks(staff._id, b.date, b.time, occ, {});
+      const code = newCode(), now = new Date(), confirmedNow = deposit === 0;
+      const holdExp = confirmedNow ? null : new Date(now.getTime() + Math.max(10, Number(st.holdMinutes || 30)) * 60000);
+      const a = {
+        code: code, customerUid: null,
+        customer: { firstName: nombre.split(/\s+/)[0], lastName: nombre.split(/\s+/).slice(1).join(' '), whatsapp: phone, email: email },
+        staffId: staff._id, staffName: staff.name, items: sel.items, totalCOP: sel.totalCOP, totalMinutes: sel.totalMinutes,
+        occupiedMinutes: occ, depositCOP: deposit, balanceDueCOP: sel.totalCOP - deposit,
+        date: b.date, startTime: b.time, endTime: mstr(tmin(b.time) + occ), startAt: mkDate(b.date, b.time), lockIds: r.all,
+        status: confirmedNow ? 'confirmed' : 'pending_payment',
+        payment: { mode: 'deposit', method: '', amountCOP: deposit, status: confirmedNow ? 'none' : 'awaiting', proofFileId: '', proofUrl: '', reference: '' },
+        holdExpiresAt: holdExp, rescheduleCount: 0, history: [{ action: 'created_whatsapp', at: now.toISOString(), by: 'asistente' }],
+        source: 'whatsapp', waChannel: 'asistente', waChat: waChatId(phone), waToken: randKey(20), createdAt: now, updatedAt: now, reminderSent: false
+      };
+      commit([wCreate(bp('appointments/' + code), a)].concat(lockWrites(r, staff._id, b.date, confirmedNow ? 'booked' : 'hold', code, holdExp)).concat(incWrites(addDelta({}, b.date, staff._id, r.create.length))));
+      return a;
+    });
+    try { if (tgEventOn('newBooking')) tgNotify([apt.staffId], '💬 <b>NUEVA CITA POR WHATSAPP</b> (asistente)' + (apt.status === 'pending_payment' ? ' · esperando abono' : '') + '\n' + aptText(apt)); } catch (e) { console.error(e); }
+    if (apt.customer.email) emailClient(apt, apt.status === 'confirmed' ? 'Tu cita está confirmada' : 'Apartamos tu cupo', apt.status === 'confirmed' ? 'Agendamos tu cita. Presenta tu número de reserva al llegar.' : 'Apartamos tu cupo. Envía el abono para confirmarlo.');
+    return { ok: true, cita: maryCitaOut_(apt), medios: maryMedios_(st), holdMinutes: Math.max(10, Number(st.holdMinutes || 30)) };
+  } catch (e) {
+    const m = String((e && (e.userMessage || e.message)) || e);
+    return { ok: false, motivo: /tomado|ya no está disponible|fuera del horario|no alcanza/i.test(m) ? 'ocupada' : m };
+  }
 }
 
 // =====================================================================
