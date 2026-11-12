@@ -3,9 +3,9 @@ import { onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordRe
 import {
   doc, getDoc, setDoc, addDoc, deleteDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp, where
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { PLAN_KEYS, PLAN_FEATURES, plansOf, planOfBiz, DEFAULT_PAY_WARNING, TG_EVENTS, BIZ_TYPES, planBenefits, planBenefitsIntro } from "./common.js?v=2026-11-07n";
-import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-07n";
-import { APP_VERSION, SERVER_VERSION, RULES_VERSION, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, readPublishedVersion, reloadFresh, startUpdateWatcher, warmServer, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-11-07n";
+import { PLAN_KEYS, PLAN_FEATURES, plansOf, planOfBiz, DEFAULT_PAY_WARNING, TG_EVENTS, BIZ_TYPES, planBenefits, planBenefitsIntro } from "./common.js?v=2026-11-12b";
+import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-12b";
+import { APP_VERSION, SERVER_VERSION, RULES_VERSION, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, readPublishedVersion, reloadFresh, startUpdateWatcher, warmServer, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-11-12b";
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on) => $(id).classList.toggle("hidden", !on);
@@ -420,7 +420,7 @@ function openStore(biz) {
     </div>
     <div class="grid gap-0.5 border-t border-line pt-2">
       ${item("edit", "fa-pen", "Editar nombre y plan")}
-      ${item("wabot", "fa-whatsapp", "💬 WhatsApp con Mary")}
+      ${item("wabot", "fa-whatsapp", "💬 WhatsApp Bot")}
       ${biz.status === "active" ? item("suspend", "fa-circle-pause", "Pausar la tienda") : item("activate", "fa-circle-play", "Activar la tienda")}
       <a class="menu-item" href="${publicUrl(biz.id)}" target="_blank" rel="noopener"><i class="fa-regular fa-eye"></i>Ver la página de clientes</a>
       <button class="menu-item" data-copy="${publicUrl(biz.id)}"><i class="fa-regular fa-copy"></i>Copiar enlace para clientes</button>
@@ -442,14 +442,14 @@ async function handleAct(act, biz, b) {
 
   if (act === "wabot") {
     const w = (Z.settings[biz.id] || {}).maryWa || {};
-    openM("💬 WhatsApp con Mary · " + biz.name, `
+    openM("💬 WhatsApp Bot · " + biz.name, `
       <div class="sp-card !p-0 overflow-hidden">
         <div class="flex items-center gap-3 p-4 text-white" style="background:${w.conectado ? "linear-gradient(135deg,#25D366,#128C7E)" : "#121216"}">
           <span class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white/15 text-xl"><i class="fa-brands fa-whatsapp"></i></span>
           <div class="min-w-0"><p class="text-[12px] font-bold uppercase tracking-wider opacity-90">${w.conectado ? "✓ Conectado" : "Sin conectar"}</p>
-            <p class="truncate text-[18px] font-extrabold">${w.conectado ? "+" + esc(w.numero || "") : "Mary aún no atiende aquí"}</p></div></div>
+            <p class="truncate text-[18px] font-extrabold">${w.conectado ? "+" + esc(w.numero || "") : "Sin WhatsApp vinculado"}</p></div></div>
         <div class="p-4 text-sm">
-          <p>${w.conectado ? "Mary da el link para agendar, muestra la cita a quien ya tiene una, manda las capturas de pago a Telegram y publica los estados con los cupos." : "El dueño lo conecta solo desde su panel: <b>Más › Configuración › WhatsApp con Mary</b> › «Pedir mi código». Funciona en iPhone y Android."}</p>
+          <p>${w.conectado ? "El asistente agenda por listas, da el link, muestra la cita a quien ya tiene una, manda las capturas de pago a Telegram y publica los estados con los cupos." : "El dueño lo vincula solo desde su panel: <b>WhatsApp Bot</b> › «Vincular mi WhatsApp» (código o QR). Funciona en iPhone y Android."}</p>
           <a class="btn-primary mt-3 block w-full text-center" href="${adminUrl(biz.id)}">Abrir su panel</a>
         </div></div>`);
     return;

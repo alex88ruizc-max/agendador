@@ -14,7 +14,7 @@ export const firebaseConfig = {
 };
 
 // 2) Pega aquí la URL de tu Apps Script (termina en /exec)
-export const API_URL = "https://script.google.com/macros/s/AKfycbwkfrob2BW4PdWyvelRae04akMPz0LNXJ9ZtZpf1Tw3TUqguJg5vu65R_BY2ctMuW8b/exec";
+export const API_URL = "https://script.google.com/macros/s/AKfycbyRSqnsiFCE402uiML6Su3ECC4YxYKXDTilLmzA1Zvsq4UA5PvyxGZmpb8tN_3L_E1DXQ/exec";
 
 // 3) (Opcional) Barbería que se abre si el enlace no trae ?b=identificador.
 //    Déjalo vacío: cada barbería usa su propio enlace, por ejemplo  index.html?b=don-carlos
