@@ -1,6 +1,6 @@
 // Página pública: ver cupos, registrarse, apartar, pagar con screenshot, mis cupos
-import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro } from "./common.js?v=2026-11-12m";
-import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-12m";
+import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro } from "./common.js?v=2026-11-12n";
+import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-12n";
 import {
   onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, sendPasswordResetEmail,
   GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult
@@ -12,7 +12,7 @@ import {
   startUpdateWatcher, applyBrandColors, warmServer, uiConfirm, setDialogBrand, viewImage, pushOverlay, dropOverlay, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, dow, hora12, fechaLarga, fechaCorta, toMillis, cop, esc,
   normalizePhone, waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, computeSlots, dayCapacityUnits, staffHours, mapLinks, headerBgCss,
   toast, openModal, closeModal, setBusy, copyText, tmin, mstr, UNIT
-} from "./common.js?v=2026-11-12m";
+} from "./common.js?v=2026-11-12n";
 
 const $ = (id) => document.getElementById(id);
 const S = {
@@ -655,7 +655,13 @@ $("btnGoogle").onclick = async () => {
   } finally { setBusy(btn, false); }
 };
 getRedirectResult(auth).then((r) => r && afterGoogle(r.user)).catch((e) => console.error(e));
-$("tabLogin").onclick = () => setAuthTab("login");
+// 3.29: si ya hay una sesión SIN datos de cliente (p. ej. la cuenta del dueño en el mismo celular) e «Ingresar» → se cierra esa sesión
+//       para que salga el formulario normal CON «Continuar con Google» (antes quedaba «Solo falta tu WhatsApp» sin el botón de Google)
+$("tabLogin").onclick = async () => {
+  if (S.user && !S.profile) { try { await signOut(auth); } catch { /* nada */ } S.user = null; updateGate(); }
+  setAuthTab("login"); $("googleBox").classList.remove("hidden");
+  $("authSub").textContent = "Entra con Google o con tu correo.";
+};
 document.querySelectorAll(".pwEye").forEach((b) => b.addEventListener("click", () => {
   const inp = b.parentElement.querySelector("input");
   const show = inp.type === "password";
