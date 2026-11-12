@@ -9,9 +9,9 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-11-12p";
-import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-12p";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-12p";
+} from "./common.js?v=2026-11-12q";
+import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-12q";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-12q";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -4000,10 +4000,10 @@ document.addEventListener("click", async (e) => {
 });
 
 // Opciones del asistente (settings.maryBot). Los valores por defecto son los mismos del servidor (maryBotCfg_).
-const BOT_DEF = { audios: true, activo: true, agendar: true, cupos: true, saludoDiario: true, pedirNombre: true, pedirCorreo: true, loDeSiempre: true, recordatorioMin: 120, recordatorioConfirmar: true, cambios: true, pausaMin: 30, estados: { activo: true, horas: ["11:00"], manana: true, semanal: false } };
+const BOT_DEF = { audios: true, activo: true, agendar: true, cupos: true, saludoDiario: true, pedirNombre: true, pedirCorreo: true, loDeSiempre: true, recordatorioMin: 120, recordatorioConfirmar: true, cambios: true, pausaMin: 30, estados: { activo: true, horas: ["11:00"], manana: true, semanal: false }, volver: { activo: false, dias: 0 } };
 function botCfg() {
   const s = A.settings || {}, b = s.maryBot || {};
-  const c = { ...BOT_DEF, ...b, estados: { ...BOT_DEF.estados, ...(b.estados || {}) } };
+  const c = { ...BOT_DEF, ...b, estados: { ...BOT_DEF.estados, ...(b.estados || {}) }, volver: { ...BOT_DEF.volver, ...(b.volver || {}) } };
   if (b.recordatorioMin === undefined && s.maryReminderMinutes !== undefined) c.recordatorioMin = Number(s.maryReminderMinutes);
   c.estados.horas = (c.estados.horas || []).filter((h) => /^\d{2}:\d{2}$/.test(h)).slice(0, 2);
   if (!c.estados.horas.length) c.estados.horas = ["11:00"];
@@ -4049,11 +4049,18 @@ function renderWaBot() {
       ${fila("estados.manana", "➡️", "Si hoy no hay cupos, publicar los de mañana", "Apagado, ese día no publica.", e.manana)}
       ${fila("estados.semanal", "🗓️", "Estado de la semana los lunes", "Además, los lunes a las 7:00 a. m. un resumen de la semana.", e.semanal)}` : ""}
     </div>
-    <p class="soft mt-3 text-xs">Los estados los ven los clientes que tienen guardado el número de tu negocio (así funciona WhatsApp).</p>`;
+    <p class="soft mt-3 text-xs">Los estados los ven los clientes que tienen guardado el número de tu negocio (así funciona WhatsApp).</p>
+    <div class="sp-h mt-5"><h2>🔁 Recordatorio de servicio</h2><span>para que vuelvan</span></div>
+    <div class="sp-card !p-0 divide-y divide-line">
+      ${fila("volver.activo", "🔁", "Escribirle al cliente para que vuelva", "«Ya van 3 semanas desde tu último Corte con Gabriel. ¿Te agendo de nuevo?» Si dice «Sí, lo mismo», solo elige día y hora y queda confirmada.", c.volver.activo)}
+      ${c.volver.activo ? `<div class="flex items-center gap-3 p-3.5"><span class="text-xl">📆</span><span class="min-w-0 flex-1"><b class="block text-[14.5px]">¿Cuántos días después de su última cita?</b>${c.volver.dias ? `<span class="block text-xs text-ink/65">Sale a partir de las 10:00 a. m., máximo 20 clientes al día, con unos minutos entre uno y otro.</span>` : `<span class="block text-xs font-bold" style="color:#B45309">⚠️ Elige los días: mientras no los elijas, no se le escribe a nadie.</span>`}</span>
+        ${sel("volver.dias", c.volver.dias || "", [["", "Elige…"], [7, "7 días"], [15, "15 días"], [21, "21 días"], [30, "30 días"], [45, "45 días"], [60, "60 días"]])}</div>` : ""}
+    </div>
+    <p class="soft mt-3 text-xs">Solo a clientes que ya vinieron y no tienen otra cita. Una sola vez por visita: si no responde o dice «no, gracias», no se insiste.</p>`;
   if (MW.res && $("mwBox") && ["pidiendo", "codigo", "desconectando"].includes(MW.res.estado) && Date.now() < MW.hasta) mwPintar(MW.res);
 }
 async function botGuardar(patch) {
-  const c = botCfg(), n = { ...c, ...patch, estados: { ...c.estados, ...(patch.estados || {}) } };
+  const c = botCfg(), n = { ...c, ...patch, estados: { ...c.estados, ...(patch.estados || {}) }, volver: { ...c.volver, ...(patch.volver || {}) } };
   A.settings.maryBot = n; renderWaBot();
   try { await setDoc(doc(db, bpath("settings", "general")), { maryBot: n }, { merge: true }); toast("✓ Guardado."); }
   catch (err) { toast("No se pudo guardar: " + err.message, "error"); }
@@ -4062,6 +4069,7 @@ document.addEventListener("click", (e) => {
   const b = e.target.closest("#tab-wabot [data-bot]"); if (!b) return;
   const k = b.dataset.bot, c = botCfg();
   if (k.startsWith("estados.")) { const kk = k.slice(8); botGuardar({ estados: { [kk]: !c.estados[kk] } }); }
+  else if (k === "volver.activo") botGuardar({ volver: { activo: !c.volver.activo } });
   else botGuardar({ [k]: !c[k] });
 });
 document.addEventListener("change", (e) => {
@@ -4070,7 +4078,8 @@ document.addEventListener("change", (e) => {
   if (k === "estados.h0" || k === "estados.h1") {
     const h = [...c.estados.horas]; h[k === "estados.h0" ? 0 : 1] = s.value;
     botGuardar({ estados: { horas: [...new Set(h.filter(Boolean))].sort().slice(0, 2) } });
-  } else botGuardar({ [k]: Number(s.value) });
+  } else if (k === "volver.dias") botGuardar({ volver: { dias: Number(s.value) || 0 } });
+  else botGuardar({ [k]: Number(s.value) });
 });
 
 // ---- Conectar el WhatsApp de la tienda (ventana oficial de Meta) ----
