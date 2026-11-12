@@ -14,6 +14,10 @@ sudo docker compose build agendador-ia >/dev/null 2>&1 || { echo "❌ No se pudo
 B=$(sudo docker run --rm --network none $IMG sh -c 'mkdir -p /datos && node --test banco/pruebas.js banco/escenarios.js' 2>&1)
 if ! echo "$B" | grep -q '^# fail 0'; then echo "$B" | grep -E '^not ok|Error' | head
   echo "❌ La versión nueva NO pasó el banco de pruebas. No la instalé: sigue la de antes."; volver; exit 1; fi
+# 2.8 · REGLA N.º 1: si algún script del paquete tocaría un contenedor ajeno (Epic u otro), NO se instala
+RG=$(sudo docker run --rm --network none -v "$(pwd)":/p:ro $IMG node --test /p/banco/reglas.js 2>&1)
+if ! echo "$RG" | grep -q '^# fail 0'; then echo "$RG" | grep -E '→' | head -5
+  echo "🚫 Esta versión tocaría otro proyecto (regla N.º 1: Epic no se toca). No la instalé: sigue la de antes."; volver; exit 1; fi
 echo "🧪 Banco de pruebas OK ($(echo "$B" | grep -o '^# pass [0-9]*' | cut -d' ' -f3) pruebas)"
 sudo docker compose up -d agendador-ia --force-recreate >/dev/null 2>&1
 OK=0; for i in $(seq 1 30); do curl -s -m 3 http://127.0.0.1:3070/salud | grep -q '"ok":true' && { OK=1; break; }; sleep 2; done

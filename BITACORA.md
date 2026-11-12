@@ -2,16 +2,18 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-2.7** · Página **2026-11-07n** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-12** · Mary **agendador-ia-2.8** · Página **2026-11-07n** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
-## 🚫 Regla universal
-El agendador **no modifica ningún otro proyecto**: Epic, Mary de Epic, Luisa, epic-tiendas ni ningún otro.
-- Sí puede **copiar** de otros proyectos, siempre aparte y con nombre propio.
-- **Nunca** debe tocarlos: ni contenedores, ni redes, ni webhooks, ni sesiones, ni archivos, ni bases de datos, ni repositorios.
-
-Ver `CLAUDE.md` y `vps/LEEME.txt`.
+## 🚫 REGLA UNIVERSAL N.º 1 — EPIC NO SE TOCA (manda sobre todo lo demás)
+**Epic** (Mary de Epic, Luisa, la tienda, epic-waha, epic-tiendas, Epic Channels y todo lo que sea de Epic) y **cualquier otro proyecto**:
+- ✅ **Solo se puede COPIAR**: leer su código o su versión y hacer una copia propia del agendador, aparte y con su propio nombre.
+- ❌ **JAMÁS se modifica**: ni sus contenedores, ni sus redes, ni sus webhooks, ni sus sesiones de WhatsApp, ni sus archivos, ni su base de datos, ni sus repositorios. Ni reiniciarlo, ni detenerlo, ni conectarlo o desconectarlo de nada.
+- ❌ **Ni siquiera para «deshacer», «arreglar» o «limpiar»**. (El 2026-11-12 sacar `epic-waha` de una red «para deshacer» le cortó la conexión a la tienda de Epic.)
+- ❌ Ningún script del agendador ejecuta comandos sobre contenedores o archivos que no sean del agendador (`agendador-ia`, `evolution-agendador`, `postgres-agendador`, `waha-agendador`, `~/agendador`).
+- 🛑 Si algún paso pudiera afectar a Epic, **se para y se le pregunta a Alex**. Solo Alex, con palabras explícitas, puede autorizar algo sobre Epic.
+Ver también `CLAUDE.md` y `vps/LEEME.txt`.
 
 ---
 
@@ -87,7 +89,7 @@ ssh -i $k $d
 
 **Antes de entregar cualquier zip:**
 ```bash
-cd vps && node --test banco/pruebas.js banco/escenarios.js     # Mary
+cd vps && node --test banco/pruebas.js banco/escenarios.js banco/reglas.js   # Mary + regla N.º 1
 node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ```
 
@@ -108,6 +110,12 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-12 · agendador-ia-2.8
+- Regla N.º 1 «Epic no se toca: solo copiar, jamás modificar» reforzada en `CLAUDE.md`, `vps/LEEME.txt` y aquí.
+- Banco nuevo `vps/banco/reglas.js`: revisa todos los scripts y falla si alguno actúa sobre un contenedor ajeno. `actualizar.sh` no instala si falla.
+  (Comprobado: detecta la línea que causó el incidente.)
+- `configurar-waha.sh`: solo avisa, nunca toca contenedores ajenos.
 
 ### 2026-11-12 · ⚠️ Incidente con Epic (error de Claude)
 - `configurar-waha.sh` (2.6/2.7) sacó `epic-waha` de la red del agendador «para deshacer» lo de la 2.2. Eso **tocó un contenedor de Epic**

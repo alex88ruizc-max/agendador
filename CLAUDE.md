@@ -1,15 +1,16 @@
 # Reglas del proyecto Tu Agenda (agendador)
 
-## 🚫 Regla universal: no se modifica ningún otro proyecto
-Este proyecto (Tu Agenda / Agendador IA, «Mary» por dentro) **nunca modifica otro proyecto**: Epic, Mary de Epic, Luisa, epic-tiendas ni ningún otro.
-- **Sí se puede copiar:** leer el código o la versión de otro proyecto y hacer una copia propia, aparte y con su propio nombre.
-- **No se puede tocar:** sus contenedores, redes, webhooks, sesiones de WhatsApp, archivos, base de datos ni repositorios. Tampoco reiniciarlo ni unirlo a nada del agendador.
-- Si el agendador necesita algo de otro proyecto, se crea una copia propia del agendador (ej. `waha-agendador`, `evolution-agendador`), jamás se usa el original.
-- Si un script o instrucción rompe esta regla, es un error: se deshace y se corrige.
+## 🚫 REGLA UNIVERSAL N.º 1 — EPIC NO SE TOCA (manda sobre todo lo demás)
+**Epic** (Mary de Epic, Luisa, la tienda, epic-waha, epic-tiendas, Epic Channels y todo lo que sea de Epic) y **cualquier otro proyecto**:
+- ✅ **Solo se puede COPIAR**: leer su código o su versión y hacer una copia propia del agendador, aparte y con su propio nombre.
+- ❌ **JAMÁS se modifica**: ni sus contenedores, ni sus redes, ni sus webhooks, ni sus sesiones de WhatsApp, ni sus archivos, ni su base de datos, ni sus repositorios. Ni reiniciarlo, ni detenerlo, ni conectarlo o desconectarlo de nada.
+- ❌ **Ni siquiera para «deshacer», «arreglar» o «limpiar»**. (El 2026-11-12 sacar `epic-waha` de una red «para deshacer» le cortó la conexión a la tienda de Epic.)
+- ❌ Ningún script del agendador ejecuta comandos sobre contenedores o archivos que no sean del agendador (`agendador-ia`, `evolution-agendador`, `postgres-agendador`, `waha-agendador`, `~/agendador`).
+- 🛑 Si algún paso pudiera afectar a Epic, **se para y se le pregunta a Alex**. Solo Alex, con palabras explícitas, puede autorizar algo sobre Epic.
 
 ## 📒 Bitácora y pruebas (en cada cambio)
 - **Cada cambio se anota en `BITACORA.md`** (Historial, versión actual y pendientes) en el mismo commit del cambio.
-- Antes de entregar un zip de Mary: `cd vps && node --test banco/pruebas.js banco/escenarios.js` (0 fallas). Un arreglo de Mary trae su escenario nuevo en `vps/banco/escenarios.js`.
+- Antes de entregar un zip de Mary: `cd vps && node --test banco/pruebas.js banco/escenarios.js banco/reglas.js` (0 fallas). Un arreglo de Mary trae su escenario nuevo en `vps/banco/escenarios.js`.
 - Antes de entregar un zip de la página: `node vps/banco/web.js <carpeta>` (0 fallas). Todas las `?v=` iguales a `APP_VERSION`.
 - Después: `graphify update .` para que el mapa del código quede al día (si falta: `pip install graphifyy`).
 - El código del VPS vive en `vps/` (fuente de verdad). Los zips se arman desde ahí, sin `node_modules`, `datos` ni `gs/mary-clave.gs`.

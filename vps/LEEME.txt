@@ -1,12 +1,13 @@
-🗓️ AGENDADOR IA · agendador-ia-2.7   (por dentro atiende «Mary», la recepcionista)
+🗓️ AGENDADOR IA · agendador-ia-2.8   (por dentro atiende «Mary», la recepcionista)
 =====================================================================================================
-🚫 REGLA UNIVERSAL (manda sobre todo lo demás, para Alex, para Claude y para cualquier script de este paquete):
-   EL AGENDADOR NO MODIFICA NINGÚN OTRO PROYECTO. NUNCA. (Epic, Mary de Epic, Luisa, epic-tiendas, ni ningún otro.)
-   · SÍ se puede COPIAR: leer su código o su versión y hacer una copia propia aparte, con su propio nombre.
-   · NO se puede TOCAR: ni sus contenedores, ni sus redes, ni sus avisos (webhooks), ni sus sesiones de WhatsApp,
-     ni sus archivos, ni su base de datos, ni reiniciarlo, ni unirlo a nada del agendador.
-   · Si algo del agendador necesita algo de otro proyecto → se hace una COPIA del agendador, jamás se usa el original.
-   · Si alguna vez un script o una instrucción rompe esta regla, es un error: se deshace y se corrige.
+🚫 REGLA UNIVERSAL N.º 1 — EPIC NO SE TOCA (manda sobre todo lo demás, para Alex, para Claude y para cada script de este paquete)
+   Epic (Mary de Epic, Luisa, la tienda, epic-waha, epic-tiendas, Epic Channels…) y CUALQUIER otro proyecto:
+   ✅ SOLO SE PUEDE COPIAR: leer su código o su versión y hacer una copia propia del agendador, aparte y con su propio nombre.
+   ❌ JAMÁS SE MODIFICA: ni contenedores, ni redes, ni avisos (webhooks), ni sesiones de WhatsApp, ni archivos, ni base de datos,
+      ni repositorios. Ni reiniciarlo, ni detenerlo, ni conectarlo o desconectarlo de nada.
+   ❌ NI SIQUIERA PARA «DESHACER», «ARREGLAR» O «LIMPIAR» (el 12-nov-2026 sacar epic-waha de una red le cortó la conexión a la tienda).
+   ❌ Los scripts del agendador solo actúan sobre lo suyo: agendador-ia, evolution-agendador, postgres-agendador, waha-agendador, ~/agendador.
+   🛑 Si algo pudiera afectar a Epic: se para y se le pregunta a Alex. Solo Alex, con palabras explícitas, lo autoriza.
 
 ⚖️ TODO APARTE DE EPIC. Vive en ~/agendador con su PROPIO Evolution (puerto 8095), su base de datos, su red «agendador-red»
    y su PROPIO bot de Telegram (el cartero), y desde la 2.6 su PROPIO WAHA (waha-agendador). No usa, no reinicia y no modifica nada de Epic.
@@ -61,6 +62,11 @@ PROBAR EN EL VPS
 AJUSTES POR NEGOCIO (negocios.json)
   "recordatorioMin": 120     ·   "estados": { "activo": true, "hoy": "07:30", "semana": "07:00", "semanaDia": 1 }
   En Firestore (settings/general del negocio) maryAutoCaptura: true → la captura confirma al instante y el dueño revisa después.
+
+NOVEDADES 2.8
+  · REGLA N.º 1 (Epic no se toca) reforzada y VIGILADA: un banco nuevo revisa todos los scripts; si alguno actuaría sobre un
+    contenedor que no es del agendador, la versión NO se instala.
+  · configurar-waha.sh ya no saca a nadie de la red del agendador (en la 2.6/2.7 sacó a epic-waha y se cortó la tienda): solo avisa.
 
 NOVEDADES 2.7
   · BANCO DE ESCENARIOS (como el de Epic, pero propio): 18 conversaciones reales simuladas (WAHA y Evolution, número oculto,
