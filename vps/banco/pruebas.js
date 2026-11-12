@@ -206,3 +206,27 @@ test('3.20 · 🔒 Bloquear cupos: crea bloqueos de 15 min para todo el equipo, 
   assert.equal(r.bloqueados, 2, 'un profesional solo bloquea lo suyo'); assert.ok(DB['slotLocks/s2_20261120_1800'] && !DB['slotLocks/s1_20261120_1800']);
   assert.throws(() => A.bloquearCupo({ date: '2026-11-01', times: ['10:00'] }, { uid: 'dueno' }), /ya pasaron/);
 });
+
+test('3.28 · Días con cupo (servidor): lee servicios y equipo UNA vez y no consulta la base en días que nadie atiende', { skip: !require('fs').existsSync(GS_MARY) && 'dentro de la imagen no está gs/' }, () => {
+  const src = require('fs').readFileSync(GS_MARY, 'utf8');
+  const n = { servicios: 0, equipo: 0, locks: 0 };
+  const tmin = (t) => { const p = t.split(':'); return +p[0] * 60 + +p[1]; }, mstr = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+  const dia = (i) => new Date(Date.UTC(2030, 0, 1 + i)).toISOString().slice(0, 10);   // 2030-01-01 es martes
+  let hoy = 0;
+  const G = {
+    ACTIONS: {}, PUBLIC_ACTIONS: {}, console, fail: (m) => { throw new Error(m); },
+    loadServices: () => { n.servicios++; return [{ _id: 'c1', name: 'Corte', minutes: 30, priceCOP: 20000 }]; },
+    loadStaff: () => { n.equipo++; return [{ _id: 's1', name: 'Lina' }]; },
+    fsQuery: (col) => { if (col === 'slotLocks') n.locks++; return []; },
+    plansCfg: () => ({ basic: { daysAhead: 30 } }), bizPlan: () => 'basic',
+    toDateStr: (d) => dia(Math.round((d.getTime() - Date.now()) / 86400000) + hoy), waDayLabel: (d) => d,
+    staffHoursFor: (st, sf, date) => new Date(date + 'T12:00:00Z').getUTCDay() === 0 ? [] : [{ open: '09:00', close: '10:00' }],   // los domingos no atiende
+    siteUrl: () => 'https://x', BID: 'b', occupiedFor: () => 30, tmin, mstr, mkDate: () => new Date(Date.now() + 86400000 * 400), unitTimes: (t) => [t]
+  };
+  const F = new Function(...Object.keys(G), src + '\nreturn { maryDias_ };')(...Object.values(G));
+  const r = F.maryDias_({ slotDurationMinutes: 30, bookingWindowDays: 30 }, { ids: ['c1'], staffId: '' });
+  assert.equal(r.dias.length, 10); assert.equal(r.dias[0].n, 2, '9:00 y 9:30');
+  assert.equal(n.servicios, 1, 'los servicios se leen una sola vez'); assert.equal(n.equipo, 1, 'el equipo una sola vez');
+  assert.ok(!r.dias.some((x) => new Date(x.date + 'T12:00:00Z').getUTCDay() === 0), 'el domingo no sale');
+  assert.equal(n.locks, 10, 'solo se consulta la base en los días que alguien atiende');
+});

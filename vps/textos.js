@@ -78,4 +78,5 @@ function citaHecha(c, info, nombre, conCorreo) {
 }
 const audio = () => '🎤 En este momento no puedo escuchar audios 🙏 ¿Me lo escribes, por favor?';
 
-module.exports = { asistio, cancelada, reagendada, parafrasisCambio, preguntaCancelar, saludo, enTiempo, duracion, listaHoras, cuposDia, cuposOtros, sinCupos, sinDias, sinServicios, pideCorreo, parafrasis, citaHecha, audio, cop, nombre1, sinCita, conCita, estadoTxt, pagoTxt, fotoRecibida, fotoSinCita, pagoConfirmado, recordatorio, decision, problema };
+const demora = (link) => `😅 Se me demoró el sistema. Escríbeme *agendar* en un momento y seguimos, o aparta aquí en 1 minuto: ${link}`;
+module.exports = { demora, asistio, cancelada, reagendada, parafrasisCambio, preguntaCancelar, saludo, enTiempo, duracion, listaHoras, cuposDia, cuposOtros, sinCupos, sinDias, sinServicios, pideCorreo, parafrasis, citaHecha, audio, cop, nombre1, sinCita, conCita, estadoTxt, pagoTxt, fotoRecibida, fotoSinCita, pagoConfirmado, recordatorio, decision, problema };

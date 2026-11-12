@@ -14,7 +14,7 @@
  * Instalación: pega este archivo, ejecuta activarMary() una vez, copia la clave que sale en el registro
  * y ponla en el mary.env del VPS (MARY_KEY). Vuelve a implementar la aplicación web (Implementar > Administrar > editar > Nueva versión).
  */
-const MARY_VERSION = 'agendador-ia-3.27';
+const MARY_VERSION = 'agendador-ia-3.28';
 
 // Se registra como acción pública del servidor (sin sesión: entra con la clave de Mary).
 // ⚠️ Este archivo debe quedar DEBAJO del archivo principal en la lista de archivos de Apps Script (los nuevos quedan al final: así está bien).
@@ -458,13 +458,16 @@ function maryStaffPara_(ids) {
   return loadStaff().filter(function (x) { return x.active !== false && (!x.serviceIds || !x.serviceIds.length || (ids || []).every(function (id) { return x.serviceIds.indexOf(id) >= 0; })); });
 }
 // Horas libres de un día para esos servicios juntos: [{ time, staffIds }]
-function maryLibres_(st, date, ids, staffId, locks) {
-  const sel = maryCompute_(ids);
+function maryLibres_(st, date, ids, staffId, locks, pre) {
+  const sel = (pre && pre.sel) || maryCompute_(ids);
   const slot = Number(st.slotDurationMinutes || 30), occ = occupiedFor(sel.totalMinutes, slot);
   if ((st.closedDates || []).indexOf(date) >= 0) return [];
+  // 3.28: si nadie atiende ese día no se consulta la base (antes 1 consulta por día aunque estuviera cerrado)
+  const quienes = ((pre && pre.staff) || maryStaffPara_(ids)).filter(function (x) { return (!staffId || x._id === staffId) && staffHoursFor(st, x, date).length; });
+  if (!quienes.length) return [];
   const taken = {}; (locks || fsQuery('slotLocks', [['date', 'EQUAL', date]])).forEach(function (l) { if (l.date === date) taken[l.staffId + '_' + l.time] = true; });
   const now = Date.now() + Number(st.minAdvanceMinutes || 0) * 60000, out = {};
-  maryStaffPara_(ids).filter(function (x) { return !staffId || x._id === staffId; }).forEach(function (sf) {
+  quienes.forEach(function (sf) {
     staffHoursFor(st, sf, date).forEach(function (h) {
       for (let t = tmin(h.open); t + occ <= tmin(h.close); t += slot) {
         const time = mstr(t);
@@ -478,10 +481,11 @@ function maryLibres_(st, date, ids, staffId, locks) {
 }
 function maryVentana_(st) { return Math.min(Number(plansCfg()[bizPlan()].daysAhead || 30), Number(st.bookingWindowDays || 30), 21); }
 function maryDias_(st, b) {
-  const win = maryVentana_(st), dias = [];
-  for (let i = 0; i <= win && dias.length < 10; i++) {
+  // 3.28: los servicios y el equipo se leen UNA vez (antes se leían de nuevo por cada día: con 21 días tardaba tanto que el bot se quedaba mudo)
+  const win = maryVentana_(st), dias = [], pre = { sel: maryCompute_(b.ids), staff: maryStaffPara_(b.ids) }, t0 = Date.now();
+  for (let i = 0; i <= win && dias.length < 10 && (Date.now() - t0 < 20000 || !dias.length); i++) {
     const date = toDateStr(new Date(Date.now() + i * 86400000));
-    const n = maryLibres_(st, date, b.ids, b.staffId).length;
+    const n = maryLibres_(st, date, b.ids, b.staffId, null, pre).length;
     if (n) dias.push({ date: date, dia: waDayLabel(date), n: n });
   }
   return { dias: dias, link: maryLinkAgenda_() };

@@ -52,6 +52,7 @@ global.fetch = async (url, o) => {
     if (b.op === 'waPedido') { const p = W.pedido; W.pedido = null; return resp({ ok: true, data: { pedido: p } }); }
     if (b.op === 'waResultado') { W.resultados.push(b); return resp({ ok: true, data: { ok: true } }); }
     if (W.gasFalla && b.op === 'chat') return resp({ ok: false, error: 'Servicio invocado demasiadas veces' });
+    if (W.falla === b.op) return resp({ ok: false, error: 'Tiempo de espera agotado' });   // 3.28: Google falla en un paso
     if (b.op === 'chat') return ok(Object.assign({}, NEGOCIO, { activo: W.activo, citas: W.citas[b.phone] || [] }));
     if (b.op === 'info') return ok(NEGOCIO);
     if (b.op === 'proof') return ok(W.proof || { ok: false, motivo: 'sin_cita_pendiente' });
@@ -167,7 +168,7 @@ test('Cita confirmada · «ok gracias» → callada; «quiero cancelar» → le 
 });
 test('No repite: «hola» 3 veces seguidas → 1 respuesta (3.5: el mismo mensaje otra vez = pausa)', async () => {
   for (let i = 0; i < 3; i++) await llega(wahaMsg(CLIENTE, 'hola'));
-  assert.equal(W.enviados.length, 1); assert.match(ultimoRegistro(), /pausado/);
+  assert.equal(W.enviados.length, 1); assert.match(ultimoRegistro(), /pausado|callada|no repito/);
 });
 test('Tras responder, un «ok» sin pregunta → callada y no gasta cupo de Google', async () => {
   await llega(wahaMsg(CLIENTE, 'hola'));
@@ -572,6 +573,10 @@ test('3.5 · frenoRobot (reglas sueltas)', () => {
   assert.equal(F({ texto: 'cuanto vale el corte', hist: { textos: [['cuanto vale el corte', 99000]], pausa: true } }).responder, false);
   assert.equal(F({ texto: 'y la barba?', hist: { textos: [['cuanto vale el corte', 99000]], pausa: true } }).responder, true);
   assert.equal(F({ texto: 'hola', hist: { textos: [['hola', 100000 - 13 * 3600000]], pausa: false } }).responder, true, 'un «hola» de ayer no cuenta');
+  assert.equal(F({ texto: 'hola', hist: { textos: [['hola', 99000]], pausa: false } }).responder, false, '«hola» repetido en el mismo minuto: pausa');
+  assert.equal(F({ texto: 'hola', hist: { textos: [['hola', 100000 - 17 * 60000]], pausa: false } }).responder, true, '3.28: «hola» otra vez 17 min después sí se responde');
+  assert.equal(F({ texto: 'quiero agendar', enFlujo: false, hist: { textos: [['quiero agendar', 100000 - 10 * 60000]], pausa: false } }).responder, true, '3.28: volver a pedir cita no es de robot');
+  assert.equal(F({ texto: 'combos desde $20.000', rowId: 'cat:1', hist: { textos: [['combos desde $20.000', 99000]], pausa: true } }).responder, true, '3.28: tocar NUESTRA lista es de una persona');
 });
 
 // =====================================================================
@@ -942,4 +947,31 @@ test('3.24 · /sinbot no es «el dueño escribió» (no deja la pausa de 30 min)
   P.CFG.agruparMs = 60;
   try { await Promise.all([llega(wahaMsg(CLIENTE, 'hola')), llega(wahaMsg(CLIENTE, '/sinbot'))]); } finally { P.CFG.agruparMs = 0; }
   assert.ok(B.ultimos.some((x) => /vuelve a atender/.test(x.que)));
+});
+
+test('3.28 · Volver a escribir «quiero agendar» a los pocos minutos: el bot NO se queda mudo en «¿Qué día?» (las listas sí se repiten)', async () => {
+  await llega(wahaMsg(CLIENTE, 'quiero agendar')); await llega(toca('cat:2')); await llega(toca('svc:e1')); await llega(toca('mas:no'));
+  assert.equal(ultimo().lista.button, 'Elegir día');
+  B.memDicho()['lina-spa:' + CLIENTE].t -= 3 * 60000;   // pasan 3 minutos
+  for (const x of Object.values(P._banco.memRobot())) (x.textos || []).forEach((y) => { y[1] -= 4 * 60000; });
+  const n = W.enviados.length;
+  await llega(wahaMsg(CLIENTE, 'quiero agendar')); await llega(toca('cat:2')); await llega(toca('svc:e1')); await llega(toca('mas:no'));
+  assert.equal(W.enviados.length, n + 4, 'respondió los 4 pasos otra vez');
+  assert.equal(ultimo().lista.button, 'Elegir día'); assert.match(ultimo().texto, /Qué día/);
+  assert.doesNotMatch(B.ultimos.slice(-4).map((x) => x.que).join('|'), /no repito/);
+});
+test('3.28 · Google falla al buscar los días en medio del agendamiento → el bot AVISA (no se queda mudo) sin preguntarle a Google', async () => {
+  await llega(wahaMsg(CLIENTE, 'quiero agendar')); await llega(toca('cat:2')); await llega(toca('svc:e1'));
+  W.falla = 'dias'; const g = W.gas.length;
+  await llega(toca('mas:no', '✅ No, solo eso'));
+  assert.match(ultimo().texto, /Se me demoró el sistema/); assert.match(ultimo().texto, /tuagenda\.vip\/index\.html\?b=lina-spa/);
+  assert.equal(W.gas.slice(g).filter((x) => x === 'info').length, 0, 'no le pregunta a Google (que es el que falla)');
+  assert.match(B.ultimos.map((x) => x.que).join('|'), /falló el asistente: Tiempo de espera/);
+  W.falla = null; await llega(wahaMsg(CLIENTE, 'agendar'));
+  assert.match(ultimo().texto, /Qué te quieres hacer/, 'al escribir «agendar» empieza otra vez');
+});
+test('3.28 · La MISMA lista dos veces en el mismo instante (doble envío) sí se frena', async () => {
+  const neg = { bid: 'lina-spa' }, n = CLIENTE;
+  assert.equal(B.yaLoDije(neg, n, 'L|dia:1', 30000), false); assert.equal(B.yaLoDije(neg, n, 'L|dia:1', 30000), true);
+  B.memDicho()['lina-spa:' + n].t -= 31000; assert.equal(B.yaLoDije(neg, n, 'L|dia:1', 30000), false, 'a los 30 s ya se puede volver a mostrar');
 });

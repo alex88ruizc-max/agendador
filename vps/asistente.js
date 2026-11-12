@@ -485,6 +485,8 @@ function crear(dep) {
       if (SI.test(t) && conv.time) return apartar(neg, c, conv);
       if (horaPedida(c.texto) || fechaPedida(c.texto, hoy())) return propuesta(neg, c, '', { date: fechaPedida(c.texto, hoy()) || conv.date, ids: conv.ids });
     }
+    // 3.28: «quiero agendar» escrito en medio de las listas = empezar de nuevo (antes respondía «No te entendí»)
+    if (!c.rowId && ['cat', 'svc', 'mas', 'dia', 'hora', 'pro'].includes(conv.paso) && QUIERE_AGENDAR.test(t) && !horaPedida(c.texto) && !fechaPedida(c.texto, hoy())) return agendar(neg, c, '', { ids: [] });
     const o = elegir(conv, c);
     if (!o) {
       if (conv.paso === 'confirmar' && SI.test(t)) return crearCita(neg, c, conv);

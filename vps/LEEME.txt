@@ -1,4 +1,4 @@
-🗓️ AGENDADOR IA · agendador-ia-3.27   (por dentro atiende «Mary», la recepcionista)
+🗓️ AGENDADOR IA · agendador-ia-3.28   (por dentro atiende «Mary», la recepcionista)
 =====================================================================================================
 🚫 REGLA UNIVERSAL N.º 1 — EPIC NO SE TOCA (manda sobre todo lo demás, para Alex, para Claude y para cada script de este paquete)
    Epic (Mary de Epic, Luisa, la tienda, epic-waha, epic-tiendas, Epic Channels…) y CUALQUIER otro proyecto:
@@ -62,6 +62,11 @@ PROBAR EN EL VPS
 AJUSTES POR NEGOCIO (negocios.json)
   "recordatorioMin": 120     ·   "estados": { "activo": true, "hoy": "07:30", "semana": "07:00", "semanaDia": 1 }
   En Firestore (settings/general del negocio) maryAutoCaptura: true → la captura confirma al instante y el dueño revisa después.
+
+NOVEDADES 3.28 · 🗓️ YA NO SE QUEDA MUDO AL PREGUNTAR EL DÍA
+  El servidor de Google busca los días con cupo mucho más rápido (lee servicios y equipo una sola vez).
+  Si algo falla en medio del agendamiento, el bot avisa al cliente y deja el link (antes se quedaba callado).
+  El anti-robot ya no pausa a una persona que repite «hola» o «quiero agendar».
 
 NOVEDADES 3.27 · ⏳ VINCULAR CON CUENTA REGRESIVA DE 3 MINUTOS
   Al tocar «Vincular» el panel muestra cuánto tiempo queda (3:00) y un botón «Cancelar».

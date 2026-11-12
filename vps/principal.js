@@ -6,7 +6,7 @@
 const http = require('http'), fs = require('fs'), path = require('path');
 const T = require('./textos'), C = require('./correo'), E = require('./estado'), A = require('./asistente');
 
-const VERSION = 'agendador-ia-3.27';
+const VERSION = 'agendador-ia-3.28';
 const env = (k, d) => (process.env[k] === undefined || process.env[k] === '' ? d : process.env[k]);
 const CFG = {
   puerto: parseInt(env('PUERTO', '3060'), 10),
@@ -107,10 +107,10 @@ async function bajarMediaWaha(url) {
 function numeroWa(x) { let d = String(x || '').replace(/\D/g, ''); if (d.length === 10 && /^3/.test(d)) d = '57' + d; return d; }
 const ULT_ENVIO = new Map();   // chat → cuándo le escribió Mary (para no confundir su propio eco con el dueño)
 // 🙊 3.6: nunca se le manda a un cliente el MISMO mensaje dos veces seguidas en 15 min
-function yaLoDije(neg, n, texto) {
+function yaLoDije(neg, n, texto, ventanaMs) {
   MEM.dicho = MEM.dicho || {};
   const k = neg.bid + ':' + n, h = normal(texto), x = MEM.dicho[k];
-  if (x && x.h === h && Date.now() - x.t < 15 * 60000) { anotar({ bid: neg.bid, chat: n.slice(-4), que: '🙊 no repito el mismo mensaje' }); return true; }
+  if (x && x.h === h && Date.now() - x.t < (ventanaMs || 15 * 60000)) { anotar({ bid: neg.bid, chat: n.slice(-4), que: '🙊 no repito el mismo mensaje' }); return true; }
   MEM.dicho[k] = { h, t: Date.now() }; memGuardar();
   return false;
 }
@@ -139,7 +139,9 @@ async function escribir(neg, numero, texto) {
 //    L = { texto, boton, pie, secciones: [{ titulo, filas: [{ id, titulo, desc }] }] }  (WhatsApp: máximo 10 filas en total)
 async function escribirLista(neg, numero, L) {
   const n = numeroWa(numero); if (n.length < 11) { const e = new Error('número inválido'); e.permanente = true; throw e; }
-  if (yaLoDije(neg, n, L.texto + '|' + L.secciones.map((x) => x.filas.map((f) => f.id).join(',')).join(';'))) return { key: { id: '' }, repetido: true };
+  // 3.28: una lista es el siguiente paso que el cliente pidió al tocar una opción: solo se frena si es la MISMA en los últimos 30 s
+  //       (doble toque). Antes eran 15 min y, si el cliente volvía a agendar, el bot se quedaba mudo en «¿Qué día?».
+  if (yaLoDije(neg, n, L.texto + '|' + L.secciones.map((x) => x.filas.map((f) => f.id).join(',')).join(';'), 30000)) return { key: { id: '' }, repetido: true };
   // 3.3: WAHA EXIGE título en la lista y en cada sección (si va vacío la rechaza y salía el texto con números).
   //      Título = primera línea del mensaje (sin *), como «🎬 Elige tu Amazon» en Epic; el resto va de descripción.
   const lineas = String(L.texto || '').split('\n'), i0 = lineas.findIndex((x) => x.trim());
@@ -236,16 +238,17 @@ const normal = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/
 function frenoRobot({ texto, rowId, interactivo, enFlujo, ultimoEnvio, ahora, hist }) {
   const t = normal(texto), largo = t.length;
   const vistos = ((hist && hist.textos) || []).filter((x) => ahora - x[1] < 12 * 3600000).map((x) => x[0]);   // lo de las últimas 12 h
+  const recientes = ((hist && hist.textos) || []).filter((x) => ahora - x[1] < 3 * 60000).map((x) => x[0]);
   const motivo =
     interactivo ? 'trae listas o botones automáticos'
     : rowId ? ''
-    : (largo >= 12 || !enFlujo) && largo >= 4 && vistos.includes(t) ? 'repite un mensaje anterior'
+    : (largo >= 25 && vistos.includes(t)) || (largo >= 4 && recientes.includes(t)) ? 'repite un mensaje anterior'   // 3.28: textos largos (bots) o lo mismo en menos de 3 min; «hola» o «quiero agendar» más tarde es normal
     : largo >= 40 && ultimoEnvio && ahora - ultimoEnvio < 3000 ? 'respondió en menos de 3 s (como un bot)'
     : (PUBLICIDAD.test(t) && largo >= 25) || (/https?:\/\/|www\./i.test(texto) && /\$\s?\d|\d+ ?%/.test(texto) && largo >= 60) ? 'parece publicidad o un mensaje automático'
     : '';
   const pausado = !!(hist && hist.pausa);
   if (motivo) return { responder: false, pausa: true, motivo };
-  if (pausado && vistos.includes(t)) return { responder: false, pausa: true, motivo: 'sigue igual (mensaje repetido)' };
+  if (pausado && !rowId && vistos.includes(t)) return { responder: false, pausa: true, motivo: 'sigue igual (mensaje repetido)' };
   return { responder: true, pausa: false, motivo: pausado ? 'mensaje distinto: vuelve a responder' : '' };
 }
 
@@ -397,7 +400,7 @@ async function atenderMensaje(c, neg) {
     const enFlujo = !!(MEM.conv && MEM.conv[k] && MEM.conv[k].paso !== 'menu');
     const f = frenoRobot({ texto: c.texto, rowId: c.rowId, interactivo: c.interactivo, enFlujo, ultimoEnvio: ULT_ENVIO.get(k), ahora: c.llegada || Date.now(), hist: h });   // 3.6: la hora en que LLEGÓ (no después de esperar)
     const tn = normal(c.texto);
-    if (tn && !h.textos.some((x) => x[0] === tn)) { h.textos.push([tn, Date.now()]); if (h.textos.length > 15) h.textos.shift(); }
+    if (tn) { const ya = h.textos.find((x) => x[0] === tn); if (ya) ya[1] = Date.now(); else { h.textos.push([tn, Date.now()]); if (h.textos.length > 15) h.textos.shift(); } }   // 3.28: guarda la ÚLTIMA vez que lo dijo
     h.t = Date.now(); h.pausa = f.pausa; memGuardar();
     if (!f.responder) { if (MEM.conv) delete MEM.conv[k]; anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: '🛑 pausado: ' + f.motivo }); return; }
     if (f.motivo) anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: '▶️ ' + f.motivo });
@@ -407,7 +410,15 @@ async function atenderMensaje(c, neg) {
     const ca = { k, tel: c.tel, texto: c.texto, rowId: c.rowId, audio: c.audio, nombre: c.nombre };
     let r = null;
     try { r = await ASIS.manejar(neg, ca); }
-    catch (e) { est.errores++; log('❌ asistente', neg.bid, e.message); if (!(prev.t && Date.now() - prev.t < CFG.silencioMin * 60000)) { try { const i2 = await gas(neg, 'info'); await escribir(neg, c.tel, T.problema(i2)); } catch (e2) { /* nada */ } } MEM.chats[k] = { t: Date.now(), firma: 'error' }; memGuardar(); return; }
+    catch (e) {
+      est.errores++; log('❌ asistente', neg.bid, e.message); anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: '❌ falló el asistente: ' + String(e.message).slice(0, 120) });
+      // 3.28: si estaba agendando, SIEMPRE se le avisa (antes se quedaba mudo porque «ya le había respondido hace poco»)
+      const agendando = !!(MEM.conv && MEM.conv[k] && MEM.conv[k].paso && MEM.conv[k].paso !== 'menu');
+      if (agendando || !(prev.t && Date.now() - prev.t < CFG.silencioMin * 60000)) {
+        const link = 'https://tuagenda.vip/index.html?b=' + encodeURIComponent(neg.bid);   // sin preguntarle a Google (puede ser Google el que falla)
+        try { await escribir(neg, c.tel, agendando ? T.demora(link) : T.problema({ link })); } catch (e2) { /* nada */ }
+        if (MEM.conv) delete MEM.conv[k];
+      } MEM.chats[k] = { t: Date.now(), firma: 'error' }; memGuardar(); return; }
     if (r === 'suspendida') { anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: 'agenda suspendida: no respondo' }); return; }
     if (r) { MEM.chats[k] = { t: Date.now(), firma: r, n: 1 }; memGuardar(); anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: { flujo: 'agendando por WhatsApp', cupos: 'le mostré los cupos', agendar: 'empezó a agendar', audio: 'audio: le pedí que escriba' }[r] || r }); return; }
   }
@@ -773,5 +784,5 @@ if (require.main === module) {
   servidor.listen(CFG.puerto, () => { log('👩‍💼 ' + VERSION + ' escuchando en ' + CFG.puerto + ' · modo ' + CFG.modo); negocios(); arrancarRelojes(); });
 }
 // 🧪 solo para el banco de escenarios (banco/escenarios.js): deja a Mary como recién encendida
-const _banco = { ASIS, BOT, yaLoDije, memDicho: () => (MEM.dicho = MEM.dicho || {}), memHumano: () => MEM.humano, tickRecordatorios, publicarEstado, alMensaje, alEventoConexion, ultimos, reiniciar() { BOT_LEIDO.clear(); MEM.sinbot = {}; MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; MEM.conv = {}; MEM.clientes = {}; MEM.conectados = {}; MEM.pendientesWa = {}; MEM.codigos = {}; MEM.robot = {}; MEM.dicho = {}; AGRUPA.clear(); ASIS._cat.clear(); BOT.clear(); CONTACTOS.clear(); vinculando.clear(); delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
+const _banco = { ASIS, BOT, yaLoDije, memDicho: () => (MEM.dicho = MEM.dicho || {}), memHumano: () => MEM.humano, memRobot: () => (MEM.robot = MEM.robot || {}), tickRecordatorios, publicarEstado, alMensaje, alEventoConexion, ultimos, reiniciar() { BOT_LEIDO.clear(); MEM.sinbot = {}; MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; MEM.conv = {}; MEM.clientes = {}; MEM.conectados = {}; MEM.pendientesWa = {}; MEM.codigos = {}; MEM.robot = {}; MEM.dicho = {}; AGRUPA.clear(); ASIS._cat.clear(); BOT.clear(); CONTACTOS.clear(); vinculando.clear(); delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
 module.exports = { _banco, botNormal, frenoRobot, estadosQueTocan, atenderPedidoWa, sincronizarConectados, renovarQr, telEnAviso, deWaha, esWaha, debeResponder, alEventoConexion, tickPedidosWa, limpiarSinVincular, leerMensaje, atiende, PREGUNTA, numeroWa, ahoraLocal, enFila, yaVisto, quienVeEstados, CFG };

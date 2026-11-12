@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-3.27** · Página **2026-11-12m** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-12** · Mary **agendador-ia-3.28** · Página **2026-11-12m** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -113,6 +113,19 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-12 · agendador-ia-3.28 · el bot se quedaba mudo después de «No, solo eso»
+- Reporte de Alex: Combos → Corte + barba → «No, solo eso» y el bot no volvió a responder (debía preguntar el día).
+- **Causa principal (servidor de Google):** para buscar los días con cupo leía otra vez los servicios y el equipo por CADA día (hasta 21 días = decenas de lecturas). Tardaba tanto que la respuesta no llegaba a tiempo.
+  - Arreglo (mary.gs 3.28): servicios y equipo se leen UNA vez; los días que nadie atiende ni se consultan; tope de 20 s.
+  - Prueba nueva en `pruebas.js`: con la versión anterior leía 11 veces los servicios y ahora 1.
+- **Causa de que no avisara nada:** si fallaba Google en medio del agendamiento, el VPS no le decía nada al cliente porque «ya le había respondido hace poco».
+  - Ahora siempre avisa: «😅 Se me demoró el sistema. Escríbeme *agendar*… o aparta aquí: link», sin depender de Google. El error queda en /registro («❌ falló el asistente: …»).
+- **Otros frenos que podían callarlo:**
+  - El anti-robot pausaba a una persona que repetía «hola» o «quiero agendar» en el mismo día. Ahora solo pausa textos largos repetidos o lo mismo en menos de 3 min. Tocar NUESTRA lista nunca se pausa.
+  - Las listas solo se frenan si son idénticas en 30 s (antes 15 min).
+  - «quiero agendar» escrito en medio de las listas empieza de nuevo (antes: «No te entendí»).
+- Banco: 4 escenarios nuevos + reglas del freno. 122 pruebas, 0 fallas. Probado con mutaciones.
 
 ### 2026-11-12 · página 2026-11-12m · Estado de cupos con las horas grandes
 - Pedido de Alex: arreglar el formato del estado «Cupos libres» y que los cupos se vean más grandes.
