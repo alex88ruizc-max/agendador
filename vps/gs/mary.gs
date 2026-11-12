@@ -14,7 +14,7 @@
  * Instalación: pega este archivo, ejecuta activarMary() una vez, copia la clave que sale en el registro
  * y ponla en el mary.env del VPS (MARY_KEY). Vuelve a implementar la aplicación web (Implementar > Administrar > editar > Nueva versión).
  */
-const MARY_VERSION = 'agendador-ia-3.7';
+const MARY_VERSION = 'agendador-ia-3.13';
 
 // Se registra como acción pública del servidor (sin sesión: entra con la clave de Mary).
 // ⚠️ Este archivo debe quedar DEBAJO del archivo principal en la lista de archivos de Apps Script (los nuevos quedan al final: así está bien).
@@ -101,7 +101,7 @@ function maryBotCfg_(st) {
   let horas = (Array.isArray(e.horas) ? e.horas : ['11:00']).filter(function (h) { return /^\d{2}:\d{2}$/.test(String(h)); }).slice(0, 2);   // máximo 2 estados al día
   if (!horas.length) horas = ['11:00'];
   return {
-    activo: d(b.activo, true) !== false, agendar: d(b.agendar, true) !== false, cupos: d(b.cupos, true) !== false,
+    activo: d(b.activo, true) !== false, agendar: d(b.agendar, true) !== false, cupos: d(b.cupos, true) !== false, audios: d(b.audios, true) !== false,
     saludoDiario: d(b.saludoDiario, true) !== false, pedirNombre: d(b.pedirNombre, true) !== false, pedirCorreo: d(b.pedirCorreo, true) !== false,
     loDeSiempre: d(b.loDeSiempre, true) !== false, recordatorioMin: Math.max(0, Number(d(b.recordatorioMin, d(st.maryReminderMinutes, 120)))),
     recordatorioConfirmar: d(b.recordatorioConfirmar, true) !== false, cambios: d(b.cambios, true) !== false, pausaMin: Math.max(5, Number(d(b.pausaMin, 30))),

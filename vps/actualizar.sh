@@ -32,4 +32,6 @@ sudo docker compose up -d agendador-ia --force-recreate >/dev/null 2>&1
 OK=0; for i in $(seq 1 30); do curl -s -m 3 http://127.0.0.1:3070/salud | grep -q '"ok":true' && { OK=1; break; }; sleep 2; done
 if [ $OK = 1 ]; then mkdir -p respaldo && for f in $CODIGOS; do [ -e "$f" ] && cp -rf "$f" respaldo/; done; echo "✅ Agendador IA: $(curl -s -m 3 http://127.0.0.1:3070/salud | grep -o '"version":"[^"]*"')"
 else echo "❌ La versión nueva no arrancó. Vuelvo a la anterior…"; volver; sudo docker compose up -d agendador-ia --force-recreate >/dev/null 2>&1; exit 1; fi
+# 3.13 · 👂 el oído del agendador (se construye en segundo plano: la primera vez tarda unos minutos y baja el modelo de voz)
+if [ -d oido ]; then (nohup sudo docker compose up -d --build oido-agendador >/tmp/oido-agendador.log 2>&1 &); echo "👂 Oído: instalando/actualizando en segundo plano (la primera vez ~5-10 min). Mira /estado."; fi
 if ls gs/*.gs >/dev/null 2>&1; then bash actualizar-google.sh; fi

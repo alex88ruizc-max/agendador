@@ -6,7 +6,7 @@
 const test = require('node:test'), assert = require('node:assert/strict');
 const fs = require('fs'), path = require('path');
 const RAIZ = path.join(__dirname, '..');
-const NUESTROS = ['agendador-ia', 'evolution-agendador', 'postgres-agendador', 'waha-agendador'];
+const NUESTROS = ['agendador-ia', 'evolution-agendador', 'postgres-agendador', 'waha-agendador', 'oido-agendador'];
 const scripts = fs.readdirSync(RAIZ).filter((f) => /\.(sh|py)$/.test(f));
 
 test('Regla N.º 1: ningún script actúa sobre contenedores ajenos (Epic ni ningún otro)', { skip: scripts.length === 0 && 'sin scripts aquí' }, () => {

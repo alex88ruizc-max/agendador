@@ -1,4 +1,4 @@
-🗓️ AGENDADOR IA · agendador-ia-3.12   (por dentro atiende «Mary», la recepcionista)
+🗓️ AGENDADOR IA · agendador-ia-3.13   (por dentro atiende «Mary», la recepcionista)
 =====================================================================================================
 🚫 REGLA UNIVERSAL N.º 1 — EPIC NO SE TOCA (manda sobre todo lo demás, para Alex, para Claude y para cada script de este paquete)
    Epic (Mary de Epic, Luisa, la tienda, epic-waha, epic-tiendas, Epic Channels…) y CUALQUIER otro proyecto:
@@ -6,7 +6,7 @@
    ❌ JAMÁS SE MODIFICA: ni contenedores, ni redes, ni avisos (webhooks), ni sesiones de WhatsApp, ni archivos, ni base de datos,
       ni repositorios. Ni reiniciarlo, ni detenerlo, ni conectarlo o desconectarlo de nada.
    ❌ NI SIQUIERA PARA «DESHACER», «ARREGLAR» O «LIMPIAR» (el 12-nov-2026 sacar epic-waha de una red le cortó la conexión a la tienda).
-   ❌ Los scripts del agendador solo actúan sobre lo suyo: agendador-ia, evolution-agendador, postgres-agendador, waha-agendador, ~/agendador.
+   ❌ Los scripts del agendador solo actúan sobre lo suyo: agendador-ia, evolution-agendador, postgres-agendador, waha-agendador, oido-agendador, ~/agendador.
    🛑 Si algo pudiera afectar a Epic: se para y se le pregunta a Alex. Solo Alex, con palabras explícitas, lo autoriza.
 
 ⚖️ TODO APARTE DE EPIC. Vive en ~/agendador con su PROPIO Evolution (puerto 8095), su base de datos, su red «agendador-red»
@@ -62,6 +62,15 @@ PROBAR EN EL VPS
 AJUSTES POR NEGOCIO (negocios.json)
   "recordatorioMin": 120     ·   "estados": { "activo": true, "hoy": "07:30", "semana": "07:00", "semanaDia": 1 }
   En Firestore (settings/general del negocio) maryAutoCaptura: true → la captura confirma al instante y el dueño revisa después.
+
+NOVEDADES 3.13 · 👂 EL OÍDO (notas de voz)
+  · Contenedor nuevo y PROPIO del agendador: oido-agendador (Whisper «faster-whisper-small», español, en CPU), dentro de la red del
+    agendador y sin puertos hacia afuera. Copia de la idea del oído de Epic, pero aparte (no usa nada de Epic ni de tu PC).
+  · Nota de voz → texto → el asistente responde igual que si la hubieran escrito («¿tienes cupo hoy a las 3?» → «Sí, tengo…»).
+    Si el oído no está listo, responde «En este momento no puedo escuchar audios, ¿me lo escribes?». Audios de más de 3 min no se escuchan.
+  · Se instala SOLO con este zip, en segundo plano: la primera vez tarda ~5-10 min (construye y baja el modelo, ~460 MB). /estado
+    muestra «oido»: «no instalado» → «cargando» → «listo (small)». Usa hasta 1,5 GB de memoria y 2 núcleos.
+  · Panel › WhatsApp Bot › «🎤 Escuchar notas de voz» (encendido por defecto). Página agendador-web-2026-11-12e.zip.
 
 NOVEDADES 3.12
   · Arreglo: si el cliente tenía abierta una lista (p. ej. «Elegir día») y escribía «¿tienes cupo mañana a las 11am?», le volvía a

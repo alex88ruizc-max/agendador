@@ -9,9 +9,9 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-11-12d";
-import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-12d";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-12d";
+} from "./common.js?v=2026-11-12e";
+import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-12e";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-12e";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -3779,7 +3779,7 @@ document.addEventListener("click", async (e) => {
 });
 
 // Opciones del asistente (settings.maryBot). Los valores por defecto son los mismos del servidor (maryBotCfg_).
-const BOT_DEF = { activo: true, agendar: true, cupos: true, saludoDiario: true, pedirNombre: true, pedirCorreo: true, loDeSiempre: true, recordatorioMin: 120, recordatorioConfirmar: true, cambios: true, pausaMin: 30, estados: { activo: true, horas: ["11:00"], manana: true, semanal: false } };
+const BOT_DEF = { audios: true, activo: true, agendar: true, cupos: true, saludoDiario: true, pedirNombre: true, pedirCorreo: true, loDeSiempre: true, recordatorioMin: 120, recordatorioConfirmar: true, cambios: true, pausaMin: 30, estados: { activo: true, horas: ["11:00"], manana: true, semanal: false } };
 function botCfg() {
   const s = A.settings || {}, b = s.maryBot || {};
   const c = { ...BOT_DEF, ...b, estados: { ...BOT_DEF.estados, ...(b.estados || {}) } };
@@ -3792,6 +3792,7 @@ const BOT_OPTS = [
   ["activo", "🤖", "Asistente encendido", "Apagado, no responde nada por WhatsApp (tú atiendes todo)."],
   ["agendar", "📋", "Agendar por WhatsApp con listas", "Categoría → servicio → día → hora → «¿Lo confirmo?». Apagado, solo manda tu link."],
   ["cupos", "🕐", "Responder «¿hay cupos?»", "Dice las horas libres del día que pregunten (o los próximos días) y siempre manda tu link."],
+  ["audios", "🎤", "Escuchar notas de voz", "Pasa el audio a texto y responde igual que si lo hubieran escrito. Apagado: pide que lo escriban."],
   ["saludoDiario", "👋", "Saludar una sola vez al día", "«Hola 👋 Soy el asistente de tu negocio» solo en el primer mensaje del día de cada cliente."],
   ["pedirNombre", "🙋", "Preguntar el nombre", "La primera vez pregunta «¿A nombre de quién agendo?» y lo recuerda. Apagado, usa el nombre de WhatsApp."],
   ["pedirCorreo", "📧", "Pedir el correo para su calendario", "Con el correo, la cita le queda en su calendario y se mueve o se borra sola si cambia."],

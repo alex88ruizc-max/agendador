@@ -53,5 +53,17 @@ services:
     ports: ["127.0.0.1:3080:3000"]
     mem_limit: 600m
     networks: [agenda]
-volumes: { evo_instancias: {}, pg_datos: {}, waha_sesiones: {} }
+  # 3.13 · 👂 el OÍDO del agendador: pasa las notas de voz a texto dentro del VPS (Whisper). Sin puertos hacia afuera.
+  oido-agendador:
+    build: ./oido
+    image: oido-agendador
+    container_name: oido-agendador
+    restart: always
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "2" } }
+    environment: { MODELO: "${OIDO_MODELO:-small}", IDIOMA: es, HILOS: "2", TZ: America/Bogota }
+    volumes: ["oido_modelos:/modelos"]
+    mem_limit: 1500m
+    cpus: 2
+    networks: [agenda]
+volumes: { evo_instancias: {}, pg_datos: {}, waha_sesiones: {}, oido_modelos: {} }
 networks: { agenda: { name: agendador-red } }

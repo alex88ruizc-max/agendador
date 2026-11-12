@@ -1,17 +1,17 @@
 # Graph Report - agendador  (2026-11-12)
 
 ## Corpus Check
-- 30 files · ~117,027 words
+- 30 files · ~117,297 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 12 file(s) not represented in the graph (top: (none) 6, .css 3, .ejemplo 2)
 
 ## Summary
-- 897 nodes · 2656 edges · 48 communities (39 shown, 9 thin omitted)
+- 897 nodes · 2628 edges · 49 communities (40 shown, 9 thin omitted)
 - Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 100 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `cd8f874f`
+- Built from commit: `826852a5`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -45,6 +45,7 @@
 - options
 - waha-agendador
 - renderAppearance
+- textos.js
 - actualizar-google.sh script
 - correo.gs
 - instalar.sh script
@@ -73,28 +74,28 @@
 7. `toMillis()` - 34 edges
 8. `renderHome()` - 32 edges
 9. `hora12()` - 31 edges
-10. `seguir()` - 29 edges
+10. `seguir()` - 28 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `maryCupos_()` --indirect_call--> `hora12()`  [INFERRED]
   vps/gs/mary.gs → common.js
-- `tickRevisadas()` --calls--> `decision()`  [EXTRACTED]
-  vps/principal.js → vps/textos.js
-- `pasoCategoria()` --calls--> `sinServicios()`  [EXTRACTED]
-  vps/asistente.js → vps/textos.js
-- `pasoDia()` --calls--> `sinDias()`  [EXTRACTED]
-  vps/asistente.js → vps/textos.js
-- `pasoDatos()` --calls--> `pideCorreo()`  [EXTRACTED]
-  vps/asistente.js → vps/textos.js
+- `llega()` --calls--> `deWaha()`  [EXTRACTED]
+  vps/banco/escenarios.js → vps/principal.js
+- `clientHistory()` --calls--> `toMillis()`  [EXTRACTED]
+  admin.js → common.js
+- `closeM()` --calls--> `closeModal()`  [EXTRACTED]
+  admin.js → common.js
+- `manageStory()` --calls--> `esc()`  [EXTRACTED]
+  admin.js → common.js
 
 ## Import Cycles
 - None detected.
 
-## Communities (48 total, 9 thin omitted)
+## Communities (49 total, 9 thin omitted)
 
 ### Community 0 - "principal.js"
 Cohesion: 0.06
-Nodes (89): llega(), assert, GS_MARY, INFO, test, AGRUPA, ahoraLocal(), alEventoConexion() (+81 more)
+Nodes (91): llega(), assert, GS_MARY, INFO, test, AGRUPA, ahoraLocal(), alEventoConexion() (+83 more)
 
 ### Community 1 - "toast"
 Cohesion: 0.15
@@ -165,8 +166,8 @@ Cohesion: 0.17
 Nodes (12): environment, EVO_URL, PUBLICO, PUERTO, TZ, WAHA_API_KEY, WAHA_BASE_URL, WAHA_DASHBOARD_ENABLED (+4 more)
 
 ### Community 18 - "textos.js"
-Cohesion: 0.08
-Nodes (72): corto(), crear(), agendar(), apartar(), aprender(), cancelarCita(), catalogo(), cliente() (+64 more)
+Cohesion: 0.18
+Nodes (41): corto(), crear(), agendar(), apartar(), aprender(), cancelarCita(), catalogo(), cliente() (+33 more)
 
 ### Community 19 - "agendador-ia"
 Cohesion: 0.18
@@ -207,6 +208,10 @@ Nodes (8): waha-agendador, container_name, image, mem_limit, networks, ports, re
 ### Community 28 - "renderAppearance"
 Cohesion: 0.50
 Nodes (4): imgToDataUrl(), renderAppearance(), renderPanelOrder(), wizChange()
+
+### Community 29 - "textos.js"
+Cohesion: 0.10
+Nodes (15): asistio(), citaHecha(), conCita(), cop(), cuposDia(), duracion(), enTiempo(), estadoTxt() (+7 more)
 
 ### Community 30 - "actualizar-google.sh script"
 Cohesion: 0.47
@@ -250,7 +255,7 @@ Nodes (3): actStats(), bogDay(), bogHour()
 
 ## Knowledge Gaps
 - **1 isolated node(s):** `RFC-5545`
-  These have ≤1 connection - possible missing edges. (Counts symbols only; 237 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+  These have ≤1 connection - possible missing edges. (Counts symbols only; 251 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **9 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
@@ -263,7 +268,7 @@ _Questions this graph is uniquely positioned to answer:_
 - **What connects `RFC-5545` to the rest of the system?**
   _1 weakly-connected nodes found - possible missing edges._
 - **Should `principal.js` be split into smaller, more focused modules?**
-  _Cohesion score 0.06217858812529219 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.06315789473684211 - nodes in this community are weakly interconnected._
 - **Why does `maryCupos_()` connect `mary.gs` to `esc`?**
   _High betweenness centrality (0.047) - this node is a cross-community bridge._
 - **Should `app.js` be split into smaller, more focused modules?**

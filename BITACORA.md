@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-3.12** · Página **2026-11-12d** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-12** · Mary **agendador-ia-3.13** · Página **2026-11-12e** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -11,7 +11,7 @@
 - ✅ **Solo se puede COPIAR**: leer su código o su versión y hacer una copia propia del agendador, aparte y con su propio nombre.
 - ❌ **JAMÁS se modifica**: ni sus contenedores, ni sus redes, ni sus webhooks, ni sus sesiones de WhatsApp, ni sus archivos, ni su base de datos, ni sus repositorios. Ni reiniciarlo, ni detenerlo, ni conectarlo o desconectarlo de nada.
 - ❌ **Ni siquiera para «deshacer», «arreglar» o «limpiar»**. (El 2026-11-12 sacar `epic-waha` de una red «para deshacer» le cortó la conexión a la tienda de Epic.)
-- ❌ Ningún script del agendador ejecuta comandos sobre contenedores o archivos que no sean del agendador (`agendador-ia`, `evolution-agendador`, `postgres-agendador`, `waha-agendador`, `~/agendador`).
+- ❌ Ningún script del agendador ejecuta comandos sobre contenedores o archivos que no sean del agendador (`agendador-ia`, `evolution-agendador`, `postgres-agendador`, `waha-agendador`, `oido-agendador`, `~/agendador`).
 - 🛑 Si algún paso pudiera afectar a Epic, **se para y se le pregunta a Alex**. Solo Alex, con palabras explícitas, puede autorizar algo sobre Epic.
 Ver también `CLAUDE.md` y `vps/LEEME.txt`.
 
@@ -99,7 +99,7 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 1. Instalar 3.1 + página 2026-11-12b y probar el agendamiento por listas con El Barba (tu 318) desde el número aparte. Luego `MARY_MODO=todos`.
    Verificar en un celular real: que la lista llegue por WAHA (si no, sale el texto con números) y que la invitación entre al calendario.
    El panel guarda `maryReminderMinutes` en settings: confirmar que las reglas de Firestore lo dejan guardar.
-8. Futuro: «oído» propio del agendador para escuchar audios (copia del de Epic: Whisper/Speaches, contenedor `oido-agendador`).
+8. Oído instalado (3.13): confirmar en /estado que pase a «listo (small)» y probar una nota de voz real.
 2. Que el panel conecte por WAHA (hoy conecta por Evolution). WAHA gratis = 1 WhatsApp: para varios negocios, arreglar Evolution o WAHA Plus.
 3. Generar la APK con `/apk` en el bot. Falta confirmar si ya se hizo.
 4. **Rotar secretos** que quedaron expuestos en chats anteriores:
@@ -113,6 +113,15 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-12 · agendador-ia-3.13 · 👂 oído
+- `vps/oido/` (oido.py + Dockerfile, python:3.12-slim + faster-whisper 1.1.1): POST /transcribir (audio crudo) → {texto}; GET /salud.
+  Modelo `small` (int8, CPU, 2 hilos) en el volumen `oido_modelos`; un audio a la vez; > 180 s no se transcribe. Probado aquí en modo
+  prueba (OIDO_PRUEBA=1); el modelo real se baja en el VPS (huggingface.co está bloqueado en este entorno).
+- `docker-compose.yml`: servicio `oido-agendador` (sin puertos). `actualizar.sh`: `docker compose up -d --build oido-agendador` en segundo plano.
+- `principal.js`: `escuchar()` (baja el audio de WAHA/Evolution → oído) antes del freno; `/salud` muestra el estado del oído.
+  `maryBot.audios` (panel «Escuchar notas de voz»). Regla N.º 1: `oido-agendador` agregado a los contenedores propios.
+- Banco: 97 pruebas.
 
 ### 2026-11-12 · agendador-ia-3.12 · hora concreta dentro de otra lista
 - Prueba real: con «Elegir día» abierta (2:58), «¿Tienes cupo para mañana a las 11am?» (3:18) devolvió la lista de mañana: en `seguir`,

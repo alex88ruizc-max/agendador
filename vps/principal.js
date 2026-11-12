@@ -6,7 +6,7 @@
 const http = require('http'), fs = require('fs'), path = require('path');
 const T = require('./textos'), C = require('./correo'), E = require('./estado'), A = require('./asistente');
 
-const VERSION = 'agendador-ia-3.12';
+const VERSION = 'agendador-ia-3.13';
 const env = (k, d) => (process.env[k] === undefined || process.env[k] === '' ? d : process.env[k]);
 const CFG = {
   puerto: parseInt(env('PUERTO', '3060'), 10),
@@ -18,7 +18,8 @@ const CFG = {
   prueba: String(env('MARY_PRUEBA', '')).split(/[,\s]+/).map((x) => x.replace(/\D/g, '')).filter((x) => x.length >= 10),
   silencioMin: parseInt(env('SILENCIO_MIN', '15'), 10),     // no repite lo mismo en un chat antes de esto (salvo que el cliente diga algo de la lista)
   humanoMin: parseFloat(env('HUMANO_MIN', '30')),           // 3.1: si el dueño escribe a mano en un chat, se calla ahí 30 min (o lo que diga su panel)
-  agruparMs: parseInt(env('AGRUPAR_MS', '7000'), 10),   // 3.6: espera a que el cliente termine de escribir (varios mensajes = UNA respuesta)
+  agruparMs: parseInt(env('AGRUPAR_MS', '7000'), 10),
+  oido: String(env('OIDO_URL', 'http://oido-agendador:9000')).replace(/\/+$/, ''),   // 3.13: el oído (notas de voz → texto)   // 3.6: espera a que el cliente termine de escribir (varios mensajes = UNA respuesta)
   tz: env('TZ', 'America/Bogota'), esperaMs: parseInt(env('ESPERA_MS', '2000'), 10),
   // 2.2 · motor de WhatsApp: evolution (el de siempre) o waha. Cada negocio puede tener el suyo en negocios.json ("motor", "sesion").
   motor: String(env('WA_MOTOR', env('WAHA_KEY', '') ? 'waha' : 'evolution')).toLowerCase(),   // 3.1: con WAHA del agendador, los negocios nuevos van por WAHA
@@ -165,6 +166,21 @@ async function escribirLista(neg, numero, L) {
   }
 }
 
+// 👂 3.13 · el oído: baja la nota de voz (WAHA o Evolution) y se la pasa a oido-agendador. Si no puede, devuelve '' (y el asistente pide que escriba)
+async function escuchar(neg, c) {
+  try {
+    let b64 = c.base64;
+    if (!b64 && c.mediaUrl) b64 = await bajarMediaWaha(c.mediaUrl);
+    if (!b64 && !esWaha(neg)) { const r = await evo('post', '/chat/getBase64FromMediaMessage/' + encodeURIComponent(neg.instancia), { message: { key: { id: c.id } }, convertToMp4: false }, 45000); b64 = String(r.base64 || ''); }
+    if (!b64) return '';
+    const datos = Buffer.from(String(b64).replace(/^data:[^,]+,/, ''), 'base64');
+    const r = await fetch(CFG.oido + '/transcribir', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: datos, signal: AbortSignal.timeout(120000) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: '🎤 el oído no pudo: ' + String(j.error || r.status).slice(0, 80) }); return ''; }
+    return String(j.texto || '').trim();
+  } catch (e) { anotar({ bid: neg.bid, chat: (c.tel || '').slice(-4), que: '🎤 el oído no respondió: ' + e.message.slice(0, 60) }); return ''; }
+}
+
 // ---------- servidor del agendador (Apps Script, acción "mary") ----------
 async function gas(neg, op, datos) {
   if (!CFG.gas || !CFG.maryKey) throw new Error('Falta GAS_URL o MARY_KEY en agendador-ia.env');
@@ -177,7 +193,7 @@ async function gas(neg, op, datos) {
 }
 // ---------- 3.1 · configuración del panel «WhatsApp Bot» (por negocio) ----------
 const BOT = new Map();
-const BOT_DEF = { activo: true, agendar: true, cupos: true, saludoDiario: true, pedirNombre: true, pedirCorreo: true, loDeSiempre: true, recordatorioMin: 120, recordatorioConfirmar: true, cambios: true, pausaMin: 30, estados: { activo: true, horas: ['11:00'], manana: true, semanal: false } };
+const BOT_DEF = { audios: true, activo: true, agendar: true, cupos: true, saludoDiario: true, pedirNombre: true, pedirCorreo: true, loDeSiempre: true, recordatorioMin: 120, recordatorioConfirmar: true, cambios: true, pausaMin: 30, estados: { activo: true, horas: ['11:00'], manana: true, semanal: false } };
 function botDe(neg) { const x = BOT.get(neg.bid); const c = Object.assign({}, BOT_DEF, x ? x.cfg : {}); c.estados = Object.assign({}, BOT_DEF.estados, (x && x.cfg.estados) || {}); if (!x) c.pausaMin = CFG.humanoMin; return c; }
 async function botFresco(neg, maxMs) { const x = BOT.get(neg.bid); if (!x || Date.now() - x.t > maxMs) await gas(neg, 'info').catch(() => {}); return botDe(neg); }
 
@@ -322,6 +338,11 @@ async function atenderMensaje(c, neg) {
     else { est.errores++; anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: 'foto: ' + (r.error || r.motivo) }); }
     MEM.chats[k] = { t: Date.now(), firma: 'foto' }; memGuardar();
     return;
+  }
+  // 👂 3.13: nota de voz → texto (el oído del agendador) → se atiende como si la hubiera escrito
+  if (c.audio && botDe(neg).audios !== false) {
+    const oido = await escuchar(neg, c);
+    if (oido) { c.texto = oido; c.audio = false; anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: '🎤 escuché: «' + oido.slice(0, 80) + '»' }); }
   }
   // 🛑 3.5: freno anti-bots / publicidad / mensajes repetidos
   if (c.texto || c.interactivo) {
@@ -680,7 +701,8 @@ const servidor = http.createServer(async (req, res) => {
     }
     const mImg = url.pathname.match(/^\/img\/([a-z0-9]+)\.png$/);
     if (req.method === 'GET' && mImg) { const x = IMG.get(mImg[1]); if (!x) { res.writeHead(404); return res.end(); } res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'no-store' }); return res.end(x.png); }
-    if (req.method === 'GET' && url.pathname === '/salud') return json(res, 200, { ok: true, version: VERSION, modo: CFG.modo, prueba: CFG.prueba.length, negocios: negocios().map((n) => n.bid), gas: !!(CFG.gas && CFG.maryKey), evo: !!CFG.evoKey, est });
+    if (req.method === 'GET' && url.pathname === '/salud') { let oido = 'no instalado'; try { const r = await fetch(CFG.oido + '/salud', { signal: AbortSignal.timeout(2000) }); const j = await r.json(); oido = j.ok ? 'listo (' + j.modelo + ')' : 'cargando' + (j.error ? ': ' + j.error.slice(0, 60) : ''); } catch (e) { /* no está */ }
+      return json(res, 200, { ok: true, version: VERSION, oido, modo: CFG.modo, prueba: CFG.prueba.length, negocios: negocios().map((n) => n.bid), gas: !!(CFG.gas && CFG.maryKey), evo: !!CFG.evoKey, est }); }
     if (req.method === 'GET' && url.pathname === '/registro') return json(res, 200, ultimos.slice(-Math.min(100, parseInt(url.searchParams.get('n') || '20', 10))));
     // 🧪 vista previa del estado (no publica): curl -s "127.0.0.1:3060/vista?bid=mi-negocio&tipo=hoy" -o hoy.png
     if (req.method === 'GET' && url.pathname === '/vista') { const neg = negocios().find((n) => n.bid === url.searchParams.get('bid')); if (!neg) return json(res, 404, { ok: false, error: 'negocio no está en negocios.json' }); const { png } = await armarEstado(neg, url.searchParams.get('tipo') === 'semana' ? 'semana' : 'hoy'); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(png); }

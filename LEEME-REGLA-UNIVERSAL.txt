@@ -5,7 +5,7 @@ NO SE PUEDE MODIFICAR NINGÚN CONTENEDOR QUE ESTÉ FUERA DEL AGENDADOR.
 SOLO SE PUEDE COPIAR.
 
 Contenedores del agendador (los ÚNICOS que se pueden tocar):
-   agendador-ia · evolution-agendador · postgres-agendador · waha-agendador     (y la carpeta ~/agendador)
+   agendador-ia · evolution-agendador · postgres-agendador · waha-agendador · oido-agendador   (y la carpeta ~/agendador)
 
 Todo lo demás (Epic, Mary de Epic, Luisa, la tienda, epic-waha, epic-tiendas, Epic Channels, o cualquier otro):
    ✅ SÍ:  copiar. Leer su código o su versión y hacer una copia propia del agendador, aparte y con nombre propio.

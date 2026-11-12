@@ -40,7 +40,7 @@ function mundoNuevo() {
 }
 const resp = (o, code) => new Response(JSON.stringify(o), { status: code || 200, headers: { 'Content-Type': 'application/json' } });
 global.fetch = async (url, o) => {
-  const u = String(url), b = o && o.body ? JSON.parse(o.body) : null;
+  const u = String(url); let b = null; try { b = o && typeof o.body === 'string' ? JSON.parse(o.body) : null; } catch (e) { b = null; }
   if (u.startsWith('https://gas.prueba')) {
     W.gas.push(b.op); W.llamadas.push(b);
     const BOTX = Object.assign({ activo: true, agendar: true, cupos: true, saludoDiario: true, pedirNombre: true, pedirCorreo: true, loDeSiempre: true, recordatorioMin: 60, recordatorioConfirmar: true, cambios: true, pausaMin: 30, estados: { activo: true, horas: ['11:00'], manana: true, semanal: false } }, W.bot);
@@ -89,6 +89,8 @@ global.fetch = async (url, o) => {
     return resp(Object.assign({ name: n }, W.sesiones[n])); }
   const ac = u.match(/\/api\/([^/]+)\/auth\/(request-code|qr)/);
   if (ac) { W.wahaLlamadas.push(ac[2] + ' ' + decodeURIComponent(ac[1])); return ac[2] === 'qr' ? resp({ mimetype: 'image/png', data: 'UVI=' }) : resp({ code: 'ABCD1234' }); }
+  if (/\/api\/files\//.test(u)) return new Response(Buffer.from('AUDIO-OGG'), { status: 200 });   // la nota de voz que baja de WAHA
+  if (/oido-agendador:9000\/transcribir$/.test(u)) { W.oidoLlamadas = (W.oidoLlamadas || 0) + 1; return W.oido == null ? resp({ error: 'el oído todavía está cargando' }, 503) : resp({ texto: W.oido, duracion: 3, tardo: 2 }); }
   if (/\/status\/image$/.test(u)) { W.estados.push({ sesion: u.split('/api/')[1].split('/')[0], caption: b.caption, contacts: b.contacts }); return resp({}); }
   if (/\/message\/sendText\//.test(u)) { const id = 'E' + W.enviados.length; W.enviados.push({ motor: 'evolution', a: String(b.number), texto: b.text }); return resp({ key: { id } }, 201); }
   if (/\/message\/sendList\//.test(u)) { const id = 'EL' + W.enviados.length; W.enviados.push({ motor: 'evolution', a: String(b.number), texto: [b.title, b.description].filter((x) => x && x.trim()).join('\n'), lista: b }); return resp({ key: { id } }, 201); }
@@ -716,4 +718,27 @@ test('3.12 · Con la lista de días/horas abierta, «¿Tienes cupo para mañana 
   assert.deepEqual(ids(ultimo()), ['ap:09:00', 'ap:otra']);
   await llega(wahaMsg(CLIENTE, 'y a las 9?'));
   assert.match(ultimo().texto, /Sí, tengo un cupo \*mañana a las 9:00 a\. m\.\*/);
+});
+
+// =====================================================================
+//  3.13 · 👂 OÍDO: nota de voz → texto → el asistente responde igual que si la hubieran escrito
+// =====================================================================
+const audio = () => wahaMsg(CLIENTE, '', { hasMedia: true, media: { url: 'http://waha-agendador:3000/api/files/default/nota.oga', mimetype: 'audio/ogg; codecs=opus' } });
+test('3.13 · Nota de voz «¿tienes cupo hoy a las 3?» → el oído la escucha → «Sí, tengo un cupo hoy a las 3:00… ¿Lo vas a apartar?»', async () => {
+  W.oido = 'Hola, ¿tienes cupo para hoy a las 3?';
+  await llega(audio());
+  assert.equal(W.oidoLlamadas, 1);
+  assert.match(ultimo().texto, /Sí, tengo un cupo \*hoy a las 3:00 p\. m\.\*/); assert.ok(B.ultimos.some((x) => /🎤 escuché: «Hola, ¿tienes cupo/.test(x.que)));
+  assert.ok(!W.gas.includes('proof'), 'un audio no es una foto de pago');
+});
+test('3.13 · El oído no está listo (cargando o caído) → «En este momento no puedo escuchar audios… ¿me lo escribes?»', async () => {
+  W.oido = null;
+  await llega(audio());
+  assert.match(ultimo().texto, /no puedo escuchar audios/); assert.ok(B.ultimos.some((x) => /el oído no pudo/.test(x.que)));
+});
+test('3.13 · Panel: «Escuchar notas de voz» apagado → no lo manda al oído y pide que escriba', async () => {
+  W.bot = { audios: false }; W.oido = 'quiero agendar';
+  await llega(wahaMsg(CLIENTE, 'hola'));   // trae la configuración del panel
+  await llega(audio());
+  assert.equal(W.oidoLlamadas || 0, 0); assert.match(ultimo().texto, /no puedo escuchar audios/);
 });
