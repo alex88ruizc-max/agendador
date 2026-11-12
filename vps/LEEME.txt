@@ -1,4 +1,4 @@
-🗓️ AGENDADOR IA · agendador-ia-3.0   (por dentro atiende «Mary», la recepcionista)
+🗓️ AGENDADOR IA · agendador-ia-3.1   (por dentro atiende «Mary», la recepcionista)
 =====================================================================================================
 🚫 REGLA UNIVERSAL N.º 1 — EPIC NO SE TOCA (manda sobre todo lo demás, para Alex, para Claude y para cada script de este paquete)
    Epic (Mary de Epic, Luisa, la tienda, epic-waha, epic-tiendas, Epic Channels…) y CUALQUIER otro proyecto:
@@ -46,7 +46,7 @@ QUÉ HACE MARY (sin IA: siempre responde lo mismo, claro)
     cuando decide, Mary le avisa al cliente por WhatsApp.
   · CORREO del banco del negocio → si hay UNA cita esperando ese monto (y el nombre del pagador coincide), la confirma sola.
     Si no está segura, le avisa al dueño y NO confirma. El buzón solo se LEE.
-  · ESTADOS con los cupos reales: «Cupos de hoy» 7:30 a. m. y «Tu semana» los lunes 7:00 a. m.
+  · ESTADOS con los cupos reales: 1 al día a las 11:00 a. m. (el dueño puede poner un 2.º; máximo 2). Si hoy no hay cupos, los de mañana.
   · RECORDATORIO por WhatsApp 2 h antes de cada cita confirmada.
 
 MODOS (en ~/agendador/agendador-ia.env, luego: cd ~/agendador && sudo docker compose up -d)
@@ -62,6 +62,21 @@ PROBAR EN EL VPS
 AJUSTES POR NEGOCIO (negocios.json)
   "recordatorioMin": 120     ·   "estados": { "activo": true, "hoy": "07:30", "semana": "07:00", "semanaDia": 1 }
   En Firestore (settings/general del negocio) maryAutoCaptura: true → la captura confirma al instante y el dueño revisa después.
+
+NOVEDADES 3.1 · PANEL «💬 WhatsApp Bot» (todo configurable por el dueño)
+  · Pestaña nueva en el panel: vincular el WhatsApp (código de 8 letras visible o QR que se renueva solo), desvincular, y opciones:
+    asistente encendido, agendar por listas, cupos, saludo diario, pedir nombre, pedir correo, «¿Lo de siempre?», recordatorio
+    (sin / 30 min / 1 h / 2 h / 3 h / 1 día), pedir confirmación, dejar cancelar o modificar, pausa cuando habla el dueño (15/30/60/120).
+  · Un WhatsApp por negocio. DESVINCULAR cierra y BORRA la sesión en waha-agendador; VINCULAR crea una nueva con el nombre del negocio.
+    Los negocios nuevos del panel ya van por WAHA (waha-agendador, una sesión por negocio). El que ya funciona se ve «✅ Vinculado».
+  · Recordatorio: «Recuerda que tu cita es en 1 hora · ¿Puedes continuar? Responde sí y te esperamos. Si no, escribe cancelar o modificar».
+    sí → asistencia confirmada + aviso al dueño por Telegram con nombre, WhatsApp, correo y la TARJETA DE CONTACTO (.vcf) para guardarlo.
+    cancelar → se cancela (respeta las horas mínimas del dueño) y desaparece del calendario. modificar → días y horas por listas.
+  · Cada cliente que agenda o confirma por WhatsApp queda en «Clientes» del panel.
+  · Pausa cuando el dueño escribe: 30 min por defecto (antes 15).
+  · Estados: 11:00 a. m. por defecto, máximo 2 al día; si hoy no hay cupos, los de mañana; si tampoco, no publica.
+    Ahora el estado va a los números de TODOS los clientes del negocio (antes WAHA solo lo mandaba a quien había escrito hace poco).
+  · Banco: 69 pruebas.
 
 NOVEDADES 3.0 · EL ASISTENTE
   · Ya no dice «Mary»: «Hola 👋 Soy el asistente de *Negocio*», y saluda UNA sola vez al día por cliente.

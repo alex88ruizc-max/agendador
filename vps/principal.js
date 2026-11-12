@@ -6,7 +6,7 @@
 const http = require('http'), fs = require('fs'), path = require('path');
 const T = require('./textos'), C = require('./correo'), E = require('./estado'), A = require('./asistente');
 
-const VERSION = 'agendador-ia-3.0';
+const VERSION = 'agendador-ia-3.1';
 const env = (k, d) => (process.env[k] === undefined || process.env[k] === '' ? d : process.env[k]);
 const CFG = {
   puerto: parseInt(env('PUERTO', '3060'), 10),
@@ -17,10 +17,10 @@ const CFG = {
   modo: String(env('MARY_MODO', 'prueba')).toLowerCase(),   // prueba (solo MARY_PRUEBA) | todos | apagado
   prueba: String(env('MARY_PRUEBA', '')).split(/[,\s]+/).map((x) => x.replace(/\D/g, '')).filter((x) => x.length >= 10),
   silencioMin: parseInt(env('SILENCIO_MIN', '15'), 10),     // no repite lo mismo en un chat antes de esto (salvo que el cliente diga algo de la lista)
-  humanoMin: parseFloat(env('HUMANO_MIN', '15')),           // 1.8: si el dueño escribe a mano en un chat, Mary se calla ahí 15 min (antes 12 h)
-  tz: env('TZ', 'America/Bogota'),
+  humanoMin: parseFloat(env('HUMANO_MIN', '30')),           // 3.1: si el dueño escribe a mano en un chat, se calla ahí 30 min (o lo que diga su panel)
+  tz: env('TZ', 'America/Bogota'), esperaMs: parseInt(env('ESPERA_MS', '2000'), 10),
   // 2.2 · motor de WhatsApp: evolution (el de siempre) o waha. Cada negocio puede tener el suyo en negocios.json ("motor", "sesion").
-  motor: String(env('WA_MOTOR', 'evolution')).toLowerCase(),
+  motor: String(env('WA_MOTOR', env('WAHA_KEY', '') ? 'waha' : 'evolution')).toLowerCase(),   // 3.1: con WAHA del agendador, los negocios nuevos van por WAHA
   waha: String(env('WAHA_URL', 'http://waha-agendador:3000')).replace(/\/+$/, ''), wahaKey: env('WAHA_KEY', '')
 };
 const log = (...a) => console.log(new Date().toISOString(), ...a);
@@ -151,12 +151,19 @@ async function gas(neg, op, datos) {
   const r = await fetch(CFG.gas, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(Object.assign({ action: 'mary', businessId: neg.bid, key: CFG.maryKey, op }, datos || {})), redirect: 'follow', signal: AbortSignal.timeout(60000) });
   const txt = await r.text(); let j; try { j = JSON.parse(txt); } catch (e) { throw new Error('El servidor respondió algo raro: ' + txt.slice(0, 160)); }
   if (!j.ok) throw new Error(j.error || 'error del servidor');
+  const bc = j.data && (j.data.bot || (j.data.info && j.data.info.bot));
+  if (bc) BOT.set(neg.bid, { cfg: bc, t: Date.now() });   // 3.1: «💬 WhatsApp Bot» del panel (viene en cada respuesta, sin gastar llamadas extra)
   return j.data;
 }
+// ---------- 3.1 · configuración del panel «WhatsApp Bot» (por negocio) ----------
+const BOT = new Map();
+const BOT_DEF = { activo: true, agendar: true, cupos: true, saludoDiario: true, pedirNombre: true, pedirCorreo: true, loDeSiempre: true, recordatorioMin: 120, recordatorioConfirmar: true, cambios: true, pausaMin: 30, estados: { activo: true, horas: ['11:00'], manana: true, semanal: false } };
+function botDe(neg) { const x = BOT.get(neg.bid); const c = Object.assign({}, BOT_DEF, x ? x.cfg : {}); c.estados = Object.assign({}, BOT_DEF.estados, (x && x.cfg.estados) || {}); if (!x) c.pausaMin = CFG.humanoMin; return c; }
+async function botFresco(neg, maxMs) { const x = BOT.get(neg.bid); if (!x || Date.now() - x.t > maxMs) await gas(neg, 'info').catch(() => {}); return botDe(neg); }
 
 // ---------- 🤖 3.0 · el asistente (agendar por listas, cupos, saludo una vez al día, nombre y gustos) ----------
 const ASIS = A.crear({ gas: (neg, op, d) => gas(neg, op, d), texto: (neg, tel, t) => escribir(neg, tel, t), lista: (neg, tel, L) => escribirLista(neg, tel, L),
-  get mem() { return MEM; }, guardar: () => memGuardar(), anotar: (x) => anotar(x), tz: CFG.tz });
+  get mem() { return MEM; }, guardar: () => memGuardar(), anotar: (x) => anotar(x), tz: CFG.tz, bot: (neg) => botDe(neg) });
 
 // ---------- ¿quién escribe? ----------
 function leerMensaje(b) {
@@ -213,13 +220,14 @@ async function atenderMensaje(c, neg) {
   if (c.deMi) {   // 🙋 el dueño escribió a mano en este chat (no fue Mary): Mary se hace a un lado
     // 1.1: ¿es el eco de lo que Mary acaba de mandar? Si Mary escribió hace poco, se espera 3 s a que Evolution le confirme el id del envío
     if (c.id && MEM.enviados.indexOf(c.id) === -1 && Date.now() - (ULT_ENVIO.get(k) || 0) < 20000) await new Promise((ok) => setTimeout(ok, 3000));
-    if (c.id && MEM.enviados.indexOf(c.id) === -1) { MEM.humano[k] = Date.now(); memGuardar(); anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: 'dueño escribió: Mary se calla ' + CFG.humanoMin + ' min' }); }
+    if (c.id && MEM.enviados.indexOf(c.id) === -1) { MEM.humano[k] = Date.now(); memGuardar(); anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: 'dueño escribió: se calla ' + botDe(neg).pausaMin + ' min' }); }
     return;
   }
   est.recibidos++;
   if (!c.tel) { anotar({ bid: neg.bid, que: 'sin número visible (LID): no respondo' }); return; }
   if (!atiende(c)) { anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: CFG.modo === 'apagado' ? 'Mary está apagada' : 'modo prueba: no es un número de prueba' }); return; }
-  const pausadoPorDueno = !!(MEM.humano[k] && Date.now() - MEM.humano[k] < CFG.humanoMin * 60000);
+  if (!botDe(neg).activo) { anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: 'asistente apagado en el panel' }); return; }
+  const pausadoPorDueno = !!(MEM.humano[k] && Date.now() - MEM.humano[k] < botDe(neg).pausaMin * 60000);
   if (pausadoPorDueno) { anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: 'callada: el dueño escribió hace poco' }); return; }
   const prev = MEM.chats[k] || {};
   // 📸 foto del pago
@@ -256,9 +264,10 @@ async function atenderMensaje(c, neg) {
   if (!info.activo) { anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: 'agenda suspendida: no respondo' }); return; }   // agenda suspendida: el dueño atiende
   const firma = (info.citas || []).map((x) => x.code + x.status).join(',') || 'sin';
   if (!debeResponder({ texto: c.texto, pausadoPorDueno, reciente, citas: info.citas, repetido: prev.firma === firma && prev.n >= 2 })) { anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: 'callada (' + (info.citas.length ? 'ya tiene su cita' : 'ya le respondí') + ')' }); return; }
-  const sal = ASIS.saludo(k, info.negocio, c.nombre);   // «Hola 👋 Soy el asistente de…» solo la primera vez del día
+  const sal = ASIS.saludo(k, info.negocio, c.nombre, !botDe(neg).saludoDiario);   // «Hola 👋 Soy el asistente de…» solo la primera vez del día (o siempre, si el dueño lo apaga)
   if (info.citas && info.citas.length) await escribir(neg, c.tel, T.conCita(info, sal));
-  else await ASIS.menu(neg, { k, tel: c.tel, texto: c.texto }, T.sinCita(info, sal), info.negocio);
+  else if (botDe(neg).agendar || botDe(neg).cupos) await ASIS.menu(neg, { k, tel: c.tel, texto: c.texto }, T.sinCita(info, sal), info.negocio);
+  else await escribir(neg, c.tel, T.sinCita(info, sal, true));
   MEM.chats[k] = { t: Date.now(), firma, n: prev.firma === firma ? (prev.n || 1) + 1 : 1 }; memGuardar();
   anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: info.citas.length ? 'tiene ' + info.citas.length + ' cita(s)' : 'link para agendar' });
 }
@@ -284,9 +293,13 @@ async function revisarCorreos() {
 const IMG = new Map();   // id → { png, t } (Evolution las baja por dentro; se borran a los 30 min)
 function guardarImg(png) { const id = Math.random().toString(36).slice(2) + Date.now().toString(36); IMG.set(id, { png, t: Date.now() }); for (const [k, v] of IMG) if (Date.now() - v.t > 30 * 60000) IMG.delete(k); return CFG.publico + '/img/' + id + '.png'; }
 async function armarEstado(neg, tipo) {
-  const d = await gas(neg, 'cupos', { dias: tipo === 'semana' ? 7 : 1 });
-  const svg = tipo === 'semana' ? E.svgSemana(d, d.dias) : E.svgHoy(d, d.dias[0]);
-  return { d, png: E.png(svg), caption: tipo === 'semana' ? E.textoSemana(d) : E.textoHoy(d, d.dias[0]) };
+  const d = await gas(neg, 'cupos', { dias: tipo === 'semana' ? 7 : 2 });
+  if (tipo === 'semana') return { d, png: E.png(E.svgSemana(d, d.dias)), caption: E.textoSemana(d) };
+  // 3.1: si hoy ya no hay cupos, el estado es el de mañana (si el dueño lo deja así); si tampoco hay, no se publica
+  let dia = d.dias[0];
+  if (tipo === 'hoy' && !(dia && dia.libres && dia.libres.length)) dia = botDe(neg).estados.manana && d.dias[1] && d.dias[1].libres.length ? d.dias[1] : null;
+  if (!dia) return { d, png: null, caption: '', dia: null };
+  return { d, dia, png: E.png(E.svgHoy(d, dia)), caption: E.textoHoy(d, dia) };
 }
 function quienVeEstados(modo, prueba) {
   if (modo === 'apagado') return null;
@@ -296,17 +309,36 @@ function quienVeEstados(modo, prueba) {
 async function publicarEstado(neg, tipo) {
   const quien = quienVeEstados(CFG.modo, CFG.prueba);
   if (!quien) return { ok: false, motivo: 'Mary está apagada' };
-  const { d, png, caption } = await armarEstado(neg, tipo);
+  const { d, png, caption, dia } = await armarEstado(neg, tipo);
   if (!d.activo) return { ok: false, motivo: 'la agenda del negocio no está activa' };
-  if (tipo === 'hoy' && !d.dias[0].abierto) return { ok: false, motivo: 'hoy está cerrado' };
+  if (tipo === 'hoy' && !png) return { ok: false, motivo: 'no hay cupos hoy ni mañana: no publiqué' };
   const url = guardarImg(png);
   try {
-    if (esWaha(neg)) await waha('post', '/api/' + encodeURIComponent(sesionDe(neg)) + '/status/image', Object.assign({ file: { mimetype: 'image/png', url }, caption }, quien.allContacts ? {} : { contacts: quien.statusJidList.map((j) => j.replace('@s.whatsapp.net', '@c.us')) }), 120000);
+    // 3.1: WAHA solo conoce a quien escribió hace poco → el estado va a TODOS los clientes del negocio (sus números)
+    let para = quien.allContacts ? null : quien.statusJidList.map((j) => j.replace('@s.whatsapp.net', '@c.us'));
+    if (!para && esWaha(neg)) { const r = await contactosDe(neg); if (r.length) para = r.map((n) => n + '@c.us'); }
+    if (esWaha(neg)) await waha('post', '/api/' + encodeURIComponent(sesionDe(neg)) + '/status/image', Object.assign({ file: { mimetype: 'image/png', url }, caption }, para ? { contacts: para } : {}), 120000);
     else await evo('post', '/message/sendStatus/' + encodeURIComponent(neg.instancia), Object.assign({ type: 'image', content: url, caption }, quien), 120000);
   }
   catch (e) { if (!/timeout|aborted|524|504/i.test(e.message)) throw e; }   // ⏳ publicar a muchos contactos tarda: Evolution lo sigue haciendo solo
-  est.estados++; anotar({ bid: neg.bid, que: 'estado ' + tipo + ' publicado' });
+  est.estados++; anotar({ bid: neg.bid, que: 'estado ' + tipo + ' publicado' + (dia && dia !== d.dias[0] ? ' (cupos de mañana)' : '') });
   return { ok: true };
+}
+const CONTACTOS = new Map();   // bid → { L, t } (6 h)
+async function contactosDe(neg) {
+  const x = CONTACTOS.get(neg.bid); if (x && Date.now() - x.t < 6 * 3600000) return x.L;
+  let L = []; try { L = ((await gas(neg, 'contactos')) || {}).numeros || []; } catch (e) { L = (x && x.L) || []; }
+  CONTACTOS.set(neg.bid, { L, t: Date.now() }); return L;
+}
+// 3.1 · qué estados tocan ahora (función pura, con pruebas): máximo 2 al día a las horas del panel, cada uno una sola vez
+function estadosQueTocan(cfg, a, hechos, bid) {
+  const e = cfg || {}, out = [];
+  if (e.activo === false) return out;
+  const horas = (e.horas || ['11:00']).filter((h) => /^\d{2}:\d{2}$/.test(h)).slice(0, 2);
+  const fin = (h) => { const [H, M] = h.split(':').map(Number); const t = Math.min(H * 60 + M + 180, 21 * 60); return String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0'); };
+  horas.forEach((h) => { const k = bid + ':hoy@' + h; if (a.hm >= h && a.hm < fin(h) && hechos[k] !== a.fecha) out.push({ tipo: 'hoy', k }); });
+  if (e.semanal && a.dow === 1 && a.hm >= '07:00' && a.hm < '12:00' && hechos[bid + ':semana'] !== a.fecha) out.push({ tipo: 'semana', k: bid + ':semana' });
+  return out;
 }
 function ahoraLocal() {
   const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: CFG.tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false, weekday: 'short' }).formatToParts(new Date()).map((x) => [x.type, x.value]));
@@ -315,25 +347,24 @@ function ahoraLocal() {
 async function tickEstados() {
   if (CFG.modo === 'apagado') return;
   const a = ahoraLocal();
+  if (a.hm < '06:30' || a.hm > '21:00') return;
   for (const neg of negocios()) {
-    const ce = Object.assign({ hoy: '07:30', semana: '07:00', semanaDia: 1 }, neg.estados || {});
-    if (ce.activo === false) continue;
-    const tareas = [];
-    if (ce.hoy && a.hm >= ce.hoy && a.hm < '12:00') tareas.push(['hoy', a.fecha]);
-    if (ce.semana && a.dow === Number(ce.semanaDia) && a.hm >= ce.semana && a.hm < '12:00') tareas.push(['semana', a.fecha]);
-    for (const [tipo, fecha] of tareas) {
-      const k = neg.bid + ':' + tipo; if (MEM.estados[k] === fecha) continue;
-      MEM.estados[k] = fecha; memGuardar();   // una sola vez al día aunque falle (no reintenta en bucle sobre WhatsApp)
-      try { const r = await publicarEstado(neg, tipo); if (!r.ok) anotar({ bid: neg.bid, que: 'estado ' + tipo + ': ' + r.motivo }); }
-      catch (e) { est.errores++; log('❌ estado', neg.bid, tipo, e.message); anotar({ bid: neg.bid, que: 'estado ' + tipo + ' falló: ' + e.message.slice(0, 120) }); }
-      if (tipo === 'hoy' && tareas.length > 1) await new Promise((ok) => setTimeout(ok, 60000));   // dos estados seguidos, con un minuto entre ellos
+    if (neg.estados && neg.estados.activo === false) continue;   // apagado a mano en negocios.json
+    const bot = await botFresco(neg, 30 * 60000);   // lo que el dueño eligió en su panel (se lee cada 30 min como mucho)
+    if (!bot.activo) continue;
+    const tareas = estadosQueTocan(bot.estados, a, MEM.estados, neg.bid);
+    for (const [n, t] of tareas.entries()) {
+      MEM.estados[t.k] = a.fecha; memGuardar();   // una sola vez al día aunque falle (no reintenta en bucle sobre WhatsApp)
+      try { const r = await publicarEstado(neg, t.tipo); if (!r.ok) anotar({ bid: neg.bid, que: 'estado ' + t.tipo + ': ' + r.motivo }); }
+      catch (e) { est.errores++; log('❌ estado', neg.bid, t.tipo, e.message); anotar({ bid: neg.bid, que: 'estado ' + t.tipo + ' falló: ' + e.message.slice(0, 120) }); }
+      if (n < tareas.length - 1) await new Promise((ok) => setTimeout(ok, 60000));
     }
   }
 }
 
 // ---------- recordatorios por WhatsApp ----------
-async function tickRecordatorios() {
-  const hm = ahoraLocal().hm; if (hm < '05:00' || hm > '21:30') return;   // 2.5: de noche no hay citas próximas: no se gasta cupo
+async function tickRecordatorios(aCualquierHora) {
+  const hm = ahoraLocal().hm; if (!aCualquierHora && (hm < '05:00' || hm > '21:30')) return;   // 2.5: de noche no hay citas próximas: no se gasta cupo
   for (const neg of negocios()) {
     const min = Number(neg.recordatorioMin == null ? 120 : neg.recordatorioMin); if (!min) continue;
     try {
@@ -341,7 +372,11 @@ async function tickRecordatorios() {
       if (!r.info || !r.info.activo) continue;
       for (const c of r.citas || []) {   // 1.1: cada cita por su lado; una que falla no frena las demás ni se repite cada 5 min
         if (!atiende({ tel: numeroWa(c.whatsapp) })) continue;
-        try { await escribir(neg, c.whatsapp, T.recordatorio(c, r.info)); est.recordatorios++; anotar({ bid: neg.bid, que: 'recordatorio ' + c.code }); }
+        try {
+          const bot = botDe(neg);
+          await escribir(neg, c.whatsapp, T.recordatorio(c, r.info, bot)); est.recordatorios++; anotar({ bid: neg.bid, que: 'recordatorio ' + c.code });
+          if (bot.recordatorioConfirmar || bot.cambios) ASIS.trasRecordatorio(neg, numeroWa(c.whatsapp), c);
+        }
         catch (e) { if (!e.permanente) { log('recordatorio', c.code, e.message); continue; } anotar({ bid: neg.bid, que: 'recordatorio ' + c.code + ' no se pudo: ' + e.message }); }
         await gas(neg, 'recordada', { code: c.code }).catch((e) => log('recordada', c.code, e.message));
       }
@@ -389,14 +424,18 @@ function guardarNegocio(bid, extra) {
   negT = 0; negocios();
 }
 function negocioRegistrado(bid) { try { return JSON.parse(fs.readFileSync(CFG.negocios, 'utf8')).some((x) => x && x.bid === bid); } catch (e) { return false; } }
-const motorBid = (bid) => { const n = negocios().find((x) => x.bid === bid); return esWaha(n || null) ? 'waha' : 'evolution'; };
+// 3.1: la sesión de WAHA de un negocio (la de su registro en negocios.json, aunque esté inactivo; si no hay, su propio nombre)
+function registroDe(bid) { try { return JSON.parse(fs.readFileSync(CFG.negocios, 'utf8')).find((x) => x && x.bid === bid) || null; } catch (e) { return null; } }
+const sesionBid = (bid) => { const n = registroDe(bid); return String((n && (n.sesion || n.instancia)) || bid); };
+const motorBid = (bid) => { const n = registroDe(bid); return esWaha(n || null) ? 'waha' : 'evolution'; };
 async function asegurarInstancia(bid) {
   if (motorBid(bid) === 'waha') {
-    const config = { webhooks: [{ url: CFG.publico + '/webhook', events: ['message.any', 'session.status'] }] };
-    let existe = false; try { await waha('get', '/api/sessions/' + encodeURIComponent(bid)); existe = true; } catch (e) { existe = false; }
-    if (!existe) await waha('post', '/api/sessions', { name: bid, start: true, config });
-    else { await waha('put', '/api/sessions/' + encodeURIComponent(bid), { name: bid, config }).catch(() => {}); await waha('post', '/api/sessions/' + encodeURIComponent(bid) + '/start').catch(() => {}); }
-    await new Promise((ok) => setTimeout(ok, 3000));
+    const ses = sesionBid(bid), config = { webhooks: [{ url: CFG.publico + '/webhook', events: ['message.any', 'session.status'] }] };
+    let existe = false; try { await waha('get', '/api/sessions/' + encodeURIComponent(ses)); existe = true; } catch (e) { existe = false; }
+    if (!existe) await waha('post', '/api/sessions', { name: ses, start: true, config });
+    else { await waha('put', '/api/sessions/' + encodeURIComponent(ses), { name: ses, config }).catch(() => {}); await waha('post', '/api/sessions/' + encodeURIComponent(ses) + '/start').catch(() => {}); }
+    // 3.1: el código solo se puede pedir cuando la sesión ya está esperando vincular
+    for (let i = 0; i < 15; i++) { const e = await estadoInstancia(bid); if (e === 'open' || e === 'scan_qr_code') break; await new Promise((ok) => setTimeout(ok, CFG.esperaMs)); }
     return;
   }
   let existe = false;
@@ -406,11 +445,11 @@ async function asegurarInstancia(bid) {
   else await evo('post', '/webhook/set/' + encodeURIComponent(bid), { webhook: Object.assign({ enabled: true }, webhook) }).catch(() => {});
 }
 async function estadoInstancia(bid) {
-  if (motorBid(bid) === 'waha') { try { const r = await waha('get', '/api/sessions/' + encodeURIComponent(bid)); return String(r.status || '').toUpperCase() === 'WORKING' ? 'open' : String(r.status || '').toLowerCase(); } catch (e) { return ''; } }
+  if (motorBid(bid) === 'waha') { try { const r = await waha('get', '/api/sessions/' + encodeURIComponent(sesionBid(bid))); return String(r.status || '').toUpperCase() === 'WORKING' ? 'open' : String(r.status || '').toLowerCase(); } catch (e) { return ''; } }
   try { const r = await evo('get', '/instance/connectionState/' + encodeURIComponent(bid)); return String((r.instance && r.instance.state) || r.state || ''); } catch (e) { return ''; }
 }
 async function numeroInstancia(bid) {
-  if (motorBid(bid) === 'waha') { try { const r = await waha('get', '/api/sessions/' + encodeURIComponent(bid)); return String((r.me && r.me.id) || '').split('@')[0].replace(/\D/g, ''); } catch (e) { return ''; } }
+  if (motorBid(bid) === 'waha') { try { const r = await waha('get', '/api/sessions/' + encodeURIComponent(sesionBid(bid))); return String((r.me && r.me.id) || '').split('@')[0].replace(/\D/g, ''); } catch (e) { return ''; } }
   try { const r = await evo('get', '/instance/fetchInstances?instanceName=' + encodeURIComponent(bid)); const x = (Array.isArray(r) ? r[0] : r) || {}; const i = x.instance || x; return String(i.ownerJid || i.owner || i.number || '').split('@')[0].replace(/\D/g, ''); } catch (e) { return ''; }
 }
 async function atenderPedidoWa(bid) {
@@ -419,19 +458,25 @@ async function atenderPedidoWa(bid) {
   if (!pedido) return;
   try {
     if (pedido.accion === 'conectar') {
+      // 3.1: un WhatsApp por negocio, en SU sesión de WAHA (nueva, con el nombre del negocio) · se registra inactivo hasta que vincule
+      const reg = registroDe(bid);
+      if (!reg || (reg.activo === false && reg.sesion !== bid)) guardarNegocio(bid, Object.assign({ activo: false, instancia: bid, motor: CFG.motor }, CFG.motor === 'waha' ? { sesion: bid } : {}));
       await asegurarInstancia(bid);   // 1.7: el negocio NO se activa para Mary hasta que vincule de verdad
       if (await estadoInstancia(bid) === 'open') { await gas(neg, 'waResultado', { estado: 'conectado', numero: await numeroInstancia(bid) }); anotar({ bid, que: 'WhatsApp ya estaba conectado' }); return; }
       const c = motorBid(bid) === 'waha'
-        ? await (async () => { const r = await waha('post', '/api/' + encodeURIComponent(bid) + '/auth/request-code', { phoneNumber: pedido.numero }); let qr = ''; try { const q = await waha('get', '/api/' + encodeURIComponent(bid) + '/auth/qr?format=image'); if (q && q.data) qr = 'data:' + (q.mimetype || 'image/png') + ';base64,' + q.data; } catch (e) { /* solo código */ } return { pairingCode: r.code || '', base64: qr }; })()
+        ? await (async () => { const ses = encodeURIComponent(sesionBid(bid)); const r = await waha('post', '/api/' + ses + '/auth/request-code', { phoneNumber: pedido.numero }); return { pairingCode: r.code || '', base64: await qrWaha(bid) }; })()
         : await evo('get', '/instance/connect/' + encodeURIComponent(bid) + '?number=' + encodeURIComponent(pedido.numero));
       vinculando.set(bid, Date.now() + 5 * 60000);
-      MEM.pendientesWa = MEM.pendientesWa || {}; MEM.pendientesWa[bid] = Date.now() + VENCE_MIN * 60000; memGuardar();   // se recuerda aunque el VPS se reinicie
+      MEM.pendientesWa = MEM.pendientesWa || {}; MEM.pendientesWa[bid] = Date.now() + VENCE_MIN * 60000;   // se recuerda aunque el VPS se reinicie
+      MEM.codigos = MEM.codigos || {}; MEM.codigos[bid] = { codigo: String(c.pairingCode || ''), t: Date.now() }; memGuardar();
       await gas(neg, 'waResultado', { estado: 'codigo', codigo: String(c.pairingCode || ''), qr: String(c.base64 || '') });
       anotar({ bid, que: 'código para vincular enviado al panel' + (c.pairingCode ? '' : ' (solo QR)') });
     } else if (pedido.accion === 'desconectar') {
-      if (motorBid(bid) === 'waha') await waha('post', '/api/sessions/' + encodeURIComponent(bid) + '/logout').catch(() => {});
-      else await evo('delete', '/instance/logout/' + encodeURIComponent(bid)).catch(() => {});
-      guardarNegocio(bid, { activo: false }); if (MEM.conectados) { delete MEM.conectados[bid]; memGuardar(); }
+      // 3.1: desvincular = cerrar la sesión y BORRAR la conexión (no queda nada abierto). La próxima vinculación crea una nueva.
+      if (motorBid(bid) === 'waha') { const ses = encodeURIComponent(sesionBid(bid)); await waha('post', '/api/sessions/' + ses + '/logout').catch(() => {}); await waha('delete', '/api/sessions/' + ses).catch(() => {}); }
+      else { await evo('delete', '/instance/logout/' + encodeURIComponent(bid)).catch(() => {}); await evo('delete', '/instance/delete/' + encodeURIComponent(bid)).catch(() => {}); }
+      guardarNegocio(bid, Object.assign({ activo: false }, motorBid(bid) === 'waha' ? { sesion: bid, instancia: bid } : {}));
+      if (MEM.conectados) { delete MEM.conectados[bid]; memGuardar(); }
       await gas(neg, 'waResultado', { estado: 'desconectado' });
       anotar({ bid, que: 'WhatsApp desconectado desde el panel' });
     }
@@ -447,16 +492,43 @@ async function limpiarSinVincular() {
     if (Date.now() < hasta) continue;
     delete P[bid]; memGuardar(); vinculando.delete(bid);
     if (await estadoInstancia(bid) === 'open') continue;   // sí vinculó (el aviso pudo perderse)
-    if (motorBid(bid) === 'waha') { await waha('post', '/api/sessions/' + encodeURIComponent(bid) + '/logout').catch(() => {}); await waha('delete', '/api/sessions/' + encodeURIComponent(bid)).catch(() => {}); }
+    if (motorBid(bid) === 'waha') { const ses = encodeURIComponent(sesionBid(bid)); await waha('post', '/api/sessions/' + ses + '/logout').catch(() => {}); await waha('delete', '/api/sessions/' + ses).catch(() => {}); }
     else { await evo('delete', '/instance/logout/' + encodeURIComponent(bid)).catch(() => {}); await evo('delete', '/instance/delete/' + encodeURIComponent(bid)).catch(() => {}); }
     const L = negocios().find((n) => n.bid === bid); if (L) guardarNegocio(bid, { activo: false });
     await gas({ bid, instancia: bid }, 'waResultado', { estado: 'vencido' }).catch(() => {});
     anotar({ bid, que: '🧹 no vinculó en ' + VENCE_MIN + ' min: borré la conexión vacía' });
   }
 }
+async function qrWaha(bid) {
+  try { const q = await waha('get', '/api/' + encodeURIComponent(sesionBid(bid)) + '/auth/qr?format=image'); if (q && q.data) return 'data:' + (q.mimetype || 'image/png') + ';base64,' + q.data; } catch (e) { /* solo código */ }
+  return '';
+}
+// 3.1: el QR de WhatsApp cambia cada ~20 s: mientras el dueño vincula, se le manda el nuevo al panel (el código sigue igual)
+const QR_T = new Map(), SINC = { t: Date.now() - 29 * 60000 };   // la primera sincronización, al minuto de encender
+async function renovarQr() {
+  for (const [bid, hasta] of vinculando) {
+    if (Date.now() > hasta || motorBid(bid) !== 'waha' || Date.now() - (QR_T.get(bid) || 0) < 15000) continue;
+    QR_T.set(bid, Date.now());
+    if (await estadoInstancia(bid) === 'open') continue;
+    const qr = await qrWaha(bid); if (!qr) continue;
+    await gas({ bid, instancia: bid }, 'waResultado', { estado: 'codigo', codigo: ((MEM.codigos || {})[bid] || {}).codigo || '', qr }).catch(() => {});
+  }
+}
+// 3.1: negocios que ya tienen WhatsApp funcionando (p. ej. vinculados por el VPS) → el panel lo muestra «✅ Vinculado»
+async function sincronizarConectados() {
+  for (const neg of negocios()) {
+    if (MEM.conectados && MEM.conectados[neg.bid]) continue;
+    if (await estadoInstancia(neg.bid) !== 'open') continue;
+    MEM.conectados = MEM.conectados || {}; MEM.conectados[neg.bid] = Date.now(); memGuardar();
+    await gas(neg, 'waResultado', { estado: 'conectado', numero: await numeroInstancia(neg.bid) }).catch((e) => log('sincronizar', e.message));
+    anotar({ bid: neg.bid, que: '✅ el panel ya muestra el WhatsApp vinculado' });
+  }
+}
 async function tickPedidosWa() {
   if (!CFG.gas || !CFG.maryKey) return;
   await limpiarSinVincular().catch((e) => log('limpiar', e.message));
+  await renovarQr().catch((e) => log('qr', e.message));
+  if (Date.now() - SINC.t > 30 * 60000) { SINC.t = Date.now(); await sincronizarConectados().catch((e) => log('sincronizar', e.message)); }
   let pend = {};
   try {
     const r = await fetch(FS.url + '/v1/projects/' + FS.proyecto + '/databases/(default)/documents/platform/public?key=' + FS.llave + '&mask.fieldPaths=maryWaPend', { signal: AbortSignal.timeout(15000) });
@@ -532,5 +604,5 @@ if (require.main === module) {
   servidor.listen(CFG.puerto, () => { log('👩‍💼 ' + VERSION + ' escuchando en ' + CFG.puerto + ' · modo ' + CFG.modo); negocios(); arrancarRelojes(); });
 }
 // 🧪 solo para el banco de escenarios (banco/escenarios.js): deja a Mary como recién encendida
-const _banco = { ASIS, alMensaje, alEventoConexion, ultimos, reiniciar() { MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; MEM.conv = {}; MEM.clientes = {}; ASIS._cat.clear(); delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
-module.exports = { _banco, telEnAviso, deWaha, esWaha, debeResponder, alEventoConexion, tickPedidosWa, limpiarSinVincular, leerMensaje, atiende, PREGUNTA, numeroWa, ahoraLocal, enFila, yaVisto, quienVeEstados, CFG };
+const _banco = { ASIS, BOT, memHumano: () => MEM.humano, tickRecordatorios, publicarEstado, alMensaje, alEventoConexion, ultimos, reiniciar() { MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; MEM.conv = {}; MEM.clientes = {}; MEM.conectados = {}; MEM.pendientesWa = {}; MEM.codigos = {}; ASIS._cat.clear(); BOT.clear(); CONTACTOS.clear(); vinculando.clear(); delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
+module.exports = { _banco, estadosQueTocan, atenderPedidoWa, sincronizarConectados, renovarQr, telEnAviso, deWaha, esWaha, debeResponder, alEventoConexion, tickPedidosWa, limpiarSinVincular, leerMensaje, atiende, PREGUNTA, numeroWa, ahoraLocal, enFila, yaVisto, quienVeEstados, CFG };

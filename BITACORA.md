@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-3.0** · Página **2026-11-12a** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-12** · Mary **agendador-ia-3.1** · Página **2026-11-12b** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -96,7 +96,7 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## ⏳ Pendientes
-1. Instalar 3.0 + página 2026-11-12a y probar el agendamiento por listas con El Barba (tu 318) desde el número aparte. Luego `MARY_MODO=todos`.
+1. Instalar 3.1 + página 2026-11-12b y probar el agendamiento por listas con El Barba (tu 318) desde el número aparte. Luego `MARY_MODO=todos`.
    Verificar en un celular real: que la lista llegue por WAHA (si no, sale el texto con números) y que la invitación entre al calendario.
    El panel guarda `maryReminderMinutes` en settings: confirmar que las reglas de Firestore lo dejan guardar.
 8. Futuro: «oído» propio del agendador para escuchar audios (copia del de Epic: Whisper/Speaches, contenedor `oido-agendador`).
@@ -113,6 +113,21 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-12 · agendador-ia-3.1 · 💬 Panel «WhatsApp Bot» + 📸 estados + recordatorio con respuesta
+- Panel (`admin.js`): pestaña nueva `wabot` («WhatsApp Bot»): tarjeta de vincular (código visible + botón «Prefiero escanear un QR»),
+  desvincular (espera la confirmación del VPS), opciones guardadas en `settings.maryBot` (ver `BOT_DEF`) y sección de estados
+  (`maryBot.estados`: activo, horas[≤2], manana, semanal). Se quitó el campo de recordatorio de Configuración (3.0) y la sección vieja de Mary.
+- Servidor (`mary.gs`): `maryBotCfg_` (valores por defecto), `bot` en cada respuesta de info/chat/catalogo, ops `asistencia`
+  (Telegram con datos + .vcf), `cancelar`, `reagendar` (mismas reglas que la página: horas mínimas, máximo de cambios), `contactos`.
+  `crear` y `asistencia` guardan al cliente en `customers/wa<10 dígitos>`. `conectar` falla si ya hay un WhatsApp vinculado.
+- VPS (`principal.js`): `BOT` (config por negocio que llega en las respuestas), pausa del dueño = `pausaMin`, asistente apagado,
+  `estadosQueTocan` (pura), estado de mañana si hoy no hay, estados a los `contactos` del negocio, vincular/desvincular por WAHA con la
+  sesión del negocio (`sesionBid`), `renovarQr` (cada 15 s mientras vincula), `sincronizarConectados` (cada 30 min).
+- Asistente: respeta las opciones del panel; tras el recordatorio entiende sí/cancelar/modificar (5 h); «quiero cancelar mi cita» pregunta
+  si está seguro; «modificar» → días → horas → paráfrasis → `reagendar`.
+- Arreglo encontrado por el banco: «cancelar» tras el recordatorio se tomaba como «salir» y no cancelaba.
+- Banco: 69 pruebas, 0 fallas (mutación hecha con la pausa del dueño).
 
 ### 2026-11-12 · agendador-ia-3.0 · 🤖 El asistente (agendar por WhatsApp)
 - Saludo «Soy el asistente de {negocio}» (sin «Mary»), una vez al día por cliente (`MEM.clientes[bid:tel].saludo`).

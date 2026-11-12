@@ -119,7 +119,7 @@ function correoIcs_(a, metodo, seq, st, biz, dir, link) {
   const fin = new Date(ini.getTime() + Number(a.occupiedMinutes || a.totalMinutes || 30) * 60000);
   let yo = ''; try { yo = mailFrom(); const al = GmailApp.getAliases().map(function (x) { return String(x).toLowerCase(); }); if (al.indexOf(yo) < 0) yo = Session.getEffectiveUser().getEmail(); } catch (e) { yo = yo || 'citas@tuagenda.vip'; }
   const nom = [((a.customer || {}).firstName || ''), ((a.customer || {}).lastName || '')].join(' ').trim();
-  const aviso = Number(st.maryReminderMinutes != null && st.maryReminderMinutes !== '' ? st.maryReminderMinutes : 120);
+  const aviso = (typeof maryBotCfg_ === 'function') ? maryBotCfg_(st).recordatorioMin : Number(st.maryReminderMinutes != null && st.maryReminderMinutes !== '' ? st.maryReminderMinutes : 120);
   const servicios = (a.items || []).map(function (i) { return i.name; }).join(' + ');
   const L = ['BEGIN:VCALENDAR', 'PRODID:-//Tu Agenda//tuagenda.vip//ES', 'VERSION:2.0', 'CALSCALE:GREGORIAN', 'METHOD:' + metodo, 'BEGIN:VEVENT',
     'UID:' + a.code + '-' + BID + '@tuagenda.vip', 'SEQUENCE:' + seq, 'DTSTAMP:' + utc(new Date()), 'DTSTART:' + utc(ini), 'DTEND:' + utc(fin),

@@ -9,9 +9,9 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-11-12a";
-import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-12a";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-12a";
+} from "./common.js?v=2026-11-12b";
+import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-12b";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-12b";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -125,7 +125,8 @@ function start() {
     A.settings = s.data() || {};
     setDialogBrand(A.settings.businessName || A.biz?.name, A.settings.appearance?.logo);
     applyPanelBrand(); if (A.me) renderTabs();
-    if (A.tab === "linkcli" && !document.activeElement?.closest?.("#tab-linkcli input")) renderLinkCli(); // p. ej. al quedar conectado el WhatsApp
+    if (A.tab === "linkcli" && !document.activeElement?.closest?.("#tab-linkcli input")) renderLinkCli();
+    if (A.tab === "wabot" && !document.activeElement?.closest?.("#tab-wabot input, #tab-wabot select")) renderWaBot(); // p. ej. al quedar vinculado el WhatsApp
     // recién creada desde "Probar gratis": abre la guía de primeros pasos
     // asistente de inicio: la primera vez (o al llegar desde "Probar gratis")
     if (!A.wizAuto && isOwner() && !A.me?.isSuper && !document.body.classList.contains("plan-gate") && !A.bill?.planWanted && (!A.settings.setupDone || new URLSearchParams(location.search).get("guia") === "1")) {
@@ -190,7 +191,7 @@ const TABS = {
   agenda: ["Agenda", "fa-calendar-days", "#2563eb"], staff: ["Equipo y descansos", "fa-users", "#7c3aed"],
   clients: ["Clientes", "fa-address-book", "#db2777"], services: ["Servicios", "fa-scissors", "#ea580c"],
   appearance: ["Apariencia", "fa-palette", "#c026d3"], images: ["Imágenes", "fa-image", "#0891b2"], plan: ["Mi plan", "fa-crown", "#ca8a04"],
-  settings: ["Configuración", "fa-gear", "#475569"], linkcli: ["Link de clientes", "fa-link", "#1E9E63"]
+  settings: ["Configuración", "fa-gear", "#475569"], linkcli: ["Link de clientes", "fa-link", "#1E9E63"], wabot: ["WhatsApp Bot", "fa-comments", "#25D366"]
 };
 // Qué trae cada plan (Gratis, Básico, Gold) lo define el superusuario en su panel (Cobros)
 const PLANS = () => plansOf(A.plat || {});
@@ -198,7 +199,7 @@ const myPlan = () => planOfBiz(A.biz || {});
 const planInfo = () => PLANS()[myPlan()];
 const isTrial = () => myPlan() === "free" && !A.me?.isSuper;
 const trialDays = () => Math.max(1, Number(planInfo().daysAhead || 30));
-const TAB_FEATURE = { clients: "clients", marketing: "marketing", appearance: "appearance", images: "images", activity: "activity" };
+const TAB_FEATURE = { wabot: "whatsapp", clients: "clients", marketing: "marketing", appearance: "appearance", images: "images", activity: "activity" };
 // el plan pagado más barato que tiene una función
 const planFor = (f) => ["basic", "gold"].find((k) => (PLANS()[k].features || []).includes(f)) || "gold";
 function lockedNow(f) {
@@ -223,7 +224,7 @@ document.addEventListener("click", (e) => {
   if (PLAN_KEYS.includes(g.dataset.goplan)) A.planPick = g.dataset.goplan;
   goTab("plan");
 });
-const ALL_TABS = ["home", "linkcli", "activity", "referrals", "agenda", "staff", "clients", "services", "marketing", "appearance", "images", "plan", "settings"];
+const ALL_TABS = ["home", "linkcli", "wabot", "activity", "referrals", "agenda", "staff", "clients", "services", "marketing", "appearance", "images", "plan", "settings"];
 const LOCKED_TABS = ["home", "appearance", "settings", "plan"]; // siempre visibles para poder deshacer cambios
 const PANEL_DEFAULT = { useBrand: true, linkLabel: "Link clientes", shareMsg: "Agenda tu cita en {negocio} aquí: {link}", columns: 3, style: "cards", colorIcons: true, order: ALL_TABS, hidden: [] };
 function panelPrefs() {
@@ -234,7 +235,7 @@ function panelPrefs() {
 }
 function renderTabs() {
   const P = panelPrefs();
-  const allowed = ["home", "agenda", "staff"].concat(isOwner() ? ["linkcli", "activity", "referrals", "clients", "services", "marketing", "appearance", "images", "plan", "settings"] : []);
+  const allowed = ["home", "agenda", "staff"].concat(isOwner() ? ["linkcli", "wabot", "activity", "referrals", "clients", "services", "marketing", "appearance", "images", "plan", "settings"] : []);
   const ids = P.order.filter((id) => allowed.includes(id) && (!P.hidden.includes(id) || A.tab === id));
   const t = $("tabs");
   t.className = `grid gap-1.5 lg:grid-cols-1 ${({ 2: "grid-cols-2", 3: "grid-cols-3", 4: "grid-cols-4" })[P.columns] || "grid-cols-3"} ${P.style === "list" ? "tabs-list" : ""} ${P.colorIcons ? "" : "tabs-mono"}`;
@@ -272,6 +273,7 @@ function switchTab(id, opts = {}) {
   if (A.tab === "clients") loadUsers();
   if (A.tab === "settings") renderSettings();
   if (A.tab === "linkcli") renderLinkCli();
+  if (A.tab === "wabot") renderWaBot();
   if (A.tab === "services") renderServices();
   if (A.tab === "appearance") renderAppearance();
   if (A.tab === "images") renderImages();
@@ -1117,9 +1119,8 @@ function renderSettings() {
         ${num("stMaxResched", "Máximo de cambios por cita", s.maxReschedules ?? 2, 'min="0"')}
         ${num("stNoShow", "Faltas seguidas antes de exigir pago total", s.noShowThreshold ?? 2, 'min="1"')}
         ${num("stReminder", "Aviso de próxima cita por Telegram (minutos antes)", s.reminderMinutesBefore ?? 15, 'min="0"')}
-        <label class="field"><span>Recordatorio al cliente por WhatsApp</span><select id="stMaryRem">${[[0, "Sin recordatorio"], [30, "30 minutos antes"], [60, "1 hora antes"], [120, "2 horas antes"], [180, "3 horas antes"], [1440, "1 día antes"]].map(([v, t]) => `<option value="${v}" ${Number(s.maryReminderMinutes ?? 120) === v ? "selected" : ""}>${t}</option>`).join("")}</select></label>
       </div>
-      <p class="mt-2 text-xs text-ink/60">El asistente de WhatsApp le escribe al cliente: «Hola 👋 Recuerda que tu cita es en 1 hora». También queda como aviso en la cita de su calendario.</p>
+      <p class="mt-2 text-xs text-ink/60">El recordatorio por WhatsApp al cliente se elige en <a href="#" class="font-bold underline" data-gotab="wabot">WhatsApp Bot</a>.</p>
     </fieldset>
 
     <fieldset class="rounded-xl border border-line bg-white p-4"><legend class="px-1 font-narrow text-xl font-bold">Telegram</legend>
@@ -1250,7 +1251,7 @@ async function saveSettings(e) {
     autoConfirmProof: $("stAuto").checked, businessHours: hours, closedDates: A.closedDraft,
     paymentMethods: A.pmDraft.filter((m) => m.label && m.account).map((m) => ({ label: m.label, account: m.account, holder: m.holder || "", qr: m.qr || "" })), paymentInstructions: $("stPayInstr").value.trim(),
     rescheduleMinHours: n("stReschedH"), maxReschedules: n("stMaxResched"), noShowThreshold: Math.max(1, n("stNoShow")),
-    reminderMinutesBefore: n("stReminder"), maryReminderMinutes: Number($("stMaryRem").value),
+    reminderMinutesBefore: n("stReminder"),
     waConfirmTemplate: $("stWaConf").value, waRescheduleTemplate: $("stWaRes").value, habeasDataText: $("stHabeas").value.trim(),
     updatedAt: serverTimestamp(), updatedBy: A.me.uid
   };
@@ -3671,85 +3672,164 @@ function renderLinkCli() {
       </button>`; }).join("")}
     </div>
     <p class="soft mt-3 text-xs">Tu dirección, redes y datos se editan en <a href="#" class="font-bold underline" data-gotab="settings">Configuración</a>. Aquí solo eliges si se muestran.</p>
-    ${waSection()}`;
+    <a href="#" data-gotab="wabot" class="sp-card mt-4 flex items-center gap-3 !py-3"><i class="fa-brands fa-whatsapp text-2xl" style="color:#25D366"></i><span class="flex-1"><b class="block text-[14.5px]">WhatsApp Bot</b><span class="block text-xs text-ink/65">Vincula tu WhatsApp y elige cómo atiende tu asistente</span></span><i class="fa-solid fa-chevron-right text-ink/40"></i></a>`;
 }
-// ---------- Mary: conectar el WhatsApp del negocio con un código de 8 letras (lo atiende el servidor del agendador) ----------
-const MW = { t: null, hasta: 0 };
+// ---------- 💬 WHATSAPP BOT: vincular el WhatsApp del negocio (código de 8 letras o QR) y configurar el asistente ----------
+//  Un solo WhatsApp por negocio. Desvincular borra la conexión en el VPS (waha-agendador); vincular crea una nueva.
+const MW = { t: null, hasta: 0, verQR: false, res: null };
 function maryWaCard() {
   const w = A.settings?.maryWa || {};
   if (w.conectado) return `
     <div class="sp-card mb-3 overflow-hidden !p-0">
       <div class="flex items-center gap-3 p-4 text-white" style="background:linear-gradient(135deg,#25D366,#128C7E)">
         <span class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/20 text-2xl"><i class="fa-brands fa-whatsapp"></i></span>
-        <div class="min-w-0 flex-1"><p class="text-[12px] font-bold uppercase tracking-wider opacity-90">✓ Mary atiende tu WhatsApp</p>
-          <p class="truncate text-[19px] font-extrabold">+${esc(w.numero || "")}</p></div></div>
-      <div class="p-4 text-sm"><p>👩‍💼 Responde con el link para agendar, muestra la cita a quien ya tiene una, recibe la captura del pago (te la manda a Telegram para aprobar) y publica estados con tus cupos.</p>
-        <p class="soft mt-2 text-xs">Sigues usando tu WhatsApp normal. Si escribes tú en un chat, Mary se hace a un lado.</p>
-        <button type="button" id="mwOff" class="mt-3 text-xs font-bold underline" style="color:var(--sred)">Desconectar mi WhatsApp de Mary</button></div></div>`;
+        <div class="min-w-0 flex-1"><p class="text-[12px] font-bold uppercase tracking-wider opacity-90">✓ WhatsApp vinculado</p>
+          <p class="truncate text-[19px] font-extrabold">+${esc(w.numero || "")}</p>
+          ${w.at ? `<p class="text-[12px] opacity-85">desde el ${esc((w.at.toDate ? w.at.toDate() : new Date(w.at)).toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" }))}</p>` : ""}</div></div>
+      <div class="p-4 text-sm"><p>🤖 Tu asistente responde, agenda por listas, muestra los cupos, recibe las capturas de pago (te llegan a Telegram para aprobar) y publica tus estados.</p>
+        <p class="soft mt-2 text-xs">Sigues usando tu WhatsApp normal. Si escribes tú en un chat, el asistente se calla ahí el tiempo que elijas abajo. Solo puedes tener <b>un WhatsApp</b> vinculado.</p>
+        <button type="button" id="mwOff" class="mt-3 inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold" style="color:var(--sred);border-color:var(--sred)"><i class="fa-solid fa-link-slash"></i> Desvincular este WhatsApp</button>
+        <div id="mwBox" class="mt-3 hidden"></div></div></div>`;
   const num = String(A.settings?.whatsapp || "").replace(/\D/g, "");
   return `
     <div class="sp-card mb-3 overflow-hidden !p-0">
       <div class="p-4 text-white" style="background:linear-gradient(135deg,#121216,#2b2b36)">
-        <p class="flex items-center gap-2 text-[17px] font-extrabold"><i class="fa-brands fa-whatsapp text-2xl" style="color:#25D366"></i> Conecta tu WhatsApp a Mary</p>
+        <p class="flex items-center gap-2 text-[17px] font-extrabold"><i class="fa-brands fa-whatsapp text-2xl" style="color:#25D366"></i> Vincula el WhatsApp de tu negocio</p>
         <p class="mt-1 text-[13px] opacity-90">Funciona en <b>iPhone y Android</b>, con WhatsApp normal o Business. No instalas nada: sigues usando tu app igual.</p></div>
       <div class="p-4">
         <label class="field"><span>Número de WhatsApp del negocio</span><input id="mwNum" type="tel" inputmode="numeric" placeholder="57 300 123 4567" value="${esc(num.length === 10 ? "57" + num : num)}"></label>
-        <button type="button" id="mwOn" class="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-[15px] font-extrabold text-white" style="background:#25D366"><i class="fa-brands fa-whatsapp text-xl"></i> Pedir mi código</button>
+        <button type="button" id="mwOn" class="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-[15px] font-extrabold text-white" style="background:#25D366"><i class="fa-brands fa-whatsapp text-xl"></i> Vincular mi WhatsApp</button>
         <div id="mwBox" class="mt-3 hidden"></div>
       </div></div>`;
 }
 function mwPintar(r) {
   const box = $("mwBox"); if (!box) return;
+  MW.res = r || MW.res;
   box.classList.remove("hidden");
   if (!r || r.estado === "pidiendo") { box.innerHTML = `<p class="flex items-center gap-2 text-sm"><span class="spin"></span> Preparando tu código… (tarda unos segundos)</p>`; return; }
+  if (r.estado === "desconectando") { box.innerHTML = `<p class="flex items-center gap-2 text-sm"><span class="spin"></span> Desvinculando tu WhatsApp…</p>`; return; }
   if (r.estado === "error") { box.innerHTML = `<p class="rounded-xl bg-rose-50 p-3 text-sm text-rose-800">${esc(r.error || "No se pudo preparar la conexión.")} Intenta de nuevo.</p>`; return; }
-  if (r.estado === "vencido") { box.innerHTML = `<p class="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">⏱️ El código venció porque no se vinculó a tiempo. Toca <b>«Pedir mi código»</b> otra vez.</p>`; return; }
+  if (r.estado === "vencido") { box.innerHTML = `<p class="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">⏱️ El código venció porque no se vinculó a tiempo. Toca <b>«Vincular mi WhatsApp»</b> otra vez.</p>`; return; }
   if (r.estado === "codigo") {
-    const c = String(r.codigo || "");
+    const c = String(r.codigo || "").replace(/-/g, "");
     box.innerHTML = `${c ? `<p class="text-center text-xs font-bold uppercase tracking-wider text-ink/55">Tu código</p>
       <p class="my-1 select-all text-center font-mono text-[34px] font-extrabold tracking-[.18em]">${esc(c.slice(0, 4))}-${esc(c.slice(4))}</p>` : ""}
       <ol class="mt-2 space-y-1.5 text-[13.5px]">
         <li>1. Abre <b>WhatsApp</b> en el celular del negocio.</li>
         <li>2. <b>⋮ (Android) o Configuración (iPhone)</b> › <b>Dispositivos vinculados</b> › <b>Vincular un dispositivo</b>.</li>
         <li>3. Toca <b>«Vincular con el número de teléfono»</b> y escribe el código.</li></ol>
-      ${r.qr ? `<details class="mt-3"><summary class="cursor-pointer text-xs font-bold text-ink/60">¿Prefieres escanear un QR? (desde otra pantalla)</summary><img src="${esc(r.qr)}" alt="Código QR para vincular" class="mx-auto mt-2 w-56 rounded-xl border border-line"></details>` : ""}
+      ${r.qr ? `<button type="button" data-mwqr class="mt-3 w-full rounded-xl border border-line py-2.5 text-sm font-bold"><i class="fa-solid fa-qrcode"></i> ${MW.verQR ? "Ocultar el QR" : "Prefiero escanear un QR"}</button>
+        ${MW.verQR ? `<img src="${esc(r.qr)}" alt="Código QR para vincular" class="mx-auto mt-2 w-60 rounded-xl border border-line"><p class="soft mt-1 text-center text-xs">Escanéalo desde <b>Dispositivos vinculados › Vincular un dispositivo</b>. Se renueva solo.</p>` : ""}` : ""}
       <p class="soft mt-3 flex items-center gap-2 text-xs"><span class="spin"></span> Esperando que vincules tu WhatsApp…</p>`;
     return;
   }
-  if (r.estado === "conectado") { box.innerHTML = `<p class="rounded-xl bg-emerald-50 p-3 text-center text-sm font-bold text-emerald-800">🎉 ¡Listo! Mary ya atiende tu WhatsApp.</p>`; }
+  if (r.estado === "conectado") { box.innerHTML = `<p class="rounded-xl bg-emerald-50 p-3 text-center text-sm font-bold text-emerald-800">🎉 ¡Listo! Tu asistente ya atiende tu WhatsApp.</p>`; }
+  if (r.estado === "desconectado") { box.innerHTML = `<p class="rounded-xl bg-slate-50 p-3 text-center text-sm font-bold">WhatsApp desvinculado.</p>`; }
 }
-function mwEsperar() {
+function mwEsperar(hastaQue) {
   clearTimeout(MW.t); MW.hasta = Date.now() + 16 * 60000;   // el VPS borra la conexión a los 15 min si no se vincula
   const paso = async () => {
     if (Date.now() > MW.hasta || !$("mwBox")) return;
-    try { const r = await api("maryWa", { op: "estado" }); mwPintar(r.res); if (r.wa?.conectado || r.res?.estado === "conectado") { A.settings.maryWa = r.wa || { conectado: true, numero: r.res?.numero }; return; } if (["error", "vencido"].includes(r.res?.estado)) return; }
-    catch (e) { console.error(e); }
+    try {
+      const r = await api("maryWa", { op: "estado" }); mwPintar(r.res);
+      if (hastaQue === "desconectado" && r.res?.estado === "desconectado") { A.settings.maryWa = { conectado: false }; return renderWaBot(); }
+      if (hastaQue !== "desconectado" && (r.wa?.conectado || r.res?.estado === "conectado")) { A.settings.maryWa = r.wa || { conectado: true, numero: r.res?.numero }; return setTimeout(renderWaBot, 1500); }
+      if (["error", "vencido"].includes(r.res?.estado)) return;
+    } catch (e) { console.error(e); }
     MW.t = setTimeout(paso, 3000);
   };
   MW.t = setTimeout(paso, 2500);
 }
 document.addEventListener("click", async (e) => {
+  if (e.target.closest("[data-mwqr]")) { MW.verQR = !MW.verQR; mwPintar(MW.res); return; }
   if (e.target.closest("#mwOn")) {
     const btn = $("mwOn"), num = ($("mwNum")?.value || "").replace(/\D/g, "");
     if (num.length < 11) { toast("Escribe el número con el indicativo del país, ej. 57 300 123 4567.", "error"); return; }
-    setBusy(btn, true, "Pidiendo tu código…");
+    setBusy(btn, true, "Pidiendo tu código…"); MW.verQR = false;
     try { await api("maryWa", { op: "conectar", numero: num }); mwPintar({ estado: "pidiendo" }); mwEsperar(); }
     catch (err) { toast(err.message, "error"); }
     finally { setBusy(btn, false); }
     return;
   }
   if (e.target.closest("#mwOff")) {
-    if (!(await uiConfirm("¿Desconectar tu WhatsApp de Mary?", "Mary deja de responder en tu número. Tu WhatsApp sigue funcionando normal.", { okText: "Desconectar", danger: true }))) return;
-    try { await api("maryWa", { op: "desconectar" }); toast("Listo: en unos segundos Mary deja de atender tu WhatsApp."); } catch (err) { toast(err.message, "error"); }
+    if (!(await uiConfirm("¿Desvincular este WhatsApp?", "Tu asistente deja de responder en este número y se borra la conexión. Tu WhatsApp sigue funcionando normal. Después puedes vincular otro.", { okText: "Desvincular", danger: true }))) return;
+    try { await api("maryWa", { op: "desconectar" }); mwPintar({ estado: "desconectando" }); mwEsperar("desconectado"); } catch (err) { toast(err.message, "error"); }
   }
 });
 
-// Citas por WhatsApp: el bot lo instala la plataforma; la tienda elige cómo funciona
-function waSection() {
-  if (lockedNow("whatsapp")) { const need = planFor("whatsapp"); return `<div class="sp-h mt-5"><h2>💬 WhatsApp con Mary</h2></div><div class="sp-card text-sm">🔒 Mary atiende tu WhatsApp: da tu link y muestra la cita a quien ya tiene una. Viene en el plan <b>${esc(PLANS()[need].name)}</b>. <a href="#" class="font-bold underline" data-goplan="${need}">Ver planes</a></div>`; }
-  return `<div class="sp-h mt-5"><h2>💬 WhatsApp con Mary</h2><span>tu recepcionista 24/7</span></div>
-    ${maryWaCard()}`;
+// Opciones del asistente (settings.maryBot). Los valores por defecto son los mismos del servidor (maryBotCfg_).
+const BOT_DEF = { activo: true, agendar: true, cupos: true, saludoDiario: true, pedirNombre: true, pedirCorreo: true, loDeSiempre: true, recordatorioMin: 120, recordatorioConfirmar: true, cambios: true, pausaMin: 30, estados: { activo: true, horas: ["11:00"], manana: true, semanal: false } };
+function botCfg() {
+  const s = A.settings || {}, b = s.maryBot || {};
+  const c = { ...BOT_DEF, ...b, estados: { ...BOT_DEF.estados, ...(b.estados || {}) } };
+  if (b.recordatorioMin === undefined && s.maryReminderMinutes !== undefined) c.recordatorioMin = Number(s.maryReminderMinutes);
+  c.estados.horas = (c.estados.horas || []).filter((h) => /^\d{2}:\d{2}$/.test(h)).slice(0, 2);
+  if (!c.estados.horas.length) c.estados.horas = ["11:00"];
+  return c;
 }
+const BOT_OPTS = [
+  ["activo", "🤖", "Asistente encendido", "Apagado, no responde nada por WhatsApp (tú atiendes todo)."],
+  ["agendar", "📋", "Agendar por WhatsApp con listas", "Categoría → servicio → día → hora → «¿Lo confirmo?». Apagado, solo manda tu link."],
+  ["cupos", "🕐", "Responder «¿hay cupos?»", "Dice las horas libres del día que pregunten (o los próximos días) y siempre manda tu link."],
+  ["saludoDiario", "👋", "Saludar una sola vez al día", "«Hola 👋 Soy el asistente de tu negocio» solo en el primer mensaje del día de cada cliente."],
+  ["pedirNombre", "🙋", "Preguntar el nombre", "La primera vez pregunta «¿A nombre de quién agendo?» y lo recuerda. Apagado, usa el nombre de WhatsApp."],
+  ["pedirCorreo", "📧", "Pedir el correo para su calendario", "Con el correo, la cita le queda en su calendario y se mueve o se borra sola si cambia."],
+  ["loDeSiempre", "⭐", "Ofrecer «¿Lo de siempre?»", "Aprende lo que pide cada cliente y se lo ofrece la próxima vez."],
+  ["recordatorioConfirmar", "✅", "Pedir confirmación en el recordatorio", "«¿Puedes continuar con tu cita? Responde sí». Si confirma, te llega a Telegram con sus datos."],
+  ["cambios", "🔄", "Dejar cancelar o modificar por WhatsApp", "Respeta tus horas mínimas y el máximo de cambios de Configuración."]
+];
+const HORAS_ESTADO = ["07:00", "08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00"];
+function renderWaBot() {
+  const el = $("tab-wabot"); if (!el) return;
+  if (lockedNow("whatsapp")) { const need = planFor("whatsapp"); el.innerHTML = `<div class="sp-card text-sm">🔒 El asistente de WhatsApp viene en el plan <b>${esc(PLANS()[need].name)}</b>. <a href="#" class="font-bold underline" data-goplan="${need}">Ver planes</a></div>`; return; }
+  const c = botCfg(), e = c.estados;
+  const sw = (on) => `<span class="relative inline-block h-7 w-12 shrink-0 rounded-full transition" style="background:${on ? "var(--mint)" : "#cfd6df"}"><i class="absolute top-[3px] h-[22px] w-[22px] rounded-full bg-white shadow transition-all" style="left:${on ? "23px" : "3px"}"></i></span>`;
+  const fila = (k, ic, t, d, on) => `<button type="button" class="flex w-full items-start gap-3 p-3.5 text-left" data-bot="${k}" aria-pressed="${on}"><span class="text-xl leading-none">${ic}</span><span class="min-w-0 flex-1"><b class="block text-[14.5px]">${t}</b><span class="block text-xs text-ink/65">${d}</span></span>${sw(on)}</button>`;
+  const sel = (k, val, ops) => `<select data-botsel="${k}" class="rounded-xl border border-line bg-white px-2 py-1.5 text-sm font-bold">${ops.map(([v, t]) => `<option value="${v}" ${String(val) === String(v) ? "selected" : ""}>${t}</option>`).join("")}</select>`;
+  const hora12 = (h) => { let [H, M] = h.split(":").map(Number); const ap = H >= 12 ? "p. m." : "a. m."; H = H % 12 || 12; return `${H}:${String(M).padStart(2, "0")} ${ap}`; };
+  el.innerHTML = `
+    <div class="sp-h"><h2>💬 WhatsApp Bot</h2><span>tu asistente 24/7</span></div>
+    ${maryWaCard()}
+    <div class="sp-h mt-5"><h2>⚙️ Cómo atiende</h2><span>se aplica al instante</span></div>
+    <div class="sp-card !p-0 divide-y divide-line">
+      ${BOT_OPTS.map(([k, ic, t, d]) => fila(k, ic, t, d, !!c[k])).join("")}
+      <div class="flex items-center gap-3 p-3.5"><span class="text-xl">⏰</span><span class="min-w-0 flex-1"><b class="block text-[14.5px]">Recordatorio al cliente</b><span class="block text-xs text-ink/65">«Hola 👋 Recuerda que tu cita es en 1 hora». También queda como aviso en su calendario.</span></span>
+        ${sel("recordatorioMin", c.recordatorioMin, [[0, "Sin recordatorio"], [30, "30 min antes"], [60, "1 hora antes"], [120, "2 horas antes"], [180, "3 horas antes"], [1440, "1 día antes"]])}</div>
+      <div class="flex items-center gap-3 p-3.5"><span class="text-xl">🙊</span><span class="min-w-0 flex-1"><b class="block text-[14.5px]">Si escribes tú en un chat, se calla</b><span class="block text-xs text-ink/65">El asistente se hace a un lado en ese chat para que hables tú.</span></span>
+        ${sel("pausaMin", c.pausaMin, [[15, "15 min"], [30, "30 min"], [60, "1 hora"], [120, "2 horas"]])}</div>
+    </div>
+    <div class="sp-h mt-5"><h2>📸 Estados con tus cupos</h2><span>máximo 2 al día</span></div>
+    <div class="sp-card !p-0 divide-y divide-line">
+      ${fila("estados.activo", "📸", "Publicar estados con los cupos del día", "Una imagen con tus horas libres. Si hoy ya no hay cupos, publica los de mañana. Si tampoco hay, no publica.", e.activo)}
+      ${e.activo ? `<div class="flex items-center gap-3 p-3.5"><span class="text-xl">1️⃣</span><span class="flex-1"><b class="block text-[14.5px]">Primer estado</b></span>${sel("estados.h0", e.horas[0], HORAS_ESTADO.map((h) => [h, hora12(h)]))}</div>
+      <div class="flex items-center gap-3 p-3.5"><span class="text-xl">2️⃣</span><span class="flex-1"><b class="block text-[14.5px]">Segundo estado</b><span class="block text-xs text-ink/65">Opcional</span></span>${sel("estados.h1", e.horas[1] || "", [["", "No publicar"]].concat(HORAS_ESTADO.filter((h) => h !== e.horas[0]).map((h) => [h, hora12(h)])))}</div>
+      ${fila("estados.manana", "➡️", "Si hoy no hay cupos, publicar los de mañana", "Apagado, ese día no publica.", e.manana)}
+      ${fila("estados.semanal", "🗓️", "Estado de la semana los lunes", "Además, los lunes a las 7:00 a. m. un resumen de la semana.", e.semanal)}` : ""}
+    </div>
+    <p class="soft mt-3 text-xs">Los estados los ven los clientes que tienen guardado el número de tu negocio (así funciona WhatsApp).</p>`;
+  if (MW.res && $("mwBox") && ["pidiendo", "codigo", "desconectando"].includes(MW.res.estado) && Date.now() < MW.hasta) mwPintar(MW.res);
+}
+async function botGuardar(patch) {
+  const c = botCfg(), n = { ...c, ...patch, estados: { ...c.estados, ...(patch.estados || {}) } };
+  A.settings.maryBot = n; renderWaBot();
+  try { await setDoc(doc(db, bpath("settings", "general")), { maryBot: n }, { merge: true }); toast("✓ Guardado."); }
+  catch (err) { toast("No se pudo guardar: " + err.message, "error"); }
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("#tab-wabot [data-bot]"); if (!b) return;
+  const k = b.dataset.bot, c = botCfg();
+  if (k.startsWith("estados.")) { const kk = k.slice(8); botGuardar({ estados: { [kk]: !c.estados[kk] } }); }
+  else botGuardar({ [k]: !c[k] });
+});
+document.addEventListener("change", (e) => {
+  const s = e.target.closest("#tab-wabot [data-botsel]"); if (!s) return;
+  const k = s.dataset.botsel, c = botCfg();
+  if (k === "estados.h0" || k === "estados.h1") {
+    const h = [...c.estados.horas]; h[k === "estados.h0" ? 0 : 1] = s.value;
+    botGuardar({ estados: { horas: [...new Set(h.filter(Boolean))].sort().slice(0, 2) } });
+  } else botGuardar({ [k]: Number(s.value) });
+});
+
 // ---- Conectar el WhatsApp de la tienda (ventana oficial de Meta) ----
 let FB_READY = null;
 function loadFB() {

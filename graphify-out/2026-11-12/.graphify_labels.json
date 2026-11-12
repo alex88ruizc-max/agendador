@@ -1,6 +1,5 @@
 {
   "0": "principal.js",
-  "1": "esc",
   "2": "app.js",
   "3": "admin.js",
   "4": "common.js",
@@ -13,8 +12,6 @@
   "12": "renderAppearance",
   "13": "openStore",
   "14": "renderMarketing",
-  "15": "openWizard",
-  "16": "plansOf",
   "17": "environment",
   "19": "agendador-ia",
   "20": "postgres-agendador",
@@ -26,7 +23,6 @@
   "30": "actualizar-google.sh script",
   "31": "correo.gs",
   "32": "instalar.sh script",
-  "33": "openModal",
   "34": "configurar-waha.sh",
   "35": "mudar-google.sh",
   "36": "conectar.sh",

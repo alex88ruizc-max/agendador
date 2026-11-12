@@ -6,10 +6,10 @@ const nombre1 = (n) => { const w = String(n || '').trim().split(/\s+/)[0] || '';
 
 const saludo = (negocio, quien) => { const n = nombre1(quien); return `Hola${n ? ' ' + n : ''} 👋 Soy el asistente de *${negocio}*.\n`; };
 // Cliente SIN cita: (saludo) + cupos de hoy + link para agendar
-function sinCita(info, sal) {
+function sinCita(info, sal, sinMenu) {
   const hoy = Number(info.cuposHoy || 0);
   return (sal || '') + (hoy > 0 ? `Hoy quedan *${hoy} ${hoy === 1 ? 'cupo' : 'cupos'}*. ` : '') +
-    `Agenda tu cita aquí en 1 minuto:\n${info.link}\n\nO toca *Ver opciones* y te ayudo por aquí 👇`;
+    `Agenda tu cita aquí en 1 minuto:\n${info.link}` + (sinMenu ? '' : '\n\nO toca *Ver opciones* y te ayudo por aquí 👇');
 }
 // Cliente CON cita (una o varias)
 function conCita(info, sal) {
@@ -41,8 +41,18 @@ const pagoConfirmado = (c) => `✅ *Recibimos tu pago de ${cop(c.abono)}.* Tu ci
 // 3.0: «Hola Andrés 👋 Recuerda que tu cita en *El Barba* es en *1 hora*» (los minutos los pone el dueño en su panel)
 const enTiempo = (min) => { min = Math.round(Number(min || 0)); const h = Math.floor(min / 60), m = min % 60;
   return h && m ? `${h} ${h === 1 ? 'hora' : 'horas'} y ${m} minutos` : h ? `${h} ${h === 1 ? 'hora' : 'horas'}` : `${m} minutos`; };
-const recordatorio = (c, info) => `⏰ Hola${nombre1(c.nombre) ? ' ' + nombre1(c.nombre) : ''} 👋 Recuerda que tu cita en *${info.negocio}* es en *${enTiempo(info.recordatorioMin || 120)}*.\n📅 ${c.dia} · ${c.hora}\n${c.servicio}${c.con ? ' · con ' + c.con : ''}` +
-  (info.direccion ? `\n📍 ${info.direccion}` : '') + (c.saldo > 0 ? `\n💵 Saldo en el local: ${cop(c.saldo)}` : '') + `\n\n¿Necesitas cambiarla? ${c.link}`;
+// 3.1: «¿Puedes continuar con tu cita? Responde sí y te esperamos. Si no, escribe cancelar o modificar» (según el panel del dueño)
+const recordatorio = (c, info, bot) => { bot = bot || {};
+  const pie = bot.recordatorioConfirmar !== false && bot.cambios !== false ? '\n\n¿Puedes continuar con tu cita? Responde *sí* y te esperamos ✨\nSi no, escribe *cancelar* o *modificar*.'
+    : bot.recordatorioConfirmar !== false ? '\n\n¿Puedes continuar con tu cita? Responde *sí* y te esperamos ✨\n¿Necesitas cambiarla? ' + c.link
+    : bot.cambios !== false ? '\n\nTe esperamos ✨ Si no puedes, escribe *cancelar* o *modificar*.' : '\n\nTe esperamos ✨ ¿Necesitas cambiarla? ' + c.link;
+  return `⏰ Hola${nombre1(c.nombre) ? ' ' + nombre1(c.nombre) : ''} 👋 Recuerda que tu cita en *${info.negocio}* es en *${enTiempo(info.recordatorioMin || 120)}*.\n📅 ${c.dia} · ${c.hora}\n${c.servicio}${c.con ? ' · con ' + c.con : ''}` +
+    (info.direccion ? `\n📍 ${info.direccion}` : '') + (c.saldo > 0 ? `\n💵 Saldo en el local: ${cop(c.saldo)}` : '') + pie; };
+const asistio = (c, nombre) => `🙌 ¡Gracias${nombre1(nombre) ? ', ' + nombre1(nombre) : ''}! Tu cita quedó confirmada. Te esperamos ✨\n📅 ${c.dia} · ${c.hora}`;
+const cancelada = (r) => `🚫 Listo, cancelé tu cita${r.cita ? ' del ' + r.cita.dia.toLowerCase() + ' a las ' + r.cita.hora : ''}. El cupo quedó libre.\n\nSi quieres agendar otra: ${r.link || ''}`.trim();
+const reagendada = (c) => `🔄 *¡Listo! Tu cita quedó para ${c.dia.toLowerCase()} a las ${c.hora}.*\n✂️ ${c.servicio}${c.con ? ' · con ' + c.con : ''}\n\nPara verla: ${c.link}`;
+const parafrasisCambio = (x) => `📝 *Entendí esto:* cambio tu cita de *${x.antes}* para *${x.dia} a las ${x.hora}*${x.con ? ' con ' + x.con : ''}.\n\n¿Lo confirmo?`;
+const preguntaCancelar = (c) => `¿Seguro que cancelo tu cita del *${c.dia.toLowerCase()} a las ${c.hora}* (${c.servicio})?`;
 const decision = (c) => c.decision === 'approved'
   ? `✅ *Tu pago fue aprobado.* Tu cita quedó confirmada.\n📅 ${c.dia} · ${c.hora}\n${c.servicio}${c.con ? ' · con ' + c.con : ''}\n\nPara verla o cambiarla: ${c.link}`
   : `❌ *No pudimos verificar tu pago*${c.motivo && !/telegram/i.test(c.motivo) ? ' (' + c.motivo + ')' : ''}, así que el cupo quedó libre.\nSi ya pagaste, escríbenos aquí y lo revisamos. Para agendar de nuevo: ${c.linkAgenda || ''}`.trim();
@@ -68,4 +78,4 @@ function citaHecha(c, info, nombre, conCorreo) {
 }
 const audio = () => '🎤 En este momento no puedo escuchar audios 🙏 ¿Me lo escribes, por favor?';
 
-module.exports = { saludo, enTiempo, duracion, listaHoras, cuposDia, cuposOtros, sinCupos, sinDias, sinServicios, pideCorreo, parafrasis, citaHecha, audio, cop, nombre1, sinCita, conCita, estadoTxt, pagoTxt, fotoRecibida, fotoSinCita, pagoConfirmado, recordatorio, decision, problema };
+module.exports = { asistio, cancelada, reagendada, parafrasisCambio, preguntaCancelar, saludo, enTiempo, duracion, listaHoras, cuposDia, cuposOtros, sinCupos, sinDias, sinServicios, pideCorreo, parafrasis, citaHecha, audio, cop, nombre1, sinCita, conCita, estadoTxt, pagoTxt, fotoRecibida, fotoSinCita, pagoConfirmado, recordatorio, decision, problema };

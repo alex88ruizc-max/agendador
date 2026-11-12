@@ -14,7 +14,7 @@
  * Instalación: pega este archivo, ejecuta activarMary() una vez, copia la clave que sale en el registro
  * y ponla en el mary.env del VPS (MARY_KEY). Vuelve a implementar la aplicación web (Implementar > Administrar > editar > Nueva versión).
  */
-const MARY_VERSION = 'agendador-ia-3.0';
+const MARY_VERSION = 'agendador-ia-3.1';
 
 // Se registra como acción pública del servidor (sin sesión: entra con la clave de Mary).
 // ⚠️ Este archivo debe quedar DEBAJO del archivo principal en la lista de archivos de Apps Script (los nuevos quedan al final: así está bien).
@@ -51,6 +51,10 @@ function maryAgenda(b) {
     case 'dias': return maryDias_(st, b);
     case 'horas': return maryHoras_(st, b);
     case 'crear': return maryCrear_(st, b);
+    case 'asistencia': return maryAsistencia_(st, b);   // 3.1 · respuesta al recordatorio
+    case 'cancelar': return maryCancelar_(st, b);
+    case 'reagendar': return maryReagendar_(st, b);
+    case 'contactos': return maryContactos_();
   }
   fail('Operación no válida.');
 }
@@ -65,7 +69,7 @@ function maryCitaOut_(a) {
     servicio: (a.items || []).map(function (i) { return i.name; }).join(' + '), con: a.staffName || '',
     abono: Number(a.depositCOP || 0), saldo: Number(a.balanceDueCOP || 0), total: Number(a.totalCOP || 0),
     pagoEstado: (a.payment || {}).status || '', vence: a.holdExpiresAt ? a.holdExpiresAt.toISOString() : null,
-    link: maryLinkCita_(a.code)
+    link: maryLinkCita_(a.code), ids: (a.items || []).map(function (i) { return i.id; }), staffId: a.staffId || '', asistencia: !!a.clientConfirmed
   };
 }
 // Citas activas (desde hace 2 h en adelante) de un número de WhatsApp
@@ -87,8 +91,123 @@ function maryInfo_(st) {
     version: MARY_VERSION, negocio: st.businessName || BIZ.name || '', activo: BIZ.status === 'active',
     link: maryLinkAgenda_(), direccion: [st.address, st.city].filter(Boolean).join(', '),
     color: (ap.colors || {}).primary || '', logo: ap.logo || '', categorias: maryCategorias_(), medios: maryMedios_(st),
-    holdMinutes: Math.max(5, Number(st.holdMinutes || 30))
+    holdMinutes: Math.max(5, Number(st.holdMinutes || 30)), bot: maryBotCfg_(st)
   };
+}
+// 3.1 · «💬 WhatsApp Bot» del panel del dueño (settings.maryBot). Todo tiene un valor por defecto.
+function maryBotCfg_(st) {
+  const b = st.maryBot || {}, e = b.estados || {};
+  const d = function (v, x) { return v === undefined || v === null || v === '' ? x : v; };
+  let horas = (Array.isArray(e.horas) ? e.horas : ['11:00']).filter(function (h) { return /^\d{2}:\d{2}$/.test(String(h)); }).slice(0, 2);   // máximo 2 estados al día
+  if (!horas.length) horas = ['11:00'];
+  return {
+    activo: d(b.activo, true) !== false, agendar: d(b.agendar, true) !== false, cupos: d(b.cupos, true) !== false,
+    saludoDiario: d(b.saludoDiario, true) !== false, pedirNombre: d(b.pedirNombre, true) !== false, pedirCorreo: d(b.pedirCorreo, true) !== false,
+    loDeSiempre: d(b.loDeSiempre, true) !== false, recordatorioMin: Math.max(0, Number(d(b.recordatorioMin, d(st.maryReminderMinutes, 120)))),
+    recordatorioConfirmar: d(b.recordatorioConfirmar, true) !== false, cambios: d(b.cambios, true) !== false, pausaMin: Math.max(5, Number(d(b.pausaMin, 30))),
+    estados: { activo: d(e.activo, true) !== false, horas: horas, manana: d(e.manana, true) !== false, semanal: d(e.semanal, false) === true }
+  };
+}
+// 3.1 · el cliente queda en los CLIENTES del negocio (panel › Clientes) con su nombre, WhatsApp y correo
+function maryGuardarCliente_(nombre, phone, email) {
+  const d10 = maryLast10_(phone); if (d10.length < 10) return;
+  try {
+    const id = 'wa' + d10, path = bp('customers/' + id), ya = fsGet(path);
+    const n = String(nombre || '').trim().split(/\s+/);
+    const datos = { whatsapp: String(phone || '').replace(/\D/g, ''), source: ya && ya.source ? ya.source : 'whatsapp', updatedAt: new Date() };
+    if (n[0] && n[0] !== 'Cliente') { datos.firstName = n[0]; datos.lastName = n.slice(1).join(' '); }
+    if (email) datos.email = String(email).toLowerCase();
+    if (ya) commit([wPatch(path, datos)]);
+    else commit([wSet(path, Object.assign({ firstName: n[0] || 'Cliente', lastName: n.slice(1).join(' '), email: '', paymentMode: 'deposit', blocked: false, noShowCount: 0, totalAppointments: 0, createdAt: new Date() }, datos))]);
+  } catch (e) { console.error('Cliente: ' + e); }
+}
+// tarjeta de contacto (.vcf) para guardarlo en el celular con un toque
+function maryVcard_(nombre, phone, email, negocio) {
+  const n = String(nombre || 'Cliente').trim(), tel = '+' + String(phone || '').replace(/\D/g, '');
+  const L = ['BEGIN:VCARD', 'VERSION:3.0', 'FN:' + n, 'N:' + n.split(/\s+/).slice(1).join(' ') + ';' + n.split(/\s+/)[0] + ';;;', 'TEL;TYPE=CELL:' + tel];
+  if (email) L.push('EMAIL:' + email);
+  L.push('NOTE:Cliente de ' + negocio + ' (Tu Agenda)', 'END:VCARD');
+  return Utilities.newBlob(L.join('\r\n') + '\r\n', 'text/vcard', n.replace(/[^\p{L}\p{N} ]/gu, '').trim().replace(/\s+/g, '-') + '.vcf');
+}
+function maryCitaDelNumero_(b) {
+  const a = fsGet(bp('appointments/' + String(b.code || '').toUpperCase().trim()));
+  if (!a || maryLast10_((a.customer || {}).whatsapp) !== maryLast10_(b.phone)) return null;
+  a.history = a.history || []; a.lockIds = a.lockIds || []; a.payment = a.payment || {};
+  return a;
+}
+// «sí» al recordatorio → asistencia confirmada + aviso al dueño por Telegram con sus datos y la tarjeta de contacto
+function maryAsistencia_(st, b) {
+  const a = maryCitaDelNumero_(b);
+  if (!a || ACTIVE.indexOf(a.status) < 0) return { ok: false, motivo: 'No encontré tu cita activa.' };
+  if (!a.clientConfirmed) commit([wPatch(bp('appointments/' + a.code), { clientConfirmed: true, clientConfirmedAt: new Date(), history: hist(a, 'client_confirmed', 'whatsapp') })]);
+  const c = a.customer || {}, nom = [c.firstName, c.lastName].filter(Boolean).join(' ') || 'Cliente', biz = st.businessName || BIZ.name || '';
+  maryGuardarCliente_(nom, c.whatsapp, c.email);
+  const txt = '✅ <b>CITA CONFIRMADA POR EL CLIENTE</b>\n🙋 ' + esc(nom) + '\n📱 wa.me/' + String(c.whatsapp || '').replace(/\D/g, '') + (c.email ? '\n📧 ' + esc(c.email) : '') + '\n\n' + aptText(a);
+  try {
+    recipients([a.staffId]).forEach(function (chat) {
+      tgSend(chat, bizTag() + txt);
+      try { tg('sendDocument', { chat_id: String(chat), document: maryVcard_(nom, c.whatsapp, c.email, biz), caption: '📇 Toca para guardar a ' + nom + ' en tus contactos' }); } catch (e) { console.error(e); }
+    });
+  } catch (e) { console.error('Telegram: ' + e); }
+  return { ok: true, cita: maryCitaOut_(a) };
+}
+function maryCancelar_(st, b) {
+  if (!maryBotCfg_(st).cambios) return { ok: false, motivo: 'Para cancelar, usa el link de tu cita o escríbele al negocio.' };
+  const a0 = maryCitaDelNumero_(b);
+  if (!a0 || ACTIVE.indexOf(a0.status) < 0) return { ok: false, motivo: 'No encontré tu cita activa.' };
+  const minH = Number(st.rescheduleMinHours != null ? st.rescheduleMinHours : 2);
+  if (a0.status !== 'pending_payment' && a0.startAt.getTime() - Date.now() < minH * 3600000) return { ok: false, motivo: 'Solo se puede cancelar con al menos ' + minH + ' horas de anticipación. Escríbele directamente al negocio.' };
+  const apt = withLock(function () {
+    const a = maryCitaDelNumero_(b);
+    if (!a || ACTIVE.indexOf(a.status) < 0) fail('Esta reserva ya no está activa.');
+    commit([wPatch(bp('appointments/' + a.code), { status: 'cancelled', cancelReason: 'Cancelada por el cliente (WhatsApp)', updatedAt: new Date(), holdExpiresAt: null, history: hist(a, 'cancelled', 'whatsapp', { reason: 'whatsapp' }) })].concat(freeLockWrites(a)));
+    a.status = 'cancelled';
+    return a;
+  });
+  try { if (tgEventOn('cancel')) tgNotify([apt.staffId], '🚫 <b>CITA CANCELADA</b> por el cliente (WhatsApp)\n' + aptText(apt) + '\nEl cupo quedó libre.'); } catch (e) { console.error(e); }
+  if ((apt.customer || {}).email) emailClient(apt, 'Tu cita fue cancelada', 'Cancelaste tu cita. La quitamos de tu calendario. Escríbenos si quieres agendar de nuevo.');
+  return { ok: true, cita: maryCitaOut_(apt), link: maryLinkAgenda_() };
+}
+function maryReagendar_(st, b) {
+  if (!maryBotCfg_(st).cambios) return { ok: false, motivo: 'Para cambiarla, usa el link de tu cita.' };
+  const a0 = maryCitaDelNumero_(b);
+  if (!a0 || ACTIVE.indexOf(a0.status) < 0) return { ok: false, motivo: 'No encontré tu cita activa.' };
+  if (a0.status === 'pending_payment') return { ok: false, motivo: 'Primero envía el abono de esta cita; después la puedes cambiar.' };
+  const minH = Number(st.rescheduleMinHours != null ? st.rescheduleMinHours : 2);
+  if (a0.startAt.getTime() - Date.now() < minH * 3600000) return { ok: false, motivo: 'Solo se puede cambiar con al menos ' + minH + ' horas de anticipación. Escríbele directamente al negocio.' };
+  if ((a0.rescheduleCount || 0) >= Number(st.maxReschedules != null ? st.maxReschedules : 2)) return { ok: false, motivo: 'Ya hiciste el máximo de cambios permitidos para esta cita.' };
+  let old;
+  try {
+    const apt = withLock(function () {
+      const a = maryCitaDelNumero_(b);
+      const staffId = b.staffId || a.staffId, staff = loadStaff().filter(function (x) { return x._id === staffId && x.active !== false; })[0];
+      if (!staff) fail('Ese profesional no está disponible.');
+      if (b.date === a.date && b.time === a.startTime && staffId === a.staffId) fail('Elegiste el mismo horario que ya tenías.');
+      checkSlot(st, b.date, b.time, a.occupiedMinutes, true, staff);
+      const own = (staffId === a.staffId && b.date === a.date) ? a.lockIds : [];
+      const r = reserveLocks(staffId, b.date, b.time, a.occupiedMinutes, { own: own });
+      const toDelete = a.lockIds.filter(function (id) { return r.all.indexOf(id) < 0; });
+      const delta = {}; addDelta(delta, a.date, a.staffId, -toDelete.length); addDelta(delta, b.date, staffId, r.create.length);
+      old = { date: a.date, startTime: a.startTime, staffId: a.staffId, staffName: a.staffName };
+      const patch = { staffId: staffId, staffName: staff.name, date: b.date, startTime: b.time, endTime: mstr(tmin(b.time) + a.occupiedMinutes), startAt: mkDate(b.date, b.time), lockIds: r.all,
+        rescheduleCount: (a.rescheduleCount || 0) + 1, history: hist(a, 'rescheduled', 'whatsapp', { from: a.date + ' ' + a.startTime, to: b.date + ' ' + b.time, byCustomer: true }), updatedAt: new Date(), reminderSent: false, maryReminded: false, clientConfirmed: false };
+      commit(toDelete.map(function (id) { return wDelete(bp('slotLocks/' + id)); }).concat(lockWrites(r, staffId, b.date, 'booked', a.code, null)).concat([wPatch(bp('appointments/' + a.code), patch)]).concat(incWrites(delta)));
+      Object.assign(a, patch);
+      return a;
+    });
+    try { if (tgEventOn('reschedule')) tgNotify([old.staffId, apt.staffId], '🔄 <b>CITA REAGENDADA</b> por el cliente (WhatsApp)\n' + esc(apt.customer.firstName + ' ' + (apt.customer.lastName || '')) + ' · ' + apt.code + '\n❌ Antes: ' + fechaTxt(old.date) + ', ' + hora12(old.startTime) + '\n✅ Ahora: ' + fechaTxt(apt.date) + ', ' + hora12(apt.startTime) + ' (' + esc(apt.staffName) + ')'); } catch (e) { console.error(e); }
+    if ((apt.customer || {}).email) emailClient(apt, 'Tu cita cambió de horario', 'Tu cita quedó para el ' + fechaTxt(apt.date) + ' a las ' + hora12(apt.startTime) + '. Ya la movimos en tu calendario.');
+    return { ok: true, cita: maryCitaOut_(apt) };
+  } catch (e) {
+    const m = String((e && (e.userMessage || e.message)) || e);
+    return { ok: false, motivo: /tomado|ya no está disponible|fuera del horario|no alcanza/i.test(m) ? 'ocupada' : m };
+  }
+}
+// números de los clientes del negocio: para que los estados les lleguen a ELLOS (WAHA solo conoce a quien escribió hace poco)
+function maryContactos_() {
+  const L = {};
+  fsListAll(bp('customers')).forEach(function (c) { const n = String(c.whatsapp || '').replace(/\D/g, ''); if (n.length >= 10 && !c.blocked) L[n.length === 10 ? '57' + n : n] = true; });
+  return { numeros: Object.keys(L).slice(0, 3000) };
 }
 // Nombres de las categorías (o de los servicios principales si no hay categorías) para los estados
 function maryCategorias_() {
@@ -246,9 +365,9 @@ function maryCupos_(st, b) {
 // ---------- recordatorio por WhatsApp ----------
 function maryProximas_(st, b) {
   // 3.0: lo decide el dueño en su panel (Ajustes › «Recordatorio al cliente por WhatsApp»). 0 = sin recordatorio.
-  const conf = st.maryReminderMinutes;
-  if (conf !== undefined && conf !== null && conf !== '' && Number(conf) === 0) return { citas: [], info: Object.assign(maryInfo_(st), { recordatorioMin: 0 }) };
-  const min = Math.max(10, Math.min(24 * 60, Number(conf != null && conf !== '' ? conf : (b.minutos || 120))));
+  const conf = maryBotCfg_(st).recordatorioMin;   // 3.1: panel › WhatsApp Bot › Recordatorio (0 = sin recordatorio)
+  if (!conf || !maryBotCfg_(st).activo) return { citas: [], info: Object.assign(maryInfo_(st), { recordatorioMin: 0 }) };
+  const min = Math.max(10, Math.min(24 * 60, Number(conf)));
   const now = Date.now(), hoy = toDateStr(new Date()), man = toDateStr(new Date(now + 86400000));
   let L = fsQuery('appointments', [['date', 'EQUAL', hoy]]).concat(hoy === man ? [] : fsQuery('appointments', [['date', 'EQUAL', man]]));
   L = L.filter(function (a) {
@@ -369,6 +488,7 @@ function maryCrear_(st, b) {
     });
     try { if (tgEventOn('newBooking')) tgNotify([apt.staffId], '💬 <b>NUEVA CITA POR WHATSAPP</b> (asistente)' + (apt.status === 'pending_payment' ? ' · esperando abono' : '') + '\n' + aptText(apt)); } catch (e) { console.error(e); }
     if (apt.customer.email) emailClient(apt, apt.status === 'confirmed' ? 'Tu cita está confirmada' : 'Apartamos tu cupo', apt.status === 'confirmed' ? 'Agendamos tu cita. Presenta tu número de reserva al llegar.' : 'Apartamos tu cupo. Envía el abono para confirmarlo.');
+    maryGuardarCliente_(nombre, phone, email);   // 3.1: queda en Clientes del panel
     return { ok: true, cita: maryCitaOut_(apt), medios: maryMedios_(st), holdMinutes: Math.max(10, Number(st.holdMinutes || 30)) };
   } catch (e) {
     const m = String((e && (e.userMessage || e.message)) || e);
@@ -395,6 +515,7 @@ function maryWaPanel(b, auth) {
   }
   if (!planHas('whatsapp')) fail('🔒 La atención por WhatsApp no viene en tu plan.');
   if (op === 'conectar') {
+    if ((loadSettings().maryWa || {}).conectado) fail('Ya tienes un WhatsApp vinculado. Desvincúlalo primero para vincular otro.');   // 3.1: uno por negocio
     let num = String(b.numero || '').replace(/\D/g, '');
     if (num.length === 10 && /^3/.test(num)) num = '57' + num;
     if (num.length < 11 || num.length > 15) fail('Escribe el número de WhatsApp del negocio con el indicativo del país (ej. 57 300 123 4567).');
@@ -436,6 +557,6 @@ function maryWaResultado_(b) {
   if (estado === 'conectado') w.push(wPatch(bp('settings/general'), { maryWa: { conectado: true, numero: r.numero, at: new Date() } }));
   if (estado === 'desconectado') w.push(wPatch(bp('settings/general'), { maryWa: { conectado: false, numero: '', at: new Date() } }));
   if (w.length) commit(w);
-  if (estado === 'conectado') tgSys('✅ <b>WhatsApp conectado a Mary</b>\nTu recepcionista ya atiende en +' + esc(r.numero) + '.');
+  if (estado === 'conectado') tgSys('✅ <b>WhatsApp vinculado</b>\nTu asistente ya atiende en +' + esc(r.numero) + '.');
   return { ok: true };
 }

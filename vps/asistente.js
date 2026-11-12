@@ -13,6 +13,9 @@ const corto = (s, n) => { s = String(s || ''); return s.length > n ? s.slice(0, 
 const DIAS = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 const VENCE_FLUJO = 30 * 60000;   // si el cliente se demora más de 30 min, el agendamiento empieza de nuevo
+const VENCE_RECORDATORIO = 5 * 3600000;   // la respuesta al recordatorio («sí», «cancelar», «modificar») vale unas horas
+const QUIERE_CANCELAR = /\bcancel/;
+const QUIERE_MODIFICAR = /modific|reagend|reprogram|\bmover\b|\bmuev|cambi(ar|o|e)? (la |mi |de )?(cita|hora|dia|fecha|turno)|otra hora|otro dia|aplaz/;
 
 // ---------- fechas (en la hora de Colombia) ----------
 function hoyLocal(tz, ms) { const p = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms)); return p; }
@@ -63,9 +66,9 @@ function crear(dep) {
   }
   function cliente(k) { const M = mem(); return (M.clientes[k] = M.clientes[k] || {}); }
   // «Hola 👋 Soy el asistente de *Negocio*» solo la primera vez del día
-  function saludo(k, negocio, nombreWa) {
+  function saludo(k, negocio, nombreWa, siempre) {
     const cl = cliente(k), h = hoy();
-    if (cl.saludo === h) return '';
+    if (cl.saludo === h && !siempre) return '';
     cl.saludo = h; dep.guardar();
     return T.saludo(negocio, cl.nombre || nombreWa);
   }
@@ -89,6 +92,7 @@ function crear(dep) {
     return L.length === 1 ? L[0] : null;
   }
   const fin = (k) => { delete mem().conv[k]; dep.guardar(); };
+  const cfg = (neg, cat) => Object.assign({ agendar: true, cupos: true, saludoDiario: true, pedirNombre: true, pedirCorreo: true, loDeSiempre: true, cambios: true }, (cat && cat.bot) || (dep.bot ? dep.bot(neg) : {}));
   const pie = (cat) => cat.negocio + ' · asistente virtual';
 
   // ---------- pasos del agendamiento ----------
@@ -161,7 +165,10 @@ function crear(dep) {
       secciones: [{ titulo: corto(cat.staffLabel || 'Profesional', 24), filas: S.slice(0, 9).map((s) => ({ id: 'pro:' + s.id, titulo: corto(s.nombre, 24), desc: '' })).concat([{ id: 'pro:', titulo: 'El que esté libre', desc: '' }]) }] });
   }
   async function pasoDatos(neg, c, conv) {
-    const cl = cliente(c.k);
+    const cl = cliente(c.k), cat = await catalogo(neg), b = cfg(neg, cat);
+    if (conv.modo === 'reagendar') return pasoConfirmar(neg, c, conv);
+    if (!cl.nombre && !b.pedirNombre) { const n = String(c.nombre || '').trim().split(/\s+/).slice(0, 2).join(' '); cl.nombre = /^[\p{L}][\p{L} .'-]{1,40}$/u.test(n) ? n : 'Cliente'; }
+    if (cl.correo === undefined && !b.pedirCorreo) cl.correo = '';
     if (!cl.nombre) { conv.paso = 'nombre'; conv.t = ahora(); mem().conv[c.k] = conv; dep.guardar(); return dep.texto(neg, c.tel, '🙋 ¿A nombre de quién agendo la cita?'); }
     if (cl.correo === undefined) { conv.paso = 'correo'; conv.t = ahora(); mem().conv[c.k] = conv; dep.guardar(); return dep.texto(neg, c.tel, T.pideCorreo()); }
     return pasoConfirmar(neg, c, conv);
@@ -171,11 +178,21 @@ function crear(dep) {
     const x = (conv.horas || []).find((y) => y.time === conv.time) || {};
     const con = conv.staffId ? ((x.staff || []).find((s) => s.id === conv.staffId) || {}).nombre : '';
     conv.paso = 'confirmar';
+    if (conv.modo === 'reagendar') return lista(neg, c, conv, { texto: T.parafrasisCambio({ antes: conv.antes, dia: conv.dia || '', hora: x.hora || conv.time, con }), boton: 'Ver opciones', pie: pie(cat),
+      secciones: [{ titulo: '¿Lo confirmo?', filas: [{ id: 'ok:si', titulo: '✅ Sí, cambiarla', desc: '' }, { id: 'ok:no', titulo: '↩️ Dejarla como estaba', desc: '' }] }] });
     return lista(neg, c, conv, { texto: T.parafrasis({ servicios: sel.map((s) => s.nombre).join(' + '), total: total(sel), min: sel.reduce((a, s) => a + s.min, 0), dia: conv.dia || '', hora: x.hora || conv.time, con, nombre: cl.nombre, abono: Math.min(Number(cat.abono || 0), total(sel)) }),
       boton: 'Ver opciones', pie: pie(cat), secciones: [{ titulo: '¿Lo confirmo?', filas: [{ id: 'ok:si', titulo: '✅ Sí, confirmar', desc: '' }, { id: 'ok:no', titulo: '✏️ Cambiar algo', desc: 'Empezamos de nuevo' }] }] });
   }
   async function crearCita(neg, c, conv) {
     const cat = await catalogo(neg), cl = cliente(c.k);
+    if (conv.modo === 'reagendar') {
+      const r = await dep.gas(neg, 'reagendar', { code: conv.code, phone: c.tel, date: conv.date, time: conv.time, staffId: conv.staffId || '' });
+      if (!r.ok && r.motivo === 'ocupada') { delete conv.time; return pasoHora(neg, c, conv, '😕 Esa hora la acaban de tomar. Mira las que quedan 👇\n\n'); }
+      fin(c.k);
+      if (!r.ok) return dep.texto(neg, c.tel, '😕 ' + r.motivo);
+      dep.anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: 'reagendó por WhatsApp ' + r.cita.code });
+      return dep.texto(neg, c.tel, T.reagendada(r.cita));
+    }
     const r = await dep.gas(neg, 'crear', { phone: c.tel, nombre: cl.nombre, email: cl.correo || '', ids: conv.ids, date: conv.date, time: conv.time, staffId: conv.staffId || '' });
     if (!r.ok) {
       if (r.motivo === 'ocupada') { delete conv.time; return pasoHora(neg, c, conv, '😕 Esa hora la acaban de tomar. Mira las que quedan 👇\n\n'); }
@@ -224,7 +241,7 @@ function crear(dep) {
     const t = sinTilde(c.texto), todos = [].concat(...(cat.categorias || []).map((x) => x.servicios));
     const dichos = todos.filter((s) => { const n = sinTilde(s.nombre); return n.length >= 4 && t.includes(n); });
     if (dichos.length) { conv.ids = dichos.map((s) => s.id); return pasoMas(neg, c, conv); }
-    const fav = !extra && favorito(cl, cat);
+    const fav = !extra && cfg(neg, cat).loDeSiempre && favorito(cl, cat);
     if (fav) {
       conv.paso = 'siempre'; conv.fav = fav;
       return lista(neg, c, conv, { texto: (pre || '') + '¿Lo de siempre? *' + fav.servicio + '*' + (fav.con ? ' con *' + fav.con + '*' : '') + ' 😊', boton: 'Ver opciones', pie: pie(cat),
@@ -236,8 +253,25 @@ function crear(dep) {
   // ---------- el cliente respondió dentro de un agendamiento ----------
   async function seguir(neg, c, conv) {
     const t = sinTilde(c.texto);
-    if (SALIR.test(t)) { fin(c.k); return dep.texto(neg, c.tel, 'Listo, lo dejamos así 👌 Cuando quieras, escribe *agendar*.'); }
     const cat = await catalogo(neg), cl = cliente(c.k);
+    if (conv.paso === 'recordatorio') {   // respuesta al recordatorio: sí / cancelar / modificar
+      const b = cfg(neg, cat);
+      if (QUIERE_CANCELAR.test(t) && b.cambios) return cancelarCita(neg, c, conv.cita);
+      if (QUIERE_MODIFICAR.test(t) && b.cambios) return modificarCita(neg, c, conv.cita);
+      if (SI.test(t) || /\b(voy|ahi estare|alla estare|confirm|asisto|llego)\b/.test(t)) {
+        fin(c.k);
+        const r = await dep.gas(neg, 'asistencia', { code: conv.cita.code, phone: c.tel });
+        dep.anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: r.ok ? 'confirmó que viene ' + conv.cita.code : 'confirmar: ' + r.motivo });
+        return dep.texto(neg, c.tel, r.ok ? T.asistio(conv.cita, cl.nombre || conv.cita.nombre) : '😕 ' + r.motivo);
+      }
+      if (NO.test(t)) return dep.texto(neg, c.tel, b.cambios ? '¿Qué prefieres? Escribe *cancelar* o *modificar* 🙏' : '¿Necesitas cambiarla? Aquí puedes: ' + conv.cita.link);
+      fin(c.k); return null;   // habló de otra cosa: se atiende como mensaje normal
+    }
+    if (conv.paso === 'cancelarSeguro') {
+      if (SI.test(t) || c.rowId === 'can:si') return cancelarCita(neg, c, conv.cita, true);
+      fin(c.k); return dep.texto(neg, c.tel, '👌 Listo, tu cita sigue igual. ¡Te esperamos!');
+    }
+    if (SALIR.test(t)) { fin(c.k); return dep.texto(neg, c.tel, 'Listo, lo dejamos así 👌 Cuando quieras, escribe *agendar*.'); }
     if (conv.paso === 'nombre') {
       const n = String(c.texto || '').trim().replace(/^(a nombre de|soy|me llamo|mi nombre es)\s+/i, '').split(/\s+/).slice(0, 3).join(' ');
       if (!/^[\p{L}][\p{L} .'-]{1,40}$/u.test(n)) return dep.texto(neg, c.tel, '🙋 Escríbeme solo tu nombre, por favor (ej. *Andrés*).');
@@ -263,6 +297,7 @@ function crear(dep) {
     const o = elegir(conv, c);
     if (!o) {
       if (conv.paso === 'confirmar' && SI.test(t)) return crearCita(neg, c, conv);
+      if (conv.paso === 'confirmar' && NO.test(t) && conv.modo === 'reagendar') { fin(c.k); return dep.texto(neg, c.tel, '👌 Listo, tu cita sigue igual. ¡Te esperamos!'); }
       if (conv.paso === 'confirmar' && NO.test(t)) return agendar(neg, c, '✏️ Listo, empecemos de nuevo.\n\n', { ids: [] });
       if (conv.paso === 'mas' && (NO.test(t) || /solo eso|nada mas|eso es todo/.test(t))) return pasoDia(neg, c, conv);
       if (conv.paso === 'mas' && SI.test(t)) return pasoCategoria(neg, c, conv);
@@ -292,6 +327,7 @@ function crear(dep) {
     if (tipo === 'hora') { conv.time = val; return pasoProfesional(neg, c, conv); }
     if (tipo === 'pro') { conv.staffId = val || ((conv.horas || []).find((y) => y.time === conv.time) || { staff: [{}] }).staff[0].id || ''; return pasoDatos(neg, c, conv); }
     if (o.id === 'ok:si') return crearCita(neg, c, conv);
+    if (o.id === 'ok:no' && conv.modo === 'reagendar') { fin(c.k); return dep.texto(neg, c.tel, '👌 Listo, tu cita sigue igual. ¡Te esperamos!'); }
     if (o.id === 'ok:no') return agendar(neg, c, '✏️ Listo, empecemos de nuevo.\n\n', { ids: [] });
     return reenviar(neg, c, conv);
   }
@@ -308,6 +344,22 @@ function crear(dep) {
     if (conv.paso === 'siempre') return agendar(neg, c, pre);
     fin(c.k); return null;
   }
+  // ---------- cancelar / modificar desde WhatsApp ----------
+  async function cancelarCita(neg, c, cita, yaSeguro) {
+    fin(c.k);
+    const r = await dep.gas(neg, 'cancelar', { code: cita.code, phone: c.tel });
+    dep.anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: r.ok ? 'canceló por WhatsApp ' + cita.code : 'cancelar: ' + r.motivo });
+    return dep.texto(neg, c.tel, r.ok ? T.cancelada(Object.assign({}, r, { cita: r.cita || cita })) : '😕 ' + r.motivo + (cita.link ? '\n' + cita.link : ''));
+  }
+  async function modificarCita(neg, c, cita) {
+    const conv = { modo: 'reagendar', code: cita.code, ids: (cita.ids || []).slice(), staffId: cita.staffId || '', antes: (cita.dia || '').toLowerCase() + ' a las ' + cita.hora };
+    if (!conv.ids.length) { fin(c.k); return dep.texto(neg, c.tel, 'Para cambiarla, entra aquí: ' + cita.link); }
+    return pasoDia(neg, c, conv, '🔄 Vamos a cambiar tu cita.\n\n');
+  }
+  // después de mandar el recordatorio: la próxima respuesta del cliente es sobre ESA cita
+  function trasRecordatorio(neg, tel, cita) {
+    mem().conv[neg.bid + ':' + tel] = { paso: 'recordatorio', cita, t: ahora(), vence: VENCE_RECORDATORIO }; dep.guardar();
+  }
   function elegidos(cat, ids) { const todos = [].concat(...(cat.categorias || []).map((x) => x.servicios)); return (ids || []).map((id) => todos.find((s) => s.id === id)).filter(Boolean); }
   function total(sel) { return sel.reduce((a, s) => a + Number(s.precio || 0), 0); }
 
@@ -315,7 +367,7 @@ function crear(dep) {
   // Devuelve: 'flujo' | 'cupos' | 'agendar' | 'audio' | null (null = lo atiende la respuesta de siempre: su cita o el link)
   async function manejar(neg, c) {
     const M = mem(), conv = M.conv[c.k];
-    if (conv && ahora() - (conv.t || 0) > VENCE_FLUJO) fin(c.k);
+    if (conv && ahora() - (conv.t || 0) > (conv.vence || VENCE_FLUJO)) fin(c.k);
     const vivo = M.conv[c.k];
     const t = sinTilde(c.texto);
     if (c.audio) {
@@ -328,19 +380,33 @@ function crear(dep) {
     if (vivo && vivo.paso === 'menu') {   // el menú del saludo: si no eligió nada de ahí, se atiende como mensaje nuevo
       const o = elegir(vivo, c); fin(c.k);
       if (o && await cerrada()) return 'suspendida';
-      if (o && o.id === 'menu:agendar') { await agendar(neg, c, ''); return 'agendar'; }
-      if (o && o.id === 'menu:cupos') { await cupos(neg, Object.assign({}, c, { texto: 'hoy' })); return 'cupos'; }
-    } else if (vivo && (c.rowId || t)) { if (await cerrada()) return 'suspendida'; await seguir(neg, c, vivo); return 'flujo'; }
-    if (QUIERE_CUPOS.test(t)) { if (await cerrada()) return 'suspendida'; const cat = await catalogo(neg); await cupos(neg, c, saludo(c.k, cat.negocio, c.nombre)); return 'cupos'; }
-    if (QUIERE_AGENDAR.test(t)) { if (await cerrada()) return 'suspendida'; const cat = await catalogo(neg); await agendar(neg, c, saludo(c.k, cat.negocio, c.nombre)); return 'agendar'; }
+      if (o && o.id === 'menu:agendar' && cfg(neg).agendar) { await agendar(neg, c, ''); return 'agendar'; }
+      if (o && o.id === 'menu:cupos' && cfg(neg).cupos) { await cupos(neg, Object.assign({}, c, { texto: 'hoy' })); return 'cupos'; }
+    } else if (vivo && (c.rowId || t)) { if (await cerrada()) return 'suspendida'; const r = await seguir(neg, c, vivo); if (r !== null) return 'flujo'; }
+    const b = cfg(neg);
+    // «quiero cancelar mi cita» / «necesito cambiar la hora» (si el dueño lo permite y tiene una cita activa)
+    if (b.cambios && (QUIERE_CANCELAR.test(t) || QUIERE_MODIFICAR.test(t))) {
+      if (await cerrada()) return 'suspendida';
+      const info = await dep.gas(neg, 'chat', { phone: c.tel });
+      const cita = (info.citas || [])[0];
+      if (cita) {
+        const sal = saludo(c.k, info.negocio, c.nombre, !b.saludoDiario);
+        if (QUIERE_CANCELAR.test(t)) { const cv = { paso: 'cancelarSeguro', cita }; return (await lista(neg, c, cv, { texto: sal + T.preguntaCancelar(cita), boton: 'Ver opciones', pie: info.negocio + ' · asistente virtual', secciones: [{ titulo: 'Tu cita', filas: [{ id: 'can:si', titulo: '🚫 Sí, cancelarla', desc: '' }, { id: 'can:no', titulo: '↩️ No, la mantengo', desc: '' }] }] }), 'flujo'); }
+        await modificarCita(neg, c, cita); return 'flujo';
+      }
+    }
+    if (QUIERE_CUPOS.test(t) && b.cupos) { if (await cerrada()) return 'suspendida'; const cat = await catalogo(neg); await cupos(neg, c, saludo(c.k, cat.negocio, c.nombre, !cfg(neg, cat).saludoDiario)); return 'cupos'; }
+    if (QUIERE_AGENDAR.test(t) && b.agendar) { if (await cerrada()) return 'suspendida'; const cat = await catalogo(neg); await agendar(neg, c, saludo(c.k, cat.negocio, c.nombre, !cfg(neg, cat).saludoDiario)); return 'agendar'; }
     return null;
   }
   // La respuesta de siempre (su cita o el link) va como LISTA con «Agendar por aquí» y «Ver cupos»
   async function menu(neg, c, texto, negocio) {
-    return lista(neg, c, { paso: 'menu', ids: [] }, { texto, boton: 'Ver opciones', pie: (negocio || '') + ' · asistente virtual',
-      secciones: [{ titulo: '¿Qué hacemos?', filas: [{ id: 'menu:agendar', titulo: '📅 Agendar por aquí', desc: 'Te ayudo paso a paso' }, { id: 'menu:cupos', titulo: '🕐 Ver cupos', desc: 'Días y horas disponibles' }] }] });
+    const b = cfg(neg), filas = [];
+    if (b.agendar) filas.push({ id: 'menu:agendar', titulo: '📅 Agendar por aquí', desc: 'Te ayudo paso a paso' });
+    if (b.cupos) filas.push({ id: 'menu:cupos', titulo: '🕐 Ver cupos', desc: 'Días y horas disponibles' });
+    return lista(neg, c, { paso: 'menu', ids: [] }, { texto, boton: 'Ver opciones', pie: (negocio || '') + ' · asistente virtual', secciones: [{ titulo: '¿Qué hacemos?', filas }] });
   }
-  return { manejar, menu, saludo, cliente, fechaPedida: (t) => fechaPedida(t, hoy()), _cat: catCache };
+  return { manejar, menu, saludo, trasRecordatorio, cliente, fechaPedida: (t) => fechaPedida(t, hoy()), _cat: catCache };
 }
 
 module.exports = { crear, fechaPedida, sinTilde, QUIERE_CUPOS, QUIERE_AGENDAR, SALUDO };
