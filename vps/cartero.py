@@ -14,6 +14,8 @@ for linea in open(os.path.join(AQUI, 'cartero.env'), encoding='utf-8'):
         k, v = linea.strip().split('=', 1); CFG[k] = v
 TOKEN, DUENO = CFG.get('TG_TOKEN', ''), str(CFG.get('TG_DUENO', ''))
 GH_TOKEN, GH_REPO, GH_RAMA = CFG.get('GH_TOKEN', ''), CFG.get('GH_REPO', 'alex88ruizc-max/agendador'), CFG.get('GH_RAMA', 'main')
+SERVIDOR_VIEJO = 'AKfycbyRSqnsiFCE402uiML6Su3ECC4YxYKXDTilLmzA1Zvsq4UA5PvyxGZmpb8tN_3L_E1DXQ'   # cuenta alex88ruizc: ya no se usa
+SERVIDOR_NUEVO = 'https://script.google.com/macros/s/AKfycbwkfrob2BW4PdWyvelRae04akMPz0LNXJ9ZtZpf1Tw3TUqguJg5vu65R_BY2ctMuW8b/exec'   # tuagenda.servidor
 API = 'https://api.telegram.org/bot' + TOKEN
 WEB_PERMITIDOS = re.compile(r'^(index|admin|super|privacidad|404)\.html$|^(app|admin|super|common|config|theme|sw)\.js$|^[a-z0-9_-]+\.css$|^[a-z0-9_-]+\.(png|svg|webmanifest|ico|apk)$')
 
@@ -83,17 +85,29 @@ def subir_web(nombre, datos):
     archivos = {destino(n): z.read(n) for n in z.namelist() if not n.endswith('/') and destino(n)}
     raros = [n for n in z.namelist() if not n.endswith('/') and not destino(n)]
     if not archivos: return '❌ ' + nombre + ' no trae archivos de la página.'
-    # 3.25 · 🛡️ el servidor de Google de la página NO se cambia por un zip de la página (solo la mudanza lo cambia):
-    #        si el zip trae config.js con otra dirección del servidor, se deja la que ya está en GitHub
+    # 3.26 · 🛡️ el servidor de Google de la página: el VIEJO (cuenta alex88ruizc) nunca vuelve; el NUEVO no se cambia por un zip.
+    #        (la 3.25 conservaba lo que hubiera en GitHub, y en GitHub había quedado el viejo: por eso seguía el «No hay conexión»)
     aviso_api = ''
     if 'config.js' in archivos and not nombre.startswith('config.js (servidor nuevo)'):
         try:
-            s_, r_ = gh('GET', '/contents/config.js?ref=' + GH_RAMA)
-            actual = base64.b64decode(r_['content']).decode('utf-8')
-            m_act = re.search(r'export const API_URL = "([^"]*)";', actual); m_zip = re.search(rb'export const API_URL = "([^"]*)";', archivos['config.js'])
-            if m_act and m_zip and m_zip.group(1).decode() != m_act.group(1):
-                archivos['config.js'] = re.sub(rb'export const API_URL = "[^"]*";', ('export const API_URL = "' + m_act.group(1) + '";').encode(), archivos['config.js'])
-                aviso_api = '\n🛡️ config.js traía otra dirección del servidor de Google: dejé la que ya funciona (' + m_act.group(1)[-18:] + ').'
+            m_zip = re.search(rb'export const API_URL = "([^"]*)";', archivos['config.js'])
+            url_zip = m_zip.group(1).decode() if m_zip else ''
+            url_gh = ''
+            try:
+                s_, r_ = gh('GET', '/contents/config.js?ref=' + GH_RAMA)
+                m_act = re.search(r'export const API_URL = "([^"]*)";', base64.b64decode(r_['content']).decode('utf-8'))
+                url_gh = m_act.group(1) if m_act else ''
+            except Exception:
+                pass
+            def malo(u): return (not u) or SERVIDOR_VIEJO in u
+            if malo(url_zip):   bueno = url_gh if not malo(url_gh) else SERVIDOR_NUEVO
+            elif malo(url_gh):  bueno = url_zip
+            else:               bueno = url_gh
+            if m_zip and bueno != url_zip:
+                archivos['config.js'] = re.sub(rb'export const API_URL = "[^"]*";', ('export const API_URL = "' + bueno + '";').encode(), archivos['config.js'])
+                aviso_api = '\n🛡️ config.js traía otra dirección del servidor de Google: dejé la buena (' + bueno[-18:] + ').'
+            elif malo(url_gh) and url_gh:
+                aviso_api = '\n✅ La página vuelve al servidor de Google nuevo (' + bueno[-18:] + ').'
         except Exception as e:
             aviso_api = '\n⚠️ No pude revisar la dirección del servidor en config.js: ' + str(e)[:80]
     # 0) 🧪 2.7: banco de pruebas de la página. Si algo falla, NO se sube nada (la página sigue como estaba)

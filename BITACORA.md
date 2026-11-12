@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-3.25** · Página **2026-11-12i** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-12** · Mary **agendador-ia-3.26** · Página **2026-11-12j** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -113,6 +113,13 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-12 · agendador-ia-3.26 · página 2026-11-12j · arreglo del arreglo
+- **Falla de la 3.25:** el escudo de config.js conservaba la dirección que hubiera en GitHub, y en GitHub había quedado la del servidor **viejo** (alex88ruizc). Por eso el escudo dejó la mala y el «No hay conexión» siguió al desvincular.
+- **Ahora:** el cartero conoce las dos direcciones. La vieja **nunca** vuelve: si llega en el zip o está en GitHub, se pone la nueva (tuagenda.servidor). La nueva no se cambia por un zip de la página; solo la mudanza la cambia.
+- Probado con un GitHub simulado en los 5 casos (viejo/nuevo en GitHub × viejo/nuevo/otro en el zip): siempre queda la nueva.
+- Página 2026-11-12j: mismo código, solo cambia la versión, para que el celular cargue todo de nuevo.
+- Instalar: primero agendador-ia-3.26, después agendador-web-2026-11-12j. El bot debe responder «✅ La página vuelve al servidor de Google nuevo».
 
 ### 2026-11-12 · agendador-ia-3.25 · ⚠️ incidente: la página volvió al servidor viejo
 - Causa del «No hay conexión con el servidor» (desvincular, panel): `config.js` del repositorio tenía la dirección VIEJA

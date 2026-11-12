@@ -1,7 +1,7 @@
 # Graph Report - agendador  (2026-11-12)
 
 ## Corpus Check
-- 31 files · ~127,493 words
+- 31 files · ~127,840 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 13 file(s) not represented in the graph (top: (none) 7, .css 3, .ejemplo 2)
 
@@ -11,7 +11,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `de674c3f`
+- Built from commit: `d65d66d1`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -65,8 +65,8 @@
 3. `bogNow()` - 48 edges
 4. `bpath()` - 46 edges
 5. `crear()` - 38 edges
-6. `cop()` - 34 edges
-7. `toMillis()` - 34 edges
+6. `toMillis()` - 34 edges
+7. `cop()` - 34 edges
 8. `hora12()` - 33 edges
 9. `renderHome()` - 32 edges
 10. `seguir()` - 29 edges
@@ -76,11 +76,11 @@
   vps/gs/mary.gs → common.js
 - `openConsent()` --calls--> `openModal()`  [EXTRACTED]
   app.js → common.js
-- `llega()` --calls--> `deWaha()`  [EXTRACTED]
-  vps/banco/escenarios.js → vps/principal.js
-- `clientHistory()` --calls--> `toMillis()`  [EXTRACTED]
+- `onErr()` --calls--> `toast()`  [EXTRACTED]
   admin.js → common.js
-- `closeM()` --calls--> `closeModal()`  [EXTRACTED]
+- `start()` --calls--> `bpath()`  [EXTRACTED]
+  admin.js → common.js
+- `start()` --calls--> `setDialogBrand()`  [EXTRACTED]
   admin.js → common.js
 
 ## Import Cycles
