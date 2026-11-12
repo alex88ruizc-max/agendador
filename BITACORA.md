@@ -114,20 +114,18 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 
 ## 📜 Historial (lo más nuevo arriba)
 
-### 2026-11-12 · agendador-ia-3.29 · página 2026-11-12n · primero la hora, después el servicio · sin «¿Lo confirmo?»
-- Pedido de Alex: «primero es día y hora, luego el servicio, porque va a escoger y quizás no esté su hora», y al final «cita confirmada, con eso basta».
-- **Orden nuevo:**
-  - El saludo, «quiero agendar» y «empezar de nuevo» muestran de una «📅 Estos son los cupos de hoy. Quedan N», con la lista de horas + Mañana + Otro día.
-  - Al elegir la hora: «¿Lo de siempre?» (si lo conoce) o solo los servicios que CABEN desde esa hora (minutos libres seguidos). Google revisa al final que todo quepa; si no, muestra las horas que sí sirven.
-  - Si el cliente dice de una el día o los servicios («quiero agendar mañana», «quiero degradado y barba»), se usan y solo se pregunta lo que falta.
-- **Sin «¿Lo confirmo?»:** después de con quién, nombre y correo se aparta de una y llega el resumen «✅ ¡Cita confirmada!» (servicio, precio, día y hora, con quién, a nombre de, reserva, link). Reagendar sí sigue preguntando.
-- Si después del saludo escribe algo que no es de la lista, se atiende normal (no «No te entendí»).
-- **Arreglos encontrados por el banco:**
-  - El número de categoría ya no se corre cuando la lista va filtrada.
-  - «Ver más horas» sí pasa de página (antes volvía a la primera).
-  - «Otro día» y «Ver más» ya no vuelven a preguntar «¿ya tienes una cita?».
-- **Página 12n:** si en el celular había una sesión sin datos de cliente (por ejemplo, la cuenta del dueño), «Ingresar» cerraba sin el botón de Google. Ahora cierra esa sesión y sale «Continuar con Google».
-- Banco: 125 pruebas, 0 fallas; las pruebas del flujo viejo se reescribieron. Probado con mutaciones (hora primero, sin confirmar, ver más, categoría).
+### 2026-11-12 · agendador-ia-3.29 · página 2026-11-12n · sin «¿Lo confirmo?» · link que falla
+- Se probó «primero la hora, después el servicio» y Alex pidió dejarlo como estaba: **primero el servicio, luego el día y la hora**. Ese cambio se deshizo; no se entregó.
+- **Sin «¿Lo confirmo?»** (pedido de Alex): la respuesta al correo (o «no») ya es la confirmación. Se aparta de una y llega «✅ ¡Cita confirmada!» con el resumen (servicio, precio y duración, día y hora, con quién, a nombre de, reserva, link). Reagendar sí sigue preguntando.
+- **«Presenta problemas tu aplicativo», «el link no me abre»…** → «😕 Qué pena que el link te esté fallando. Tranquilo, te agendo por aquí mismo 👇» + lista de servicios. Queda en /registro.
+- **Arreglos que encontró el banco:**
+  - «Ver más horas» volvía a la primera página.
+  - El número de categoría podía no coincidir con el catálogo.
+  - «Otro día» volvía a preguntar «¿ya tienes una cita?».
+  - «Lo de siempre» marca «como siempre».
+- **Página 12n:** con una sesión abierta sin datos de cliente (por ejemplo, la del dueño en el mismo celular), «Ingresar» quedaba sin el botón de Google. Ahora cierra esa sesión y sale «Continuar con Google».
+- Pendiente de revisar con Alex: un recordatorio de una cita que él dice que ya estaba cancelada (R-RZP6UR, avisos a las 4:54 p. m.). El servidor solo avisa citas «confirmadas» al momento: falta saber a qué hora se canceló.
+- Banco: 125 pruebas, 0 fallas. Probado con mutaciones.
 
 ### 2026-11-12 · agendador-ia-3.28 · el bot se quedaba mudo después de «No, solo eso»
 - Reporte de Alex: Combos → Corte + barba → «No, solo eso» y el bot no volvió a responder (debía preguntar el día).

@@ -63,9 +63,9 @@ AJUSTES POR NEGOCIO (negocios.json)
   "recordatorioMin": 120     ·   "estados": { "activo": true, "hoy": "07:30", "semana": "07:00", "semanaDia": 1 }
   En Firestore (settings/general del negocio) maryAutoCaptura: true → la captura confirma al instante y el dueño revisa después.
 
-NOVEDADES 3.29 · 📅 PRIMERO LA HORA, DESPUÉS EL SERVICIO
-  El saludo y «quiero agendar» muestran los cupos de hoy. Al elegir la hora salen solo los servicios que caben.
-  Ya no pregunta «¿Lo confirmo?»: al final llega «✅ ¡Cita confirmada!» con el resumen.
+NOVEDADES 3.29 · ✅ SIN «¿LO CONFIRMO?»
+  Igual que antes: primero el servicio, luego el día y la hora. Al responder el correo (o «no») la cita queda confirmada
+  y llega «✅ ¡Cita confirmada!» con el resumen. Si el cliente dice que el link le falla, se le agenda por WhatsApp.
   Después de este zip manda agendador-web-2026-11-12n.zip.
 
 NOVEDADES 3.28 · 🗓️ YA NO SE QUEDA MUDO AL PREGUNTAR EL DÍA

@@ -84,6 +84,9 @@ function horaPedida(texto) {
 // ---------- ¿qué quiere? ----------
 const QUIERE_CUPOS = /cupo|disponib|espacio|\bhay (hora|turno|citas?|agenda)\b|tiene[ns]? (hora|turno|espacio|agenda|algo)|horario libre|(a )?que horas? (hay|tiene|tienen|quedan)|que (dias|dia) (hay|tienen)|quedan? (horas|turnos)/;
 const QUIERE_AGENDAR = /agend|reserv|apart(ar|o|e)\b|separ(ar|o) (una |un )?(cita|hora|cupo|turno)|(quiero|quisiera|necesito|me gustaria|puedo|deseo|pedir|sacar|hacer)( una| un)? (cita|turno|hora)\b|nueva cita|otra cita|\b(quiero|quisiera|necesito)\b.*\b(corte|cortar|motilar|motilada|barba|unas|cejas|pestanas|manicure|pedicure|depil|masaje|tinte|cepillado|peinado|maquillaje)/;
+// 3.29: «presenta problemas tu aplicativo», «el link no me abre», «la página no funciona» → se le agenda por aquí mismo
+const LINK_FALLA = /(problema|no (me )?(funciona|carga|abre|sirve|deja|entra|sale)|falla|fallando|error|dañad|no puedo (entrar|agendar|abrir|reservar))/;
+const LINK_QUE = /(link|enlace|pagina|aplicativo|aplicacion|app\b|web|agendamiento|plataforma|sistema)/;
 const SALUDO = /^(hola+|holi|ola|buenas|buenos dias|buenas tardes|buenas noches|buen dia|hey|saludos|que tal)\b/;
 const SALIR = /^(cancelar|salir|menu|inicio|empezar de nuevo|volver a empezar|dejalo asi|olvidalo)$/;
 const SI = /^(si+|claro|dale|listo|ok|okey|okay|confirmo|confirmar|confirmado|de una|correcto|perfecto|va|hagale|hagamosle|asi esta bien|esta bien)\b/;
@@ -136,19 +139,9 @@ function crear(dep) {
   const pie = (cat) => cat.negocio + ' · asistente virtual';
 
   // ---------- pasos del agendamiento ----------
-  // 3.29: si ya eligió la HORA, solo se muestran los servicios que caben en el tiempo libre desde esa hora (la revisión exacta la hace Google después)
-  function caben(conv, cat, S) {
-    if (!conv.cabe) return S;
-    const usado = elegidos(cat, conv.ids).reduce((a, x) => a + Number(x.min || 0), 0);
-    const L = S.filter((x) => usado + Number(x.min || 0) <= conv.cabe);
-    return L.length ? L : S;   // si nada cabe, se muestran todos y Google dice qué horas sí sirven
-  }
   async function pasoCategoria(neg, c, conv, pre) {
     const cat = await catalogo(neg);
-    const usado = elegidos(cat, conv.ids).reduce((a, y) => a + Number(y.min || 0), 0);
-    const C0 = (cat.categorias || []).filter((x) => x.servicios && x.servicios.length);
-    const C1 = conv.cabe ? C0.filter((x) => x.servicios.some((s) => !(conv.ids || []).includes(s.id) && usado + Number(s.min || 0) <= conv.cabe)) : C0;
-    const C = C1.length ? C1 : C0;
+    const C = (cat.categorias || []).filter((x) => x.servicios && x.servicios.length);
     if (!C.length) { fin(c.k); return dep.texto(neg, c.tel, (pre || '') + T.sinServicios(cat)); }
     if (C.length === 1) { conv.cat = C[0].nombre; return pasoServicio(neg, c, conv, pre); }
     conv.paso = 'cat';
@@ -158,7 +151,7 @@ function crear(dep) {
   async function pasoServicio(neg, c, conv, pre) {
     const cat = await catalogo(neg);
     const C = (cat.categorias || []).find((x) => x.nombre === conv.cat) || (cat.categorias || [])[0];
-    const S0 = C.servicios.filter((s) => !(conv.ids || []).includes(s.id)), S = caben(conv, cat, S0);
+    const S = C.servicios.filter((s) => !(conv.ids || []).includes(s.id));
     const pag = conv.pag || 0, por = 8, vista = S.slice(pag * por, pag * por + por);
     const filas = vista.map((s) => ({ id: 'svc:' + s.id, titulo: corto(s.nombre, 24), desc: T.cop(s.precio) + ' · ' + T.duracion(s.min) }));
     if (S.length > (pag + 1) * por) filas.push({ id: 'mas:svc', titulo: 'Ver más ➡️', desc: 'Más servicios de ' + corto(C.nombre, 40) });
@@ -219,7 +212,7 @@ function crear(dep) {
   async function pasoDatos(neg, c, conv) {
     const cl = cliente(c.k), cat = await catalogo(neg), b = cfg(neg, cat);
     if (conv.modo === 'reagendar') return pasoConfirmar(neg, c, conv);
-    const fin2 = () => crearCita(neg, c, conv);   // 3.29: sin «¿Lo confirmo?»: se aparta y llega el resumen con «✅ Cita confirmada»
+    const fin2 = () => crearCita(neg, c, conv);   // 3.29: sin «¿Lo confirmo?»: la respuesta al correo (o «no») ya es la confirmación
     if (!cl.nombre && !b.pedirNombre) { const n = String(c.nombre || '').trim().split(/\s+/).slice(0, 2).join(' '); cl.nombre = /^[\p{L}][\p{L} .'-]{1,40}$/u.test(n) ? n : 'Cliente'; }
     if (cl.correo === undefined && !b.pedirCorreo) cl.correo = '';
     if (conv.otraPersona && conv.nombreOtra === undefined) { conv.paso = 'nombreOtra'; conv.t = ahora(); mem().conv[c.k] = conv; dep.guardar(); return dep.texto(neg, c.tel, '🙋 ¿A nombre de quién es esta cita? (si es para ti, escribe *yo*)'); }
@@ -285,10 +278,10 @@ function crear(dep) {
     if (!D.length) { fin(c.k); return dep.texto(neg, c.tel, (pre || '') + T.sinCupos(r)); }
     let d = D.find((x) => x.date === pedida), aviso = '';
     if (!d) { const cual = pedida === h ? 'Hoy' : ((r.dias || []).find((x) => x.date === pedida) || {}).dia || 'Ese día'; d = D.find((x) => x.date > pedida) || D[0]; aviso = '😕 ' + cual + ' ya no hay cupos.\n'; }
-    return horasCupos(neg, c, Object.assign({}, base || {}, { paso: 'horaCupos', ids: (base && base.ids) || [], dias: D.map((x) => ({ date: x.date, dia: x.dia, n: x.libres.length })), link: r.link, negocio: r.negocio }), d, (pre || '') + aviso);
+    return horasCupos(neg, c, Object.assign({}, base || {}, { paso: 'horaCupos', ids: [], dias: D.map((x) => ({ date: x.date, dia: x.dia, n: x.libres.length })), link: r.link, negocio: r.negocio }), d, (pre || '') + aviso);
   }
   async function horasCupos(neg, c, conv, d, pre) {
-    conv.paso = 'horaCupos'; conv.date = d.date; conv.dia = d.dia; conv.libres = d.libres;
+    conv.paso = 'horaCupos'; conv.date = d.date; conv.dia = d.dia;
     const pag = conv.pagHC || 0, por = 8, L = d.libres.map((t, i) => ({ t, hora: d.horas[i] })), vista = L.slice(pag * por, pag * por + por);
     const fila = (x) => ({ id: 'hc:' + x.t, titulo: x.hora });
     const sec = [];
@@ -302,15 +295,7 @@ function crear(dep) {
     mas.push({ id: 'hc:otro', titulo: '🗓️ Otro día', desc: 'Elige la fecha' });
     sec.push({ titulo: 'Otro día', filas: mas });
     const cual = d.date === hoy() ? 'de hoy' : d.dia.toLowerCase() === 'mañana' ? 'de mañana' : 'del ' + d.dia.charAt(0).toLowerCase() + d.dia.slice(1);
-    return lista(neg, c, conv, { texto: (pre || '') + '📅 *Estos son los cupos ' + cual + '.*' + (cual === 'de hoy' ? ' Quedan *' + L.length + '*.' : '') + '\nElige tu hora 👇' + (conv.link ? '\n\nTambién puedes agendar aquí: ' + conv.link : ''), boton: 'Ver horas', pie: (conv.negocio || '') + ' · asistente virtual', secciones: sec });
-  }
-  // minutos libres seguidos desde una hora (con la lista de horas libres del día, de un servicio corto)
-  function libreDesde(libres, t) {
-    const L = (libres || []).map((x) => { const [h, m] = x.split(':').map(Number); return h * 60 + m; }).sort((a, b) => a - b);
-    const paso = L.slice(1).reduce((a, x, i) => Math.min(a, x - L[i]), Infinity), ini = (() => { const [h, m] = t.split(':').map(Number); return h * 60 + m; })();
-    if (!isFinite(paso) || L.indexOf(ini) < 0) return 0;
-    let n = 1; while (L.indexOf(ini + n * paso) >= 0) n++;
-    return n * paso;
+    return lista(neg, c, conv, { texto: (pre || '') + '📅 *Estos son los cupos ' + cual + '.*\nElige tu hora 👇' + (conv.link ? '\n\nTambién puedes agendar aquí: ' + conv.link : ''), boton: 'Ver horas', pie: (conv.negocio || '') + ' · asistente virtual', secciones: sec });
   }
   async function diasCupos(neg, c, conv) {
     conv.paso = 'diaCupos';
@@ -401,12 +386,9 @@ function crear(dep) {
     if (pregunta) return pregunta;
     // ¿escribió de una los servicios? («quiero corte y barba»)
     const t = sinTilde(c.texto), todos = [].concat(...(cat.categorias || []).map((x) => x.servicios));
-    const dichos = conv.time ? [] : todos.filter((s) => { const n = sinTilde(s.nombre); return n.length >= 4 && t.includes(n); });
-    if (dichos.length) conv.ids = dichos.map((s) => s.id);
-    // 3.29: PRIMERO el día y la hora («📅 Estos son los cupos de hoy»), después el servicio: así no escoge algo y luego no hay su hora
-    if (!conv.time && cfg(neg, cat).cupos) return cupos(neg, Object.assign({}, c, { texto: '' }), pre, conv.date || (horaPedida(c.texto) ? null : fechaPedida(c.texto, hoy())) || null, { ids: conv.ids, otraOk: conv.otraOk, otraPersona: conv.otraPersona, nombreOtra: conv.nombreOtra });
-    if (conv.ids.length) return pasoMas(neg, c, conv);
-    const fav = (!extra || extra.time) && cfg(neg, cat).loDeSiempre && favorito(cl, cat);
+    const dichos = todos.filter((s) => { const n = sinTilde(s.nombre); return n.length >= 4 && t.includes(n); });
+    if (dichos.length) { conv.ids = dichos.map((s) => s.id); return pasoMas(neg, c, conv); }
+    const fav = !extra && cfg(neg, cat).loDeSiempre && favorito(cl, cat);
     if (fav) {
       conv.paso = 'siempre'; conv.fav = fav;
       return lista(neg, c, conv, { texto: (pre || '') + '¿Lo de siempre? *' + fav.servicio + '*' + (fav.con ? ' con *' + fav.con + '*' : '') + ' 😊', boton: 'Ver opciones', pie: pie(cat),
@@ -517,7 +499,7 @@ function crear(dep) {
       if (conv.paso === 'mas' && (NO.test(t) || /solo eso|nada mas|eso es todo/.test(t))) return pasoDia(neg, c, conv);
       if (conv.paso === 'mas' && SI.test(t)) return pasoCategoria(neg, c, conv);
       if (conv.paso === 'siempre' && SI.test(t)) { conv.ids = conv.fav.ids.slice(); conv.staffId = conv.fav.staffId; conv.comoSiempre = true; return pasoDia(neg, c, conv); }
-      if (conv.paso === 'siempre' && NO.test(t)) { conv.ids = []; delete conv.staffId; return pasoCategoria(neg, c, conv); }
+      if (conv.paso === 'siempre' && NO.test(t)) return pasoCategoria(neg, c, { ids: [] });
       if ((conv.paso === 'diaCupos' || conv.paso === 'horaCupos') && (QUIERE_AGENDAR.test(t) || SI.test(t))) return agendar(neg, c, '', { ids: [] });
       const f = (conv.paso === 'dia' || conv.paso === 'diaCupos' || conv.paso === 'horaCupos') && fechaPedida(c.texto, hoy());
       if (f && conv.paso === 'horaCupos') return cupos(neg, c, '', f, conv);
@@ -532,14 +514,14 @@ function crear(dep) {
     if (o.id === 'mas:si') return pasoCategoria(neg, c, conv);
     if (o.id === 'mas:no') return pasoDia(neg, c, conv);
     if (o.id === 'fav:si') { conv.ids = conv.fav.ids.slice(); conv.staffId = conv.fav.staffId; conv.comoSiempre = true; return pasoDia(neg, c, conv); }
-    if (o.id === 'fav:no') { conv.ids = []; delete conv.staffId; return pasoCategoria(neg, c, conv); }   // 3.29: conserva el día y la hora elegidos
+    if (o.id === 'fav:no') return pasoCategoria(neg, c, { ids: [] });
     if (o.id === 'ap:si') return apartar(neg, c, conv);
     if (o.id === 'ap:otra') { conv.pagHC = 0; return cupos(neg, c, '', conv.date, conv); }
     if (tipo === 'ap') { conv.time = val; conv.hora = horaTxt(val); return apartar(neg, c, conv); }
     if (o.id === 'hc:mas') { conv.pagHC = (conv.pagHC || 0) + 1; return cupos(neg, c, '', conv.date, conv); }
     if (o.id === 'hc:otro') return diasCupos(neg, c, conv);
     if (o.id.startsWith('hc:dia:')) { conv.pagHC = 0; return cupos(neg, c, '', o.id.slice(7), conv); }
-    if (tipo === 'hc') { return agendar(neg, c, '🕐 *' + o.titulo + '* · ' + (conv.dia || '') + '\n\n', { ids: conv.ids || [], date: conv.date, dia: conv.dia, time: val, cabe: libreDesde(conv.libres, val), otraOk: conv.otraOk, otraPersona: conv.otraPersona }); }
+    if (tipo === 'hc') { return agendar(neg, c, '🕐 *' + o.titulo + '* · ' + (conv.dia || '') + '\n\n', { ids: [], date: conv.date, dia: conv.dia, time: val }); }
     if (tipo === 'dia') {
       if (conv.paso === 'diaCupos') { conv.pagHC = 0; return cupos(neg, c, '', val, conv); }
       conv.date = val; conv.dia = o.titulo; conv.pagH = 0;
@@ -632,14 +614,13 @@ function crear(dep) {
     }
     // agenda suspendida por el dueño o la plataforma: no agenda ni muestra cupos (el catálogo queda en memoria 10 min: no gasta cupo)
     const cerrada = async () => { const cat = await catalogo(neg); if (cat.activo === false) { fin(c.k); return true; } return false; };
-    if (vivo && vivo.deSaludo) { if (elegir(vivo, c)) delete vivo.deSaludo; else fin(c.k); }   // 3.29: la lista del saludo (cupos de hoy): si escribe otra cosa, se atiende como mensaje nuevo
-    if (M.conv[c.k] && M.conv[c.k].paso === 'menu') {   // el menú del saludo: si no eligió nada de ahí, se atiende como mensaje nuevo
+    if (vivo && vivo.paso === 'menu') {   // el menú del saludo: si no eligió nada de ahí, se atiende como mensaje nuevo
       const o = elegir(vivo, c); fin(c.k);
       if (o && await cerrada()) return 'suspendida';
       if (o && o.id === 'menu:agendar' && cfg(neg).agendar) { await agendar(neg, c, ''); return 'agendar'; }
       if (o && o.id === 'menu:cupos' && cfg(neg).cupos) { await cupos(neg, Object.assign({}, c, { texto: 'hoy' })); return 'cupos'; }
       if (o && o.id.startsWith('cat:') && cfg(neg).agendar) { const cat = await catalogo(neg); const C = (cat.categorias || [])[Number(o.id.slice(4))]; await pasoServicio(neg, c, { ids: [], cat: C && C.nombre }); return 'agendar'; }
-    } else if (M.conv[c.k] && (c.rowId || t)) { if (await cerrada()) return 'suspendida'; const r = await seguir(neg, c, vivo); if (r !== null) return 'flujo'; }
+    } else if (vivo && (c.rowId || t)) { if (await cerrada()) return 'suspendida'; const r = await seguir(neg, c, vivo); if (r !== null) return 'flujo'; }
     const b = cfg(neg);
     // «quiero cancelar mi cita» / «necesito cambiar la hora» (si el dueño lo permite y tiene una cita activa)
     if (b.cambios && (QUIERE_CANCELAR.test(t) || QUIERE_MODIFICAR.test(t))) {
@@ -653,6 +634,13 @@ function crear(dep) {
         await modificarCita(neg, c, cita); return 'flujo';
       }
     }
+    if (b.agendar && LINK_FALLA.test(t) && LINK_QUE.test(t)) {
+      if (await cerrada()) return 'suspendida';
+      const cat = await catalogo(neg);
+      dep.anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: '⚠️ dice que el link le falla: lo agendo por WhatsApp' });
+      await agendar(neg, c, saludo(c.k, cat.negocio, c.nombre, !cfg(neg, cat).saludoDiario) + '😕 Qué pena que el link te esté fallando. Tranquilo, te agendo por aquí mismo 👇\n\n');
+      return 'agendar';
+    }
     // 3.11: «¿tienes cupo hoy a las 3?», «mañana a las 4», «un corte el viernes en la tarde» → propuesta natural
     const hp = horaPedida(c.texto);
     if (b.agendar && hp && (fechaPedida(c.texto, hoy()) || /cupo|cita|turno|espacio|puedo|puedes|tienes|tienen|tiene|hay|agend|apart|disponib|atiend|\?/.test(t))) {
@@ -665,10 +653,8 @@ function crear(dep) {
   }
   // La respuesta de siempre (su cita o el link) va como LISTA con «Agendar por aquí» y «Ver cupos»
   // 3.11: el saludo trae la lista de SERVICIOS (por categorías) + «Ver cupos de hoy»; también puede escribir el día y la hora
-  async function menu(neg, c, texto, negocio, sal) {
+  async function menu(neg, c, texto, negocio) {
     const b = cfg(neg), secciones = [];
-    // 3.29: con agendar y cupos encendidos, el saludo muestra de una «📅 Estos son los cupos de hoy» (primero la hora, después el servicio)
-    if (b.agendar && b.cupos && sal !== undefined) { try { return await cupos(neg, Object.assign({}, c, { texto: '' }), sal, null, { deSaludo: true }); } catch (e) { /* si falla, el menú de siempre */ } }
     let cat = null; try { cat = await catalogo(neg); } catch (e) { cat = null; }
     const C = ((cat && cat.categorias) || []).filter((x) => x.servicios && x.servicios.length);
     if (b.agendar && C.length) secciones.push({ titulo: '¿Qué te vas a hacer?', filas: C.slice(0, 9).map((x, i) => ({ id: 'cat:' + (cat.categorias.indexOf(x)), titulo: corto(x.nombre, 24), desc: 'desde ' + T.cop(x.desde) })) });
