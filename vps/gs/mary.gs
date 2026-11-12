@@ -14,7 +14,7 @@
  * Instalación: pega este archivo, ejecuta activarMary() una vez, copia la clave que sale en el registro
  * y ponla en el mary.env del VPS (MARY_KEY). Vuelve a implementar la aplicación web (Implementar > Administrar > editar > Nueva versión).
  */
-const MARY_VERSION = 'agendador-ia-3.13';
+const MARY_VERSION = 'agendador-ia-3.15';
 
 // Se registra como acción pública del servidor (sin sesión: entra con la clave de Mary).
 // ⚠️ Este archivo debe quedar DEBAJO del archivo principal en la lista de archivos de Apps Script (los nuevos quedan al final: así está bien).
@@ -55,6 +55,7 @@ function maryAgenda(b) {
     case 'cancelar': return maryCancelar_(st, b);
     case 'reagendar': return maryReagendar_(st, b);
     case 'contactos': return maryContactos_();
+    case 'dobleAvisado': return maryDobleAvisado_(b);
   }
   fail('Operación no válida.');
 }
@@ -156,7 +157,9 @@ function maryCancelar_(st, b) {
   const a0 = maryCitaDelNumero_(b);
   if (!a0 || ACTIVE.indexOf(a0.status) < 0) return { ok: false, motivo: 'No encontré tu cita activa.' };
   const minH = Number(st.rescheduleMinHours != null ? st.rescheduleMinHours : 2);
-  if (a0.status !== 'pending_payment' && a0.startAt.getTime() - Date.now() < minH * 3600000) return { ok: false, motivo: 'Solo se puede cancelar con al menos ' + minH + ' horas de anticipación. Escríbele directamente al negocio.' };
+  // 3.14: si es una cita DOBLE (el mismo cliente tiene otra activa que se cruza), puede quitar la de sobra aunque falte poco
+  const esDoble = maryCitasDe_(b.phone).some(function (x) { return x.code !== a0.code && x.date === a0.date && tmin(x.startTime) < tmin(a0.endTime || a0.startTime) && tmin(a0.startTime) < tmin(x.endTime || x.startTime); });
+  if (!esDoble && a0.status !== 'pending_payment' && a0.startAt.getTime() - Date.now() < minH * 3600000) return { ok: false, motivo: 'Solo se puede cancelar con al menos ' + minH + ' horas de anticipación. Escríbele directamente al negocio.' };
   const apt = withLock(function () {
     const a = maryCitaDelNumero_(b);
     if (!a || ACTIVE.indexOf(a.status) < 0) fail('Esta reserva ya no está activa.');
@@ -366,16 +369,36 @@ function maryCupos_(st, b) {
 function maryProximas_(st, b) {
   // 3.0: lo decide el dueño en su panel (Ajustes › «Recordatorio al cliente por WhatsApp»). 0 = sin recordatorio.
   const conf = maryBotCfg_(st).recordatorioMin;   // 3.1: panel › WhatsApp Bot › Recordatorio (0 = sin recordatorio)
-  if (!conf || !maryBotCfg_(st).activo) return { citas: [], info: Object.assign(maryInfo_(st), { recordatorioMin: 0 }) };
+  if (!maryBotCfg_(st).activo) return { citas: [], dobles: [], info: Object.assign(maryInfo_(st), { recordatorioMin: 0 }) };
+  if (!conf) { const h0 = toDateStr(new Date()), m0 = toDateStr(new Date(Date.now() + 86400000)); return { citas: [], dobles: maryDobles_(fsQuery('appointments', [['date', 'EQUAL', h0]]).concat(fsQuery('appointments', [['date', 'EQUAL', m0]]))), info: Object.assign(maryInfo_(st), { recordatorioMin: 0 }) }; }
   const min = Math.max(10, Math.min(24 * 60, Number(conf)));
   const now = Date.now(), hoy = toDateStr(new Date()), man = toDateStr(new Date(now + 86400000));
   let L = fsQuery('appointments', [['date', 'EQUAL', hoy]]).concat(hoy === man ? [] : fsQuery('appointments', [['date', 'EQUAL', man]]));
+  const dobles = maryDobles_(L);   // 3.14: el mismo cliente con 2 citas que se cruzan (el mismo día a la misma hora)
   L = L.filter(function (a) {
     if (a.status !== 'confirmed' || a.maryReminded) return false;
     const m = (a.startAt.getTime() - now) / 60000;
     return m > 0 && m <= min && maryLast10_((a.customer || {}).whatsapp).length === 10;
   });
-  return { citas: L.map(function (a) { const o = maryCitaOut_(a); o.whatsapp = (a.customer || {}).whatsapp || ''; o.nombre = (a.customer || {}).firstName || ''; return o; }), info: Object.assign(maryInfo_(st), { recordatorioMin: min }) };
+  return { citas: L.map(function (a) { const o = maryCitaOut_(a); o.whatsapp = (a.customer || {}).whatsapp || ''; o.nombre = (a.customer || {}).firstName || ''; return o; }), dobles: dobles, info: Object.assign(maryInfo_(st), { recordatorioMin: min }) };
+}
+// 3.14 · citas que se cruzan del mismo WhatsApp (aún no se le preguntó): [{ whatsapp, nombre, citas: [...] }]
+function maryDobles_(L) {
+  const por = {};
+  L.filter(function (a) { return ACTIVE.indexOf(a.status) >= 0 && maryLast10_((a.customer || {}).whatsapp).length === 10 && a.startAt && a.startAt.getTime() > Date.now(); })
+    .forEach(function (a) { const k = maryLast10_(a.customer.whatsapp); (por[k] = por[k] || []).push(a); });
+  const out = [];
+  Object.keys(por).forEach(function (k) {
+    const C = por[k].sort(function (x, y) { return x.startAt.getTime() - y.startAt.getTime(); });
+    const cruce = C.filter(function (a, i) { return C.some(function (b, j) { return j !== i && a.date === b.date && tmin(a.startTime) < tmin(b.endTime || b.startTime) + 0 && tmin(b.startTime) < tmin(a.endTime || a.startTime); }); });
+    if (cruce.length >= 2 && cruce.some(function (a) { return !a.maryDobleAvisado; }))
+      out.push({ whatsapp: cruce[0].customer.whatsapp, nombre: cruce[0].customer.firstName || '', citas: cruce.map(maryCitaOut_) });
+  });
+  return out;
+}
+function maryDobleAvisado_(b) {
+  commit((b.codes || []).slice(0, 10).map(function (c) { return wPatch(bp('appointments/' + String(c).toUpperCase()), { maryDobleAvisado: true }); }));
+  return { ok: true };
 }
 function maryRecordada_(b) {
   const a = getApt(b.code);

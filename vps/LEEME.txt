@@ -1,4 +1,4 @@
-🗓️ AGENDADOR IA · agendador-ia-3.13   (por dentro atiende «Mary», la recepcionista)
+🗓️ AGENDADOR IA · agendador-ia-3.15   (por dentro atiende «Mary», la recepcionista)
 =====================================================================================================
 🚫 REGLA UNIVERSAL N.º 1 — EPIC NO SE TOCA (manda sobre todo lo demás, para Alex, para Claude y para cada script de este paquete)
    Epic (Mary de Epic, Luisa, la tienda, epic-waha, epic-tiendas, Epic Channels…) y CUALQUIER otro proyecto:
@@ -62,6 +62,20 @@ PROBAR EN EL VPS
 AJUSTES POR NEGOCIO (negocios.json)
   "recordatorioMin": 120     ·   "estados": { "activo": true, "hoy": "07:30", "semana": "07:00", "semanaDia": 1 }
   En Firestore (settings/general del negocio) maryAutoCaptura: true → la captura confirma al instante y el dueño revisa después.
+
+NOVEDADES 3.15 · OTRA CITA TENIENDO UNA ABIERTA
+  · Si el cliente ya tiene una cita y quiere sacar otra: «📌 Ya tienes una cita: hoy · 6:30 p. m.… ¿Seguro que quieres sacar otra?
+    (por ejemplo, para otra persona)» → ✅ Sí (pregunta «¿a nombre de quién?», p. ej. «mi hijo Tomás» → Tomás) · 🔄 Cambiar la que
+    tengo · ↩️ No. Lo de otra persona no cuenta como «lo de siempre» y no lleva el correo del cliente.
+  · Oído: si no puede bajar el audio de WhatsApp, ahora lo deja escrito en /registro con la razón.
+
+NOVEDADES 3.14 · CITAS DOBLES Y FECHA EN EL PANEL
+  · Panel › Agenda: cada cita muestra SIEMPRE su fecha arriba («📅 Hoy · jueves 13 de noviembre»).
+  · Si el mismo cliente tiene 2 citas que se cruzan (el mismo día, a la misma hora), el asistente le escribe UNA vez:
+    – con 2 barberos distintos: «¿Con quién te quieres quedar? Cancelo la otra» → 💈 Con Yeferson / 💈 Con Gabriel / Quiero las dos.
+    – con el mismo: «¿Deseas cancelar una de las dos?» → Cancelar la 1 / la 2 / Mantener. Entiende «la dos», «la primera», «con Gabriel».
+    Esa cancelación se permite aunque falte poco (es la cita de sobra). Si escribe «quiero cancelar» teniendo varias: «¿Cuál?».
+  · Página agendador-web-2026-11-12f.zip.
 
 NOVEDADES 3.13 · 👂 EL OÍDO (notas de voz)
   · Contenedor nuevo y PROPIO del agendador: oido-agendador (Whisper «faster-whisper-small», español, en CPU), dentro de la red del

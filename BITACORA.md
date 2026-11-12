@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-3.13** · Página **2026-11-12e** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-12** · Mary **agendador-ia-3.15** · Página **2026-11-12f** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -113,6 +113,16 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-12 · agendador-ia-3.14 / 3.15 · citas dobles, otra cita, fecha en el panel
+- 3.13 instalada: `/estado` → `"oido":"listo (small)"`. Una nota de voz real respondió «no puedo escuchar audios»: falta saber si WAHA
+  entregó el archivo. 3.15 anota en /registro «🎤 no pude bajar el audio…» con la razón (`mediaError`).
+- `admin.js` `aptCard`: fecha siempre visible.
+- `mary.gs`: `maryDobles_` (mismo WhatsApp, citas que se cruzan, sin `maryDobleAvisado`) dentro de `proximas`; op `dobleAvisado`;
+  `maryCancelar_` deja cancelar una doble sin el mínimo de horas.
+- `asistente.js`: `elegirCualCancelar` (profesionales distintos → «¿con quién te quedas?», `dobq:i`; si no → «¿cancelar una?», `dob:i`),
+  `preguntarOtra` (paso `otraCita`, `otraPersona`, `nombreOtra`). Arreglo: `lista()` no devuelve valor → la pregunta devuelve 'preguntado'.
+- Banco: 105 pruebas.
 
 ### 2026-11-12 · agendador-ia-3.13 · 👂 oído
 - `vps/oido/` (oido.py + Dockerfile, python:3.12-slim + faster-whisper 1.1.1): POST /transcribir (audio crudo) → {texto}; GET /salud.

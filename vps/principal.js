@@ -6,7 +6,7 @@
 const http = require('http'), fs = require('fs'), path = require('path');
 const T = require('./textos'), C = require('./correo'), E = require('./estado'), A = require('./asistente');
 
-const VERSION = 'agendador-ia-3.13';
+const VERSION = 'agendador-ia-3.15';
 const env = (k, d) => (process.env[k] === undefined || process.env[k] === '' ? d : process.env[k]);
 const CFG = {
   puerto: parseInt(env('PUERTO', '3060'), 10),
@@ -94,10 +94,11 @@ function deWaha(b) {
   const message = interactivo && !fila ? { conversation: String(p.body || ''), _interactivo: true } : fila ? { listResponseMessage: { title: String(p.body || ''), singleSelectReply: { selectedRowId: String(fila) } } }
     : esAudio ? { audioMessage: { mimetype: mime || 'audio/ogg' } }
     : p.hasMedia && /image|pdf/.test(mime) ? (/pdf/.test(mime) ? { documentMessage: { mimetype: mime } } : { imageMessage: { mimetype: mime, caption: p.body || '' } }) : { conversation: String(p.body || '') };
-  return { event: 'messages.upsert', instance: neg.instancia, data: { key: { remoteJid: jid, remoteJidAlt: /@/.test(alt) ? alt : '', fromMe: p.fromMe === true, id: String(p.id || '') }, pushName: String(d.notifyName || d.pushName || ''), message, mediaUrl: String((p.media && p.media.url) || '') } };
+  return { event: 'messages.upsert', instance: neg.instancia, data: { key: { remoteJid: jid, remoteJidAlt: /@/.test(alt) ? alt : '', fromMe: p.fromMe === true, id: String(p.id || '') }, pushName: String(d.notifyName || d.pushName || ''), message, mediaUrl: String((p.media && p.media.url) || ''), mediaError: p.hasMedia && !(p.media && p.media.url) ? String((p.media && p.media.error) || 'hasMedia sin url') : '' } };
 }
 async function bajarMediaWaha(url) {
   if (!url) return '';
+  if (!/^https?:/.test(url)) url = CFG.waha + (url.startsWith('/') ? '' : '/') + url;
   const u = url.replace(/^https?:\/\/[^/]+/, CFG.waha);   // WAHA a veces da su dirección pública: se baja por dentro
   const r = await fetch(u, { headers: CFG.wahaKey ? { 'X-Api-Key': CFG.wahaKey } : {}, signal: AbortSignal.timeout(45000) });
   if (!r.ok) return '';
@@ -172,7 +173,7 @@ async function escuchar(neg, c) {
     let b64 = c.base64;
     if (!b64 && c.mediaUrl) b64 = await bajarMediaWaha(c.mediaUrl);
     if (!b64 && !esWaha(neg)) { const r = await evo('post', '/chat/getBase64FromMediaMessage/' + encodeURIComponent(neg.instancia), { message: { key: { id: c.id } }, convertToMp4: false }, 45000); b64 = String(r.base64 || ''); }
-    if (!b64) return '';
+    if (!b64) { anotar({ bid: neg.bid, chat: (c.tel || '').slice(-4), que: '🎤 no pude bajar el audio de WhatsApp (' + (c.mediaUrl ? 'WAHA no lo entregó: ' + c.mediaUrl.slice(-40) : 'el aviso no trae el archivo' + (c.mediaError ? ': ' + c.mediaError : '')) + ')' }); return ''; }
     const datos = Buffer.from(String(b64).replace(/^data:[^,]+,/, ''), 'base64');
     const r = await fetch(CFG.oido + '/transcribir', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: datos, signal: AbortSignal.timeout(120000) });
     const j = await r.json().catch(() => ({}));
@@ -237,7 +238,7 @@ function leerMensaje(b) {
     evento: String(b && b.event || '').toLowerCase().replace(/_/g, '.'), inst: String(b && b.instance || ''), jid, tel, texto, media, id: String(k.id || ''), rowId, audio: !!m.audioMessage,
     interactivo: !!(m._interactivo || m.listMessage || m.buttonsMessage || m.templateMessage || m.interactiveMessage),
     nombre: String(d.pushName || ''), deMi: k.fromMe === true, grupo: /@g\.us$/.test(jid), estado: /status@broadcast/.test(jid),
-    base64: String(m.base64 || d.base64 || ''), mediaUrl: String(d.mediaUrl || ''), mime: String((m.imageMessage && m.imageMessage.mimetype) || (m.documentMessage && m.documentMessage.mimetype) || 'image/jpeg')
+    base64: String(m.base64 || d.base64 || ''), mediaUrl: String(d.mediaUrl || ''), mediaError: String(d.mediaError || ''), mime: String((m.imageMessage && m.imageMessage.mimetype) || (m.documentMessage && m.documentMessage.mimetype) || 'image/jpeg')
   };
 }
 function atiende(c) {
@@ -491,6 +492,14 @@ async function tickRecordatorios(aCualquierHora) {
         }
         catch (e) { if (!e.permanente) { log('recordatorio', c.code, e.message); continue; } anotar({ bid: neg.bid, que: 'recordatorio ' + c.code + ' no se pudo: ' + e.message }); }
         await gas(neg, 'recordada', { code: c.code }).catch((e) => log('recordada', c.code, e.message));
+      }
+      // 3.14 · el mismo cliente con 2 citas que se cruzan → «Tienes 2 citas… ¿deseas cancelar una de las dos?» (una sola vez)
+      for (const d of r.dobles || []) {
+        const tel = numeroWa(d.whatsapp);
+        if (!atiende({ tel }) || !botDe(neg).cambios) continue;
+        try { await ASIS.preguntarDobles(neg, tel, d, r.info.negocio); anotar({ bid: neg.bid, chat: tel.slice(-4), que: '👀 tiene ' + d.citas.length + ' citas que se cruzan: le pregunté cuál cancelar' }); }
+        catch (e) { log('dobles', e.message); continue; }
+        await gas(neg, 'dobleAvisado', { codes: d.citas.map((x) => x.code) }).catch((e) => log('dobleAvisado', e.message));
       }
     } catch (e) { est.errores++; log('❌ recordatorios', neg.bid, e.message); }
   }

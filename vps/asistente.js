@@ -7,6 +7,7 @@
 //   · Audios: por ahora no los escucha (lo dice amable y sigue).
 'use strict';
 const T = require('./textos');
+const nombre1 = (n) => T.nombre1(n);
 
 const sinTilde = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
 const horaTxt = (t) => { let [H, M] = String(t).split(':').map(Number); const ap = H >= 12 ? 'p. m.' : 'a. m.'; H = H % 12 || 12; return H + ':' + String(M).padStart(2, '0') + ' ' + ap; };
@@ -196,6 +197,7 @@ function crear(dep) {
     const fin2 = () => conv.directo ? crearCita(neg, c, conv) : pasoConfirmar(neg, c, conv);
     if (!cl.nombre && !b.pedirNombre) { const n = String(c.nombre || '').trim().split(/\s+/).slice(0, 2).join(' '); cl.nombre = /^[\p{L}][\p{L} .'-]{1,40}$/u.test(n) ? n : 'Cliente'; }
     if (cl.correo === undefined && !b.pedirCorreo) cl.correo = '';
+    if (conv.otraPersona && conv.nombreOtra === undefined) { conv.paso = 'nombreOtra'; conv.t = ahora(); mem().conv[c.k] = conv; dep.guardar(); return dep.texto(neg, c.tel, '🙋 ¿A nombre de quién es esta cita? (si es para ti, escribe *yo*)'); }
     if (!cl.nombre) { conv.paso = 'nombre'; conv.t = ahora(); mem().conv[c.k] = conv; dep.guardar(); return dep.texto(neg, c.tel, '🙋 ¿A nombre de quién agendo la cita?'); }
     if (cl.correo === undefined) { conv.paso = 'correo'; conv.t = ahora(); mem().conv[c.k] = conv; dep.guardar(); return dep.texto(neg, c.tel, T.pideCorreo()); }
     return fin2();
@@ -207,7 +209,7 @@ function crear(dep) {
     conv.paso = 'confirmar';
     if (conv.modo === 'reagendar') return lista(neg, c, conv, { texto: T.parafrasisCambio({ antes: conv.antes, dia: conv.dia || '', hora: x.hora || conv.time, con }), boton: 'Ver opciones', pie: pie(cat),
       secciones: [{ titulo: '¿Lo confirmo?', filas: [{ id: 'ok:si', titulo: '✅ Sí, cambiarla', desc: '' }, { id: 'ok:no', titulo: '↩️ Dejarla como estaba', desc: '' }] }] });
-    return lista(neg, c, conv, { texto: T.parafrasis({ servicios: sel.map((s) => s.nombre).join(' + '), total: total(sel), min: sel.reduce((a, s) => a + s.min, 0), dia: conv.dia || '', hora: x.hora || conv.time, con, nombre: cl.nombre, abono: Math.min(Number(cat.abono || 0), total(sel)) }),
+    return lista(neg, c, conv, { texto: T.parafrasis({ servicios: sel.map((s) => s.nombre).join(' + '), total: total(sel), min: sel.reduce((a, s) => a + s.min, 0), dia: conv.dia || '', hora: x.hora || conv.time, con, nombre: conv.nombreOtra || cl.nombre, abono: Math.min(Number(cat.abono || 0), total(sel)) }),
       boton: 'Ver opciones', pie: pie(cat), secciones: [{ titulo: '¿Lo confirmo?', filas: [{ id: 'ok:si', titulo: '✅ Sí, confirmar', desc: '' }, { id: 'ok:no', titulo: '✏️ Cambiar algo', desc: 'Empezamos de nuevo' }] }] });
   }
   async function crearCita(neg, c, conv) {
@@ -220,16 +222,16 @@ function crear(dep) {
       dep.anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: 'reagendó por WhatsApp ' + r.cita.code });
       return dep.texto(neg, c.tel, T.reagendada(r.cita));
     }
-    const r = await dep.gas(neg, 'crear', { phone: c.tel, nombre: cl.nombre, email: cl.correo || '', ids: conv.ids, date: conv.date, time: conv.time, staffId: conv.staffId || '' });
+    const r = await dep.gas(neg, 'crear', { phone: c.tel, nombre: conv.nombreOtra || cl.nombre, email: conv.otraPersona && conv.nombreOtra && conv.nombreOtra !== cl.nombre ? '' : (cl.correo || ''), ids: conv.ids, date: conv.date, time: conv.time, staffId: conv.staffId || '' });
     if (!r.ok) {
       if (r.motivo === 'ocupada') { delete conv.time; return pasoHora(neg, c, conv, '😕 Esa hora la acaban de tomar. Mira las que quedan 👇\n\n'); }
       fin(c.k); dep.anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: 'no se pudo agendar: ' + r.motivo });
       return dep.texto(neg, c.tel, '😕 ' + r.motivo + '\n\nTambién puedes agendar aquí: ' + cat.link);
     }
     fin(c.k);
-    aprender(cl, conv, r.cita);
+    if (!(conv.otraPersona && conv.nombreOtra && conv.nombreOtra !== cl.nombre)) aprender(cl, conv, r.cita);   // lo de otra persona no cuenta como «lo de siempre»
     dep.anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: 'agendó por WhatsApp ' + r.cita.code + ' (' + r.cita.status + ')' });
-    return dep.texto(neg, c.tel, T.citaHecha(r.cita, { medios: r.medios, holdMinutes: r.holdMinutes, negocio: cat.negocio, comoSiempre: !!conv.comoSiempre }, cl.nombre, !!cl.correo));
+    return dep.texto(neg, c.tel, T.citaHecha(r.cita, { medios: r.medios, holdMinutes: r.holdMinutes, negocio: cat.negocio, comoSiempre: !!conv.comoSiempre }, conv.nombreOtra || cl.nombre, !!cl.correo && !(conv.otraPersona && conv.nombreOtra !== cl.nombre)));
   }
   // 🧠 aprende la combinación habitual (servicios + profesional) para ofrecer «¿Lo de siempre?»
   function aprender(cl, conv, cita) {
@@ -330,6 +332,8 @@ function crear(dep) {
   async function apartar(neg, c, conv) {
     const cat = await catalogo(neg), cl = cliente(c.k);
     conv.directo = true;
+    const pregunta = await preguntarOtra(neg, c, conv, 'apartar');
+    if (pregunta) return pregunta;
     if (!(conv.ids || []).length) {
       const fav = cfg(neg, cat).loDeSiempre && favorito(cl, cat);
       if (fav) { conv.ids = fav.ids.slice(); conv.comoSiempre = true; if (fav.staffId) conv.staffId = fav.staffId; }
@@ -338,10 +342,28 @@ function crear(dep) {
     return pasoDia(neg, c, conv);
   }
 
+  // ---------- 3.15 · ya tiene una cita abierta → «¿Seguro que quieres sacar otra? (p. ej. para otra persona)» ----------
+  async function preguntarOtra(neg, c, conv, reanudar, pre) {
+    if (conv.otraOk || conv.modo === 'reagendar') return null;
+    conv.otraOk = true;
+    let L = []; try { L = ((await dep.gas(neg, 'chat', { phone: c.tel })) || {}).citas || []; } catch (e) { L = []; }
+    if (!L.length) return null;
+    const x = L[0], cat = await catalogo(neg);
+    conv.paso = 'otraCita'; conv.reanudar = reanudar; conv.citaYa = x;
+    await lista(neg, c, conv, { texto: (pre || '') + '📌 Ya tienes ' + (L.length === 1 ? 'una cita' : L.length + ' citas, la próxima') + ': *' + x.dia + ' · ' + x.hora + '* · ' + x.servicio + (x.con ? ' con ' + x.con : '') + '.\n¿Seguro que quieres sacar otra? (por ejemplo, para otra persona)',
+      boton: 'Ver opciones', pie: pie(cat), secciones: [{ titulo: '¿Otra cita?', filas: [
+        { id: 'otra:si', titulo: '✅ Sí, otra cita', desc: 'Para mí o para otra persona' },
+        { id: 'otra:cambiar', titulo: '🔄 Cambiar la que tengo', desc: 'Mover mi cita a otra hora' },
+        { id: 'otra:no', titulo: '↩️ No, solo la que tengo', desc: '' }] }] });
+    return 'preguntado';
+  }
+
   // ---------- empezar a agendar ----------
   async function agendar(neg, c, pre, extra) {
     const cat = await catalogo(neg), cl = cliente(c.k);
     const conv = Object.assign({ ids: [] }, extra || {});
+    const pregunta = await preguntarOtra(neg, c, conv, 'agendar', pre);
+    if (pregunta) return pregunta;
     // ¿escribió de una los servicios? («quiero corte y barba»)
     const t = sinTilde(c.texto), todos = [].concat(...(cat.categorias || []).map((x) => x.servicios));
     const dichos = todos.filter((s) => { const n = sinTilde(s.nombre); return n.length >= 4 && t.includes(n); });
@@ -371,6 +393,42 @@ function crear(dep) {
       }
       if (NO.test(t)) return dep.texto(neg, c.tel, b.cambios ? '¿Qué prefieres? Escribe *cancelar* o *modificar* 🙏' : '¿Necesitas cambiarla? Aquí puedes: ' + conv.cita.link);
       fin(c.k); return null;   // habló de otra cosa: se atiende como mensaje normal
+    }
+    if (conv.paso === 'otraCita') {
+      const ya = conv.citaYa || {};
+      if (c.rowId === 'otra:cambiar' || (!c.rowId && QUIERE_MODIFICAR.test(t))) return modificarCita(neg, c, ya);
+      if (c.rowId === 'otra:no' || (!c.rowId && NO.test(t))) { fin(c.k); return dep.texto(neg, c.tel, '👌 Listo, sigues con tu cita de *' + (ya.dia || '').toLowerCase() + ' a las ' + ya.hora + '*. ¡Te esperamos!'); }
+      if (c.rowId === 'otra:si' || (!c.rowId && (SI.test(t) || /otra (persona|cita)|para (mi )?(hijo|hija|esposa|esposo|novia|novio|mama|papa|amig|herman|sobrin)/.test(t)))) {
+        conv.otraPersona = true; delete conv.paso;
+        return conv.reanudar === 'apartar' ? apartar(neg, c, conv) : agendar(neg, c, '👌 Perfecto, otra cita.\n\n', conv);
+      }
+      return dep.texto(neg, c.tel, '¿Sacamos otra cita? Responde *sí*, *no* o *cambiar la que tengo* 🙏');
+    }
+    if (conv.paso === 'nombreOtra') {
+      const n = String(c.texto || '').trim().replace(/^(a nombre de|es para|para)\s+/i, '').replace(/^(mi|mí)\s+(hij[oa]|esposa|esposo|novi[oa]|mam[aá]|pap[aá]|herman[oa]|sobrin[oa]|prim[oa]|amig[oa]|t[ií][oa]|abuel[oa]|pareja|nieto|nieta)\s+/i, '').split(/\s+/).slice(0, 3).join(' ');
+      if (/^(yo|mi|mio|mia|para mi|a mi nombre)$/i.test(sinTilde(n))) conv.nombreOtra = cl.nombre || '';
+      else if (/^[\p{L}][\p{L} .'-]{1,40}$/u.test(n)) conv.nombreOtra = n.split(' ').map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+      else return dep.texto(neg, c.tel, '🙋 Escríbeme solo el nombre de la persona (o *yo* si es para ti).');
+      return pasoDatos(neg, c, conv);
+    }
+    if (conv.paso === 'dobles' && conv.quedarse) {   // «¿con quién te quieres quedar?» → se cancelan las demás
+      const L = conv.citas || [];
+      let i = c.rowId && /^dobq:\d+$/.test(c.rowId) ? Number(c.rowId.slice(5)) : -1;
+      if (i < 0 && !c.rowId) { i = L.findIndex((x) => x.con && t.includes(sinTilde(x.con))); if (i < 0) i = cualDijo(t, L.length); }
+      if (c.rowId === 'dob:no' || (i < 0 && (/las dos|ambas|todas|mantener|dejar/.test(t) || NO.test(t)))) { fin(c.k); return dep.texto(neg, c.tel, '👌 Listo, quedan ' + (L.length === 2 ? 'las dos' : 'todas') + ' como estaban. ¡Te esperamos!'); }
+      if (i < 0 || !L[i]) return dep.texto(neg, c.tel, '¿Con quién te quedas? Escribe ' + L.map((x) => '*' + x.con + '*').join(' o ') + ' 🙏');
+      fin(c.k);
+      const otras = L.filter((x, j) => j !== i), bien = [];
+      for (const x of otras) { const r = await dep.gas(neg, 'cancelar', { code: x.code, phone: c.tel }); if (r.ok) bien.push(x); dep.anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: r.ok ? 'se quedó con ' + L[i].con + ': cancelé ' + x.code : 'cancelar ' + x.code + ': ' + r.motivo }); }
+      return dep.texto(neg, c.tel, bien.length === otras.length ? '✅ Listo, te quedas con *' + L[i].con + '* ' + L[i].dia.toLowerCase() + ' a las ' + L[i].hora + '. Cancelé la otra cita y el cupo quedó libre. ¡Te esperamos!' : '😕 No pude cancelar ' + (otras.length - bien.length === 1 ? 'la otra cita' : 'algunas citas') + '. Escríbele al negocio, por favor.');
+    }
+    if (conv.paso === 'dobles') {
+      const L = conv.citas || [];
+      let i = c.rowId && /^dob:\d+$/.test(c.rowId) ? Number(c.rowId.slice(4)) : -1;
+      if (i < 0 && !c.rowId) i = cualDijo(t, L.length);
+      if (c.rowId === 'dob:no' || (i < 0 && (NO.test(t) || /mantener|dejar|ninguna|las dos (quedan|estan bien)|ambas (quedan|bien)/.test(t)))) { fin(c.k); return dep.texto(neg, c.tel, '👌 Listo, quedan ' + (L.length === 2 ? 'las dos' : 'todas') + ' como estaban. ¡Te esperamos!'); }
+      if (i >= 0 && L[i]) return cancelarCita(neg, c, L[i]);
+      return dep.texto(neg, c.tel, '¿Cuál cancelo? Escribe *la 1* o *la 2* (o *ninguna*) 🙏');
     }
     if (conv.paso === 'cancelarSeguro') {
       if (SI.test(t) || c.rowId === 'can:si') return cancelarCita(neg, c, conv.cita, true);
@@ -471,6 +529,35 @@ function crear(dep) {
     if (conv.paso === 'siempre') return agendar(neg, c, pre);
     fin(c.k); return null;
   }
+  // ---------- 3.14 · dos (o más) citas: «¿deseas cancelar una?» → la 1 / la 2 / mantener ----------
+  async function elegirCualCancelar(neg, c, citas, pre, proactivo) {
+    const L = citas.slice(0, 9), linea = (x, i) => (i + 1) + ') *' + x.dia + ' · ' + x.hora + '* · ' + x.servicio + (x.con ? ' con ' + x.con : '');
+    const misma = L.length >= 2 && L.every((x) => x.date === L[0].date && x.time === L[0].time);
+    // 3.14: misma hora con PROFESIONALES distintos → seguramente no sabía con quién: «¿Con quién te quieres quedar?» (se cancela la otra)
+    const pros = [...new Set(L.map((x) => x.con).filter(Boolean))];
+    if (proactivo && misma && pros.length === L.length) {
+      const texto = (pre || '') + '👀 Tienes ' + L.length + ' citas para ' + L[0].dia.toLowerCase() + ' a las ' + L[0].hora + ': ' + L.map((x) => 'con *' + x.con + '*').join(' y ') + '.\n¿Con quién te quieres quedar? Cancelo la otra.';
+      return lista(neg, c, { paso: 'dobles', quedarse: true, citas: L, vence: VENCE_RECORDATORIO }, { texto, boton: 'Elegir', pie: (c.negocio || '') + ' · asistente virtual',
+        secciones: [{ titulo: '¿Con quién te quedas?', filas: L.map((x, i) => ({ id: 'dobq:' + i, titulo: corto('💈 Con ' + x.con, 24), desc: corto('cancelo la de ' + L.filter((y, j) => j !== i).map((y) => y.con).join(' y '), 70) })).concat([{ id: 'dob:no', titulo: L.length === 2 ? '✅ Quiero las dos' : '✅ Quiero todas', desc: '' }]) }] });
+    }
+    const texto = (pre || '') + (proactivo ? '👀 Tienes *' + L.length + ' citas*' + (misma ? ' para ' + L[0].dia.toLowerCase() + ' a la misma hora' : '') + ':\n' : '¿Cuál cita deseas cancelar?\n') +
+      L.map(linea).join('\n') + (proactivo ? '\n\n¿Deseas cancelar una de ' + (L.length === 2 ? 'las dos' : 'ellas') + '?' : '');
+    return lista(neg, c, { paso: 'dobles', citas: L, vence: VENCE_RECORDATORIO }, { texto, boton: 'Ver opciones', pie: (c.negocio || '') + ' · asistente virtual',
+      secciones: [{ titulo: '¿Cuál cancelo?', filas: L.map((x, i) => ({ id: 'dob:' + i, titulo: '🚫 Cancelar la ' + (i + 1), desc: corto(x.dia + ' ' + x.hora + (x.con ? ' con ' + x.con : ''), 70) })).concat([{ id: 'dob:no', titulo: L.length === 2 ? '✅ Mantener las dos' : '✅ No cancelar ninguna', desc: '' }]) }] });
+  }
+  // la manda Mary sola (tick de recordatorios) cuando el mismo cliente tiene citas que se cruzan
+  async function preguntarDobles(neg, tel, d, negocio) {
+    const c = { k: neg.bid + ':' + tel, tel, negocio };
+    const n = nombre1(d.nombre);
+    return elegirCualCancelar(neg, c, d.citas, 'Hola' + (n ? ' ' + n : '') + ' 👋 ', true);
+  }
+  function cualDijo(t, n) {
+    if (/\b(la |el )?(1|uno|una|primera|primero)\b/.test(t) && !/\b(las|los) (dos|2)\b/.test(t)) return 0;
+    if (/\b(la |el )(2|dos)\b|\bsegund[ao]\b|^2$|^dos$/.test(t)) return 1;
+    if (/\b(la |el )?(3|tres|tercer[ao])\b/.test(t) && n >= 3) return 2;
+    return -1;
+  }
+
   // ---------- cancelar / modificar desde WhatsApp ----------
   async function cancelarCita(neg, c, cita, yaSeguro) {
     fin(c.k);
@@ -519,6 +606,7 @@ function crear(dep) {
       const cita = (info.citas || [])[0];
       if (cita) {
         const sal = saludo(c.k, info.negocio, c.nombre, !b.saludoDiario);
+        if (QUIERE_CANCELAR.test(t) && (info.citas || []).length >= 2) return (await elegirCualCancelar(neg, Object.assign({}, c, { negocio: info.negocio }), info.citas, sal), 'flujo');
         if (QUIERE_CANCELAR.test(t)) { const cv = { paso: 'cancelarSeguro', cita }; return (await lista(neg, c, cv, { texto: sal + T.preguntaCancelar(cita), boton: 'Ver opciones', pie: info.negocio + ' · asistente virtual', secciones: [{ titulo: 'Tu cita', filas: [{ id: 'can:si', titulo: '🚫 Sí, cancelarla', desc: '' }, { id: 'can:no', titulo: '↩️ No, la mantengo', desc: '' }] }] }), 'flujo'); }
         await modificarCita(neg, c, cita); return 'flujo';
       }
@@ -544,7 +632,7 @@ function crear(dep) {
     if (b.cupos) secciones.push({ titulo: 'Horarios', filas: [{ id: 'menu:cupos', titulo: '🕐 Ver cupos de hoy', desc: 'Horas disponibles' }] });
     return lista(neg, c, { paso: 'menu', ids: [] }, { texto, boton: b.agendar && C.length ? 'Ver servicios' : 'Ver opciones', pie: (negocio || '') + ' · asistente virtual', secciones });
   }
-  return { manejar, menu, saludo, trasRecordatorio, cliente, fechaPedida: (t) => fechaPedida(t, hoy()), _cat: catCache };
+  return { manejar, menu, saludo, trasRecordatorio, preguntarDobles, cliente, fechaPedida: (t) => fechaPedida(t, hoy()), _cat: catCache };
 }
 
 module.exports = { crear, horaPedida, fechaPedida, sinTilde, QUIERE_CUPOS, QUIERE_AGENDAR, SALUDO };

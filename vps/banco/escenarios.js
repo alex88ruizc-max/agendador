@@ -45,7 +45,7 @@ global.fetch = async (url, o) => {
     W.gas.push(b.op); W.llamadas.push(b);
     const BOTX = Object.assign({ activo: true, agendar: true, cupos: true, saludoDiario: true, pedirNombre: true, pedirCorreo: true, loDeSiempre: true, recordatorioMin: 60, recordatorioConfirmar: true, cambios: true, pausaMin: 30, estados: { activo: true, horas: ['11:00'], manana: true, semanal: false } }, W.bot);
     const ok = (data) => resp({ ok: true, data: data && typeof data === 'object' && !Array.isArray(data) && (data.negocio || data.citas) ? Object.assign({ bot: BOTX }, data) : data });
-    if (b.op === 'proximas') return resp({ ok: true, data: { citas: W.proximas, info: Object.assign({ bot: BOTX, recordatorioMin: BOTX.recordatorioMin }, NEGOCIO) } });
+    if (b.op === 'proximas') return resp({ ok: true, data: { citas: W.proximas, dobles: W.dobles || [], info: Object.assign({ bot: BOTX, recordatorioMin: BOTX.recordatorioMin }, NEGOCIO) } });
     if (b.op === 'asistencia' || b.op === 'cancelar') return resp({ ok: true, data: { ok: true, link: NEGOCIO.link, cita: (W.proximas[0] || {}) } });
     if (b.op === 'reagendar') { const d = W.cupos.find((x) => x.date === b.date); return resp({ ok: true, data: { ok: true, cita: Object.assign({}, W.proximas[0] || {}, { dia: d.dia, hora: d.horas[d.libres.indexOf(b.time)], link: NEGOCIO.link + '&cita=R-VIEJA1' }) } }); }
     if (b.op === 'contactos') return resp({ ok: true, data: { numeros: W.contactos } });
@@ -741,4 +741,89 @@ test('3.13 · Panel: «Escuchar notas de voz» apagado → no lo manda al oído 
   await llega(wahaMsg(CLIENTE, 'hola'));   // trae la configuración del panel
   await llega(audio());
   assert.equal(W.oidoLlamadas || 0, 0); assert.match(ultimo().texto, /no puedo escuchar audios/);
+});
+
+// =====================================================================
+//  3.14 · Dos citas que se cruzan → «Tienes 2 citas… ¿deseas cancelar una de las dos?» → la 1 / la 2 / mantener
+// =====================================================================
+const DOS = [
+  { code: 'R-92KAFG', status: 'confirmed', date: HOY, time: '18:30', dia: 'Hoy', hora: '6:30 p. m.', servicio: 'Corte clásico', con: 'Yeferson', link: 'L1', ids: ['c1'], staffId: 's1' },
+  { code: 'R-RZP6UR', status: 'confirmed', date: HOY, time: '18:30', dia: 'Hoy', hora: '6:30 p. m.', servicio: 'Corte clásico', con: 'Gabriel', link: 'L2', ids: ['c1'], staffId: 's2' }];
+test('3.14 · 2 citas a la misma hora con 2 barberos → «¿Con quién te quieres quedar?» → «con Gabriel» cancela la de Yeferson', async () => {
+  W.dobles = [{ whatsapp: CLIENTE, nombre: 'Nicolas', citas: DOS }];
+  await B.tickRecordatorios(true);
+  assert.match(ultimo().texto, /Tienes 2 citas para hoy a las 6:30 p\. m\.: con \*?Yeferson\*? y con \*?Gabriel\*?/); assert.match(ultimo().texto, /¿Con quién te quieres quedar\?/);
+  assert.deepEqual(ids(ultimo()), ['dobq:0', 'dobq:1', 'dob:no']);
+  assert.deepEqual(W.llamadas.find((x) => x.op === 'dobleAvisado').codes, ['R-92KAFG', 'R-RZP6UR'], 'queda marcado: no se vuelve a preguntar');
+  await llega(wahaMsg(CLIENTE, 'me quedo con gabriel'));
+  assert.deepEqual(W.llamadas.filter((x) => x.op === 'cancelar').map((x) => x.code), ['R-92KAFG']);
+  assert.match(ultimo().texto, /te quedas con \*Gabriel\*/);
+});
+test('3.14 · «Quiero las dos» → no cancela nada · tocar «Con Yeferson» cancela la de Gabriel', async () => {
+  W.dobles = [{ whatsapp: CLIENTE, nombre: 'Nicolas', citas: DOS }];
+  await B.tickRecordatorios(true);
+  await llega(toca('dob:no', '✅ Quiero las dos'));
+  assert.ok(!W.llamadas.some((x) => x.op === 'cancelar')); assert.match(ultimo().texto, /quedan las dos como estaban/);
+  mundoNuevo(); W.dobles = [{ whatsapp: CLIENTE, nombre: 'Nicolas', citas: DOS }];
+  await B.tickRecordatorios(true);
+  await llega(toca('dobq:0', '💈 Con Yeferson'));
+  assert.deepEqual(W.llamadas.filter((x) => x.op === 'cancelar').map((x) => x.code), ['R-RZP6UR']);
+});
+test('3.14 · 2 citas que se cruzan con el MISMO barbero → «¿deseas cancelar una de las dos?» → «la dos» cancela la 2', async () => {
+  const MISMO = DOS.map((x) => Object.assign({}, x, { con: 'Lina', staffId: 's1' }));
+  W.dobles = [{ whatsapp: CLIENTE, nombre: 'Nicolas', citas: MISMO }];
+  await B.tickRecordatorios(true);
+  assert.match(ultimo().texto, /Tienes \*?2 citas\*? para hoy a la misma hora/); assert.match(ultimo().texto, /¿Deseas cancelar una de las dos\?/);
+  assert.deepEqual(ids(ultimo()), ['dob:0', 'dob:1', 'dob:no']);
+  await llega(wahaMsg(CLIENTE, 'cancela la dos'));
+  assert.equal(W.llamadas.find((x) => x.op === 'cancelar').code, 'R-RZP6UR');
+});
+test('3.14 · Cliente con 2 citas escribe «quiero cancelar mi cita» → «¿Cuál cita deseas cancelar?» (no cancela la primera a ciegas)', async () => {
+  W.citas[CLIENTE] = DOS;
+  await llega(wahaMsg(CLIENTE, 'quiero cancelar mi cita'));
+  assert.match(ultimo().texto, /¿Cuál cita deseas cancelar\?/); assert.deepEqual(ids(ultimo()), ['dob:0', 'dob:1', 'dob:no']);
+  await llega(toca('dob:1', '🚫 Cancelar la 2'));
+  assert.equal(W.llamadas.find((x) => x.op === 'cancelar').code, 'R-RZP6UR');
+});
+
+// =====================================================================
+//  3.15 · Ya tiene una cita abierta → «¿Seguro que quieres sacar otra? (p. ej. para otra persona)»
+// =====================================================================
+const YA = [{ code: 'R-YATENG', status: 'confirmed', date: HOY, time: '18:30', dia: 'Hoy', hora: '6:30 p. m.', servicio: 'Corte clásico', con: 'Yeferson', link: 'L', ids: ['c1'], staffId: 's1' }];
+test('3.15 · Con una cita abierta, «quiero agendar» → «Ya tienes una cita… ¿Seguro que quieres sacar otra?» → sí → a nombre de la OTRA persona', async () => {
+  const cl = B.ASIS.cliente('lina-spa:' + CLIENTE); cl.nombre = 'Nicolas'; cl.correo = 'nico@x.com';
+  W.citas[CLIENTE] = YA;
+  await llega(wahaMsg(CLIENTE, 'quiero agendar una cita'));
+  assert.match(ultimo().texto, /Ya tienes una cita: \*?Hoy · 6:30 p\. m\.\*? · Corte clásico con Yeferson/); assert.match(ultimo().texto, /¿Seguro que quieres sacar otra\?/);
+  assert.deepEqual(ids(ultimo()), ['otra:si', 'otra:cambiar', 'otra:no']);
+  await llega(toca('otra:si', '✅ Sí, otra cita'));
+  assert.deepEqual(ids(ultimo()), ['cat:0', 'cat:1', 'cat:2'], 'sigue el agendamiento');
+  await llega(toca('cat:2')); await llega(toca('svc:e1')); await llega(toca('mas:no')); await llega(toca('dia:' + masDias(1))); await llega(toca('hora:09:00'));
+  await llega(toca('pro:s1'));
+  assert.match(ultimo().texto, /A nombre de quién es esta cita\? \(si es para ti, escribe \*yo\*\)/);
+  await llega(wahaMsg(CLIENTE, 'mi hijo Tomás'));
+  assert.match(ultimo().texto, /A nombre de Tomás\n/);
+  await llega(toca('ok:si'));
+  const cr = W.llamadas.find((x) => x.op === 'crear'); assert.equal(cr.nombre, 'Tomás'); assert.equal(cr.email, '', 'el correo de Nicolás no va en la cita de Tomás');
+  assert.equal(B.ASIS.cliente('lina-spa:' + CLIENTE).nombre, 'Nicolas', 'el nombre del cliente no cambia');
+});
+test('3.15 · «No, solo la que tengo» → no agenda · «Cambiar la que tengo» → la mueve', async () => {
+  W.citas[CLIENTE] = YA;
+  await llega(wahaMsg(CLIENTE, 'quiero agendar'));
+  await llega(toca('otra:no'));
+  assert.match(ultimo().texto, /sigues con tu cita de \*hoy a las 6:30 p\. m\.\*/); assert.ok(!W.llamadas.some((x) => x.op === 'crear'));
+  mundoNuevo(); W.citas[CLIENTE] = YA;
+  await llega(wahaMsg(CLIENTE, 'quiero agendar'));
+  await llega(toca('otra:cambiar'));
+  assert.match(ultimo().texto, /Vamos a cambiar tu cita/); assert.equal(ultimo().lista.button, 'Elegir día');
+});
+test('3.15 · Por la conversación natural también: «¿tienes cupo mañana a las 9?» → sí → «Ya tienes una cita…»', async () => {
+  W.citas[CLIENTE] = YA;
+  await llega(wahaMsg(CLIENTE, 'tienes cupo mañana a las 9?'));
+  await llega(toca('ap:si'));
+  assert.match(ultimo().texto, /¿Seguro que quieres sacar otra\?/);
+});
+test('3.15 · Sin citas abiertas NO pregunta nada (va directo)', async () => {
+  await llega(wahaMsg(CLIENTE, 'quiero agendar'));
+  assert.deepEqual(ids(ultimo()), ['cat:0', 'cat:1', 'cat:2']);
 });
