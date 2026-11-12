@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-3.17** · Página **2026-11-12f** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-12** · Mary **agendador-ia-3.18** · Página **2026-11-12f** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -113,6 +113,12 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-12 · agendador-ia-3.18 · /auditoria (Epic no tocado)
+- Alex pidió verificar que el oído no afecta a Epic. Revisión: nada del agendador modifica Epic; único incidente fue el de 2.2–2.7
+  (ya corregido). El oído comparte CPU/RAM del VPS (límite 2 núcleos / 1,5 GB).
+- Verificado por Alex en el VPS: `agendador-red` = agendador-ia, waha-agendador, postgres-agendador, oido-agendador, evolution-agendador (nada de Epic).
+- `cartero.py`: `/auditoria` (solo `docker network inspect / ps / inspect / port / stats`) + auditoría automática tras cada instalación.
 
 ### 2026-11-12 · agendador-ia-3.17 · arreglo del oído
 - /registro real: «🎤 el oído no pudo: open() got an unexpected keyword argument 'metadata_errors'». Reproducido aquí: faster-whisper

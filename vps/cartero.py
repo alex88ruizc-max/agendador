@@ -184,6 +184,8 @@ def atender(m):
         n = doc.get('file_name') or ''
         if re.match(r'^agendador-ia-[\w.-]+\.zip$', n):
             decir('📦 Recibí ' + n + '. Instalando (banco de pruebas primero)…'); decir('📦 ' + n + '\n' + instalar_mary(n, bajar(doc['file_id'])))
+            try: decir(auditoria())   # 3.18: después de cada instalación, la revisión de que no se tocó a nadie
+            except Exception as e: decir('⚠️ No pude hacer la auditoría: ' + str(e)[:120])
             return 'reiniciar'   # el zip pudo traer un cartero nuevo
         elif re.match(r'^agendador-web-[\w.-]+\.zip$', n): decir('📦 Recibí ' + n + '. Subiendo la página…'); decir(subir_web(n, bajar(doc['file_id'])))
         elif n == 'assetlinks.json' or re.match(r'^tu-agenda[\w.-]*\.apk$', n):   # 1.4: la APK de Android y su verificación, directo
@@ -197,9 +199,10 @@ def atender(m):
     elif texto.startswith('/apk'): decir('📱 Generando la app de Android… (tarda 1 a 3 minutos)'); decir(hacer_apk())
     elif texto.startswith('/estado'): decir(curl('/salud'))
     elif texto.startswith('/registro'): decir(curl('/registro?n=12'))
+    elif texto.startswith('/auditoria') or texto.startswith('/auditoría'): decir(auditoria())
     elif texto.startswith('/modo'): decir(cmd_modo(texto))
     elif texto.startswith('/prueba'): decir(cmd_prueba(texto))
-    elif texto: decir('Hola 👋 Soy el cartero del Agendador IA.\nMándame:\n• agendador-ia-….zip → actualizo el VPS (Mary) y el Apps Script de Google\n• agendador-web-….zip → subo la página tuagenda.vip\n/apk → genero la app de Android\n/estado · /registro\n/modo → ver o cambiar el modo (prueba, todos, apagado)\n/prueba <números> → tus números de prueba')
+    elif texto: decir('Hola 👋 Soy el cartero del Agendador IA.\nMándame:\n• agendador-ia-….zip → actualizo el VPS (Mary) y el Apps Script de Google\n• agendador-web-….zip → subo la página tuagenda.vip\n/apk → genero la app de Android\n/estado · /registro\n/auditoria → reviso que el agendador no toque a Epic ni a nadie (solo lee)\n/modo → ver o cambiar el modo (prueba, todos, apagado)\n/prueba <números> → tus números de prueba')
 
 # ---------- 🧪 3.1 · modo del asistente por Telegram: /modo · /modo prueba|todos|apagado · /prueba <números> ----------
 ENV_IA = os.path.join(AQUI, 'agendador-ia.env')
@@ -243,6 +246,45 @@ def cmd_prueba(texto):
     if not nums or any(len(n) < 11 or len(n) > 15 for n in nums): return '🤔 Escríbelos con el indicativo, separados por coma. Ej.:\n/prueba 573001234567,573009998877'
     env_poner('MARY_PRUEBA', ','.join(nums))
     return '🧪 Números de prueba: ' + ', '.join(nums) + '\n' + reiniciar_ia()
+
+# ---------- 🔍 3.18 · /auditoria: ¿el agendador tocó o interfiere con Epic u otro proyecto? SOLO LEE (regla N.º 1) ----------
+NUESTROS = ('agendador-ia', 'evolution-agendador', 'postgres-agendador', 'waha-agendador', 'oido-agendador')
+def dk(*a):
+    try:
+        r = subprocess.run(['sudo', 'docker'] + list(a), capture_output=True, text=True, timeout=60)
+        return (r.stdout or '').strip()
+    except Exception as e:
+        return ''
+def auditoria():
+    L, mal = ['🔍 *Auditoría del agendador* (solo lectura: no cambia nada)'], 0
+    # 1) la red del agendador solo tiene contenedores del agendador
+    en_red = dk('network', 'inspect', 'agendador-red', '-f', '{{range .Containers}}{{.Name}} {{end}}').split()
+    ajenos = [x for x in en_red if x not in NUESTROS]
+    if ajenos: mal += 1; L.append('❌ En la red del agendador hay contenedores AJENOS: ' + ', '.join(ajenos) + ' (no los toco: avísale a Claude)')
+    else: L.append('✅ Red del agendador: solo contenedores del agendador (' + ', '.join(en_red) + ')')
+    # 2) ningún contenedor ajeno está conectado a la red del agendador, y los de Epic siguen en sus redes de siempre
+    todos = [x for x in dk('ps', '-a', '--format', '{{.Names}}').split('\n') if x]
+    otros = [x for x in todos if x not in NUESTROS]
+    epic = [x for x in otros if 'epic' in x.lower()]
+    for x in epic:
+        redes = dk('inspect', x, '-f', '{{range $k, $v := .NetworkSettings.Networks}}{{$k}} {{end}}').split()
+        estado = dk('ps', '-a', '--filter', 'name=^' + x + '$', '--format', '{{.Status}}')
+        reinicios = dk('inspect', x, '-f', '{{.RestartCount}}')
+        if 'agendador-red' in redes: mal += 1; L.append('❌ ' + x + ' está en la red del agendador')
+        L.append(('✅ ' if estado.startswith('Up') else '⚠️ ') + x + ': ' + (estado or '?') + ' · redes: ' + (' '.join(redes) or '—') + (' · reinicios: ' + reinicios if reinicios and reinicios != '0' else ''))
+    if not epic: L.append('ℹ️ No veo contenedores con «epic» en el nombre.')
+    # 3) puertos: los del agendador no chocan con los de nadie
+    def puertos(n): return set(p.strip() for p in dk('port', n).split('\n') if p.strip())
+    nuestros_p = set().union(*[set(p.split('->')[-1].strip() for p in puertos(n)) for n in NUESTROS if n in todos]) if any(n in todos for n in NUESTROS) else set()
+    choques = [x for x in otros if set(p.split('->')[-1].strip() for p in puertos(x)) & nuestros_p]
+    if choques: mal += 1; L.append('❌ Puertos repetidos con: ' + ', '.join(choques))
+    else: L.append('✅ Puertos del agendador: propios (' + (', '.join(sorted(nuestros_p)) or '—') + ')')
+    # 4) consumo: oído y agendador al lado de Epic
+    st = dk('stats', '--no-stream', '--format', '{{.Name}}|{{.CPUPerc}}|{{.MemUsage}}')
+    filas = [x.split('|') for x in st.split('\n') if x and (x.split('|')[0] in NUESTROS or 'epic' in x.split('|')[0].lower())]
+    if filas: L.append('📊 Consumo ahora:\n' + '\n'.join('  · ' + f[0] + ': CPU ' + f[1] + ' · RAM ' + f[2].split('/')[0].strip() for f in filas if len(f) >= 3))
+    L.append('\n' + ('✅ *Epic no está tocado por el agendador.*' if not mal else '⚠️ Hay ' + str(mal) + ' punto(s) para revisar (arriba). No toqué nada.'))
+    return '\n'.join(L)
 
 INICIO = os.path.getmtime(os.path.abspath(__file__))
 def main():
