@@ -6,7 +6,7 @@
 const http = require('http'), fs = require('fs'), path = require('path');
 const T = require('./textos'), C = require('./correo'), E = require('./estado'), A = require('./asistente');
 
-const VERSION = 'agendador-ia-3.31';
+const VERSION = 'agendador-ia-3.32';
 const env = (k, d) => (process.env[k] === undefined || process.env[k] === '' ? d : process.env[k]);
 const CFG = {
   puerto: parseInt(env('PUERTO', '3060'), 10),
@@ -16,7 +16,8 @@ const CFG = {
   datos: env('DATOS', path.join(__dirname, 'datos')), negocios: env('NEGOCIOS', path.join(__dirname, 'negocios.json')),
   modo: String(env('MARY_MODO', 'prueba')).toLowerCase(),   // prueba (solo MARY_PRUEBA) | todos | apagado
   prueba: String(env('MARY_PRUEBA', '')).split(/[,\s]+/).map((x) => x.replace(/\D/g, '')).filter((x) => x.length >= 10),
-  leerDirecto: env('LEER_DIRECTO', 'si') !== 'no',   // 3.30: días/horas/cupos calculados en el VPS (LEER_DIRECTO=no → todo por Google como antes)
+  leerDirecto: env('LEER_DIRECTO', 'si') !== 'no',
+  volverEspacioMs: parseInt(env('VOLVER_ESPACIO_MS', String(3 * 60000)), 10),   // 3.32: minutos entre un recordatorio de servicio y el siguiente   // 3.30: días/horas/cupos calculados en el VPS (LEER_DIRECTO=no → todo por Google como antes)
   silencioMin: parseInt(env('SILENCIO_MIN', '15'), 10),     // no repite lo mismo en un chat antes de esto (salvo que el cliente diga algo de la lista)
   humanoMin: parseFloat(env('HUMANO_MIN', '30')),           // 3.1: si el dueño escribe a mano en un chat, se calla ahí 30 min (o lo que diga su panel)
   agruparMs: parseInt(env('AGRUPAR_MS', '7000'), 10),
@@ -215,6 +216,7 @@ function botNormal(b, recordatorioViejo) {   // mismos valores por defecto que e
   const c = {}; ['audios', 'activo', 'agendar', 'cupos', 'saludoDiario', 'pedirNombre', 'pedirCorreo', 'loDeSiempre', 'recordatorioConfirmar', 'cambios'].forEach((k) => { c[k] = d(b[k], true) !== false; });
   c.recordatorioMin = Math.max(0, Number(d(b.recordatorioMin, d(recordatorioViejo, 120)))); c.pausaMin = Math.max(5, Number(d(b.pausaMin, 30)));
   c.estados = { activo: d(e.activo, true) !== false, horas, manana: d(e.manana, true) !== false, semanal: d(e.semanal, false) === true };
+  const v = b.volver || {}; c.volver = { activo: v.activo === true, dias: Math.max(0, Math.min(60, Number(v.dias || 0))) };   // 3.32: recordatorio de servicio (lo elige el dueño)
   return c;
 }
 const BOT_LEIDO = new Map();   // bid → cuándo se leyó de la base
@@ -552,6 +554,31 @@ async function tickEstados() {
 }
 
 // ---------- recordatorios por WhatsApp ----------
+// 🔁 3.32 · RECORDATORIO DE SERVICIO: a los clientes cuya última visita fue hace N días (lo elige el dueño) se les escribe
+//    «Ya van 3 semanas desde tu último Corte con Gabriel. ¿Te agendo de nuevo?». Una vez al día desde las 10:00,
+//    máximo 20 y con unos minutos entre uno y otro (si WhatsApp ve muchos mensajes de golpe, puede bloquear el número).
+async function tickVolver(aCualquierHora) {
+  if (CFG.modo === 'apagado') return;
+  const a = ahoraLocal(); if (!aCualquierHora && (a.hm < '10:00' || a.hm > '18:00')) return;
+  MEM.volver = MEM.volver || {};
+  for (const neg of negocios()) {
+    if (MEM.volver[neg.bid] === a.fecha) continue;
+    const bot = await botAlDia(neg);
+    if (!bot.activo || !bot.volver || !bot.volver.activo || !bot.volver.dias) continue;
+    MEM.volver[neg.bid] = a.fecha; memGuardar();   // una sola vez al día aunque falle
+    try {
+      const r = await gas(neg, 'volver', { max: 20 });
+      const L = (r.clientes || []).filter((x) => atiende({ tel: numeroWa(x.whatsapp) }) && !mudo(neg.bid + ':' + numeroWa(x.whatsapp)) && !(MEM.conv && MEM.conv[neg.bid + ':' + numeroWa(x.whatsapp)]));
+      if (!L.length) continue;
+      await gas(neg, 'volverAvisado', { codes: L.map((x) => x.code) });   // marcado antes de mandar: nunca se le escribe dos veces por la misma visita
+      L.forEach((x, i) => setTimeout(() => {
+        ASIS.ofrecerVolver(neg, numeroWa(x.whatsapp), x, r.negocio).then(() => anotar({ bid: neg.bid, chat: numeroWa(x.whatsapp).slice(-4), que: '🔁 recordatorio de servicio (' + x.diasDesde + ' días)' }))
+          .catch((e) => log('volver', x.code, e.message));
+      }, i * CFG.volverEspacioMs));
+      anotar({ bid: neg.bid, que: '🔁 recordatorio de servicio: ' + L.length + ' cliente(s) hoy' });
+    } catch (e) { est.errores++; log('❌ volver', neg.bid, e.message); }
+  }
+}
 async function tickRecordatorios(aCualquierHora) {
   const hm = ahoraLocal().hm; if (!aCualquierHora && (hm < '05:00' || hm > '21:30')) return;   // 2.5: de noche no hay citas próximas: no se gasta cupo
   for (const neg of negocios()) {
@@ -769,7 +796,8 @@ const cada = (ms, k, fn) => setInterval(async () => { if (ocupado[k]) return; oc
 function arrancarRelojes() {
   cada(60000, 'correo', revisarCorreos);
   cada(30000, 'estados', tickEstados);
-  cada(15 * 60000, 'record', tickRecordatorios);   // 2.5: cada 15 min (antes 5): el recordatorio sale igual con tiempo de sobra
+  cada(15 * 60000, 'record', tickRecordatorios);
+  cada(5 * 60000, 'volver', tickVolver);   // 3.32: recordatorio de servicio (una vez al día, desde las 10:00)   // 2.5: cada 15 min (antes 5): el recordatorio sale igual con tiempo de sobra
   cada(60000, 'revis', tickRevisadas);
   cada(5000, 'wa', tickPedidosWa);
 }
@@ -806,5 +834,5 @@ if (require.main === module) {
   servidor.listen(CFG.puerto, () => { log('👩‍💼 ' + VERSION + ' escuchando en ' + CFG.puerto + ' · modo ' + CFG.modo); negocios(); arrancarRelojes(); });
 }
 // 🧪 solo para el banco de escenarios (banco/escenarios.js): deja a Mary como recién encendida
-const _banco = { ASIS, BOT, yaLoDije, memDicho: () => (MEM.dicho = MEM.dicho || {}), memHumano: () => MEM.humano, memRobot: () => (MEM.robot = MEM.robot || {}), tickRecordatorios, publicarEstado, alMensaje, alEventoConexion, ultimos, reiniciar() { CL = null; leer.avisado = false; BOT_LEIDO.clear(); MEM.sinbot = {}; MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; MEM.conv = {}; MEM.clientes = {}; MEM.conectados = {}; MEM.pendientesWa = {}; MEM.codigos = {}; MEM.robot = {}; MEM.dicho = {}; AGRUPA.clear(); ASIS._cat.clear(); BOT.clear(); CONTACTOS.clear(); vinculando.clear(); delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
+const _banco = { ASIS, BOT, yaLoDije, memDicho: () => (MEM.dicho = MEM.dicho || {}), memHumano: () => MEM.humano, memRobot: () => (MEM.robot = MEM.robot || {}), tickRecordatorios, tickVolver, publicarEstado, alMensaje, alEventoConexion, ultimos, reiniciar() { CL = null; MEM.volver = {}; leer.avisado = false; BOT_LEIDO.clear(); MEM.sinbot = {}; MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; MEM.conv = {}; MEM.clientes = {}; MEM.conectados = {}; MEM.pendientesWa = {}; MEM.codigos = {}; MEM.robot = {}; MEM.dicho = {}; AGRUPA.clear(); ASIS._cat.clear(); BOT.clear(); CONTACTOS.clear(); vinculando.clear(); delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
 module.exports = { _banco, botNormal, frenoRobot, estadosQueTocan, atenderPedidoWa, sincronizarConectados, renovarQr, telEnAviso, deWaha, esWaha, debeResponder, alEventoConexion, tickPedidosWa, limpiarSinVincular, leerMensaje, atiende, PREGUNTA, numeroWa, ahoraLocal, enFila, yaVisto, quienVeEstados, CFG };

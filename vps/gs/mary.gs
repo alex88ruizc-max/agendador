@@ -14,7 +14,7 @@
  * Instalación: pega este archivo, ejecuta activarMary() una vez, copia la clave que sale en el registro
  * y ponla en el mary.env del VPS (MARY_KEY). Vuelve a implementar la aplicación web (Implementar > Administrar > editar > Nueva versión).
  */
-const MARY_VERSION = 'agendador-ia-3.31';
+const MARY_VERSION = 'agendador-ia-3.32';
 
 // Se registra como acción pública del servidor (sin sesión: entra con la clave de Mary).
 // ⚠️ Este archivo debe quedar DEBAJO del archivo principal en la lista de archivos de Apps Script (los nuevos quedan al final: así está bien).
@@ -56,6 +56,8 @@ function maryAgenda(b) {
     case 'reagendar': return maryReagendar_(st, b);
     case 'contactos': return maryContactos_();
     case 'dobleAvisado': return maryDobleAvisado_(b);
+    case 'volver': return maryVolver_(st, b);           // 3.32 · recordatorio de servicio
+    case 'volverAvisado': return maryVolverAvisado_(b);
   }
   fail('Operación no válida.');
 }
@@ -106,7 +108,8 @@ function maryBotCfg_(st) {
     saludoDiario: d(b.saludoDiario, true) !== false, pedirNombre: d(b.pedirNombre, true) !== false, pedirCorreo: d(b.pedirCorreo, true) !== false,
     loDeSiempre: d(b.loDeSiempre, true) !== false, recordatorioMin: Math.max(0, Number(d(b.recordatorioMin, d(st.maryReminderMinutes, 120)))),
     recordatorioConfirmar: d(b.recordatorioConfirmar, true) !== false, cambios: d(b.cambios, true) !== false, pausaMin: Math.max(5, Number(d(b.pausaMin, 30))),
-    estados: { activo: d(e.activo, true) !== false, horas: horas, manana: d(e.manana, true) !== false, semanal: d(e.semanal, false) === true }
+    estados: { activo: d(e.activo, true) !== false, horas: horas, manana: d(e.manana, true) !== false, semanal: d(e.semanal, false) === true },
+    volver: { activo: (b.volver || {}).activo === true, dias: Math.max(0, Math.min(60, Number((b.volver || {}).dias || 0))) }   // 3.32: lo elige el dueño (0 = no elegido: no sale)
   };
 }
 // 3.1 · el cliente queda en los CLIENTES del negocio (panel › Clientes) con su nombre, WhatsApp y correo
@@ -393,6 +396,36 @@ function maryProximas_(st, b) {
     return m > 0 && m <= min && maryLast10_((a.customer || {}).whatsapp).length === 10;
   });
   return { citas: L.map(function (a) { const o = maryCitaOut_(a); o.whatsapp = (a.customer || {}).whatsapp || ''; o.nombre = (a.customer || {}).firstName || ''; return o; }), dobles: dobles, info: Object.assign(maryInfo_(st), { recordatorioMin: min }) };
+}
+// ---------- 3.32 · 🔁 recordatorio de servicio: «Ya van 3 semanas desde tu último corte. ¿Te agendo de nuevo?» ----------
+// Clientes cuya ÚLTIMA visita fue hace «dias» días (con 6 días de margen por si un día no salió), sin cita próxima,
+// y a los que no se les ha escrito por esa visita. Máximo 20 por día. Se leen los días por fecha (sin índices nuevos).
+function maryVolver_(st, b) {
+  const cfg = maryBotCfg_(st).volver;
+  if (!maryBotCfg_(st).activo || !cfg.activo || !cfg.dias) return { clientes: [] };
+  const max = Math.max(1, Math.min(20, Number(b.max || 20))), ahora = Date.now(), hoy = toDateStr(new Date(ahora));
+  const desde = toDateStr(new Date(ahora - (cfg.dias + 6) * 86400000)), hasta = toDateStr(new Date(ahora - cfg.dias * 86400000));
+  const ultima = {}, futuras = {};
+  ACTIVE.forEach(function (s) { fsQuery('appointments', [['status', 'EQUAL', s]]).forEach(function (a) { if (a.startAt && a.startAt.getTime() > ahora) futuras[maryLast10_((a.customer || {}).whatsapp)] = true; }); });
+  for (let i = cfg.dias + 6; i >= 1; i--) {
+    const f = toDateStr(new Date(ahora - i * 86400000));
+    if (f >= hoy) continue;
+    fsQuery('appointments', [['date', 'EQUAL', f]]).forEach(function (a) {
+      if (['attended', 'confirmed'].indexOf(a.status) < 0) return;
+      const k = maryLast10_((a.customer || {}).whatsapp); if (k.length !== 10) return;
+      if (!ultima[k] || a.date + a.startTime > ultima[k].date + ultima[k].startTime) ultima[k] = a;
+    });
+  }
+  const out = Object.keys(ultima).map(function (k) { return ultima[k]; })
+    .filter(function (a) { return a.date >= desde && a.date <= hasta && !a.maryVolver && !futuras[maryLast10_(a.customer.whatsapp)]; })
+    .sort(function (x, y) { return (x.date + x.startTime).localeCompare(y.date + y.startTime); }).slice(0, max)
+    .map(function (a) { const o = maryCitaOut_(a); o.whatsapp = a.customer.whatsapp; o.nombre = String(a.customer.firstName || '').trim(); o.diasDesde = Math.round((Date.parse(hoy) - Date.parse(a.date)) / 86400000); return o; });
+  return { clientes: out, negocio: st.businessName || BIZ.name || '', link: maryLinkAgenda_() };
+}
+function maryVolverAvisado_(b) {
+  const L = (b.codes || []).slice(0, 20).map(function (c) { return wPatch(bp('appointments/' + String(c).toUpperCase()), { maryVolver: true }); });
+  if (L.length) commit(L);
+  return { ok: true };
 }
 // 3.14 · citas que se cruzan del mismo WhatsApp (aún no se le preguntó): [{ whatsapp, nombre, citas: [...] }]
 function maryDobles_(L) {

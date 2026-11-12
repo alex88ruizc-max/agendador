@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-3.31** · Página **2026-11-12p** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-12** · Mary **agendador-ia-3.32** · Página **2026-11-12q** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -113,6 +113,20 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-12 · agendador-ia-3.32 · página 2026-11-12q · 🔁 recordatorio de servicio
+- Pedido de Alex: escribirle al cliente que ya vino para que vuelva: «¿quieres hacerte lo mismo o cambiarlo?». Si dice sí, solo elige fecha y queda confirmada.
+- **Panel › WhatsApp Bot › 🔁 Recordatorio de servicio** (apagado por defecto). **Cada cuánto lo elige el dueño** (7, 15, 21, 30, 45 o 60 días); mientras no lo elija, no sale nada.
+- **A quién:**
+  - A los clientes cuya **última** visita (atendida o confirmada) fue hace esos días, con 6 de margen.
+  - No a quien tenga una cita próxima, esté en /sinbot o esté agendando. Una sola vez por visita (`maryVolver` en la cita).
+- **Cuándo:** una vez al día desde las 10:00 a. m., **máximo 20**, con 3 minutos entre uno y otro (`VOLVER_ESPACIO_MS`), para que WhatsApp no vea mensajes masivos.
+- **Mensaje:** «Hola Nicolás 👋 Te escribe el asistente de *Barba*. Ya van 3 semanas desde tu último *Corte* con Gabriel. ¿Te agendo de nuevo?» con tres opciones:
+  - ✅ Sí, lo mismo → día → hora → «✅ Cita confirmada», con el mismo barbero y sin pedir el correo.
+  - ✂️ Otro servicio → agendamiento normal.
+  - 🙅 No, gracias → se despide y no insiste.
+- Servidor (mary.gs 3.32): ops `volver` y `volverAvisado`. Lee los días por fecha (sin índices nuevos), una vez al día.
+- Banco: 138 pruebas, 0 fallas (servidor: a quién sí y a quién no; escenarios: sí / no / otro / sin días elegidos). Probado con mutaciones.
 
 ### 2026-11-12 · agendador-ia-3.31 · página 2026-11-12p · bloquear UNA hora y a UN barbero · saludo con el nombre
 - Pedido de Alex: «no me permite bloquear individual, sino completo».

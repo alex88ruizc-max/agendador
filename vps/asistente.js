@@ -217,7 +217,7 @@ function crear(dep) {
     if (cl.correo === undefined && !b.pedirCorreo) cl.correo = '';
     if (conv.otraPersona && conv.nombreOtra === undefined) { conv.paso = 'nombreOtra'; conv.t = ahora(); mem().conv[c.k] = conv; dep.guardar(); return dep.texto(neg, c.tel, '🙋 ¿A nombre de quién es esta cita? (si es para ti, escribe *yo*)'); }
     if (!cl.nombre) { conv.paso = 'nombre'; conv.t = ahora(); mem().conv[c.k] = conv; dep.guardar(); return dep.texto(neg, c.tel, '🙋 ¿A nombre de quién agendo la cita?'); }
-    if (cl.correo === undefined) { conv.paso = 'correo'; conv.t = ahora(); mem().conv[c.k] = conv; dep.guardar(); return dep.texto(neg, c.tel, T.pideCorreo()); }
+    if (cl.correo === undefined && !conv.volver) { conv.paso = 'correo'; conv.t = ahora(); mem().conv[c.k] = conv; dep.guardar(); return dep.texto(neg, c.tel, T.pideCorreo()); }
     return fin2();
   }
   async function pasoConfirmar(neg, c, conv) {
@@ -248,7 +248,7 @@ function crear(dep) {
     }
     fin(c.k);
     if (!(conv.otraPersona && conv.nombreOtra && conv.nombreOtra !== cl.nombre)) aprender(cl, conv, r.cita);   // lo de otra persona no cuenta como «lo de siempre»
-    dep.anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: 'agendó por WhatsApp ' + r.cita.code + ' (' + r.cita.status + ')' });
+    dep.anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: (conv.volver ? '🔁 volvió a agendar (recordatorio de servicio) ' : 'agendó por WhatsApp ') + r.cita.code + ' (' + r.cita.status + ')' });
     const sel = elegidos(cat, conv.ids);
     return dep.texto(neg, c.tel, T.citaHecha(r.cita, { medios: r.medios, holdMinutes: r.holdMinutes, negocio: cat.negocio, comoSiempre: !!conv.comoSiempre, total: r.cita.total || total(sel), min: sel.reduce((a, x) => a + Number(x.min || 0), 0) }, conv.nombreOtra || cl.nombre, !!cl.correo && !(conv.otraPersona && conv.nombreOtra !== cl.nombre)));
   }
@@ -412,6 +412,12 @@ function crear(dep) {
         return dep.texto(neg, c.tel, r.ok ? T.asistio(conv.cita, cl.nombre || conv.cita.nombre) : '😕 ' + r.motivo);
       }
       if (NO.test(t)) return dep.texto(neg, c.tel, b.cambios ? '¿Qué prefieres? Escribe *cancelar* o *modificar* 🙏' : '¿Necesitas cambiarla? Aquí puedes: ' + conv.cita.link);
+      fin(c.k); return null;   // habló de otra cosa: se atiende como mensaje normal
+    }
+    if (conv.paso === 'volver') {   // 3.32: respuesta al recordatorio de servicio
+      if (c.rowId === 'vol:si' || (!c.rowId && (SI.test(t) || /lo mismo|lo de siempre|igual/.test(t)))) { delete conv.paso; conv.comoSiempre = true; return pasoDia(neg, c, conv, '👌 ¡Listo! '); }
+      if (c.rowId === 'vol:otro' || (!c.rowId && /otro|otra cosa|cambiar|diferente/.test(t))) { conv.ids = []; delete conv.staffId; delete conv.paso; return pasoCategoria(neg, c, conv); }
+      if (c.rowId === 'vol:no' || (!c.rowId && NO.test(t))) { fin(c.k); return dep.texto(neg, c.tel, '👌 Listo, aquí estamos cuando quieras. ¡Feliz día!'); }
       fin(c.k); return null;   // habló de otra cosa: se atiende como mensaje normal
     }
     if (conv.paso === 'otraCita') {
@@ -594,6 +600,17 @@ function crear(dep) {
     return pasoDia(neg, c, conv, '🔄 Vamos a cambiar tu cita.\n\n');
   }
   // después de mandar el recordatorio: la próxima respuesta del cliente es sobre ESA cita
+  // 🔁 3.32 · recordatorio de servicio: «Ya van 3 semanas desde tu último Corte con Gabriel. ¿Te agendo de nuevo?»
+  async function ofrecerVolver(neg, tel, x, negocio) {
+    const k = neg.bid + ':' + tel, cl = cliente(k);
+    if (!cl.nombre && x.nombre && x.nombre !== 'Cliente') { cl.nombre = x.nombre; dep.guardar(); }
+    const n = nombre1(cl.nombre || x.nombre), sem = Math.round(Number(x.diasDesde || 0) / 7);
+    const cuanto = sem >= 2 ? sem + ' semanas' : (x.diasDesde || 0) + ' días';
+    const conv = { paso: 'volver', ids: (x.ids || []).slice(), staffId: x.staffId || '', volver: true, otraOk: true, vence: 2 * 86400000 };
+    return lista(neg, { k, tel }, conv, { texto: 'Hola' + (n ? ' ' + n : '') + ' 👋 Te escribe el asistente de *' + negocio + '*.\nYa van ' + cuanto + ' desde tu último *' + x.servicio + '*' + (x.con ? ' con ' + x.con : '') + '. ¿Te agendo de nuevo? 😊',
+      boton: 'Ver opciones', pie: negocio + ' · asistente virtual',
+      secciones: [{ titulo: '¿Agendamos?', filas: [{ id: 'vol:si', titulo: '✅ Sí, lo mismo', desc: corto(x.servicio + (x.con ? ' con ' + x.con : ''), 70) }, { id: 'vol:otro', titulo: '✂️ Otro servicio', desc: 'Elegir qué me hago' }, { id: 'vol:no', titulo: '🙅 No, gracias', desc: '' }] }] });
+  }
   function trasRecordatorio(neg, tel, cita) {
     mem().conv[neg.bid + ':' + tel] = { paso: 'recordatorio', cita, t: ahora(), vence: VENCE_RECORDATORIO }; dep.guardar();
   }
@@ -662,7 +679,7 @@ function crear(dep) {
     if (b.cupos) secciones.push({ titulo: 'Horarios', filas: [{ id: 'menu:cupos', titulo: '🕐 Ver cupos de hoy', desc: 'Horas disponibles' }] });
     return lista(neg, c, { paso: 'menu', ids: [] }, { texto, boton: b.agendar && C.length ? 'Ver servicios' : 'Ver opciones', pie: (negocio || '') + ' · asistente virtual', secciones });
   }
-  return { manejar, menu, saludo, trasRecordatorio, preguntarDobles, cliente, fechaPedida: (t) => fechaPedida(t, hoy()), _cat: catCache };
+  return { manejar, menu, saludo, ofrecerVolver, trasRecordatorio, preguntarDobles, cliente, fechaPedida: (t) => fechaPedida(t, hoy()), _cat: catCache };
 }
 
 module.exports = { crear, horaPedida, fechaPedida, sinTilde, QUIERE_CUPOS, QUIERE_AGENDAR, SALUDO };

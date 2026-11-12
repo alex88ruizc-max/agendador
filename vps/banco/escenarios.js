@@ -54,6 +54,8 @@ global.fetch = async (url, o) => {
     if (W.gasFalla && b.op === 'chat') return resp({ ok: false, error: 'Servicio invocado demasiadas veces' });
     if (b.op === 'chat' && b.conNombre && W.nombreBase) { W.pidioNombre = (W.pidioNombre || 0) + 1; }
     if (W.falla === b.op) return resp({ ok: false, error: 'Tiempo de espera agotado' });   // 3.28: Google falla en un paso
+    if (b.op === 'volver') return ok({ clientes: W.volver || [], negocio: 'Lina Spa', link: NEGOCIO.link });
+    if (b.op === 'volverAvisado') { W.volverAvisados = (W.volverAvisados || []).concat(b.codes); return ok({ ok: true }); }
     if (b.op === 'chat') return ok(Object.assign({}, NEGOCIO, { activo: W.activo, citas: W.citas[b.phone] || [] }, b.conNombre && W.nombreBase ? { cliente: W.nombreBase } : {}));
     if (b.op === 'info') return ok(NEGOCIO);
     if (b.op === 'proof') return ok(W.proof || { ok: false, motivo: 'sin_cita_pendiente' });
@@ -1036,4 +1038,44 @@ test('3.30 · El saludo usa el NOMBRE que el cliente ya tiene en el negocio (aun
 test('3.30 · WAHA (GOWS) manda el nombre en Info.PushName → también se usa', async () => {
   await llega(wahaMsg(CLIENTE, 'hola', { _data: { Info: { PushName: 'Mateo Gil' } } }));
   assert.match(W.enviados[0].texto, /^Hola Mateo 👋/);
+});
+
+// =====================================================================
+//  3.32 · 🔁 recordatorio de servicio
+// =====================================================================
+const VOLVER = { code: 'R-VIEJA9', whatsapp: CLIENTE, nombre: 'Nicolas', servicio: 'Degradado', con: 'Lina', ids: ['c2'], staffId: 's1', diasDesde: 21 };
+test('3.32 · 🔁 Recordatorio de servicio: «Ya van 3 semanas desde tu último Degradado con Lina. ¿Te agendo de nuevo?» → Sí, lo mismo → día → hora → ✅ Cita confirmada (sin pedir correo)', async () => {
+  W.volver = [VOLVER];
+  B.BOT.set('lina-spa', { cfg: P.botNormal({ volver: { activo: true, dias: 21 } }), t: Date.now() });
+  const espacio = P.CFG.volverEspacioMs; P.CFG.volverEspacioMs = 0;
+  try {
+    await B.tickVolver(true); await new Promise((ok) => setTimeout(ok, 20));
+    assert.deepEqual(W.volverAvisados, ['R-VIEJA9'], 'se marca para no escribirle dos veces por la misma visita');
+    const m = ultimo();
+    assert.equal(m.a, CLIENTE); assert.match(m.texto, /Hola Nicolas 👋 Te escribe el asistente de \*?Lina Spa/); assert.match(m.texto, /Ya van 3 semanas desde tu último \*?Degradado\*? con Lina\. ¿Te agendo de nuevo\?/);
+    assert.deepEqual(ids(m), ['vol:si', 'vol:otro', 'vol:no']);
+    await llega(toca('vol:si', '✅ Sí, lo mismo'));
+    assert.equal(ultimo().lista.button, 'Elegir día'); assert.equal(W.llamadas.filter((x) => x.op === 'dias').pop().staffId, 's1', 'con el mismo profesional');
+    await llega(toca('dia:' + HOY)); await llega(toca('hora:15:00'));
+    const cr = W.llamadas.find((x) => x.op === 'crear');
+    assert.ok(cr, 'confirmada sin preguntar el correo'); assert.deepEqual(cr.ids, ['c2']); assert.equal(cr.staffId, 's1'); assert.equal(cr.nombre, 'Nicolas');
+    assert.match(ultimo().texto, /Cita confirmada, Nicolas/); assert.ok(B.ultimos.some((x) => /volvió a agendar/.test(x.que)));
+    await B.tickVolver(true); assert.deepEqual(W.volverAvisados, ['R-VIEJA9'], 'una sola vez al día');
+  } finally { P.CFG.volverEspacioMs = espacio; }
+});
+test('3.32 · 🔁 «No, gracias» → se despide y no insiste · «Otro servicio» → lista de servicios', async () => {
+  B.BOT.set('lina-spa', { cfg: P.botNormal({ volver: { activo: true, dias: 21 } }), t: Date.now() });
+  await B.ASIS.ofrecerVolver({ bid: 'lina-spa', instancia: 'lina-spa', motor: 'waha', sesion: 'default' }, CLIENTE, VOLVER, 'Lina Spa');
+  await llega(toca('vol:no', '🙅 No, gracias'));
+  assert.match(ultimo().texto, /aquí estamos cuando quieras/);
+  await B.ASIS.ofrecerVolver({ bid: 'lina-spa', instancia: 'lina-spa', motor: 'waha', sesion: 'default' }, CLIENTE, VOLVER, 'Lina Spa');
+  await llega(wahaMsg(CLIENTE, 'otro'));
+  assert.deepEqual(ids(ultimo()), ['cat:0', 'cat:1', 'cat:2']);
+});
+test('3.32 · 🔁 Sin días elegidos por el dueño (o apagado) NO sale nada', async () => {
+  W.volver = [VOLVER];
+  B.BOT.set('lina-spa', { cfg: P.botNormal({ volver: { activo: true } }), t: Date.now() });
+  await B.tickVolver(true); assert.ok(!W.gas.includes('volver'));
+  B.BOT.set('lina-spa', { cfg: P.botNormal({ volver: { activo: false, dias: 21 } }), t: Date.now() });
+  await B.tickVolver(true); assert.ok(!W.gas.includes('volver')); assert.equal(W.enviados.length, 0);
 });

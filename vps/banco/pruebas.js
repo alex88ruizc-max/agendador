@@ -329,3 +329,28 @@ test('3.30 · Servidor: el nombre del cliente sale de sus datos en el negocio (p
   assert.equal(F.maryNombreCliente_('573001112233'), '', '«Cliente» no es un nombre');
   DB['customers/wa3001112233'] = { firstName: 'Ana', lastName: 'Ruiz' }; assert.equal(F.maryNombreCliente_('3001112233'), 'Ana Ruiz');
 });
+test('3.32 · 🔁 Recordatorio de servicio (servidor): solo clientes cuya ÚLTIMA visita fue hace N días, sin cita próxima, sin aviso previo; máximo 20', { skip: !require('fs').existsSync(GS_MARY) && 'dentro de la imagen no está gs/' }, () => {
+  const src = require('fs').readFileSync(GS_MARY, 'utf8');
+  const HOY = Date.UTC(2030, 0, 31, 15), dia = (n) => new Date(HOY - n * 86400000).toISOString().slice(0, 10);
+  const cita = (code, n, wa, x) => Object.assign({ code, date: dia(n), startTime: '10:00', status: 'attended', customer: { whatsapp: wa, firstName: 'Cli ' + code }, items: [{ id: 'c1', name: 'Corte' }], staffId: 's1', staffName: 'Gabriel', startAt: new Date(HOY - n * 86400000) }, x || {});
+  const A = [
+    cita('A', 21, '573000000001'),                                   // le toca
+    cita('B', 21, '573000000002'), cita('B2', 5, '573000000002'),    // volvió hace 5 días: su última visita es reciente
+    cita('C', 22, '573000000003'),                                   // le toca (margen)
+    cita('D', 21, '573000000004', { maryVolver: true }),            // ya se le escribió
+    cita('E', 21, '573000000005', { status: 'cancelled' }),         // cancelada no cuenta
+    cita('F', 40, '573000000006'),                                   // muy vieja
+    cita('G', 21, '573000000007')                                    // tiene cita próxima
+  ];
+  const futura = { code: 'G2', status: 'confirmed', customer: { whatsapp: '573000000007' }, startAt: new Date(HOY + 86400000) };
+  let bot = { activo: true, volver: { activo: true, dias: 21 } };
+  const G = { ACTIONS: {}, PUBLIC_ACTIONS: {}, console, ACTIVE: ['pending_payment', 'pending_verification', 'confirmed'], BIZ: { name: 'Barba' }, Date: class extends Date { constructor(...a) { if (a.length) super(...a); else super(HOY); } static now() { return HOY; } },
+    toDateStr: (d) => d.toISOString().slice(0, 10), fsQuery: (col, f) => f[0][0] === 'status' ? (f[0][2] === 'confirmed' ? [futura] : []) : A.filter((a) => a.date === f[0][2]),
+    waDayLabel: (d) => d, hora12: (t) => t, siteUrl: () => 'https://x', BID: 'b', fail: (m) => { throw new Error(m); } };
+  const correr = () => new Function(...Object.keys(G), 'BOT', src + '\nreturn maryVolver_({ maryBot: BOT, businessName: "Barba" }, {});')(...Object.values(G), bot);
+  const r = correr();
+  assert.deepEqual(r.clientes.map((x) => x.code).sort(), ['A', 'C']);
+  const a = r.clientes.find((x) => x.code === 'A'); assert.deepEqual(a.ids, ['c1']); assert.equal(a.staffId, 's1'); assert.equal(a.con, 'Gabriel'); assert.equal(a.diasDesde, 21); assert.equal(a.whatsapp, '573000000001');
+  bot = { activo: true, volver: { activo: true, dias: 0 } }; assert.deepEqual(correr().clientes, [], 'sin días elegidos por el dueño: no sale');
+  bot = { activo: true, volver: { activo: false, dias: 21 } }; assert.deepEqual(correr().clientes, [], 'apagado: no sale');
+});
