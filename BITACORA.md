@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-3.26** · Página **2026-11-12j** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-12** · Mary **agendador-ia-3.27** · Página **2026-11-12k** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -113,6 +113,15 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-12 · agendador-ia-3.27 · página 2026-11-12k · vincular con cuenta regresiva de 3 minutos
+- Pedido de Alex: si toca «Vincular» y no vincula, que haya un contador y que al terminar se borre el puente de WAHA para que no quede gastando.
+- **VPS:** la conexión sin vincular se borra a los **3 minutos** (antes 15). Se hace logout y DELETE de la sesión, solo en `waha-agendador`. El VPS le manda al panel la hora exacta en que vence.
+- **Panel:** muestra «⏳ Te quedan 2:59 para vincular», con un botón **Cancelar** que borra la conexión al instante. Al llegar a 0 dice «Se acabó el tiempo» y luego «⏱️ El código venció…».
+- Al cancelar ya no queda un «venció» pendiente que llegue tarde.
+- Servidor de Google (mary.gs 3.27): guarda `vence` para que el panel lo lea.
+- Banco: 2 escenarios nuevos (vence a los 3 min y borra la sesión una sola vez; cancelar borra ya y no deja nada por vencer). Probados con mutaciones: volver a 15 min o no limpiar al cancelar hace fallar el banco.
+- No se probó en el celular real: el contador del panel no tiene prueba automática.
 
 ### 2026-11-12 · agendador-ia-3.26 · página 2026-11-12j · arreglo del arreglo
 - **Falla de la 3.25:** el escudo de config.js conservaba la dirección que hubiera en GitHub, y en GitHub había quedado la del servidor **viejo** (alex88ruizc). Por eso el escudo dejó la mala y el «No hay conexión» siguió al desvincular.

@@ -6,7 +6,7 @@
 const http = require('http'), fs = require('fs'), path = require('path');
 const T = require('./textos'), C = require('./correo'), E = require('./estado'), A = require('./asistente');
 
-const VERSION = 'agendador-ia-3.26';
+const VERSION = 'agendador-ia-3.27';
 const env = (k, d) => (process.env[k] === undefined || process.env[k] === '' ? d : process.env[k]);
 const CFG = {
   puerto: parseInt(env('PUERTO', '3060'), 10),
@@ -579,7 +579,7 @@ const FS = { url: env('FS_URL', 'https://firestore.googleapis.com'), proyecto: e
 const EVENTOS = ['MESSAGES_UPSERT', 'CONNECTION_UPDATE', 'QRCODE_UPDATED'];
 const atendidos = new Map();   // bid → hora del último pedido atendido
 const vinculando = new Map();  // bid → hasta cuándo se reenvían los QR nuevos al panel
-const VENCE_MIN = Math.max(5, parseInt(env('VINCULAR_MIN', '15'), 10));   // si no vincula en este tiempo, se borra la conexión vacía
+const VENCE_MIN = Math.max(2, parseInt(env('VINCULAR_MIN', '3'), 10));   // 3.27: si no vincula en 3 min, se borra la conexión vacía (el panel muestra la cuenta regresiva)
 function guardarNegocio(bid, extra) {
   let L = []; try { L = JSON.parse(fs.readFileSync(CFG.negocios, 'utf8')); } catch (e) { L = []; }
   const i = L.findIndex((x) => x.bid === bid);
@@ -631,10 +631,11 @@ async function atenderPedidoWa(bid) {
       const c = motorBid(bid) === 'waha'
         ? await (async () => { const ses = encodeURIComponent(sesionBid(bid)); const r = await waha('post', '/api/' + ses + '/auth/request-code', { phoneNumber: pedido.numero }); return { pairingCode: r.code || '', base64: await qrWaha(bid) }; })()
         : await evo('get', '/instance/connect/' + encodeURIComponent(bid) + '?number=' + encodeURIComponent(pedido.numero));
-      vinculando.set(bid, Date.now() + 5 * 60000);
-      MEM.pendientesWa = MEM.pendientesWa || {}; MEM.pendientesWa[bid] = Date.now() + VENCE_MIN * 60000;   // se recuerda aunque el VPS se reinicie
+      const vence = Date.now() + VENCE_MIN * 60000;
+      vinculando.set(bid, vence);
+      MEM.pendientesWa = MEM.pendientesWa || {}; MEM.pendientesWa[bid] = vence;   // se recuerda aunque el VPS se reinicie
       MEM.codigos = MEM.codigos || {}; MEM.codigos[bid] = { codigo: String(c.pairingCode || ''), t: Date.now() }; memGuardar();
-      await gas(neg, 'waResultado', { estado: 'codigo', codigo: String(c.pairingCode || ''), qr: String(c.base64 || '') });
+      await gas(neg, 'waResultado', { estado: 'codigo', codigo: String(c.pairingCode || ''), qr: String(c.base64 || ''), vence });
       anotar({ bid, que: 'código para vincular enviado al panel' + (c.pairingCode ? '' : ' (solo QR)') });
     } else if (pedido.accion === 'desconectar') {
       // 3.1: desvincular = cerrar la sesión y BORRAR la conexión (no queda nada abierto). La próxima vinculación crea una nueva.
@@ -642,6 +643,8 @@ async function atenderPedidoWa(bid) {
       else { await evo('delete', '/instance/logout/' + encodeURIComponent(bid)).catch(() => {}); await evo('delete', '/instance/delete/' + encodeURIComponent(bid)).catch(() => {}); }
       guardarNegocio(bid, Object.assign({ activo: false }, motorBid(bid) === 'waha' ? { sesion: bid, instancia: bid } : {}));
       if (MEM.conectados) { delete MEM.conectados[bid]; memGuardar(); }
+      if (MEM.pendientesWa) { delete MEM.pendientesWa[bid]; memGuardar(); }   // 3.27: «Cancelar» mientras vinculaba: ya no queda nada por vencer
+      vinculando.delete(bid);
       await gas(neg, 'waResultado', { estado: 'desconectado' });
       anotar({ bid, que: 'WhatsApp desconectado desde el panel' });
     }
@@ -676,7 +679,7 @@ async function renovarQr() {
     QR_T.set(bid, Date.now());
     if (await estadoInstancia(bid) === 'open') continue;
     const qr = await qrWaha(bid); if (!qr) continue;
-    await gas({ bid, instancia: bid }, 'waResultado', { estado: 'codigo', codigo: ((MEM.codigos || {})[bid] || {}).codigo || '', qr }).catch(() => {});
+    await gas({ bid, instancia: bid }, 'waResultado', { estado: 'codigo', codigo: ((MEM.codigos || {})[bid] || {}).codigo || '', qr, vence: hasta }).catch(() => {});
   }
 }
 // 3.1: negocios que ya tienen WhatsApp funcionando (p. ej. vinculados por el VPS) → el panel lo muestra «✅ Vinculado»

@@ -14,7 +14,7 @@
  * Instalación: pega este archivo, ejecuta activarMary() una vez, copia la clave que sale en el registro
  * y ponla en el mary.env del VPS (MARY_KEY). Vuelve a implementar la aplicación web (Implementar > Administrar > editar > Nueva versión).
  */
-const MARY_VERSION = 'agendador-ia-3.20';
+const MARY_VERSION = 'agendador-ia-3.27';
 
 // Se registra como acción pública del servidor (sin sesión: entra con la clave de Mary).
 // ⚠️ Este archivo debe quedar DEBAJO del archivo principal en la lista de archivos de Apps Script (los nuevos quedan al final: así está bien).
@@ -671,7 +671,7 @@ function maryWaPedido_() {
 }
 function maryWaResultado_(b) {
   const ca = CacheService.getScriptCache(), estado = String(b.estado || '');
-  const r = { estado: estado, codigo: String(b.codigo || '').slice(0, 20), qr: String(b.qr || '').slice(0, 20000), numero: String(b.numero || '').replace(/\D/g, ''), error: String(b.error || '').slice(0, 200), t: Date.now() };
+  const r = { estado: estado, codigo: String(b.codigo || '').slice(0, 20), qr: String(b.qr || '').slice(0, 20000), numero: String(b.numero || '').replace(/\D/g, ''), error: String(b.error || '').slice(0, 200), vence: Number(b.vence) || 0, t: Date.now() };
   ca.put('mwa_res_' + BID, JSON.stringify(r), 900);
   const fin = ['codigo', 'conectado', 'desconectado', 'error', 'vencido'].indexOf(estado) >= 0;
   const w = [];

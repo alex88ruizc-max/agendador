@@ -9,9 +9,9 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-11-12j";
-import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-12j";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-12j";
+} from "./common.js?v=2026-11-12k";
+import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-12k";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-12k";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -3819,7 +3819,14 @@ function renderLinkCli() {
 }
 // ---------- 💬 WHATSAPP BOT: vincular el WhatsApp del negocio (código de 8 letras o QR) y configurar el asistente ----------
 //  Un solo WhatsApp por negocio. Desvincular borra la conexión en el VPS (waha-agendador); vincular crea una nueva.
-const MW = { t: null, hasta: 0, verQR: false, res: null };
+const MW = { t: null, hasta: 0, verQR: false, res: null, vence: 0, c: null };
+// 3.27: cuenta regresiva de 3 minutos para vincular. Al llegar a 0 el VPS borra la conexión vacía de waha-agendador.
+const MW_MIN = 3;
+function mwCuenta() {
+  const el = $("mwCuenta"); if (!el) { clearInterval(MW.c); MW.c = null; return; }
+  const s = Math.max(0, Math.ceil((MW.vence - Date.now()) / 1000));
+  el.innerHTML = s > 0 ? `⏳ Te quedan <b class="font-mono text-[15px]">${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}</b> para vincular` : `⏱️ Se acabó el tiempo. Borrando la conexión…`;
+}
 function maryWaCard() {
   const w = A.settings?.maryWa || {};
   if (w.conectado) return `
@@ -3849,13 +3856,17 @@ function mwPintar(r) {
   const box = $("mwBox"); if (!box) return;
   MW.res = r || MW.res;
   box.classList.remove("hidden");
+  if (!r || r.estado !== "codigo") { clearInterval(MW.c); MW.c = null; }
   if (!r || r.estado === "pidiendo") { box.innerHTML = `<p class="flex items-center gap-2 text-sm"><span class="spin"></span> Preparando tu código… (tarda unos segundos)</p>`; return; }
   if (r.estado === "desconectando") { box.innerHTML = `<p class="flex items-center gap-2 text-sm"><span class="spin"></span> Desvinculando tu WhatsApp…</p>`; return; }
   if (r.estado === "error") { box.innerHTML = `<p class="rounded-xl bg-rose-50 p-3 text-sm text-rose-800">${esc(r.error || "No se pudo preparar la conexión.")} Intenta de nuevo.</p>`; return; }
   if (r.estado === "vencido") { box.innerHTML = `<p class="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">⏱️ El código venció porque no se vinculó a tiempo. Toca <b>«Vincular mi WhatsApp»</b> otra vez.</p>`; return; }
   if (r.estado === "codigo") {
     const c = String(r.codigo || "").replace(/-/g, "");
-    box.innerHTML = `${c ? `<p class="text-center text-xs font-bold uppercase tracking-wider text-ink/55">Tu código</p>
+    const tope = Date.now() + MW_MIN * 60000;   // la hora del celular y la del VPS pueden diferir un poco: nunca más de 3 min
+    MW.vence = Math.min(Number(r.vence) || MW.vence || tope, tope);
+    box.innerHTML = `<p id="mwCuenta" class="mb-2 rounded-xl bg-amber-50 p-2.5 text-center text-sm text-amber-900"></p>
+      ${c ? `<p class="text-center text-xs font-bold uppercase tracking-wider text-ink/55">Tu código</p>
       <p class="my-1 select-all text-center font-mono text-[34px] font-extrabold tracking-[.18em]">${esc(c.slice(0, 4))}-${esc(c.slice(4))}</p>` : ""}
       <ol class="mt-2 space-y-1.5 text-[13.5px]">
         <li>1. Abre <b>WhatsApp</b> en el celular del negocio.</li>
@@ -3863,7 +3874,9 @@ function mwPintar(r) {
         <li>3. Toca <b>«Vincular con el número de teléfono»</b> y escribe el código.</li></ol>
       ${r.qr ? `<button type="button" data-mwqr class="mt-3 w-full rounded-xl border border-line py-2.5 text-sm font-bold"><i class="fa-solid fa-qrcode"></i> ${MW.verQR ? "Ocultar el QR" : "Prefiero escanear un QR"}</button>
         ${MW.verQR ? `<img src="${esc(r.qr)}" alt="Código QR para vincular" class="mx-auto mt-2 w-60 rounded-xl border border-line"><p class="soft mt-1 text-center text-xs">Escanéalo desde <b>Dispositivos vinculados › Vincular un dispositivo</b>. Se renueva solo.</p>` : ""}` : ""}
-      <p class="soft mt-3 flex items-center gap-2 text-xs"><span class="spin"></span> Esperando que vincules tu WhatsApp…</p>`;
+      <p class="soft mt-3 flex items-center gap-2 text-xs"><span class="spin"></span> Esperando que vincules tu WhatsApp…</p>
+      <button type="button" data-mwcancel class="mt-3 w-full rounded-xl border py-2.5 text-sm font-bold" style="color:var(--sred);border-color:var(--sred)"><i class="fa-solid fa-xmark"></i> Cancelar</button>`;
+    mwCuenta(); if (!MW.c) MW.c = setInterval(mwCuenta, 1000);
     return;
   }
   if (r.estado === "conectado") { box.innerHTML = `<p class="rounded-xl bg-emerald-50 p-3 text-center text-sm font-bold text-emerald-800">🎉 ¡Listo! Tu asistente ya atiende tu WhatsApp.</p>`; }
@@ -3889,9 +3902,15 @@ document.addEventListener("click", async (e) => {
     const btn = $("mwOn"), num = ($("mwNum")?.value || "").replace(/\D/g, "");
     if (num.length < 11) { toast("Escribe el número con el indicativo del país, ej. 57 300 123 4567.", "error"); return; }
     setBusy(btn, true, "Pidiendo tu código…"); MW.verQR = false;
+    MW.vence = 0;
     try { await api("maryWa", { op: "conectar", numero: num }); mwPintar({ estado: "pidiendo" }); mwEsperar(); }
     catch (err) { toast(err.message, "error"); }
     finally { setBusy(btn, false); }
+    return;
+  }
+  if (e.target.closest("[data-mwcancel]")) {   // 3.27: cancelar mientras vincula = borrar ya la conexión (no espera los 3 min)
+    MW.vence = 0;
+    try { await api("maryWa", { op: "desconectar" }); mwPintar({ estado: "desconectando" }); mwEsperar("desconectado"); } catch (err) { toast(err.message, "error"); }
     return;
   }
   if (e.target.closest("#mwOff")) {

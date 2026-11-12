@@ -484,6 +484,36 @@ test('3.1 · Panel: DESVINCULAR cierra la sesión y la BORRA (no queda abierta);
     assert.ok(W.wahaLlamadas.includes('crear lina-spa'), 'vinculación nueva = sesión nueva');
   } finally { fs.writeFileSync(NEG_F, antes); }
 });
+test('3.27 · VINCULAR sin terminar: a los 3 minutos se BORRA la sesión del WAHA del agendador y el panel dice «venció»', async () => {
+  const antes = fs.readFileSync(NEG_F, 'utf8'), ahora = Date.now, t0 = Date.now();
+  try {
+    W.pedido = { accion: 'conectar', numero: '573005556677' };
+    await P.atenderPedidoWa('nuevo-spa');
+    const c = W.resultados.find((x) => x.estado === 'codigo');
+    assert.ok(c.vence - t0 >= 3 * 60000 - 1000 && c.vence - t0 <= 3 * 60000 + 5000, 'el panel recibe cuándo vence (3 min) para la cuenta regresiva');
+    assert.ok(W.sesiones['nuevo-spa'], 'la sesión existe mientras espera');
+    Date.now = () => t0 + 2 * 60000; await P.limpiarSinVincular();
+    assert.ok(W.sesiones['nuevo-spa'], 'a los 2 min todavía espera');
+    Date.now = () => t0 + 3 * 60000 + 5000; await P.limpiarSinVincular();
+    assert.equal(W.sesiones['nuevo-spa'], undefined, 'a los 3 min la sesión ya no existe en waha-agendador');
+    assert.ok(W.wahaLlamadas.includes('POST nuevo-spa logout') && W.wahaLlamadas.includes('DELETE nuevo-spa'));
+    assert.ok(W.resultados.some((x) => x.estado === 'vencido'), 'el panel muestra «venció»');
+    assert.equal(leerNeg().find((x) => x.bid === 'nuevo-spa').activo, false);
+    const n = W.wahaLlamadas.length; await P.limpiarSinVincular(); assert.equal(W.wahaLlamadas.length, n, 'se borra una sola vez');
+  } finally { Date.now = ahora; fs.writeFileSync(NEG_F, antes); }
+});
+test('3.27 · CANCELAR mientras vincula: se borra al instante y después no queda nada por vencer', async () => {
+  const antes = fs.readFileSync(NEG_F, 'utf8'), ahora = Date.now, t0 = Date.now();
+  try {
+    W.pedido = { accion: 'conectar', numero: '573005556677' };
+    await P.atenderPedidoWa('nuevo-spa');
+    W.pedido = { accion: 'desconectar' };
+    await P.atenderPedidoWa('nuevo-spa');
+    assert.equal(W.sesiones['nuevo-spa'], undefined, 'cancelar borra la sesión ya');
+    Date.now = () => t0 + 4 * 60000; const n = W.resultados.length; await P.limpiarSinVincular();
+    assert.equal(W.resultados.length, n, 'no llega un «venció» tardío que tape el panel');
+  } finally { Date.now = ahora; fs.writeFileSync(NEG_F, antes); }
+});
 test('3.1 · Un negocio vinculado por el VPS aparece «✅ Vinculado» en su panel (una sola vez)', async () => {
   W.sesiones.default = { status: 'WORKING', me: { id: '573187920386@c.us' } };
   await P.sincronizarConectados(); await P.sincronizarConectados();
