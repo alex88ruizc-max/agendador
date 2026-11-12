@@ -116,6 +116,7 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 - Banco nuevo `vps/banco/reglas.js`: revisa todos los scripts y falla si alguno actúa sobre un contenedor ajeno. `actualizar.sh` no instala si falla.
   (Comprobado: detecta la línea que causó el incidente.)
 - `configurar-waha.sh`: solo avisa, nunca toca contenedores ajenos.
+- `LEEME-REGLA-UNIVERSAL.txt` (raíz y `vps/`, viaja en el zip al VPS): «no se puede modificar ningún contenedor fuera del agendador, solo copiar».
 
 ### 2026-11-12 · ⚠️ Incidente con Epic (error de Claude)
 - `configurar-waha.sh` (2.6/2.7) sacó `epic-waha` de la red del agendador «para deshacer» lo de la 2.2. Eso **tocó un contenedor de Epic**

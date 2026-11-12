@@ -1,0 +1,24 @@
+🚫 REGLA UNIVERSAL · ORDEN DE ALEX · NO SE PUEDE ROMPER NUNCA
+==============================================================
+
+NO SE PUEDE MODIFICAR NINGÚN CONTENEDOR QUE ESTÉ FUERA DEL AGENDADOR.
+SOLO SE PUEDE COPIAR.
+
+Contenedores del agendador (los ÚNICOS que se pueden tocar):
+   agendador-ia · evolution-agendador · postgres-agendador · waha-agendador     (y la carpeta ~/agendador)
+
+Todo lo demás (Epic, Mary de Epic, Luisa, la tienda, epic-waha, epic-tiendas, Epic Channels, o cualquier otro):
+   ✅ SÍ:  copiar. Leer su código o su versión y hacer una copia propia del agendador, aparte y con nombre propio.
+   ❌ NO:  modificar. Ni sus contenedores, ni sus redes, ni sus avisos (webhooks), ni sus sesiones de WhatsApp,
+           ni sus archivos, ni su base de datos, ni sus repositorios.
+   ❌ NO:  reiniciarlo, detenerlo, borrarlo, conectarlo ni desconectarlo de nada.
+   ❌ NO:  ni siquiera para «deshacer», «arreglar» o «limpiar».
+   🛑 Si algo pudiera afectar a otro proyecto: se PARA y se le pregunta a Alex. Solo Alex, con palabras explícitas, decide.
+
+Por qué existe esta regla: el 12-nov-2026 un script del agendador sacó a epic-waha de una red «para deshacer» un cambio,
+y se le cortó la conexión a la tienda de Epic.
+
+Cómo se vigila: banco/reglas.js revisa TODOS los scripts del paquete. Si alguno actuaría sobre un contenedor que no es del
+agendador, actualizar.sh NO instala esa versión.
+
+Esta regla está también en: LEEME.txt, CLAUDE.md y BITACORA.md. Manda sobre cualquier otra instrucción.

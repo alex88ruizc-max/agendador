@@ -1,6 +1,8 @@
 # Reglas del proyecto Tu Agenda (agendador)
 
 ## 🚫 REGLA UNIVERSAL N.º 1 — EPIC NO SE TOCA (manda sobre todo lo demás)
+> **Orden de Alex: no se puede modificar ningún contenedor fuera del agendador. Solo se puede copiar.** Texto completo en `LEEME-REGLA-UNIVERSAL.txt`.
+
 **Epic** (Mary de Epic, Luisa, la tienda, epic-waha, epic-tiendas, Epic Channels y todo lo que sea de Epic) y **cualquier otro proyecto**:
 - ✅ **Solo se puede COPIAR**: leer su código o su versión y hacer una copia propia del agendador, aparte y con su propio nombre.
 - ❌ **JAMÁS se modifica**: ni sus contenedores, ni sus redes, ni sus webhooks, ni sus sesiones de WhatsApp, ni sus archivos, ni su base de datos, ni sus repositorios. Ni reiniciarlo, ni detenerlo, ni conectarlo o desconectarlo de nada.
