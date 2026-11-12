@@ -1,20 +1,20 @@
 {
   "admin.js": {
-    "mtime": 1794511723.9520397,
-    "seen": 1794511728.8773007,
-    "ast_hash": "5cd9a6a37fe603ec39458f2857f48aeb",
+    "mtime": 1794512793.9236355,
+    "seen": 1794512799.078133,
+    "ast_hash": "3ef6aa8c6284434f3ec9fd653009d0af",
     "semantic_hash": ""
   },
   "app.js": {
-    "mtime": 1794511723.950288,
-    "seen": 1794511728.8773093,
-    "ast_hash": "7cc76f7282051b2cbc74375cd6b4e5c8",
+    "mtime": 1794512793.9220266,
+    "seen": 1794512799.0781412,
+    "ast_hash": "52fbae512e511a835b7c34d4e499dd96",
     "semantic_hash": ""
   },
   "common.js": {
-    "mtime": 1794511723.9516795,
-    "seen": 1794511728.877316,
-    "ast_hash": "6dd4b7983f2de4f3cabd755b03befb24",
+    "mtime": 1794512793.9233413,
+    "seen": 1794512799.078148,
+    "ast_hash": "fb83275aaecd363f16d8299d952057b2",
     "semantic_hash": ""
   },
   "config.js": {
@@ -24,9 +24,9 @@
     "semantic_hash": "de5f72de928795211bae338f5997befb"
   },
   "super.js": {
-    "mtime": 1794511723.9509172,
-    "seen": 1794511728.8773282,
-    "ast_hash": "5c617d95d671bd2453c6ed0d83e4d125",
+    "mtime": 1794512793.9226186,
+    "seen": 1794512799.078159,
+    "ast_hash": "46fb018bd416fd89259d1e94cea82683",
     "semantic_hash": ""
   },
   "sw.js": {
@@ -60,9 +60,9 @@
     "semantic_hash": ""
   },
   "vps/banco/pruebas.js": {
-    "mtime": 1794511659.371222,
-    "seen": 1794511728.8773696,
-    "ast_hash": "ff2ae68a3379a4ea22621292e5d170cf",
+    "mtime": 1794512743.5444708,
+    "seen": 1794512799.0782,
+    "ast_hash": "dd94afb7eaa9f74c7f072dc6504d10d7",
     "semantic_hash": ""
   },
   "vps/banco/web.js": {
@@ -115,9 +115,9 @@
     "language": "language=.js"
   },
   "vps/gs/mary.gs": {
-    "mtime": 1794511610.6078866,
-    "seen": 1794511728.877429,
-    "ast_hash": "d4e889fe6633a9ed91483ac32d12708b",
+    "mtime": 1794512724.5434446,
+    "seen": 1794512799.0782704,
+    "ast_hash": "58bd13117513d549d95cba28ff9380f5",
     "semantic_hash": "",
     "language": "language=.js"
   },
@@ -152,9 +152,9 @@
     "semantic_hash": "5009abfe30c8d8ffe5acf888999b674b"
   },
   "vps/principal.js": {
-    "mtime": 1794512634.3480859,
-    "seen": 1794512650.719608,
-    "ast_hash": "6b98647a2e6dfde16bd05737eb2f6729",
+    "mtime": 1794512794.185952,
+    "seen": 1794512799.078309,
+    "ast_hash": "f89326400a1f13b714f75e2ddb673238",
     "semantic_hash": ""
   },
   "vps/textos.js": {
@@ -182,9 +182,9 @@
     "semantic_hash": ""
   },
   "BITACORA.md": {
-    "mtime": 1794512648.4630988,
-    "seen": 1794512650.7196293,
-    "ast_hash": "1c5ac7a4884da1aef07568fed2c9f80e",
+    "mtime": 1794512794.201318,
+    "seen": 1794512799.0783303,
+    "ast_hash": "c7ab36f3d9f4b011709bdfeb63d026e8",
     "semantic_hash": ""
   },
   "CLAUDE.md": {
@@ -194,15 +194,15 @@
     "semantic_hash": ""
   },
   "admin.html": {
-    "mtime": 1794511723.9500346,
-    "seen": 1794511728.8774986,
-    "ast_hash": "332404b10416990f8536fba033efe88d",
+    "mtime": 1794512793.9217212,
+    "seen": 1794512799.0783458,
+    "ast_hash": "c9a942f0b68775197eff06dff2e74381",
     "semantic_hash": ""
   },
   "index.html": {
-    "mtime": 1794511723.9513526,
-    "seen": 1794511728.8775034,
-    "ast_hash": "bcbe8502a3fac928c4ad4f653de0b453",
+    "mtime": 1794512793.9230497,
+    "seen": 1794512799.0783505,
+    "ast_hash": "b9ce8d8c68db76587252e3695edb1292",
     "semantic_hash": ""
   },
   "privacidad.html": {
@@ -212,15 +212,15 @@
     "semantic_hash": ""
   },
   "super.html": {
-    "mtime": 1794511723.9496145,
-    "seen": 1794511728.8775136,
-    "ast_hash": "b38f98b12d0abcb116550da4255e5d5b",
+    "mtime": 1794512793.92104,
+    "seen": 1794512799.07836,
+    "ast_hash": "5d6329e579255429eb957979558148bb",
     "semantic_hash": ""
   },
   "vps/LEEME.txt": {
-    "mtime": 1794512648.4621954,
-    "seen": 1794512650.7196717,
-    "ast_hash": "b8ad912264886246271226013c3470a4",
+    "mtime": 1794512794.200742,
+    "seen": 1794512799.0783694,
+    "ast_hash": "b2d5b28d262aa81cae5cb96b2799b796",
     "semantic_hash": ""
   },
   "vps/banco/reglas.js": {

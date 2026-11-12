@@ -599,3 +599,13 @@ test('3.6 · Tocar una opción de la lista NO espera (responde al instante)', as
     assert.ok(Date.now() - t0 < 2000, 'no esperó los 5 s');
   } finally { P.CFG.agruparMs = 0; }
 });
+
+test('3.8 · El dueño toca «Ver cupos» desde el celular del NEGOCIO → al cliente le llegan los cupos (y no se pausa)', async () => {
+  await llega(wahaMsg(CLIENTE, 'hola'));   // el cliente recibe el menú
+  await llega(wahaMsg('x', '🕐 Ver cupos\nDías y horas disponibles', { id: 'true_' + CLIENTE + '@c.us_TAP', from: '573110000000@c.us', to: CLIENTE + '@c.us', fromMe: true,
+    _data: { Message: { listResponseMessage: { singleSelectReply: { selectedRowID: 'menu:cupos' } } } } }));
+  assert.equal(ultimo().a, CLIENTE); assert.match(ultimo().texto, /hay cupo a las/); assert.match(ultimoRegistro(), /el negocio tocó|le mostré los cupos/);
+  assert.ok(!B.memHumano()['lina-spa:' + CLIENTE], 'no cuenta como «el dueño escribió»');
+  await llega(wahaMsg(CLIENTE, 'quiero agendar'));
+  assert.ok(ultimo().lista, 'el asistente sigue atendiendo al cliente');
+});

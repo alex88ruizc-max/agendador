@@ -6,7 +6,7 @@
 const http = require('http'), fs = require('fs'), path = require('path');
 const T = require('./textos'), C = require('./correo'), E = require('./estado'), A = require('./asistente');
 
-const VERSION = 'agendador-ia-3.7';
+const VERSION = 'agendador-ia-3.8';
 const env = (k, d) => (process.env[k] === undefined || process.env[k] === '' ? d : process.env[k]);
 const CFG = {
   puerto: parseInt(env('PUERTO', '3060'), 10),
@@ -277,6 +277,16 @@ function alMensaje(b) {
 }
 async function atenderMensaje(c, neg) {
   const k = neg.bid + ':' + (c.tel || c.jid);
+  // 👆 3.8: el dueño tocó una opción de la lista DESDE el celular del negocio → el asistente la hace para ese cliente
+  //        (p. ej. «Ver cupos» en el chat de Marianna → a Marianna le llegan los cupos). No cuenta como «el dueño escribió».
+  if (c.deMi && c.rowId) {
+    if (!botDe(neg).activo || !c.tel) return;
+    if (MEM.humano) delete MEM.humano[k];
+    anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: '👆 el negocio tocó «' + (c.texto || c.rowId).split('\n')[0] + '»: lo hago para el cliente' });
+    try { await ASIS.manejar(neg, { k, tel: c.tel, texto: '', rowId: c.rowId, nombre: '' }); }
+    catch (e) { est.errores++; log('❌ asistente (opción del negocio)', e.message); }
+    return;
+  }
   if (c.deMi) {   // 🙋 el dueño escribió a mano en este chat (no fue Mary): Mary se hace a un lado
     // 1.1: ¿es el eco de lo que Mary acaba de mandar? Si Mary escribió hace poco, se espera 3 s a que Evolution le confirme el id del envío
     if (c.id && MEM.enviados.indexOf(c.id) === -1 && Date.now() - (ULT_ENVIO.get(k) || 0) < 20000) await new Promise((ok) => setTimeout(ok, 3000));

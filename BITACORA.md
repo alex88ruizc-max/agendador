@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-3.7** · Página **2026-11-12d** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-12** · Mary **agendador-ia-3.8** · Página **2026-11-12d** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -113,6 +113,11 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-12 · agendador-ia-3.8 · opción tocada desde el celular del negocio
+- Prueba real: Alex (modo todos) tocó «Ver cupos» en la lista DESDE el 318 (negocio) → llegaba como mensaje del negocio (fromMe)
+  → «el dueño escribió» → no pasaba nada; y luego el mensaje de Marianna recibía el menú otra vez (lo que se veía como «el mismo menú»).
+- `atenderMensaje`: `deMi && rowId` → el asistente ejecuta esa opción para el cliente del chat, sin pausar. Banco: 83 pruebas.
 
 ### 2026-11-12 · agendador-ia-3.7 · cita rápida sin WhatsApp
 - `mary.gs`: envuelve `ACTIONS.createManualAppointment`: con WhatsApp (≥10 dígitos) usa la ORIGINAL; sin WhatsApp usa
