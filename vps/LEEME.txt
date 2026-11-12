@@ -1,4 +1,4 @@
-🗓️ AGENDADOR IA · agendador-ia-3.15   (por dentro atiende «Mary», la recepcionista)
+🗓️ AGENDADOR IA · agendador-ia-3.16   (por dentro atiende «Mary», la recepcionista)
 =====================================================================================================
 🚫 REGLA UNIVERSAL N.º 1 — EPIC NO SE TOCA (manda sobre todo lo demás, para Alex, para Claude y para cada script de este paquete)
    Epic (Mary de Epic, Luisa, la tienda, epic-waha, epic-tiendas, Epic Channels…) y CUALQUIER otro proyecto:
@@ -62,6 +62,10 @@ PROBAR EN EL VPS
 AJUSTES POR NEGOCIO (negocios.json)
   "recordatorioMin": 120     ·   "estados": { "activo": true, "hoy": "07:30", "semana": "07:00", "semanaDia": 1 }
   En Firestore (settings/general del negocio) maryAutoCaptura: true → la captura confirma al instante y el dueño revisa después.
+
+NOVEDADES 3.16
+  · «📌 Ya tienes una cita activa: … ¿Quieres sacar otra (por ejemplo, para otra persona), o prefieres cambiar o cancelar la que
+    tienes?» → ➕ Sí, sacar otra · ✏️ Cambiar la que tengo · 🚫 Cancelar la que tengo · ↩️ Dejarla así.
 
 NOVEDADES 3.15 · OTRA CITA TENIENDO UNA ABIERTA
   · Si el cliente ya tiene una cita y quiere sacar otra: «📌 Ya tienes una cita: hoy · 6:30 p. m.… ¿Seguro que quieres sacar otra?

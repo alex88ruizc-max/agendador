@@ -49,7 +49,7 @@ const recordatorio = (c, info, bot) => { bot = bot || {};
   return `⏰ Hola${nombre1(c.nombre) ? ' ' + nombre1(c.nombre) : ''} 👋 Recuerda que tu cita en *${info.negocio}* es en *${enTiempo(info.recordatorioMin || 120)}*.\n📅 ${c.dia} · ${c.hora}\n${c.servicio}${c.con ? ' · con ' + c.con : ''}` +
     (info.direccion ? `\n📍 ${info.direccion}` : '') + (c.saldo > 0 ? `\n💵 Saldo en el local: ${cop(c.saldo)}` : '') + pie; };
 const asistio = (c, nombre) => `🙌 ¡Gracias${nombre1(nombre) ? ', ' + nombre1(nombre) : ''}! Tu cita quedó confirmada. Te esperamos ✨\n📅 ${c.dia} · ${c.hora}`;
-const cancelada = (r) => `🚫 Listo, cancelé tu cita${r.cita ? ' del ' + r.cita.dia.toLowerCase() + ' a las ' + r.cita.hora : ''}. El cupo quedó libre.\n\nSi quieres agendar otra: ${r.link || ''}`.trim();
+const cancelada = (r) => `🚫 Listo, cancelé tu cita${r.cita && r.cita.dia ? ' del ' + String(r.cita.dia).toLowerCase() + ' a las ' + r.cita.hora : ''}. El cupo quedó libre.\n\nSi quieres agendar otra: ${r.link || ''}`.trim();
 const reagendada = (c) => `🔄 *¡Listo! Tu cita quedó para ${c.dia.toLowerCase()} a las ${c.hora}.*\n✂️ ${c.servicio}${c.con ? ' · con ' + c.con : ''}\n\nPara verla: ${c.link}`;
 const parafrasisCambio = (x) => `📝 *Entendí esto:* cambio tu cita de *${x.antes}* para *${x.dia} a las ${x.hora}*${x.con ? ' con ' + x.con : ''}.\n\n¿Lo confirmo?`;
 const preguntaCancelar = (c) => `¿Seguro que cancelo tu cita del *${c.dia.toLowerCase()} a las ${c.hora}* (${c.servicio})?`;

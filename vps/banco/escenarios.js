@@ -794,8 +794,8 @@ test('3.15 · Con una cita abierta, «quiero agendar» → «Ya tienes una cita�
   const cl = B.ASIS.cliente('lina-spa:' + CLIENTE); cl.nombre = 'Nicolas'; cl.correo = 'nico@x.com';
   W.citas[CLIENTE] = YA;
   await llega(wahaMsg(CLIENTE, 'quiero agendar una cita'));
-  assert.match(ultimo().texto, /Ya tienes una cita: \*?Hoy · 6:30 p\. m\.\*? · Corte clásico con Yeferson/); assert.match(ultimo().texto, /¿Seguro que quieres sacar otra\?/);
-  assert.deepEqual(ids(ultimo()), ['otra:si', 'otra:cambiar', 'otra:no']);
+  assert.match(ultimo().texto, /Ya tienes una cita activa: \*?Hoy · 6:30 p\. m\.\*? · Corte clásico con Yeferson/); assert.match(ultimo().texto, /¿Quieres sacar otra .*cambiar o cancelar la que tienes\?/);
+  assert.deepEqual(ids(ultimo()), ['otra:si', 'otra:cambiar', 'otra:cancelar', 'otra:no']);
   await llega(toca('otra:si', '✅ Sí, otra cita'));
   assert.deepEqual(ids(ultimo()), ['cat:0', 'cat:1', 'cat:2'], 'sigue el agendamiento');
   await llega(toca('cat:2')); await llega(toca('svc:e1')); await llega(toca('mas:no')); await llega(toca('dia:' + masDias(1))); await llega(toca('hora:09:00'));
@@ -821,7 +821,13 @@ test('3.15 · Por la conversación natural también: «¿tienes cupo mañana a l
   W.citas[CLIENTE] = YA;
   await llega(wahaMsg(CLIENTE, 'tienes cupo mañana a las 9?'));
   await llega(toca('ap:si'));
-  assert.match(ultimo().texto, /¿Seguro que quieres sacar otra\?/);
+  assert.match(ultimo().texto, /¿Quieres sacar otra/);
+});
+test('3.16 · «Ya tienes una cita activa» → «🚫 Cancelar la que tengo» la cancela', async () => {
+  W.citas[CLIENTE] = YA;
+  await llega(wahaMsg(CLIENTE, 'quiero agendar'));
+  await llega(toca('otra:cancelar', '🚫 Cancelar la que tengo'));
+  assert.equal(W.llamadas.find((x) => x.op === 'cancelar').code, 'R-YATENG'); assert.match(ultimo().texto, /cancelé tu cita/);
 });
 test('3.15 · Sin citas abiertas NO pregunta nada (va directo)', async () => {
   await llega(wahaMsg(CLIENTE, 'quiero agendar'));

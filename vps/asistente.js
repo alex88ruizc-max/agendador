@@ -350,11 +350,12 @@ function crear(dep) {
     if (!L.length) return null;
     const x = L[0], cat = await catalogo(neg);
     conv.paso = 'otraCita'; conv.reanudar = reanudar; conv.citaYa = x;
-    await lista(neg, c, conv, { texto: (pre || '') + '📌 Ya tienes ' + (L.length === 1 ? 'una cita' : L.length + ' citas, la próxima') + ': *' + x.dia + ' · ' + x.hora + '* · ' + x.servicio + (x.con ? ' con ' + x.con : '') + '.\n¿Seguro que quieres sacar otra? (por ejemplo, para otra persona)',
+    await lista(neg, c, conv, { texto: (pre || '') + '📌 Ya tienes ' + (L.length === 1 ? 'una cita activa' : L.length + ' citas activas, la próxima') + ': *' + x.dia + ' · ' + x.hora + '* · ' + x.servicio + (x.con ? ' con ' + x.con : '') + '.\n¿Quieres sacar otra (por ejemplo, para otra persona), o prefieres cambiar o cancelar la que tienes?',
       boton: 'Ver opciones', pie: pie(cat), secciones: [{ titulo: '¿Otra cita?', filas: [
-        { id: 'otra:si', titulo: '✅ Sí, otra cita', desc: 'Para mí o para otra persona' },
-        { id: 'otra:cambiar', titulo: '🔄 Cambiar la que tengo', desc: 'Mover mi cita a otra hora' },
-        { id: 'otra:no', titulo: '↩️ No, solo la que tengo', desc: '' }] }] });
+        { id: 'otra:si', titulo: '➕ Sí, sacar otra', desc: 'Para mí o para otra persona' },
+        { id: 'otra:cambiar', titulo: '✏️ Cambiar la que tengo', desc: 'Moverla a otro día u hora' },
+        { id: 'otra:cancelar', titulo: '🚫 Cancelar la que tengo', desc: corto(x.dia + ' ' + x.hora, 60) },
+        { id: 'otra:no', titulo: '↩️ Dejarla así', desc: 'No saco otra' }] }] });
     return 'preguntado';
   }
 
@@ -397,6 +398,7 @@ function crear(dep) {
     if (conv.paso === 'otraCita') {
       const ya = conv.citaYa || {};
       if (c.rowId === 'otra:cambiar' || (!c.rowId && QUIERE_MODIFICAR.test(t))) return modificarCita(neg, c, ya);
+      if (c.rowId === 'otra:cancelar' || (!c.rowId && QUIERE_CANCELAR.test(t))) return cancelarCita(neg, c, ya);
       if (c.rowId === 'otra:no' || (!c.rowId && NO.test(t))) { fin(c.k); return dep.texto(neg, c.tel, '👌 Listo, sigues con tu cita de *' + (ya.dia || '').toLowerCase() + ' a las ' + ya.hora + '*. ¡Te esperamos!'); }
       if (c.rowId === 'otra:si' || (!c.rowId && (SI.test(t) || /otra (persona|cita)|para (mi )?(hijo|hija|esposa|esposo|novia|novio|mama|papa|amig|herman|sobrin)/.test(t)))) {
         conv.otraPersona = true; delete conv.paso;
@@ -563,7 +565,7 @@ function crear(dep) {
     fin(c.k);
     const r = await dep.gas(neg, 'cancelar', { code: cita.code, phone: c.tel });
     dep.anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: r.ok ? 'canceló por WhatsApp ' + cita.code : 'cancelar: ' + r.motivo });
-    return dep.texto(neg, c.tel, r.ok ? T.cancelada(Object.assign({}, r, { cita: r.cita || cita })) : '😕 ' + r.motivo + (cita.link ? '\n' + cita.link : ''));
+    return dep.texto(neg, c.tel, r.ok ? T.cancelada(Object.assign({}, r, { cita: r.cita && r.cita.dia ? r.cita : cita })) : '😕 ' + r.motivo + (cita.link ? '\n' + cita.link : ''));
   }
   async function modificarCita(neg, c, cita) {
     const conv = { modo: 'reagendar', code: cita.code, ids: (cita.ids || []).slice(), staffId: cita.staffId || '', antes: (cita.dia || '').toLowerCase() + ' a las ' + cita.hora };
