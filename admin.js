@@ -9,9 +9,9 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-11-12e";
-import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-12e";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-12e";
+} from "./common.js?v=2026-11-12f";
+import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-12f";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-12f";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -325,13 +325,16 @@ function aptCard(a) {
     acts.push(`<a class="btn-sm" target="_blank" rel="noopener" href="${waLink(a.customer.whatsapp, fillTemplate(A.settings.waConfirmTemplate || DEFAULT_WA_CONFIRM, a, A.settings))}">WhatsApp: confirmar</a>`);
     if (ACTIVE.includes(a.status)) acts.push(`<a class="btn-sm" target="_blank" rel="noopener" href="${waLink(a.customer.whatsapp, fillTemplate(A.settings.waRescheduleTemplate || DEFAULT_WA_RESCHEDULE, a, A.settings))}">WhatsApp: reagendar</a>`);
   }
+  // 3.14: la fecha SIEMPRE visible (antes solo salía si no era el día que estabas mirando)
+  const hoyB = bogNow().date, cuando = a.date === hoyB ? "Hoy · " : a.date === addDays(hoyB, 1) ? "Mañana · " : a.date === addDays(hoyB, -1) ? "Ayer · " : "";
   return `<article class="rounded-xl border border-line bg-white p-4">
+    <p class="mb-1 text-xs font-bold uppercase tracking-wide" style="color:var(--mint)">📅 ${cuando}<span class="capitalize">${fechaLarga(a.date)}</span></p>
     <div class="flex flex-wrap items-center justify-between gap-2">
       <p class="font-narrow text-2xl font-bold">${hora12(a.startTime)}<span class="ml-2 text-sm font-normal text-ink/60">a ${hora12(a.endTime)}</span></p>
       ${statusBadge(a.status)}
     </div>
     <p class="font-semibold">${esc(custName(a))} <span class="font-normal text-ink/60">${esc(a.code)}</span></p>
-    <p class="text-sm">${(a.items || []).map((i) => esc(i.name)).join(" + ")}, con ${esc(a.staffName)}${a.date !== A.date ? `, <span class="capitalize">${fechaCorta(a.date)}</span>` : ""}</p>
+    <p class="text-sm">${(a.items || []).map((i) => esc(i.name)).join(" + ")}, con ${esc(a.staffName)}</p>
     <p class="text-sm text-ink/70">Total ${cop(a.totalCOP)}, abono ${cop(a.depositCOP)}, saldo ${cop(a.balanceDueCOP)}</p>
     <p class="text-sm text-ink/70">${payLine(a)}${a.source === "manual" ? ". Agendada desde el panel" : ""}${a.rescheduleCount ? `. Reagendada ${a.rescheduleCount} vez/veces` : ""}</p>
     ${a.customer?.whatsapp ? `<p class="text-sm text-ink/70">WhatsApp ${esc(a.customer.whatsapp)}</p>` : ""}
