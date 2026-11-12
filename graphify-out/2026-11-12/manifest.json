@@ -1,20 +1,20 @@
 {
   "admin.js": {
-    "mtime": 1794516033.5034044,
-    "seen": 1794516038.862437,
-    "ast_hash": "c2a5b65c7841da54fcf7d35514b7da88",
+    "mtime": 1794517155.9420557,
+    "seen": 1794517241.1666784,
+    "ast_hash": "ec642b77cd63250e24d5e562b2ad3baa",
     "semantic_hash": ""
   },
   "app.js": {
-    "mtime": 1794516033.5013123,
-    "seen": 1794516038.8624463,
-    "ast_hash": "280b959e63cb3bc1b084878cd25f6f79",
+    "mtime": 1794517155.9401286,
+    "seen": 1794517241.166689,
+    "ast_hash": "e93e92d570828f1fb6d779d8ee7d5282",
     "semantic_hash": ""
   },
   "common.js": {
-    "mtime": 1794516033.5030355,
-    "seen": 1794516038.8624532,
-    "ast_hash": "33f2f91a07f4b646dad990451f813d16",
+    "mtime": 1794517155.941697,
+    "seen": 1794517241.1666968,
+    "ast_hash": "607567bd11c87acc3bc17a62449fed74",
     "semantic_hash": ""
   },
   "config.js": {
@@ -24,9 +24,9 @@
     "semantic_hash": "de5f72de928795211bae338f5997befb"
   },
   "super.js": {
-    "mtime": 1794516033.5020971,
-    "seen": 1794516038.8624666,
-    "ast_hash": "bc736460bd50b0ebe630b5daf57ecda1",
+    "mtime": 1794517155.940785,
+    "seen": 1794517241.1667116,
+    "ast_hash": "a5daa449899558a083ebb92d06cf411e",
     "semantic_hash": ""
   },
   "sw.js": {
@@ -60,9 +60,9 @@
     "semantic_hash": ""
   },
   "vps/banco/pruebas.js": {
-    "mtime": 1794512743.5444708,
-    "seen": 1794512799.0782,
-    "ast_hash": "dd94afb7eaa9f74c7f072dc6504d10d7",
+    "mtime": 1794517173.27791,
+    "seen": 1794517241.1667712,
+    "ast_hash": "dc55f3f5931b477b4bed3e820101a1f0",
     "semantic_hash": ""
   },
   "vps/banco/web.js": {
@@ -115,9 +115,9 @@
     "language": "language=.js"
   },
   "vps/gs/mary.gs": {
-    "mtime": 1794516033.7418516,
-    "seen": 1794516038.862578,
-    "ast_hash": "005c257d8b3de7b3b9dc1cd7a7ca2d8a",
+    "mtime": 1794517125.8815744,
+    "seen": 1794517241.1668477,
+    "ast_hash": "f2a3171619b4c6eb3aabe76932192ef2",
     "semantic_hash": "",
     "language": "language=.js"
   },
@@ -152,9 +152,9 @@
     "semantic_hash": "5009abfe30c8d8ffe5acf888999b674b"
   },
   "vps/principal.js": {
-    "mtime": 1794516976.518581,
-    "seen": 1794517042.4101942,
-    "ast_hash": "e03419e156ec1426282ac77d23b42d96",
+    "mtime": 1794517173.2826862,
+    "seen": 1794517241.1668992,
+    "ast_hash": "6f95d57aa056c5c1e6536f557472f25f",
     "semantic_hash": ""
   },
   "vps/textos.js": {
@@ -182,9 +182,9 @@
     "semantic_hash": ""
   },
   "BITACORA.md": {
-    "mtime": 1794517039.7422135,
-    "seen": 1794517042.410223,
-    "ast_hash": "555e7b9cc3cd0b277cbb9c79f398bcd7",
+    "mtime": 1794517236.5684032,
+    "seen": 1794517241.16693,
+    "ast_hash": "2b72e17d1e9a7b4089e979feee273947",
     "semantic_hash": ""
   },
   "CLAUDE.md": {
@@ -194,15 +194,15 @@
     "semantic_hash": ""
   },
   "admin.html": {
-    "mtime": 1794516033.5008652,
-    "seen": 1794516038.8626626,
-    "ast_hash": "52a7b2e7a0e16e89dc3b15fd5daab683",
+    "mtime": 1794517155.93981,
+    "seen": 1794517241.1669521,
+    "ast_hash": "cbe9ed42bd77723bd3201af336d5637b",
     "semantic_hash": ""
   },
   "index.html": {
-    "mtime": 1794516033.5026884,
-    "seen": 1794516038.8626683,
-    "ast_hash": "81a7e27015703f2a545fbdc140e9d523",
+    "mtime": 1794517155.9413087,
+    "seen": 1794517241.1669586,
+    "ast_hash": "31e9086f4405ceb403d5b0853bb2b57b",
     "semantic_hash": ""
   },
   "privacidad.html": {
@@ -212,15 +212,15 @@
     "semantic_hash": ""
   },
   "super.html": {
-    "mtime": 1794516033.5002863,
-    "seen": 1794516038.8626797,
-    "ast_hash": "e5d50df76afb75abe5f8c6d4b144dc94",
+    "mtime": 1794517155.9393296,
+    "seen": 1794517241.1669722,
+    "ast_hash": "a800ad30d832c15affc07656d262bceb",
     "semantic_hash": ""
   },
   "vps/LEEME.txt": {
-    "mtime": 1794517039.7412095,
-    "seen": 1794517042.4102917,
-    "ast_hash": "42a5e01a972394c625c7d2e82b485957",
+    "mtime": 1794517236.567738,
+    "seen": 1794517241.1669862,
+    "ast_hash": "8ef30f7849053ed50d268637c8be45b2",
     "semantic_hash": ""
   },
   "vps/banco/reglas.js": {

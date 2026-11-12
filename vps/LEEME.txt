@@ -63,6 +63,11 @@ AJUSTES POR NEGOCIO (negocios.json)
   "recordatorioMin": 120     ·   "estados": { "activo": true, "hoy": "07:30", "semana": "07:00", "semanaDia": 1 }
   En Firestore (settings/general del negocio) maryAutoCaptura: true → la captura confirma al instante y el dueño revisa después.
 
+NOVEDADES 3.21 (solo la página: agendador-web-2026-11-12h.zip) · 🗓️ SECCIÓN «CUPOS»
+  · Pestaña nueva «Cupos» en el panel: el tablero del día con TODAS las horas: 🟢 libre (y cuántos profesionales libres), 🔴 ocupado
+    (con quién viene), 🔒 bloqueado, ☕ descanso. Toca una libre → la bloqueas; toca una 🔒 → la liberas; toca una ocupada → ves la cita.
+    Días de la semana + «Otra fecha», «Bloquear todo el día» y «Liberar todo el día». Se actualiza solo (en vivo).
+
 NOVEDADES 3.20 · 🔒 BLOQUEAR CUPOS
   · Panel › Agenda › «Cupos libres» › «🔒 Bloquear»: toca una hora y queda bloqueada para TODOS los clientes (página, asistente de
     WhatsApp y estados). Toca una 🔒 para liberarla. «Bloquear todo el día» bloquea todos los libres de ese día.

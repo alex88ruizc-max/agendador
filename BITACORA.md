@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-3.20** · Página **2026-11-12g** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-12** · Mary **agendador-ia-3.20** · Página **2026-11-12h** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -113,6 +113,11 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-12 · página 2026-11-12h · 🗓️ sección «Cupos»
+- `admin.js`: pestaña `cupos` («Cupos», `fa-table-cells`): `abrirCupos()` escucha en vivo `slotLocks` y `appointments` del día;
+  `estadoCupos()` arma cada hora del horario (paso = `slotDurationMinutes`) como libre / ocupado / bloqueado / descanso / ya pasó;
+  toques → `bloqueo()` (servidor 3.20). Vista previa hecha con las funciones reales del panel (`/home/user/cupos-vista.png`).
 
 ### 2026-11-12 · agendador-ia-3.20 · 🔒 bloquear cupos
 - `mary.gs` `ACTIONS.bloquearCupo` {date, times[], accion}: crea `slotLocks` state `block` (+ `bloqueo` = hora del cupo) para cada
