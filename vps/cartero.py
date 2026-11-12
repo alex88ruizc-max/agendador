@@ -227,9 +227,10 @@ def atender(m):
     elif texto.startswith('/estado'): decir(curl('/salud'))
     elif texto.startswith('/registro'): decir(curl('/registro?n=12'))
     elif texto.startswith('/auditoria') or texto.startswith('/auditoría'): decir(auditoria())
+    elif texto.startswith('/limpiar'): decir(limpiar())
     elif texto.startswith('/modo'): decir(cmd_modo(texto))
     elif texto.startswith('/prueba'): decir(cmd_prueba(texto))
-    elif texto: decir('Hola 👋 Soy el cartero del Agendador IA.\nMándame:\n• agendador-ia-….zip → actualizo el VPS (Mary) y el Apps Script de Google\n• agendador-web-….zip → subo la página tuagenda.vip\n/apk → genero la app de Android\n/estado · /registro\n/auditoria → reviso que el agendador no toque a Epic ni a nadie (solo lee)\n/modo → ver o cambiar el modo (prueba, todos, apagado)\n/prueba <números> → tus números de prueba')
+    elif texto: decir('Hola 👋 Soy el cartero del Agendador IA.\nMándame:\n• agendador-ia-….zip → actualizo el VPS (Mary) y el Apps Script de Google\n• agendador-web-….zip → subo la página tuagenda.vip\n/apk → genero la app de Android\n/estado · /registro\n/auditoria → reviso que el agendador no toque a Epic ni a nadie (solo lee)\n/limpiar → quito contenedores sueltos del agendador (solo los nuestros)\n/modo → ver o cambiar el modo (prueba, todos, apagado)\n/prueba <números> → tus números de prueba')
 
 # ---------- 🧪 3.1 · modo del asistente por Telegram: /modo · /modo prueba|todos|apagado · /prueba <números> ----------
 ENV_IA = os.path.join(AQUI, 'agendador-ia.env')
@@ -282,6 +283,31 @@ def dk(*a):
         return (r.stdout or '').strip()
     except Exception as e:
         return ''
+# 🧹 3.33 · contenedores SUELTOS del agendador (p. ej. «vigorous_burnell»: un banco o un clasp que quedó colgado).
+#    Solo cuenta como nuestro lo que se PRUEBA: imagen del agendador, o una carpeta montada dentro de ~/agendador.
+#    Nunca: los fijos del agendador (NUESTROS), nada con «epic» en el nombre, ni contenedores de un docker compose (de nadie).
+IMAGENES_NUESTRAS = ('agendador-ia-agendador-ia', 'agendador-ia', 'agendador-ia-agendador-ia:latest', 'agendador-ia-agendador-ia:buena')
+def sueltos():
+    out = []
+    for cid in [x for x in dk('ps', '-aq').split('\n') if x]:
+        try: d = json.loads(dk('inspect', cid))[0]
+        except Exception: continue
+        nombre = str(d.get('Name', '')).lstrip('/')
+        if nombre in NUESTROS or 'epic' in nombre.lower(): continue
+        if ((d.get('Config') or {}).get('Labels') or {}).get('com.docker.compose.project'): continue   # de un compose: no es suelto
+        img = str((d.get('Config') or {}).get('Image', ''))
+        montajes = [str(m.get('Source', '')) for m in (d.get('Mounts') or [])]
+        if img in IMAGENES_NUESTRAS or any(m == AQUI or m.startswith(AQUI + '/') for m in montajes):
+            out.append({ 'id': cid, 'nombre': nombre, 'imagen': img, 'estado': str((d.get('State') or {}).get('Status', '')), 'desde': str((d.get('State') or {}).get('StartedAt', ''))[:16] })
+    return out
+def limpiar():
+    L = sueltos()
+    if not L: return '✅ No hay contenedores sueltos del agendador. No toqué nada.'
+    hechos = []
+    for x in L:
+        dk('rm', '-f', x['id'])   # solo los probados como del agendador (ver sueltos())
+        hechos.append('🧹 ' + x['nombre'] + ' (' + x['imagen'] + ', ' + x['estado'] + ' desde ' + x['desde'] + ')')
+    return 'Quité ' + str(len(hechos)) + ' contenedor(es) suelto(s) del agendador:\n' + '\n'.join(hechos) + '\nEpic y los demás no se tocaron.'
 def auditoria():
     L, mal = ['🔍 *Auditoría del agendador* (solo lectura: no cambia nada)'], 0
     # 1) la red del agendador solo tiene contenedores del agendador
@@ -310,6 +336,8 @@ def auditoria():
     st = dk('stats', '--no-stream', '--format', '{{.Name}}|{{.CPUPerc}}|{{.MemUsage}}')
     filas = [x.split('|') for x in st.split('\n') if x and (x.split('|')[0] in NUESTROS or 'epic' in x.split('|')[0].lower())]
     if filas: L.append('📊 Consumo ahora:\n' + '\n'.join('  · ' + f[0] + ': CPU ' + f[1] + ' · RAM ' + f[2].split('/')[0].strip() for f in filas if len(f) >= 3))
+    su = sueltos()
+    if su: L.append('🧹 Contenedores sueltos del agendador: ' + ', '.join(x['nombre'] + ' (' + x['imagen'] + ')' for x in su) + ' → mándame /limpiar para quitarlos')
     L.append('\n' + ('✅ *Epic no está tocado por el agendador.*' if not mal else '⚠️ Hay ' + str(mal) + ' punto(s) para revisar (arriba). No toqué nada.'))
     return '\n'.join(L)
 

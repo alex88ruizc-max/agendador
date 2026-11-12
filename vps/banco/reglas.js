@@ -37,3 +37,11 @@ test('3.33 · Ningún «docker run» sin nombre: todos se llaman agendador-tmp-�
   });
   assert.deepEqual(malas, [], malas.join('\n'));
 });
+test('3.33 · El cartero solo BORRA contenedores en /limpiar, y solo los probados como del agendador (sueltos())', { skip: !fs.existsSync(path.join(RAIZ, 'cartero.py')) && 'sin cartero aquí' }, () => {
+  const src = fs.readFileSync(path.join(RAIZ, 'cartero.py'), 'utf8');
+  const borra = src.split('\n').filter((l) => /dk\(\s*'(rm|stop|kill|restart)'/.test(l) && !/^\s*#/.test(l));
+  assert.equal(borra.length, 1, 'un solo sitio que borra: ' + borra.join(' | '));
+  assert.match(borra[0], /x\['id'\]/); assert.match(src, /def limpiar\(\):\n    L = sueltos\(\)/);
+  const s = src.slice(src.indexOf('def sueltos'), src.indexOf('def limpiar'));
+  assert.match(s, /in NUESTROS or 'epic' in nombre\.lower\(\): continue/); assert.match(s, /com\.docker\.compose\.project/); assert.match(s, /m == AQUI or m\.startswith\(AQUI \+ '\/'\)/);
+});

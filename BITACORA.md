@@ -128,6 +128,8 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
   - Ahora TODOS los `docker run` de los scripts se llaman `agendador-tmp-…` y tienen tiempo límite (`timeout 600`).
   - `actualizar.sh` quita al empezar los `agendador-tmp-…` que hayan quedado. SOLO esos, nunca otro contenedor.
   - Banco `reglas.js`: falla si un `docker run` no tiene nombre o tiempo límite.
+  - **/limpiar** (autorizado por Alex) en el cartero quita los contenedores SUELTOS del agendador. Solo los que se prueban nuestros: imagen del agendador o una carpeta montada dentro de ~/agendador. Nunca los fijos, nada con «epic» y nada de un docker compose. /auditoria los muestra.
+  - Probado con contenedores simulados: borra solo los 2 nuestros. `reglas.js` revisa que el cartero borre solo ahí.
 - Banco: 141 pruebas, 0 fallas. Probado con mutaciones (una sola vez, 30 min).
 
 ### 2026-11-12 · agendador-ia-3.32 · página 2026-11-12q · 🔁 recordatorio de servicio

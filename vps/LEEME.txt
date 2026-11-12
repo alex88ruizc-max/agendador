@@ -65,6 +65,7 @@ AJUSTES POR NEGOCIO (negocios.json)
 
 NOVEDADES 3.33 · ⏰ RETOMAR AL CLIENTE
   Si empezó a agendar y lleva 30 min sin elegir nada: «¿Seguimos con tu cita? Te quedaste en elegir el día» (una sola vez, de día).
+  /limpiar en el bot quita contenedores sueltos del agendador (como «vigorous_burnell»); solo los nuestros.
 
 NOVEDADES 3.32 · 🔁 RECORDATORIO DE SERVICIO
   Panel › WhatsApp Bot › «Recordatorio de servicio»: actívalo y elige a los cuántos días. Desde las 10:00, máx. 20 al día.
