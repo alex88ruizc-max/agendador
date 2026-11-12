@@ -880,3 +880,36 @@ test('3.23 · botNormal: los mismos valores por defecto que el servidor y el pan
   assert.equal(c.activo, false); assert.equal(c.agendar, true); assert.equal(c.recordatorioMin, 60); assert.equal(c.pausaMin, 30);
   assert.deepEqual(c.estados.horas, ['09:00', '11:00'], 'máximo 2 estados'); assert.deepEqual(P.botNormal(null).estados.horas, ['11:00']);
 });
+
+// =====================================================================
+//  3.24 · LEY /sinbot
+// =====================================================================
+const delNegocio = (texto, id) => wahaMsg('x', texto, { id: 'true_' + CLIENTE + '@c.us_' + id, from: '573110000000@c.us', to: CLIENTE + '@c.us', fromMe: true });
+test('3.24 · El dueño escribe /sinbot → mudo en ese chat (sin límite, ni recordatorios) → otro /sinbot del CLIENTE lo reactiva', async () => {
+  await llega(delNegocio('/sinbot', 'SB1'));
+  assert.match(ultimoRegistro(), /queda mudo en este chat/);
+  const H = B.memHumano(); delete H['lina-spa:' + CLIENTE];   // aunque pase la pausa normal del dueño
+  await llega(wahaMsg(CLIENTE, 'hola')); await llega(wahaMsg(CLIENTE, 'quiero agendar'));
+  W.proximas = [{ code: 'R-1', status: 'confirmed', dia: 'Hoy', hora: '3:00 p. m.', servicio: 'Corte', link: 'L', whatsapp: CLIENTE, nombre: 'Ana' }];
+  await B.tickRecordatorios(true);
+  assert.equal(W.enviados.filter((x) => x.motor === 'waha').length, 0, 'ni respuestas ni recordatorio en el chat silenciado');
+  assert.equal(W.enviados.filter((x) => x.motor === 'evolution').length, 1, 'el otro negocio sí manda su recordatorio');
+  W.enviados = [];
+  await llega(wahaMsg(CLIENTE, '/sinbot'));
+  assert.match(ultimoRegistro(), /vuelve a atender este chat \(el cliente\)/);
+  await llega(wahaMsg(CLIENTE, 'hay cupos hoy?'));
+  assert.equal(W.enviados.length, 1, 'ya responde');
+});
+test('3.24 · /sinbot del dueño otra vez también lo reactiva · un /sinbot del cliente sin estar mudo no hace nada', async () => {
+  await llega(wahaMsg(CLIENTE, '/sinbot'));
+  assert.match(ultimoRegistro(), /sin estar mudo: no hace nada/);
+  await llega(delNegocio('/sinbot', 'SB2')); await llega(delNegocio('/SinBot', 'SB3'));
+  assert.match(ultimoRegistro(), /vuelve a atender este chat \(el negocio\)/);
+});
+test('3.24 · /sinbot no es «el dueño escribió» (no deja la pausa de 30 min) y no se agrupa con otros mensajes', async () => {
+  await llega(delNegocio('/sinbot', 'SB4'));
+  assert.ok(!B.memHumano()['lina-spa:' + CLIENTE]);
+  P.CFG.agruparMs = 60;
+  try { await Promise.all([llega(wahaMsg(CLIENTE, 'hola')), llega(wahaMsg(CLIENTE, '/sinbot'))]); } finally { P.CFG.agruparMs = 0; }
+  assert.ok(B.ultimos.some((x) => /vuelve a atender/.test(x.que)));
+});

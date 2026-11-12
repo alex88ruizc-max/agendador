@@ -6,7 +6,7 @@
 const http = require('http'), fs = require('fs'), path = require('path');
 const T = require('./textos'), C = require('./correo'), E = require('./estado'), A = require('./asistente');
 
-const VERSION = 'agendador-ia-3.23';
+const VERSION = 'agendador-ia-3.24';
 const env = (k, d) => (process.env[k] === undefined || process.env[k] === '' ? d : process.env[k]);
 const CFG = {
   puerto: parseInt(env('PUERTO', '3060'), 10),
@@ -306,7 +306,7 @@ function alMensaje(b) {
   const neg = negDe(c.inst); if (!neg) { if (!c.deMi) anotar({ que: '⚠️ mensaje de «' + c.inst + '», que no está en negocios.json: no respondo' }); return Promise.resolve(); }
   const k = neg.bid + ':' + (c.tel || c.jid);
   c.llegada = Date.now();
-  const agrupar = CFG.agruparMs > 0 && !c.deMi && !c.media && !c.rowId && !c.audio && !!c.texto;
+  const agrupar = CFG.agruparMs > 0 && !c.deMi && !c.media && !c.rowId && !c.audio && !!c.texto && !/^\s*\//.test(c.texto);   // los comandos (/sinbot) van al instante
   if (!agrupar) return enFila(k, () => atenderMensaje(c, neg));
   return new Promise((listo) => {
     const g = AGRUPA.get(k) || { lista: [], avisar: [] };
@@ -321,8 +321,20 @@ function alMensaje(b) {
     AGRUPA.set(k, g);
   });
 }
+// 🤐 3.24 · LEY /sinbot: «/sinbot» escrito por el dueño en un chat → el asistente queda MUDO en ese chat (sin respuestas, recordatorios
+//    ni preguntas), sin límite de tiempo. Otro «/sinbot» en ese chat (del dueño o del cliente) lo vuelve a activar. Nada lo salta.
+const esSinbot = (t) => /^\/\s*sin\s*bot\s*$/i.test(String(t || '').trim());
+const mudo = (k) => !!(MEM.sinbot && MEM.sinbot[k]);
 async function atenderMensaje(c, neg) {
   const k = neg.bid + ':' + (c.tel || c.jid);
+  if (esSinbot(c.texto)) {
+    MEM.sinbot = MEM.sinbot || {};
+    if (mudo(k)) { delete MEM.sinbot[k]; memGuardar(); anotar({ bid: neg.bid, chat: (c.tel || '').slice(-4), que: '🔊 /sinbot: el asistente vuelve a atender este chat (' + (c.deMi ? 'el negocio' : 'el cliente') + ')' }); return; }
+    if (!c.deMi) { anotar({ bid: neg.bid, chat: (c.tel || '').slice(-4), que: '/sinbot del cliente sin estar mudo: no hace nada' }); return; }
+    MEM.sinbot[k] = { desde: Date.now() }; if (MEM.conv) delete MEM.conv[k]; memGuardar();
+    anotar({ bid: neg.bid, chat: (c.tel || '').slice(-4), que: '🤐 /sinbot: el asistente queda mudo en este chat hasta otro /sinbot' }); return;
+  }
+  if (mudo(k)) { if (!c.deMi) anotar({ bid: neg.bid, chat: (c.tel || '').slice(-4), que: '🤐 mudo por /sinbot' }); return; }
   // 👆 3.8: el dueño tocó una opción de la lista DESDE el celular del negocio → el asistente la hace para ese cliente
   //        (p. ej. «Ver cupos» en el chat de Marianna → a Marianna le llegan los cupos). No cuenta como «el dueño escribió».
   // 3.9: WAHA a veces avisa el toque del negocio SIN la opción (solo el texto «🕐 Ver cupos…»): se reconoce por el título,
@@ -516,7 +528,7 @@ async function tickRecordatorios(aCualquierHora) {
       const r = await gas(neg, 'proximas', { minutos: min });
       if (!r.info || !r.info.activo) continue;
       for (const c of r.citas || []) {   // 1.1: cada cita por su lado; una que falla no frena las demás ni se repite cada 5 min
-        if (!atiende({ tel: numeroWa(c.whatsapp) })) continue;
+        if (!atiende({ tel: numeroWa(c.whatsapp) }) || mudo(neg.bid + ':' + numeroWa(c.whatsapp))) continue;   // 3.24: /sinbot
         try {
           const bot = botDe(neg);
           await escribir(neg, c.whatsapp, T.recordatorio(c, r.info, bot)); est.recordatorios++; anotar({ bid: neg.bid, que: 'recordatorio ' + c.code });
@@ -528,7 +540,7 @@ async function tickRecordatorios(aCualquierHora) {
       // 3.14 · el mismo cliente con 2 citas que se cruzan → «Tienes 2 citas… ¿deseas cancelar una de las dos?» (una sola vez)
       for (const d of r.dobles || []) {
         const tel = numeroWa(d.whatsapp);
-        if (!atiende({ tel }) || !botDe(neg).cambios) continue;
+        if (!atiende({ tel }) || !botDe(neg).cambios || mudo(neg.bid + ':' + tel)) continue;
         try { await ASIS.preguntarDobles(neg, tel, d, r.info.negocio); anotar({ bid: neg.bid, chat: tel.slice(-4), que: '👀 tiene ' + d.citas.length + ' citas que se cruzan: le pregunté cuál cancelar' }); }
         catch (e) { log('dobles', e.message); continue; }
         await gas(neg, 'dobleAvisado', { codes: d.citas.map((x) => x.code) }).catch((e) => log('dobleAvisado', e.message));
@@ -758,5 +770,5 @@ if (require.main === module) {
   servidor.listen(CFG.puerto, () => { log('👩‍💼 ' + VERSION + ' escuchando en ' + CFG.puerto + ' · modo ' + CFG.modo); negocios(); arrancarRelojes(); });
 }
 // 🧪 solo para el banco de escenarios (banco/escenarios.js): deja a Mary como recién encendida
-const _banco = { ASIS, BOT, yaLoDije, memDicho: () => (MEM.dicho = MEM.dicho || {}), memHumano: () => MEM.humano, tickRecordatorios, publicarEstado, alMensaje, alEventoConexion, ultimos, reiniciar() { BOT_LEIDO.clear(); MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; MEM.conv = {}; MEM.clientes = {}; MEM.conectados = {}; MEM.pendientesWa = {}; MEM.codigos = {}; MEM.robot = {}; MEM.dicho = {}; AGRUPA.clear(); ASIS._cat.clear(); BOT.clear(); CONTACTOS.clear(); vinculando.clear(); delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
+const _banco = { ASIS, BOT, yaLoDije, memDicho: () => (MEM.dicho = MEM.dicho || {}), memHumano: () => MEM.humano, tickRecordatorios, publicarEstado, alMensaje, alEventoConexion, ultimos, reiniciar() { BOT_LEIDO.clear(); MEM.sinbot = {}; MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; MEM.conv = {}; MEM.clientes = {}; MEM.conectados = {}; MEM.pendientesWa = {}; MEM.codigos = {}; MEM.robot = {}; MEM.dicho = {}; AGRUPA.clear(); ASIS._cat.clear(); BOT.clear(); CONTACTOS.clear(); vinculando.clear(); delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
 module.exports = { _banco, botNormal, frenoRobot, estadosQueTocan, atenderPedidoWa, sincronizarConectados, renovarQr, telEnAviso, deWaha, esWaha, debeResponder, alEventoConexion, tickPedidosWa, limpiarSinVincular, leerMensaje, atiende, PREGUNTA, numeroWa, ahoraLocal, enFila, yaVisto, quienVeEstados, CFG };

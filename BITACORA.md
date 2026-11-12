@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-3.23** · Página **2026-11-12h** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-12** · Mary **agendador-ia-3.24** · Página **2026-11-12h** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -113,6 +113,11 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-12 · agendador-ia-3.24 · ley /sinbot
+- `atenderMensaje`: `esSinbot()` antes de todo: del dueño → `MEM.sinbot[k]` (mudo, persistente); otro /sinbot (dueño o cliente) lo
+  quita. `mudo(k)` corta respuestas, recordatorios y citas dobles. /sinbot no cuenta como «el dueño escribió» y no se agrupa.
+- Banco: 116 pruebas.
 
 ### 2026-11-12 · agendador-ia-3.23 · el panel manda (lectura directa de la base)
 - Prueba real: Alex apagó todo en «WhatsApp Bot» y el asistente siguió respondiendo; el panel decía «No hay conexión con el servidor»
