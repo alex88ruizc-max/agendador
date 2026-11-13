@@ -6,7 +6,7 @@
 const http = require('http'), fs = require('fs'), path = require('path');
 const T = require('./textos'), C = require('./correo'), E = require('./estado'), A = require('./asistente');
 
-const VERSION = 'agendador-ia-3.48';
+const VERSION = 'agendador-ia-3.49';
 const env = (k, d) => (process.env[k] === undefined || process.env[k] === '' ? d : process.env[k]);
 const CFG = {
   puerto: parseInt(env('PUERTO', '3060'), 10),
@@ -400,7 +400,36 @@ function alMensaje(b) {
 //    ni preguntas), sin límite de tiempo. Otro «/sinbot» en ese chat (del dueño o del cliente) lo vuelve a activar. Nada lo salta.
 const esSinbot = (t) => /^\/\s*sin\s*bot\s*$/i.test(String(t || '').trim());
 const mudo = (k) => !!(MEM.sinbot && MEM.sinbot[k]);
+// 🕵️ 3.49 · NÚMERO OCULTO (…@lid): WhatsApp a veces no manda el número del cliente, solo un código. Antes el bot se quedaba callado.
+//    1) Se le pregunta a WAHA el número real de ese código (se guarda: la próxima vez ni se pregunta).
+//    2) Si no lo consigue, igual responde EN ESE CHAT con el link de la agenda (una vez cada 12 h), para que el cliente no quede sin respuesta.
+const LID_NO = new Map();   // código → cuándo se intentó sin suerte (no se insiste por 10 min)
+async function telDeLid(neg, jid) {
+  MEM.lids = MEM.lids || {};
+  const ya = MEM.lids[neg.bid + ':' + jid]; if (ya) return ya;
+  if (!esWaha(neg) || Date.now() - (LID_NO.get(jid) || 0) < 10 * 60000) return '';
+  try {
+    const r = await waha('get', '/api/' + encodeURIComponent(sesionDe(neg)) + '/lids/' + encodeURIComponent(jid), null, 8000);
+    const pn = String((r && (r.pn || r.phone || r.jid)) || ''), tel = /@(c\.us|s\.whatsapp\.net)$/.test(pn) ? pn.split('@')[0].replace(/\D/g, '') : '';
+    if (tel.length >= 10) { MEM.lids[neg.bid + ':' + jid] = tel; memGuardar(); return tel; }
+  } catch (e) { /* WAHA no lo sabe o esa versión no lo trae: se responde con el link */ }
+  LID_NO.set(jid, Date.now()); return '';
+}
+async function responderSinNumero(c, neg, k) {
+  if (CFG.modo !== 'todos') { anotar({ bid: neg.bid, que: 'número oculto en modo ' + CFG.modo + ': no respondo (no sé si es un número de prueba)' }); return; }
+  await botAlDia(neg);
+  if (!botDe(neg).activo || mudo(k) || (MEM.humano[k] && Date.now() - MEM.humano[k] < botDe(neg).pausaMin * 60000)) { anotar({ bid: neg.bid, que: 'número oculto: el asistente está apagado o callado en ese chat' }); return; }
+  MEM.lidAviso = MEM.lidAviso || {};
+  if (Date.now() - (MEM.lidAviso[k] || 0) < 12 * 3600000) { anotar({ bid: neg.bid, que: 'número oculto: ya le mandé el link hace poco' }); return; }
+  MEM.lidAviso[k] = Date.now(); memGuardar();
+  const negocio = ((ASIS._cat.get(neg.bid) || {}).d || {}).negocio || '';
+  const r = await waha('post', '/api/sendText', { session: sesionDe(neg), chatId: c.jid, text: T.sinNumero(negocio, 'https://tuagenda.vip/index.html?b=' + encodeURIComponent(neg.bid)), linkPreview: false });
+  const id = r && (r.id && (r.id._serialized || r.id.id || r.id)); if (typeof id === 'string' && id) { MEM.enviados.push(id); memGuardar(); }   // para no confundirlo con el dueño escribiendo
+  ULT_ENVIO.set(k, Date.now()); est.respondidos++;
+  anotar({ bid: neg.bid, que: '🕵️ número oculto: le respondí con el link de la agenda' });
+}
 async function atenderMensaje(c, neg) {
+  if (!c.tel && !c.deMi && /@lid$/.test(c.jid)) c.tel = await telDeLid(neg, c.jid);
   const k = neg.bid + ':' + (c.tel || c.jid);
   if (await respuestaDelDueno(c, neg)) return;   // 🔔 3.47: el dueño aprobó o rechazó un pago respondiendo 1 o 2
   if (esSinbot(c.texto)) {
@@ -437,7 +466,11 @@ async function atenderMensaje(c, neg) {
     return;
   }
   est.recibidos++;
-  if (!c.tel) { anotar({ bid: neg.bid, que: 'sin número visible (LID): no respondo' }); return; }
+  if (!c.tel) {
+    if (/@lid$/.test(c.jid) && esWaha(neg)) { try { await responderSinNumero(c, neg, k); } catch (e) { est.errores++; anotar({ bid: neg.bid, que: 'número oculto: no pude responder (' + String(e.message).slice(0, 80) + ')' }); } }
+    else anotar({ bid: neg.bid, que: 'mensaje sin número (' + (c.jid.split('@')[1] || '?') + '): no respondo' });
+    return;
+  }
   if (!atiende(c)) { anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: CFG.modo === 'apagado' ? 'Mary está apagada' : 'modo prueba: no es un número de prueba' }); return; }
   await botAlDia(neg);
   if (!botDe(neg).activo) { anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: 'asistente apagado en el panel' }); return; }
@@ -969,5 +1002,5 @@ if (require.main === module) {
   servidor.listen(CFG.puerto, () => { log('👩‍💼 ' + VERSION + ' escuchando en ' + CFG.puerto + ' · modo ' + CFG.modo); negocios(); arrancarRelojes(); });
 }
 // 🧪 solo para el banco de escenarios (banco/escenarios.js): deja a Mary como recién encendida
-const _banco = { ASIS, BOT, yaLoDije, memDicho: () => (MEM.dicho = MEM.dicho || {}), memHumano: () => MEM.humano, memRobot: () => (MEM.robot = MEM.robot || {}), memConv: () => (MEM.conv = MEM.conv || {}), tickRecordatorios, tickVolver, tickRetomar, tickEstadisticas, tickEstados, publicarGuia, entregarAvisos, tickPedidosWa, memAvisoPago: () => (MEM.avisoPago = MEM.avisoPago || {}), avisados, botOff: BOT_OFF, apagarGlobal, botAlDia, botDe, memGuia: () => (MEM.guia = MEM.guia || {}), memStats: () => (MEM.stats = MEM.stats || {}), publicarEstado, alMensaje, alEventoConexion, ultimos, reiniciar() { CL = null; MEM.volver = {}; MEM.stats = {}; MEM.piePrueba = {}; MEM.guia = {}; MEM.avisoPago = {}; avisados.clear(); leer.avisado = false; BOT_LEIDO.clear(); MEM.sinbot = {}; MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; MEM.conv = {}; MEM.clientes = {}; MEM.conectados = {}; MEM.pendientesWa = {}; MEM.codigos = {}; MEM.robot = {}; MEM.dicho = {}; AGRUPA.clear(); ASIS._cat.clear(); BOT.clear(); CONTACTOS.clear(); vinculando.clear(); delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
+const _banco = { ASIS, BOT, yaLoDije, memDicho: () => (MEM.dicho = MEM.dicho || {}), memHumano: () => MEM.humano, memRobot: () => (MEM.robot = MEM.robot || {}), memConv: () => (MEM.conv = MEM.conv || {}), tickRecordatorios, tickVolver, tickRetomar, tickEstadisticas, tickEstados, publicarGuia, memLids: () => (MEM.lids = MEM.lids || {}), entregarAvisos, tickPedidosWa, memAvisoPago: () => (MEM.avisoPago = MEM.avisoPago || {}), avisados, botOff: BOT_OFF, apagarGlobal, botAlDia, botDe, memGuia: () => (MEM.guia = MEM.guia || {}), memStats: () => (MEM.stats = MEM.stats || {}), publicarEstado, alMensaje, alEventoConexion, ultimos, reiniciar() { CL = null; MEM.volver = {}; MEM.stats = {}; MEM.piePrueba = {}; MEM.lids = {}; MEM.lidAviso = {}; LID_NO.clear(); MEM.guia = {}; MEM.avisoPago = {}; avisados.clear(); leer.avisado = false; BOT_LEIDO.clear(); MEM.sinbot = {}; MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; MEM.conv = {}; MEM.clientes = {}; MEM.conectados = {}; MEM.pendientesWa = {}; MEM.codigos = {}; MEM.robot = {}; MEM.dicho = {}; AGRUPA.clear(); ASIS._cat.clear(); BOT.clear(); CONTACTOS.clear(); vinculando.clear(); delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
 module.exports = { _banco, botNormal, frenoRobot, estadosQueTocan, atenderPedidoWa, sincronizarConectados, renovarQr, telEnAviso, deWaha, esWaha, debeResponder, alEventoConexion, tickPedidosWa, limpiarSinVincular, leerMensaje, atiende, PREGUNTA, numeroWa, ahoraLocal, enFila, yaVisto, quienVeEstados, CFG };

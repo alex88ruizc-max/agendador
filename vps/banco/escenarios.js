@@ -74,7 +74,9 @@ global.fetch = async (url, o) => {
     }
     return ok({});
   }
-  if (/\/api\/sendText$/.test(u)) { const id = 'W' + W.enviados.length; W.enviados.push({ id, motor: 'waha', a: b.chatId.split('@')[0], texto: b.text, sesion: b.session }); return resp({ id }); }
+  const lidM = u.match(/\/api\/[^/]+\/lids\/([^/?]+)$/);   // 3.49: WAHA dice (o no) el número real de un código …@lid
+  if (lidM) { const pn = (W.lids || {})[decodeURIComponent(lidM[1])]; return pn ? resp({ lid: decodeURIComponent(lidM[1]), pn }) : resp({ error: 'no lo sé' }, 404); }
+  if (/\/api\/sendText$/.test(u)) { const id = 'W' + W.enviados.length; W.enviados.push({ id, motor: 'waha', a: b.chatId.split('@')[0], chatId: b.chatId, texto: b.text, sesion: b.session }); return resp({ id }); }
   if (/\/api\/sendList$/.test(u)) {
     if (W.listaFalla) return resp({ error: 'no soportado' }, 501);
     // 3.3: las MISMAS reglas que WAHA (chatting.list.dto.ts): título, botón y título de sección obligatorios; filas con título y rowId
@@ -149,9 +151,13 @@ test('Número oculto (…@lid) con el real en el aviso → responde al número R
   await llega(wahaMsg('x', 'hola', { from: '123456789012345@lid', _data: { Info: { Sender: '123456789012345@lid', SenderAlt: CLIENTE + '@s.whatsapp.net' } } }));
   assert.equal(W.enviados.length, 1); assert.equal(W.enviados[0].a, CLIENTE);
 });
-test('Número oculto SIN el real → no responde y lo deja escrito', async () => {
+test('Número oculto SIN el real → (3.49) ya no se queda callada: responde en ese chat con el link; en modo prueba sigue callada', async () => {
   await llega(wahaMsg('x', 'hola', { from: '999999999999999@lid', _data: {} }));
-  assert.equal(W.enviados.length, 0); assert.match(ultimoRegistro(), /LID/);
+  assert.equal(W.enviados.length, 1); assert.equal(ultimo().chatId, '999999999999999@lid'); assert.match(ultimoRegistro(), /número oculto: le respondí con el link/);
+  P.CFG.modo = 'prueba';
+  await llega(wahaMsg('x', 'hola', { from: '888888888888888@lid', _data: {} }));
+  assert.equal(W.enviados.length, 1, 'en modo prueba no se sabe si es un número de prueba: no responde'); assert.match(ultimoRegistro(), /modo prueba/);
+  P.CFG.modo = 'todos';
 });
 test('Modo prueba · número que no es de prueba → callada y lo deja escrito', async () => {
   P.CFG.modo = 'prueba';
@@ -1275,4 +1281,20 @@ test('3.47 · 🔔 Avisos al dueño por WhatsApp: le llegan a su número persona
   assert.deepEqual(W.revisado, { code: 'R-AAAA1', aprobar: true, de: DUENO }); assert.match(ultimo().texto, /Pago aprobado.*R-AAAA1/);
   W.revisado = undefined; await llega(wahaMsg(DUENO, '1')); assert.equal(W.revisado, undefined, 'ya no hay nada pendiente: el 1 no vuelve a aprobar');
   W.avisoPend = 0; W.avisos = []; W.avisosNum = '';
+});
+
+test('3.49 · 🕵️ Número oculto (…@lid): si WAHA sabe el número real, se atiende normal (y se recuerda); si no, se responde EN ESE CHAT con el link, una sola vez', async () => {
+  const lid = (codigo, texto) => wahaMsg('x', texto, { from: codigo + '@lid' });
+  // 1) WAHA no sabe el número → responde con el link al chat oculto
+  await llega(lid('111222333444555', 'hola quiero una cita'));
+  assert.equal(ultimo().chatId, '111222333444555@lid'); assert.match(ultimo().texto, /Para agendar tu cita entra aquí 👉 https:\/\/tuagenda\.vip\/index\.html\?b=lina-spa/);
+  assert.match(ultimoRegistro(), /número oculto: le respondí con el link/);
+  const n = W.enviados.length;
+  await llega(lid('111222333444555', 'hola??')); assert.equal(W.enviados.length, n, 'no repite el link en menos de 12 h'); assert.match(ultimoRegistro(), /ya le mandé el link/);
+  // 2) WAHA sí sabe el número → se atiende como cualquier cliente, a su número real
+  W.lids = { '999888777666555@lid': '573005550101@c.us' };
+  await llega(lid('999888777666555', 'hola'));
+  assert.equal(ultimo().a, '573005550101', 'le responde a su número real'); assert.doesNotMatch(ultimo().texto, /Para agendar tu cita entra aquí 👉/, 'ya no es el mensaje de emergencia');
+  assert.equal(B.memLids()['lina-spa:999888777666555@lid'], '573005550101', 'queda guardado para la próxima');
+  W.lids = {};
 });

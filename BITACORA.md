@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.48** · Página **2026-11-13p** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.49** · Página **2026-11-13p** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -133,6 +133,16 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-13 · agendador-ia-3.49 · 🕵️ clientes con número oculto: ya no se quedan sin respuesta
+- **Lo que vio Alex en /registro (El Barba):** 5 mensajes en 2 horas con «sin número visible (LID): no respondo». WhatsApp no mandó el número del cliente, solo un código (…@lid), y el bot se callaba.
+- **Arreglo en dos niveles:**
+  1. `telDeLid`: le pregunta a WAHA el número real de ese código (`GET /api/<sesión>/lids/<código>`). Si lo sabe, el cliente se atiende NORMAL (agenda por chat) y queda guardado (`MEM.lids`).
+  2. Si WAHA no lo sabe (o esa versión no trae la consulta): `responderSinNumero` le escribe EN ESE MISMO CHAT el link de la agenda (`T.sinNumero`), una vez cada 12 h.
+     Respeta: asistente apagado, /sinbot, dueño escribiendo. En modo prueba no responde (no se puede saber si es un número de prueba).
+- El registro ahora dice «🕵️ número oculto: le respondí con el link de la agenda» (o por qué no).
+- Sin verificar en el servidor real: si la consulta `/lids/` existe en la versión de WAHA instalada. Si no existe, funciona el nivel 2.
+- Banco: 170 pasan aquí; como el VPS: 148 pasan, 16 saltadas, 0 fallas. Escenario nuevo + el viejo («no responde») actualizado al comportamiento nuevo.
 
 ### 2026-11-13 · página 2026-11-13p · 🧸 explicaciones «para cualquiera» (Telegram y avisos)
 - Alex: «la explicación debe ser full intuitiva, para dummies». Regla de estilo desde ahora: frases cortas, palabras de todos los días, un ejemplo, y preguntas con respuesta de una línea.
