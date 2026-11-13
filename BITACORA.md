@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.42** · Página **2026-11-13f** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.43** · Página **2026-11-13g** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -133,10 +133,10 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 
 ## 📜 Historial (lo más nuevo arriba)
 
-### 2026-11-13 · (en progreso, sin zip) agendador-ia-3.43 · 📲 estado «Cómo agendar»
+### 2026-11-13 · agendador-ia-3.43 · página 2026-11-13g · 📲 estado «Cómo agendar»
 - `vps/guia.js`: 2 imágenes 1080×1920 (pasos 1-2 «Entra · Día y hora» y 3-4 «Servicio · Aparta y ¡listo!») con nombre, tipo, servicios, equipo y horas reales del negocio. Diseño blanco de Tu Agenda.
 - Datos directo de la base (`cuposLocal.guia`): no gasta Google. Sale en todos los planes. 8:00 a. m. cada 3 días por defecto (`maryBot.guia`), se cambia en el panel (WhatsApp Bot).
-- Se publican en orden con 20 s entre una y otra. Banco: 162 pasan. Falta: que Alex vea las 2 y confirme antes de armar el zip.
+- Se publican en orden con 20 s entre una y otra. Banco: 162 pasan. Página: 0 fallas. Alex aprobó las 2 imágenes. Panel: «WhatsApp Bot › 📲 Estado «Cómo agendar»» (prender, hora, cada cuántos días).
 
 ### 2026-11-13 · agendador-ia-3.42 · página 2026-11-13f · 🚀 «Probar gratis» solo DESPUÉS de agendar (página blanca, colores de Tu Agenda)
 - Idea de Alex: si el «Probar gratis» está mientras el cliente agenda, se puede perder la cita. Ahora:
