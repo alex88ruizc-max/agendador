@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.56** · Página **2026-11-13w** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.56** · Página **2026-11-13x** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -136,6 +136,10 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-13 · página 2026-11-13x · 👥 el equipo arriba del Inicio
+- Alex: las personas que atienden deben quedar ARRIBA para marcar rápido un descanso o un almuerzo. Las tarjetas del equipo (Disponible / Descanso) pasaron a ser lo primero del Inicio, encima de los accesos directos.
+- Banco de la página: 0 fallas.
 
 ### 2026-11-13 · página 2026-11-13w · 🔔 las notificaciones se encuentran en la campana (y el superusuario también las ve)
 - Alex: «¿las notificaciones dónde están?». Estaba viendo la tienda como superusuario y la tarjeta se escondía para el superusuario.
