@@ -46,9 +46,11 @@ global.fetch = async (url, o) => {
     const BOTX = Object.assign({ activo: true, agendar: true, cupos: true, saludoDiario: true, pedirNombre: true, pedirCorreo: true, loDeSiempre: true, recordatorioMin: 60, recordatorioConfirmar: true, cambios: true, pausaMin: 30, estados: { activo: true, horas: ['11:00'], manana: true, semanal: false } }, W.bot);
     const ok = (data) => resp({ ok: true, data: data && typeof data === 'object' && !Array.isArray(data) && (data.negocio || data.citas) ? Object.assign({ bot: BOTX }, data) : data });
     if (b.op === 'proximas') return resp({ ok: true, data: { citas: W.proximas, dobles: W.dobles || [], info: Object.assign({ bot: BOTX, recordatorioMin: BOTX.recordatorioMin }, NEGOCIO) } });
+    if (b.op === 'cancelar') { W.cancelado = { code: b.code, motivo: b.motivo || '', conCodigo: b.conCodigo === true }; if (W.cancelarTarde && !b.motivo) return resp({ ok: true, data: { ok: false, tarde: true, motivo: 'Falta poco' } }); }   // 3.53
     if (b.op === 'asistencia' || b.op === 'cancelar') return resp({ ok: true, data: { ok: true, link: NEGOCIO.link, cita: (W.proximas[0] || {}) } });
     if (b.op === 'reagendar') { const d = W.cupos.find((x) => x.date === b.date); return resp({ ok: true, data: { ok: true, cita: Object.assign({}, W.proximas[0] || {}, { dia: d.dia, hora: d.horas[d.libres.indexOf(b.time)], link: NEGOCIO.link + '&cita=R-VIEJA1' }) } }); }
     if (b.op === 'contactos') return resp({ ok: true, data: { numeros: W.contactos, bloqueados: W.bloqueados || [] } });
+    if (b.op === 'citaCodigo') { const c = (W.porCodigo || {})[b.code]; return resp({ ok: true, data: c ? { ok: true, cita: c } : { ok: false } }); }   // 3.53
     if (b.op === 'reconocer') { W.reconocido = { phone: b.phone, email: b.email }; const c = (W.porCorreo || {})[b.email]; return resp({ ok: true, data: c ? { ok: true, nombre: c.nombre, citas: c.citas || [] } : { ok: false } }); }   // 3.52
     if (b.op === 'guardarContacto') { (W.guardados = W.guardados || []).push({ phone: b.phone, nombre: b.nombre }); return resp({ ok: true, data: { ok: true, nuevo: true } }); }   // 3.52
     if (b.op === 'historia') { (W.historias = W.historias || []).push({ id: b.id, label: b.label, horas: b.horas, img: String(b.img).slice(0, 22) }); return resp({ ok: true, data: { ok: true } }); }   // 3.51
@@ -1346,4 +1348,23 @@ test('3.52 · 🧠 Guardado inteligente: apagado por defecto (no guarda a nadie)
   await llega(wahaMsg(CLIENTE, 'gracias')); await new Promise((ok) => setTimeout(ok, 20));
   assert.equal(W.guardados.length, 1, 'una sola vez por persona');
   W.fsBot = null; W.guardados = null;
+});
+
+test('3.53 · 🚫 «Necesito cancelar mi reserva R-G2GKAH» en medio de las listas: NO arranca a agendar; usa esa reserva y, si falta poco, pide el motivo y cancela', async () => {
+  W.porCodigo = { 'R-G2GKAH': { code: 'R-G2GKAH', status: 'confirmed', dia: 'Hoy', hora: '11:00 a. m.', servicio: 'Corte', link: 'https://tuagenda.vip/?b=lina-spa&cita=R-G2GKAH' } };
+  W.cancelarTarde = true;
+  await llega(wahaMsg(CLIENTE, 'quiero agendar'));                       // deja una lista viva, como en el chat de Alex
+  await llega(wahaMsg(CLIENTE, 'cancelar mi reserva R-G2GKAH'));   // corto: en la prueba llega al instante y el freno anti-bots pausa los textos largos
+  assert.doesNotMatch(ultimo().texto, /Qué te quieres hacer/, 'ya no arranca a agendar');
+  assert.match(ultimo().texto, /Seguro que cancelo tu cita del \*hoy a las 11:00 a\. m\.\*/);
+  await llega(wahaMsg(CLIENTE, 'sí'));
+  assert.match(ultimo().texto, /Falta poco para tu cita/); assert.match(ultimo().texto, /por qué no puedes ir/);
+  await llega(wahaMsg(CLIENTE, 'se me dañó la moto'));
+  assert.deepEqual(W.cancelado, { code: 'R-G2GKAH', motivo: 'se me dañó la moto', conCodigo: true });
+  assert.match(ultimo().texto, /cancelé tu cita/);
+  W.porCodigo = null; W.cancelarTarde = false; W.cancelado = null;
+});
+test('3.53 · Quiere cancelar y no se le encuentra cita: se le dice y se le pide el número de reserva (antes arrancaba a agendar)', async () => {
+  await llega(wahaMsg(CLIENTE, 'necesito cancelar mi reserva'));
+  assert.match(ultimo().texto, /No encontré una cita activa/); assert.match(ultimo().texto, /cancelar R-ABC123/); assert.ok(!ultimo().lista, 'sin lista de servicios');
 });

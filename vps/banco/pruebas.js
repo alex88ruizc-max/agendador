@@ -539,3 +539,27 @@ test('3.52 · Servidor: la cita con el número MAL escrito se encuentra por el c
   assert.equal(escrito[0].p, 'customers/wa3025550002'); assert.equal(escrito[0].v.firstName, 'Juan'); assert.equal(escrito[0].v.lastName, 'Pérez'); assert.equal(escrito[0].v.prospecto, true);
   assert.deepEqual(F.maryGuardarContacto_({ phone: '573187920386', nombre: 'Otro' }), { ok: true, existia: true }, 'si ya existe con ese número, no se toca');
 });
+
+test('3.53 · Servidor: cancelar faltando poco SÍ se puede con motivo (y le llega al negocio); sin motivo lo pide; si el dueño lo apaga, no · en la página igual', { skip: !require('fs').existsSync(GS_MARY) && 'dentro de la imagen no está gs/' }, () => {
+  const src = require('fs').readFileSync(GS_MARY, 'utf8');
+  let st = { rescheduleMinHours: 2 }, escrito = null, aviso = '', paginaMinH = null;
+  const cita = () => ({ code: 'R-1', status: 'confirmed', staffId: 's1', date: '2030-01-01', startTime: '10:00', endTime: '11:00', customer: { whatsapp: '+573001112233' }, startAt: new Date(Date.now() + 30 * 60000), lockIds: [] });
+  const G = { ACTIONS: { cancelAppointment: (b) => { paginaMinH = st.rescheduleMinHours; return { reason: b.reason }; } }, PUBLIC_ACTIONS: {}, console, ACTIVE: ['confirmed', 'pending_payment'], bp: (x) => x,
+    loadSettings: () => st, fsGet: (p) => (p === 'appointments/R-1' ? cita() : null), fsQuery: () => [], withLock: (f) => f(), fail: (m) => { throw new Error(m); }, tmin: (t) => Number(t.split(':')[0]) * 60 + Number(t.split(':')[1]),
+    wPatch: (p, v) => ({ p, v }), commit: (w) => { escrito = w; }, freeLockWrites: () => [], hist: () => [], tgEventOn: () => true, tgNotify: (ids, t) => { aviso = t; }, aptText: () => 'Juan · R-1', esc: (x) => x, emailClient: () => {},
+    waDayLabel: () => 'Hoy', hora12: (t) => t, siteUrl: () => 'https://x', BID: 'barba', maryLinkAgenda_: undefined };
+  delete G.maryLinkAgenda_;
+  const F = new Function(...Object.keys(G), src + '\nreturn { maryCancelar_, ACTIONS };')(...Object.values(G));
+  let r = F.maryCancelar_(st, { code: 'R-1', phone: '573001112233' });
+  assert.equal(r.ok, false); assert.equal(r.tarde, true, 'faltan 30 min: pide el motivo'); assert.equal(escrito, null);
+  r = F.maryCancelar_(st, { code: 'R-1', phone: '573001112233', motivo: 'se me dañó la moto' });
+  assert.equal(r.ok, true); assert.match(escrito[0].v.cancelReason, /se me dañó la moto/); assert.equal(escrito[0].v.lateCancel, true); assert.match(aviso, /faltando poco[\s\S]*Motivo: se me dañó la moto/);
+  st.lateCancel = false; escrito = null;
+  r = F.maryCancelar_(st, { code: 'R-1', phone: '573001112233', motivo: 'se me dañó la moto' });
+  assert.equal(r.ok, false); assert.ok(!r.tarde); assert.match(r.motivo, /al menos 2 horas/); assert.equal(escrito, null, 'el dueño lo apagó: como antes');
+  // página: con motivo se quita el límite de horas SOLO durante esa cancelación
+  st = { rescheduleMinHours: 2 };
+  let p = F.ACTIONS.cancelAppointment({ code: 'R-1', reason: 'me enfermé', tarde: true }, {});
+  assert.equal(paginaMinH, 0); assert.match(p.reason, /Faltando poco: me enfermé/); assert.equal(st.rescheduleMinHours, 2, 'el límite vuelve a quedar igual');
+  F.ACTIONS.cancelAppointment({ code: 'R-1', reason: '', tarde: true }, {}); assert.equal(paginaMinH, 2, 'sin motivo no se quita');
+});

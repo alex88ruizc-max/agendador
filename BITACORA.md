@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.52** · Página **2026-11-13r** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.53** · Página **2026-11-13s** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -136,6 +136,17 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-13 · agendador-ia-3.53 · página 2026-11-13s · 🚫 cancelar faltando poco, con motivo · el bot entiende «cancelar mi reserva R-…»
+- **Caso de Alex:** la página no lo dejó cancelar («menos de 2 horas»), y al escribirle al bot «necesito cancelar mi reserva R-G2GKAH» le respondió «¿Qué te quieres hacer?».
+- **Causa del bot (confirmada):** la palabra «reserva» coincidía con «reservar» y, en medio de una lista, el bot arrancaba a agendar. Además no encontraba su cita (tenía otro WhatsApp).
+- **Bot:** «cancelar/cambiar» en medio de las listas ya no es agendar. Si escribe su número de reserva (R-XXXXXX) se usa esa cita (op `citaCodigo`). Si no se le encuentra cita, se le dice y se le pide el número de reserva.
+- **Cancelar faltando poco (regla nueva de Alex: «si no puede ir, que cancele y diga el motivo»):**
+  - Bot: pide el motivo («cuéntame por qué no puedes ir») y cancela. Servidor `maryCancelar_`: `tarde` + `motivo`; queda en `cancelReason` y `lateCancel: true`.
+  - Página («Mis citas»): «¿No puedes ir?» pide el motivo y cancela (`ACTIONS.cancelAppointment` envuelto: con motivo se quita el límite de horas solo para esa cancelación).
+  - Al negocio le llega «🚫 CITA CANCELADA ⚠️ faltando poco · Motivo: …» (Telegram y avisos por WhatsApp). El cupo queda libre.
+  - El dueño lo puede apagar: Configuración › Reglas de las citas (`settings.lateCancel`, prendido por defecto).
+- Banco: 178 pasan aquí; como el VPS: 153 pasan, 19 saltadas, 0 fallas. Página: 0 fallas.
 
 ### 2026-11-13 · agendador-ia-3.52 · página 2026-11-13r · 🔎 el bot reconoce al cliente · 🧠 guardado inteligente
 - **Caso de Alex:** un cliente apartó con el número mal escrito. Lo corrigieron en el panel y el bot seguía sin reconocerlo; tampoco al dar su correo (respondía «No te entendí»).

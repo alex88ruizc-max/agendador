@@ -1,6 +1,6 @@
 // Página pública: ver cupos, registrarse, apartar, pagar con screenshot, mis cupos
-import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro, ventanaReserva, OFERTA_TXT, nombreCompleto } from "./common.js?v=2026-11-13r";
-import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-13r";
+import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro, ventanaReserva, OFERTA_TXT, nombreCompleto } from "./common.js?v=2026-11-13s";
+import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-13s";
 import {
   onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, sendPasswordResetEmail,
   GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult
@@ -9,10 +9,10 @@ import {
   doc, getDoc, setDoc, getDocs, updateDoc, collection, query, where, onSnapshot, serverTimestamp, Timestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
-  startUpdateWatcher, applyBrandColors, warmServer, uiConfirm, setDialogBrand, viewImage, pushOverlay, dropOverlay, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, dow, hora12, fechaLarga, fechaCorta, toMillis, cop, esc,
+  startUpdateWatcher, applyBrandColors, warmServer, uiConfirm, uiPrompt, setDialogBrand, viewImage, pushOverlay, dropOverlay, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, dow, hora12, fechaLarga, fechaCorta, toMillis, cop, esc,
   normalizePhone, waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, computeSlots, dayCapacityUnits, staffHours, mapLinks, headerBgCss,
   toast, openModal, closeModal, setBusy, copyText, tmin, mstr, UNIT
-} from "./common.js?v=2026-11-13r";
+} from "./common.js?v=2026-11-13s";
 
 const $ = (id) => document.getElementById(id);
 const S = {
@@ -49,7 +49,7 @@ if (!/^[a-z0-9][a-z0-9-]{1,29}$/.test(BIZ_ID)) {
     const b = e.target.closest("[data-lp]"); if (!b) return;
     if (b.dataset.lp === "trial") $("btnTrial").click(); else openAuth("login");
   });
-  // 🚀 2026-11-13r · viene de la invitación de una página de negocio: se abre «Probar gratis» de una vez
+  // 🚀 2026-11-13s · viene de la invitación de una página de negocio: se abre «Probar gratis» de una vez
   if (new URLSearchParams(location.search).has("probar")) setTimeout(() => $("btnTrial").click(), 400);
 } else {
   setBusiness(BIZ_ID);
@@ -1018,7 +1018,7 @@ function apptCard(a, i, list) {
     </div>
     <p class="mt-1 text-sm capitalize">${fechaLarga(a.date)} · ${hora12(a.startTime)} · ${esc(a.staffName)}</p>
     <p class="text-sm text-ink/70">${(a.items || []).map((i) => esc(i.name)).join(" + ")} · ${cop(a.totalCOP)}</p>
-    ${soon && ["confirmed", "pending_verification"].includes(a.status) ? `<p class="mt-2 rounded-lg px-2.5 py-1.5 text-xs" style="background:#fff7e6;color:#7a4b00">⏰ Tu cita ya se acerca: faltan menos de ${Number(S.settings?.rescheduleMinHours ?? 2)} horas. Para cancelar o cambiar la hora, escríbele al negocio.</p>` : ""}
+    ${soon && ["confirmed", "pending_verification"].includes(a.status) ? `<p class="mt-2 rounded-lg px-2.5 py-1.5 text-xs" style="background:#fff7e6;color:#7a4b00">⏰ Tu cita ya se acerca: faltan menos de ${Number(S.settings?.rescheduleMinHours ?? 2)} horas. ${S.settings?.lateCancel !== false ? "Si no puedes ir, toca «Cancelar» y cuéntanos el motivo." : "Para cancelar o cambiar la hora, escríbele al negocio."}</p>` : ""}
     <div class="mt-2 flex flex-wrap gap-2">${acts.join("")}</div>
   </article>`;
 }
@@ -1106,6 +1106,16 @@ $("mineList").addEventListener("click", async (e) => {
   const act = b.dataset.act;
   if (act === "pay") showPay(apt);
   if (act === "ticket") { closeModal("mineModal"); showTicket(apt); watchTicket(apt.code); }
+  // 2026-11-13s · falta poco y no puede ir: SÍ puede cancelar, diciendo el motivo (le llega al negocio). El dueño lo puede apagar en Configuración.
+  if (act === "cancel" && !canChange(apt) && apt.status !== "pending_payment" && S.settings?.lateCancel !== false) {
+    const motivo = await uiPrompt("¿No puedes ir?", "Falta poco para tu cita. Sí la puedes cancelar: cuéntanos en una frase por qué no puedes ir. Se lo avisamos al negocio.", "", { okText: "Cancelar mi cita", cancelText: "Volver", danger: true });
+    if (motivo === null) return;
+    if (String(motivo).trim().length < 3) return toast("Escribe el motivo para poder cancelar.", "error");
+    setBusy(b, true, "Cancelando…");
+    try { await api("cancelAppointment", { code: apt.code, reason: String(motivo).trim().slice(0, 160), tarde: true }); toast("Reserva cancelada. Ya le avisamos al negocio."); }
+    catch (err) { toast(err.message, "error"); setBusy(b, false); }
+    return;
+  }
   if ((act === "resched" || act === "cancel") && !canChange(apt) && apt.status !== "pending_payment") {
     const h = Number(S.settings?.rescheduleMinHours ?? 2);
     if (await uiConfirm("Tu cita ya se acerca", `Faltan menos de ${h} horas para tu cita, así que ya no se puede ${act === "cancel" ? "cancelar" : "cambiar"} desde aquí. Escríbele al negocio por WhatsApp y te ayudan.`, { okText: "Escribir por WhatsApp", cancelText: "Cerrar" }) && S.settings?.whatsapp) window.open(waLink(S.settings.whatsapp, `Hola, necesito ${act === "cancel" ? "cancelar" : "cambiar la hora de"} mi reserva ${apt.code}`), "_blank");
@@ -1174,7 +1184,7 @@ getDoc(doc(db, "platform", "public")).then((d) => {
   if (S.settings) renderAll();
   const on = PLAT.trialEnabled !== false;
   $("trialCta").classList.toggle("hidden", !on);
-  // 2026-11-13r · en la página de un negocio NO hay «Probar gratis» mientras el cliente agenda (no se pierde la cita):
+  // 2026-11-13s · en la página de un negocio NO hay «Probar gratis» mientras el cliente agenda (no se pierde la cita):
   //   solo el sello chiquito abajo; la invitación sale DESPUÉS (cita confirmada y «Mis citas"), en otra pestaña.
   $("trialTop").classList.add("hidden"); $("trialTop").classList.remove("inline-flex");
   $("trialCta").classList.add("hidden");
@@ -1236,7 +1246,7 @@ $("btnTrial").onclick = () => {
   const f = $("trialForm");
   if (S.profile) { f.ownerName.value = `${S.profile.firstName || ""} ${S.profile.lastName || ""}`.trim(); f.whatsapp.value = S.profile.whatsapp || ""; }
   $("trialForm").classList.add("hidden"); $("trialDone").classList.add("hidden");
-  // 🚀 2026-11-13r · «Probar gratis» entra DIRECTO a la prueba (sin elegir plan): una sola pantalla. Los planes quedan en «Ver planes y precios».
+  // 🚀 2026-11-13s · «Probar gratis» entra DIRECTO a la prueba (sin elegir plan): una sola pantalla. Los planes quedan en «Ver planes y precios».
   if (PLAT.trialEnabled !== false) { T_PLAN = "free"; showTrialForm(true); }
   openModal("trialModal");
 };

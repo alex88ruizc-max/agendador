@@ -472,6 +472,12 @@ function crear(dep) {
       if (i >= 0 && L[i]) return cancelarCita(neg, c, L[i]);
       return dep.texto(neg, c.tel, '¿Cuál cancelo? Escribe *la 1* o *la 2* (o *ninguna*) 🙏');
     }
+    if (conv.paso === 'motivoCancelar') {
+      const m = String(c.texto || '').replace(/\s+/g, ' ').trim();
+      if (/^(no|nada|ninguna|dejala|déjala|mejor no|ya no)$/i.test(m)) { fin(c.k); return dep.texto(neg, c.tel, '👌 Listo, tu cita sigue igual. ¡Te esperamos!'); }
+      if (m.length < 3) return dep.texto(neg, c.tel, '✍️ Escríbeme en una frase por qué no puedes ir (o *no* para dejar la cita).');
+      return cancelarCita(neg, c, Object.assign({}, conv.cita, { motivo: m }), true);
+    }
     if (conv.paso === 'cancelarSeguro') {
       if (SI.test(t) || c.rowId === 'can:si') return cancelarCita(neg, c, conv.cita, true);
       fin(c.k); return dep.texto(neg, c.tel, '👌 Listo, tu cita sigue igual. ¡Te esperamos!');
@@ -510,6 +516,8 @@ function crear(dep) {
       if (SI.test(t) && conv.time) return apartar(neg, c, conv);
       if (horaPedida(c.texto) || fechaPedida(c.texto, hoy())) return propuesta(neg, c, '', { date: fechaPedida(c.texto, hoy()) || conv.date, ids: conv.ids });
     }
+    // 3.53: «necesito CANCELAR mi reserva» en medio de las listas NO es agendar (decía «reserva» y arrancaba de nuevo): se suelta la lista y se atiende la cancelación
+    if (!c.rowId && ['cat', 'svc', 'mas', 'dia', 'hora', 'pro'].includes(conv.paso) && conv.modo !== 'reagendar' && cfg(neg).cambios && (QUIERE_CANCELAR.test(t) || QUIERE_MODIFICAR.test(t))) { fin(c.k); return null; }
     // 3.28: «quiero agendar» escrito en medio de las listas = empezar de nuevo (antes respondía «No te entendí»)
     if (!c.rowId && ['cat', 'svc', 'mas', 'dia', 'hora', 'pro'].includes(conv.paso) && QUIERE_AGENDAR.test(t) && !horaPedida(c.texto) && !fechaPedida(c.texto, hoy())) return agendar(neg, c, '', { ids: [] });
     const o = elegir(conv, c);
@@ -608,7 +616,11 @@ function crear(dep) {
   // ---------- cancelar / modificar desde WhatsApp ----------
   async function cancelarCita(neg, c, cita, yaSeguro) {
     fin(c.k);
-    const r = await dep.gas(neg, 'cancelar', { code: cita.code, phone: c.tel });
+    const r = await dep.gas(neg, 'cancelar', Object.assign({ code: cita.code, phone: c.tel }, cita.conCodigo ? { conCodigo: true } : {}, cita.motivo ? { motivo: cita.motivo } : {}));
+    if (r && r.tarde) {   // 3.53: falta poco para la cita → se puede cancelar, pero diciendo el motivo (le llega al negocio)
+      mem().conv[c.k] = { paso: 'motivoCancelar', cita, t: ahora() }; dep.guardar();
+      return dep.texto(neg, c.tel, T.pideMotivo(cita));
+    }
     dep.anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: r.ok ? 'canceló por WhatsApp ' + cita.code : 'cancelar: ' + r.motivo });
     return dep.texto(neg, c.tel, r.ok ? T.cancelada(Object.assign({}, r, { cita: r.cita && r.cita.dia ? r.cita : cita })) : '😕 ' + r.motivo + (cita.link ? '\n' + cita.link : ''));
   }
@@ -705,10 +717,20 @@ function crear(dep) {
     if (b.cambios && (QUIERE_CANCELAR.test(t) || QUIERE_MODIFICAR.test(t))) {
       if (await cerrada()) return 'suspendida';
       const info = await dep.gas(neg, 'chat', { phone: c.tel });
-      const cita = (info.citas || [])[0];
+      // 3.53: «necesito cancelar mi reserva R-G2GKAH» → si escribió su número de reserva, se usa ESA cita aunque esté con otro WhatsApp
+      const mc = String(c.texto || '').toUpperCase().match(/\bR-([A-Z0-9]{6})\b|\bR((?=[A-Z]*\d)[A-Z0-9]{6})\b/);   // con guion, o pegado pero con algún número (para no confundir «RESERVA»)
+      const cod = mc ? (mc[1] || mc[2]) : '';
+      if (cod && !(info.citas || []).some((x) => x.code === 'R-' + cod)) {
+        try { const rc = await dep.gas(neg, 'citaCodigo', { code: 'R-' + cod, phone: c.tel }); if (rc && rc.ok && rc.cita) info.citas = [Object.assign({ conCodigo: true }, rc.cita)].concat(info.citas || []); } catch (e) { /* sigue con las suyas */ }
+      }
+      if (!(info.citas || []).length) {   // 3.53: quiere cancelar o cambiar y no hay cita: se le dice (antes arrancaba a agendar porque decía «reserva»)
+        await dep.texto(neg, c.tel, saludo(c.k, info.negocio, c.nombre, !b.saludoDiario) + T.sinCitaActiva(info.link));
+        return 'quiere cancelar o cambiar, pero no le encontré cita';
+      }
+      const cita = (cod && (info.citas || []).find((x) => x.code === 'R-' + cod)) || (info.citas || [])[0];
       if (cita) {
         const sal = saludo(c.k, info.negocio, c.nombre, !b.saludoDiario);
-        if (QUIERE_CANCELAR.test(t) && (info.citas || []).length >= 2) return (await elegirCualCancelar(neg, Object.assign({}, c, { negocio: info.negocio }), info.citas, sal), 'flujo');
+        if (QUIERE_CANCELAR.test(t) && !cod && (info.citas || []).length >= 2) return (await elegirCualCancelar(neg, Object.assign({}, c, { negocio: info.negocio }), info.citas, sal), 'flujo');
         if (QUIERE_CANCELAR.test(t)) { const cv = { paso: 'cancelarSeguro', cita }; return (await lista(neg, c, cv, { texto: sal + T.preguntaCancelar(cita), boton: 'Ver opciones', pie: info.negocio + ' · asistente virtual', secciones: [{ titulo: 'Tu cita', filas: [{ id: 'can:si', titulo: '🚫 Sí, cancelarla', desc: '' }, { id: 'can:no', titulo: '↩️ No, la mantengo', desc: '' }] }] }), 'flujo'); }
         await modificarCita(neg, c, cita); return 'flujo';
       }

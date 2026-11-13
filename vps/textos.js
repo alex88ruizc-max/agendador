@@ -92,4 +92,7 @@ const teEncontre = (nombre, citas) => {
 };
 const correoNoEsta = () => '🔎 No encontré ese correo en nuestros clientes. No pasa nada, te atiendo igual. 😊';
 const correoSigue = () => 'Escríbeme *agendar* para apartar una cita o *cupos* para ver las horas libres.';
-module.exports = { teEncontre, correoNoEsta, correoSigue, sinNumero, demora, asistio, cancelada, reagendada, parafrasisCambio, preguntaCancelar, saludo, enTiempo, duracion, listaHoras, cuposDia, cuposOtros, sinCupos, sinDias, sinServicios, pideCorreo, parafrasis, citaHecha, audio, cop, nombre1, sinCita, conCita, estadoTxt, pagoTxt, fotoRecibida, fotoSinCita, pagoConfirmado, recordatorio, decision, problema };
+// 🚫 3.53 · cancelar faltando poco: se pide el motivo · y cuando quiere cancelar pero no se le encuentra cita
+const pideMotivo = (c) => `⏰ Falta poco para tu cita${c && c.hora ? ' de las *' + c.hora + '*' : ''}.\n\nSí te la cancelo. Solo cuéntame *por qué no puedes ir* (una frase) y le aviso al negocio. 🙏\n\nSi mejor la dejas, escribe *no*.`;
+const sinCitaActiva = (link) => `🔎 No encontré una cita activa a tu nombre con este número.\n\nSi tienes tu *número de reserva* (empieza por R-), escríbemelo así: *cancelar R-ABC123*.${link ? '\n\nO mírala aquí: ' + link : ''}`;
+module.exports = { pideMotivo, sinCitaActiva, teEncontre, correoNoEsta, correoSigue, sinNumero, demora, asistio, cancelada, reagendada, parafrasisCambio, preguntaCancelar, saludo, enTiempo, duracion, listaHoras, cuposDia, cuposOtros, sinCupos, sinDias, sinServicios, pideCorreo, parafrasis, citaHecha, audio, cop, nombre1, sinCita, conCita, estadoTxt, pagoTxt, fotoRecibida, fotoSinCita, pagoConfirmado, recordatorio, decision, problema };

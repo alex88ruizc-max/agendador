@@ -14,7 +14,7 @@
  * Instalación: pega este archivo, ejecuta activarMary() una vez, copia la clave que sale en el registro
  * y ponla en el mary.env del VPS (MARY_KEY). Vuelve a implementar la aplicación web (Implementar > Administrar > editar > Nueva versión).
  */
-const MARY_VERSION = 'agendador-ia-3.52';
+const MARY_VERSION = 'agendador-ia-3.53';
 
 // Se registra como acción pública del servidor (sin sesión: entra con la clave de Mary).
 // ⚠️ Este archivo debe quedar DEBAJO del archivo principal en la lista de archivos de Apps Script (los nuevos quedan al final: así está bien).
@@ -58,6 +58,7 @@ function maryAgenda(b) {
     case 'dobleAvisado': return maryDobleAvisado_(b);
     case 'volver': return maryVolver_(st, b);           // 3.32 · recordatorio de servicio
     case 'volverAvisado': return maryVolverAvisado_(b);
+    case 'citaCodigo': { const ac = maryCitaDelNumero_({ code: b.code, phone: b.phone, conCodigo: true }); return ac && ACTIVE.indexOf(ac.status) >= 0 ? { ok: true, cita: maryCitaOut_(ac) } : { ok: false }; }   // 3.53 · el cliente escribió su número de reserva
     case 'reconocer': return maryReconocer_(b);         // 3.52 · el cliente dio su correo: ¿está en los clientes del negocio?
     case 'guardarContacto': return maryGuardarContacto_(b);   // 3.52 · guardado inteligente (si el dueño lo activó)
     case 'historia': return maryHistoria_(b);           // 3.51 · el estado que publicó el bot también va a los estados de la página
@@ -194,7 +195,11 @@ function maryVcard_(nombre, phone, email, negocio) {
 }
 function maryCitaDelNumero_(b) {
   const a = fsGet(bp('appointments/' + String(b.code || '').toUpperCase().trim()));
-  if (!a || maryLast10_((a.customer || {}).whatsapp) !== maryLast10_(b.phone)) return null;
+  if (!a) return null;
+  // 3.53: la cita es suya si (1) tiene su WhatsApp, (2) es del cliente que HOY tiene ese WhatsApp en «Clientes», o (3) él mismo escribió el número de reserva (solo lo tiene quien apartó)
+  const suya = maryLast10_((a.customer || {}).whatsapp) === maryLast10_(b.phone) || b.conCodigo === true
+    || (a.customerUid && maryClientesPorNumero_(b.phone).some(function (c) { return c._id === a.customerUid; }));
+  if (!suya) return null;
   a.history = a.history || []; a.lockIds = a.lockIds || []; a.payment = a.payment || {};
   return a;
 }
@@ -221,15 +226,19 @@ function maryCancelar_(st, b) {
   const minH = Number(st.rescheduleMinHours != null ? st.rescheduleMinHours : 2);
   // 3.14: si es una cita DOBLE (el mismo cliente tiene otra activa que se cruza), puede quitar la de sobra aunque falte poco
   const esDoble = maryCitasDe_(b.phone).some(function (x) { return x.code !== a0.code && x.date === a0.date && tmin(x.startTime) < tmin(a0.endTime || a0.startTime) && tmin(a0.startTime) < tmin(x.endTime || x.startTime); });
-  if (!esDoble && a0.status !== 'pending_payment' && a0.startAt.getTime() - Date.now() < minH * 3600000) return { ok: false, motivo: 'Solo se puede cancelar con al menos ' + minH + ' horas de anticipación. Escríbele directamente al negocio.' };
+  // 3.53: falta poco para la cita → SÍ se puede cancelar, pero diciendo el motivo (le llega al negocio). El dueño lo puede apagar (lateCancel: false).
+  const tarde = !esDoble && a0.status !== 'pending_payment' && a0.startAt.getTime() - Date.now() < minH * 3600000;
+  const motivoCli = String(b.motivo || '').replace(/\s+/g, ' ').trim().slice(0, 160);
+  if (tarde && st.lateCancel !== false && motivoCli.length < 3) return { ok: false, tarde: true, motivo: 'Falta poco para tu cita. Cuéntame el motivo y la cancelo.' };
+  if (tarde && st.lateCancel === false) return { ok: false, motivo: 'Solo se puede cancelar con al menos ' + minH + ' horas de anticipación. Escríbele directamente al negocio.' };
   const apt = withLock(function () {
     const a = maryCitaDelNumero_(b);
     if (!a || ACTIVE.indexOf(a.status) < 0) fail('Esta reserva ya no está activa.');
-    commit([wPatch(bp('appointments/' + a.code), { status: 'cancelled', cancelReason: 'Cancelada por el cliente (WhatsApp)', updatedAt: new Date(), holdExpiresAt: null, history: hist(a, 'cancelled', 'whatsapp', { reason: 'whatsapp' }) })].concat(freeLockWrites(a)));
+    commit([wPatch(bp('appointments/' + a.code), { status: 'cancelled', cancelReason: 'Cancelada por el cliente (WhatsApp)' + (motivoCli ? ': ' + motivoCli : ''), lateCancel: tarde, updatedAt: new Date(), holdExpiresAt: null, history: hist(a, 'cancelled', 'whatsapp', { reason: 'whatsapp' }) })].concat(freeLockWrites(a)));
     a.status = 'cancelled';
     return a;
   });
-  try { if (tgEventOn('cancel')) tgNotify([apt.staffId], '🚫 <b>CITA CANCELADA</b> por el cliente (WhatsApp)\n' + aptText(apt) + '\nEl cupo quedó libre.'); } catch (e) { console.error(e); }
+  try { if (tgEventOn('cancel')) tgNotify([apt.staffId], '🚫 <b>CITA CANCELADA</b> por el cliente (WhatsApp)' + (tarde ? ' ⚠️ faltando poco' : '') + '\n' + aptText(apt) + (motivoCli ? '\nMotivo: ' + esc(motivoCli) : '') + '\nEl cupo quedó libre.'); } catch (e) { console.error(e); }
   if ((apt.customer || {}).email) emailClient(apt, 'Tu cita fue cancelada', 'Cancelaste tu cita. La quitamos de tu calendario. Escríbenos si quieres agendar de nuevo.');
   return { ok: true, cita: maryCitaOut_(apt), link: maryLinkAgenda_() };
 }
@@ -1032,3 +1041,18 @@ function maryGuardarContacto_(b) {
     paymentMode: 'deposit', blocked: false, noShowCount: 0, totalAppointments: 0, createdAt: new Date(), updatedAt: new Date() })]);
   return { ok: true, nuevo: true };
 }
+
+// ---------- 🚫 3.53 · CANCELAR TARDE DESDE LA PÁGINA, CON MOTIVO ----------
+// La página no dejaba cancelar si faltaba menos de N horas («escríbele al negocio»). Si el cliente no puede ir, es mejor que lo diga:
+// ahora puede cancelar escribiendo el motivo, que le llega al negocio (Telegram / WhatsApp del dueño). El dueño lo puede apagar (lateCancel: false).
+// Se envuelve la acción de siempre: solo se le quita el límite de horas cuando el cliente manda motivo; todo lo demás es igual.
+try {
+  const _cancelar = ACTIONS.cancelAppointment;
+  if (_cancelar) ACTIONS.cancelAppointment = function (b, auth) {
+    const st = loadSettings(), motivo = String((b && b.reason) || '').trim();
+    const quitar = !!(b && b.tarde === true && motivo.length >= 3 && st.lateCancel !== false);
+    const antes = st.rescheduleMinHours;
+    if (quitar) { st.rescheduleMinHours = 0; b.reason = '⚠️ Faltando poco: ' + motivo; }
+    try { return _cancelar.apply(this, arguments); } finally { st.rescheduleMinHours = antes; }
+  };
+} catch (e) { console.error('Cancelar tarde: ' + e); }
