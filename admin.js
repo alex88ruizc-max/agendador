@@ -9,9 +9,9 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, ventanaReserva, OFERTA_TXT, nombreCompleto, planEjemplos, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-11-13s";
-import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-13s";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-13s";
+} from "./common.js?v=2026-11-13t";
+import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-13t";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-13t";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -130,7 +130,7 @@ function start() {
     // recién creada desde "Probar gratis": abre la guía de primeros pasos
     // asistente de inicio: la primera vez (o al llegar desde "Probar gratis")
     if (!A.wizAuto && isOwner() && !A.me?.isSuper && !document.body.classList.contains("plan-gate") && !A.bill?.planWanted && (!A.settings.setupDone || !A.settings.tutorial2 || new URLSearchParams(location.search).get("guia") === "1")) {
-      // 2026-11-13s · los primeros pasos (nuevos, 4 pasos) se muestran UNA vez más a todas las tiendas, también a las que ya los habían hecho (tutorial2)
+      // 2026-11-13t · los primeros pasos (nuevos, 4 pasos) se muestran UNA vez más a todas las tiendas, también a las que ya los habían hecho (tutorial2)
       const otraVez = !!A.settings.setupDone && !A.settings.tutorial2;
       A.wizAuto = true; A.geoAsked = true;
       if (!A.settings.tutorial2) updateDoc(doc(db, bpath("settings", "general")), { tutorial2: true }).catch(() => {});
@@ -1261,7 +1261,8 @@ function renderSettings() {
     </fieldset>
 
     <fieldset class="rounded-xl border border-line bg-white p-4"><legend class="px-1 font-narrow text-xl font-bold">Telegram</legend>
-      <div class="mt-2">${tgPorQue()}</div>
+      ${pushCard("settings")}
+      <div class="mt-3">${tgPorQue()}</div>
       <div class="mt-3 flex flex-wrap items-center gap-2">
         <button type="button" id="tgOwner" class="btn-dark">${A.tg?.owner ? "Reconectar mi Telegram de dueño" : "Conectar mi Telegram de dueño"}</button>
         <span class="text-sm text-ink/70">${A.tg?.owner ? "Conectado ✓" : "Sin conectar"}</span>
@@ -2370,7 +2371,7 @@ function renderHome() {
         <button class="rounded-2xl bg-white py-2.5 text-[14px] font-extrabold" style="color:var(--sink)" data-bl="copy"><i class="fa-regular fa-copy"></i> Copiar</button>
         <button class="rounded-2xl py-2.5 text-[16px]" style="background:rgba(255,255,255,.18)" data-bl="qr" aria-label="Ver QR del enlace"><i class="fa-solid fa-qrcode"></i></button>
       </div></div>` : "";
-  el.innerHTML = `${linkHtml}${isOwner() ? guideCard() : ""}<div class="home-grid"><div class="home-col">${liveHtml}${teamHtml}
+  el.innerHTML = `${linkHtml}${pushCard("home")}${isOwner() ? guideCard() : ""}<div class="home-grid"><div class="home-col">${liveHtml}${teamHtml}
     <div class="sp-card mt-3" id="chairCard"><div class="flex items-center justify-between gap-2"><h2 class="disp text-[18px] font-bold">Hoy en tu agenda</h2>
       ${freeLater.length ? `<button class="rounded-full px-3 py-1.5 text-xs font-bold ${H.showFree ? "" : "t-late"}" style="${H.showFree ? "background:var(--sink);color:#fff" : ""}" data-hfree="1" aria-expanded="${!!H.showFree}">${freeLater.length} hueco${freeLater.length === 1 ? "" : "s"} libre${freeLater.length === 1 ? "" : "s"} ${H.showFree ? "▴" : "▾"}</button>` : `<span class="soft text-xs">Sin huecos libres</span>`}</div>${chair}
       ${H.showFree && freeLater.length ? `<div class="q-pop mt-3 rounded-2xl p-3" style="background:var(--canvas)">
@@ -2993,7 +2994,7 @@ async function loadLost() {
 const guideDone = () => A.settings?.guideDone || [];
 // lo que ya se hizo en el asistente de inicio cuenta como hecho en la guía
 const WIZ_ORDER = ["hi", "biz", "social", "team", "hours", "services", "deposit", "geo", "telegram", "done"];
-// 2026-11-13s · el asistente de inicio ahora son 4 pasos (negocio, horario, servicios y listo). Lo demás queda en la guía.
+// 2026-11-13t · el asistente de inicio ahora son 4 pasos (negocio, horario, servicios y listo). Lo demás queda en la guía.
 //   Quien terminó el asistente viejo (10 pasos) ya pasó por todo; quien termina el nuevo (setupVer 2) solo pasó por esos 4.
 const WIZ_NUEVO = ["biz", "hours", "services", "done"];
 const wizPassed = (id) => {
@@ -3040,6 +3041,61 @@ function guideSteps() {
   ];
 }
 function guideProgress() { const st = guideSteps().filter((x) => !x.optional); return { done: st.filter((x) => x.ok).length, total: st.length, next: guideSteps().find((x) => !x.ok && !x.optional) }; }
+// ================= 🔔 NOTIFICACIONES DE LA APP (en este celular) =================
+//  Cada reserva nueva y cada cancelación le llegan como notificación, aunque tenga la app cerrada. Sin importar el plan.
+//  Se activan por celular: el dueño toca «Activar» y da el permiso. Las manda el servidor del agendador (Web Push).
+const pushSoporta = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+const pushClave = () => "pushOn:" + (bpath().split("/")[1] || "");
+const pushOn = () => { try { return localStorage.getItem(pushClave()) === "1" && Notification.permission === "granted"; } catch { return false; } };
+const pushVisto = () => { try { return localStorage.getItem(pushClave() + ":no") === "1"; } catch { return false; } };
+function pushCard(donde) {
+  if (!A.me || A.me.isSuper) return "";
+  const on = pushOn();
+  if (donde === "home" && (on || pushVisto())) return "";   // en Inicio solo invita; el control completo está en WhatsApp Bot y Configuración
+  if (!pushSoporta()) return donde === "home" ? "" : `<div class="sp-card mt-3 text-[13.5px]"><p class="font-extrabold">🔔 Notificaciones en este celular</p>
+    <p class="mt-1">Este navegador no deja recibir notificaciones. <b>En iPhone:</b> abre tuagenda.vip en Safari, toca <b>Compartir</b> › <b>Agregar a inicio</b> y entra desde ese ícono. <b>En Android:</b> usa Chrome o la app.</p></div>`;
+  return `<div class="sp-card ${donde === "home" ? "mb-3" : "mt-3"} text-[13.5px] leading-snug" style="${on ? "" : "border:2px solid #16a34a;background:#f0fdf4"}">
+    <p class="text-[15.5px] font-extrabold">🔔 ${on ? "Notificaciones activadas en este celular ✓" : "Que te suene el celular con cada cita"}</p>
+    ${on ? `<p class="mt-1">Te avisamos de cada <b>reserva nueva</b> y cada <b>cancelación</b>, aunque tengas la app cerrada.</p>`
+      : `<p class="mt-1">Cada vez que alguien <b>aparte</b> o <b>cancele</b> una cita, te llega una notificación a <b>este celular</b>. Aunque tengas la app cerrada.</p>
+         <p class="soft mt-1 text-[12.5px]">Tocas «Activar», el celular te pregunta y eliges <b>Permitir</b>. Listo. Es gratis.</p>`}
+    <div class="mt-2 flex flex-wrap gap-2">${on ? `<button type="button" class="btn-light text-sm" data-push="no">Quitarlas en este celular</button>`
+      : `<button type="button" class="btn-primary" data-push="si">🔔 Activar</button>${donde === "home" ? `<button type="button" class="btn-light" data-push="luego">Ahora no</button>` : ""}`}</div>
+  </div>`;
+}
+const pushBytes = (b64u) => { const s = atob(String(b64u).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from(s, (c) => c.charCodeAt(0)); };
+async function pushActivar(btn) {
+  const key = A.plat?.pushKey;
+  if (!pushSoporta()) return toast("Este navegador no deja recibir notificaciones.", "error");
+  if (!key) return toast("Las notificaciones aún se están preparando. Intenta en unos minutos.", "error");
+  setBusy(btn, true, "Activando…");
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") { setBusy(btn, false); return toast("No diste el permiso. Lo puedes cambiar en los ajustes del navegador (Notificaciones).", "error"); }
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (sub) { const k = sub.options?.applicationServerKey ? btoa(String.fromCharCode(...new Uint8Array(sub.options.applicationServerKey))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "") : ""; if (k && k !== key) { await sub.unsubscribe(); sub = null; } }
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: pushBytes(key) });
+    await api("maryPushSub", { sub: sub.toJSON() });
+    try { localStorage.setItem(pushClave(), "1"); } catch { /* nada */ }
+    toast("🔔 Listo. Te avisaremos de cada reserva y cada cancelación.");
+    try { reg.showNotification("Tu Agenda", { body: "Así te van a llegar los avisos de tus citas. 👍", icon: "/icon-192.png" }); } catch { /* nada */ }
+  } catch (err) { toast("No se pudieron activar: " + err.message, "error"); }
+  setBusy(btn, false); pushRepintar();
+}
+async function pushQuitar(btn) {
+  setBusy(btn, true, "Quitando…");
+  try { const reg = await navigator.serviceWorker.ready, sub = await reg.pushManager.getSubscription(); if (sub) await api("maryPushSub", { sub: sub.toJSON(), quitar: true }).catch(() => {}); } catch { /* nada */ }
+  try { localStorage.removeItem(pushClave()); } catch { /* nada */ }
+  toast("Notificaciones quitadas en este celular."); pushRepintar();
+}
+function pushRepintar() { if (A.tab === "home") renderHome(); if (A.tab === "wabot") renderWaBot(); }   // Configuración no se repinta (podría borrar lo que el dueño está escribiendo)
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-push]"); if (!b) return;
+  if (b.dataset.push === "si") return pushActivar(b);
+  if (b.dataset.push === "no") return pushQuitar(b);
+  try { localStorage.setItem(pushClave() + ":no", "1"); } catch { /* nada */ } pushRepintar();
+});
 function guideCard() {
   if (!A.settings) return "";
   const g = guideProgress();
@@ -4223,6 +4279,8 @@ function renderWaBot() {
       <div class="flex items-center gap-3 p-3.5"><span class="text-xl">🙊</span><span class="min-w-0 flex-1"><b class="block text-[14.5px]">Si escribes tú en un chat, se calla</b><span class="block text-xs text-ink/65">El asistente se hace a un lado en ese chat para que hables tú.</span></span>
         ${sel("pausaMin", c.pausaMin, [[15, "15 min"], [30, "30 min"], [60, "1 hora"], [120, "2 horas"]])}</div>
     </div>
+    <div class="sp-h mt-5"><h2>🔔 Notificaciones</h2><span>en este celular</span></div>
+    ${pushCard("wabot")}
     ${hay("avisosWa") ? `<div class="sp-h mt-5"><h2>🔔 Que te avisen a tu celular</h2><span>por WhatsApp</span></div>
     <div class="sp-card !p-0 divide-y divide-line">
       ${fila("avisos.activo", "🔔", "Avisarme por WhatsApp", "Cada vez que alguien aparte una cita o te pague, te escribimos a TU celular.", c.avisos.activo)}

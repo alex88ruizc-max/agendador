@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.54** · Página **2026-11-13s** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.55** · Página **2026-11-13t** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -115,9 +115,6 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## ⏳ Pendientes
-000. **🔔 Notificaciones de la app (push) — pedido por Alex, NO hecho todavía:** que al dueño le llegue una notificación cada vez que reserven y cada vez que cancelen.
-     Idea técnica: Web Push enviado desde el VPS (Node), usando la misma cola de avisos (`private/maryAvisos` + `platform/public.maryAvisoPend`); el panel guarda la suscripción; `sw.js` muestra la notificación.
-     Ojo: hoy los avisos dependen de las reglas del plan (`tgEventOn`); Alex los quiere SIEMPRE para reserva nueva y cancelación.
 0000. **📋 Vista de servicios «por categoría» o «una sola lista» — Alex pidió confirmar si se entendió (NO hecho):** una opción (en Servicios o en WhatsApp Bot) que decide cómo se muestran los servicios, y el bot de WhatsApp usa la misma.
 00. **💡 Idea de Alex (solo anotada, NO hecha): línea de ayuda para dueños.** Su WhatsApp 318 como «máster»: en el panel de cada dueño un botón «¿Necesitas ayuda?» que le escribe a ese número.
     Un bot ahí responde SOLO a los dueños de tiendas (los reconoce por su número) con autoayuda de Tu Agenda, y Alex puede responder él mismo. A nadie más de su agenda le responde.
@@ -140,6 +137,20 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-13 · agendador-ia-3.55 · página 2026-11-13t · 🔔 notificaciones de la app: cada reserva y cada cancelación, en todos los planes
+- **Alex:** «cada vez que reserven una nueva cita, cada vez que cancelen, que llegue la notificación… sin importar el plan».
+- **Cómo funciona:** el dueño (o alguien de su equipo) toca «🔔 Activar» en su panel (Inicio, WhatsApp Bot o Configuración) y da el permiso en ESE celular.
+  El panel guarda la suscripción (`ACTIONS.maryPushSub` → `private/maryPush`, máximo 20 celulares por negocio). Cuando hay un aviso, el VPS la manda cifrada (Web Push).
+- **VPS (`vps/push.js`, sin librerías):** cifrado RFC 8291 (probado con el ejemplo oficial) y firma VAPID. Las llaves se crean solas en `datos/push-llaves.json` (no van al código ni al zip);
+  la parte pública se publica en `platform/public.pushKey`. Solo se envía a servicios de notificaciones conocidos (Google, Mozilla, Apple, Microsoft). Los celulares que ya no existen se dan de baja solos.
+- **Sin importar el plan:** `tgEventOn` envuelto en gs/mary.gs: «newBooking» y «cancel» avisan siempre. Si el plan no los traía, a Telegram NO se manda (eso sigue siendo del plan), pero sí la notificación de la app
+  (y el WhatsApp del dueño si lo activó). Los demás avisos siguen las reglas del plan.
+- **Van aunque la tienda no tenga bot de WhatsApp** (la cola de avisos y la bandera `maryAvisoPend` ya existían desde la 3.47).
+- **Página:** `sw.js` muestra la notificación y, al tocarla, abre el panel. En iPhone hay que agregar Tu Agenda a la pantalla de inicio (regla de Apple): el panel lo explica.
+- **Sin probar en un celular real** (desde aquí no se puede): la primera prueba es con Alex. Tampoco está verificado que la APK actual las muestre sin regenerarla.
+- Reseña (Prueba) y página de venta: «🔔 Notificación en tu celular con cada reserva y cada cancelación».
+- Banco: 183 pasan aquí; como el VPS: 157 pasan, 20 saltadas, 0 fallas. Página: 0 fallas.
 
 ### 2026-11-13 · agendador-ia-3.54 · el bot pregunta «¿cancelar o reagendar?»
 - Alex: «si piden cancelar: listo, perfecto, ¿deseas cancelar o reagendar? Y si dice reagendar, que siga el flujo».

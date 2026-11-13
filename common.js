@@ -2,7 +2,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js?v=2026-11-13s";
+import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js?v=2026-11-13t";
 
 export const app = initializeApp(firebaseConfig);
 // Caché en el dispositivo: muestra al instante lo último que se vio y luego actualiza en vivo
@@ -21,7 +21,7 @@ export function businessFromUrl() {
 export const bpath = (...parts) => ["businesses", BID, ...parts].join("/");
 
 // Versión de la página: cámbiala en cada actualización para comprobar que se publicó
-export const APP_VERSION = '2026-11-13s';
+export const APP_VERSION = '2026-11-13t';
 // Versiones que esta página espera del servidor y de las reglas de Firebase
 export const SERVER_VERSION = '2026-10-10n';
 export const RULES_VERSION = '2026-10-10l';
@@ -453,13 +453,13 @@ export function plansOf(plat = {}) {
 //   📌 REGLA (Alex, 2026-11-13): cada mejora nueva que vean las tiendas se agrega AQUÍ (y en la página de venta, index.html),
 //   en el mismo cambio. La lista vieja va a BENEFITS_VIEJOS para que, si el superusuario no la editó, se cambie sola.
 export const DEFAULT_BENEFITS = {
-  free: ["📅 Tu página para que te agenden en línea, 24/7", "📧 Confirmación al correo y la cita en su calendario", "🕐 Horario de cada profesional y bloqueo de horas", "💳 Cobro de abonos con Nequi o Bre-B", "⚡ Cita rápida y «atender ahora»"],
+  free: ["📅 Tu página para que te agenden en línea, 24/7", "🔔 Notificación en tu celular con cada reserva y cada cancelación", "📧 Confirmación al correo y la cita en su calendario", "🕐 Horario de cada profesional y bloqueo de horas", "💳 Cobro de abonos con Nequi o Bre-B", "⚡ Cita rápida y «atender ahora»"],
   basic: ["🎨 Tu marca: portada, colores y logo", "🔔 Aviso en Telegram de cada reserva (también a cada profesional)", "🗂️ Tus clientes: historial, preferenciales y bloqueos", "🖼️ Imágenes con tus horarios libres", "👥 Hasta 3 profesionales y reservas hasta 30 días"],
   gold: ["🤖 Bot de WhatsApp 24/7: agenda con listas, dice tus cupos y escucha audios", "🔔 Avisos de cada reserva a tu WhatsApp o Telegram: apruebas pagos con un toque", "⏰ Recordatorio por WhatsApp antes de la cita, con confirmación", "📸 Estados automáticos en WhatsApp y en tu página: tus cupos y «Cómo agendar»", "🔁 Le escribe al cliente para que vuelva", "🧠 Guardado inteligente: no pierdes a nadie que te escriba", "📊 Reporte del bot, del link y de tus ingresos", "🎨 Estados PRO con tu logo y marketing para llenar huecos", "👥 Equipo sin límite y reservas hasta 90 días"]
 };
 // listas que ya se usaron: si están guardadas sin cambios, se muestran las nuevas
 const BENEFITS_VIEJOS = {
-  free: ["📅 Tu página para que te agenden en línea|⚡ Cita rápida y atender ahora|💳 Cobro de abonos con Nequi o Bre-B"],
+  free: ["📅 Tu página para que te agenden en línea, 24/7|📧 Confirmación al correo y la cita en su calendario|🕐 Horario de cada profesional y bloqueo de horas|💳 Cobro de abonos con Nequi o Bre-B|⚡ Cita rápida y «atender ahora»", "📅 Tu página para que te agenden en línea|⚡ Cita rápida y atender ahora|💳 Cobro de abonos con Nequi o Bre-B"],
   basic: ["🎨 Tu marca: portada, colores y logo|🔔 Aviso en Telegram de cada reserva|🗂️ Tus clientes: historial, preferenciales y bloqueos|🖼️ Imágenes con tus horarios libres|👥 Hasta 3 profesionales y reservas hasta 30 días"],
   gold: ["🤖 Bot de WhatsApp 24/7: agenda con listas, dice tus cupos y escucha audios|🔔 Avisos de cada reserva a tu WhatsApp o Telegram: apruebas pagos con un toque|⏰ Recordatorio por WhatsApp antes de la cita, con confirmación|📸 Estados automáticos en WhatsApp y en tu página: tus cupos y «Cómo agendar»|🔁 Le escribe al cliente para que vuelva|📊 Reporte del bot, del link y de tus ingresos|🎨 Estados PRO con tu logo y marketing para llenar huecos|👥 Equipo sin límite y reservas hasta 90 días", "🤖 Bot de WhatsApp 24/7: agenda con listas, dice tus cupos y escucha audios|🔔 Avisos de cada reserva a tu WhatsApp o Telegram: apruebas pagos con un toque|⏰ Recordatorio por WhatsApp antes de la cita, con confirmación|📸 Estados automáticos: tus cupos del día y «Cómo agendar»|🔁 Le escribe al cliente para que vuelva|📊 Reporte del bot, del link y de tus ingresos|🎨 Estados PRO con tu logo y marketing para llenar huecos|👥 Equipo sin límite y reservas hasta 90 días", "🤖 Bot de WhatsApp 24/7: agenda con listas, dice tus cupos y escucha audios|⏰ Recordatorio por WhatsApp antes de la cita, con confirmación|📸 Estados automáticos: tus cupos del día y «Cómo agendar»|🔁 Le escribe al cliente para que vuelva|📊 Reporte del bot, del link y de tus ingresos|🎨 Estados PRO con tu logo y marketing para llenar huecos|👥 Equipo sin límite y reservas hasta 90 días", "🎨 Estados PRO: 8 diseños con tu logo|📲 Publícalos en tu estado de WhatsApp con un toque|📣 Marketing para llenar tus huecos libres|🔔 Tú eliges qué avisos de Telegram recibir|👥 Equipo sin límite y reservas hasta 90 días"]
 };

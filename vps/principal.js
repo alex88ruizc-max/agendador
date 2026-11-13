@@ -6,7 +6,7 @@
 const http = require('http'), fs = require('fs'), path = require('path');
 const T = require('./textos'), C = require('./correo'), E = require('./estado'), A = require('./asistente');
 
-const VERSION = 'agendador-ia-3.54';
+const VERSION = 'agendador-ia-3.55';
 const env = (k, d) => (process.env[k] === undefined || process.env[k] === '' ? d : process.env[k]);
 const CFG = {
   puerto: parseInt(env('PUERTO', '3060'), 10),
@@ -836,16 +836,37 @@ const avisados = new Map();
 async function entregarAvisos(bid, t) {
   if (!/^[a-z0-9][a-z0-9-]{1,29}$/.test(bid) || !t || Date.now() - t > 6 * 3600000 || avisados.get(bid) === t) return;
   avisados.set(bid, t);
-  const neg = negocios().find((n) => n.bid === bid); if (!neg || CFG.modo === 'apagado') return;
+  const conBot = negocios().find((n) => n.bid === bid), neg = conBot || { bid };   // las notificaciones de la app van aunque la tienda no tenga bot de WhatsApp
   const r = await gas(neg, 'avisos');
-  const num = String(r.numero || '').replace(/\D/g, ''); if (!num || !(r.avisos || []).length) return;
+  if (!(r.avisos || []).length) return;
+  const num = String(r.numero || '').replace(/\D/g, ''), subs = r.subs || [];
+  let nWa = 0, nPush = 0; const bajas = [];
   for (const a of r.avisos) {
-    const cola = a.code ? '\n\n👉 Responde *1* para APROBAR el pago o *2* para rechazarlo.\n(La captura la ves en tu panel, en Agenda.)' : '';
-    await escribir(neg, num, '🔔 ' + a.texto + cola);
-    if (a.code) { MEM.avisoPago = MEM.avisoPago || {}; MEM.avisoPago[bid] = { code: a.code, numero: num, t: Date.now() }; memGuardar(); }
-    est.avisosWa = (est.avisosWa || 0) + 1;
+    if (conBot && num && a.wa !== false && CFG.modo !== 'apagado') {
+      const cola = a.code ? '\n\n👉 Responde *1* para APROBAR el pago o *2* para rechazarlo.\n(La captura la ves en tu panel, en Agenda.)' : '';
+      try { await escribir(neg, num, '🔔 ' + a.texto + cola); nWa++; if (a.code) { MEM.avisoPago = MEM.avisoPago || {}; MEM.avisoPago[bid] = { code: a.code, numero: num, t: Date.now() }; memGuardar(); } }
+      catch (e) { log('aviso wa', bid, e.message); }
+    }
+    // 🔔 3.55 · notificación de la app en cada celular que la activó
+    if (subs.length) {
+      const L = String(a.texto || '').split('\n').map((x) => x.trim()).filter(Boolean);
+      const datos = { title: (L[0] || 'Tu Agenda').slice(0, 60), body: (L.slice(1, 4).join(' · ') || r.negocio || '').slice(0, 160), url: 'https://tuagenda.vip/admin.html?b=' + encodeURIComponent(bid), tag: 'ta-' + bid + '-' + a.t, negocio: r.negocio || '' };
+      for (const sub of subs) { if (bajas.includes(sub.id)) continue; const x = await PUSH.enviar(sub, datos, llavesPush()); if (x.ok) nPush++; else if (x.baja) bajas.push(sub.id); else log('push', bid, x.motivo); }
+    }
   }
-  anotar({ bid, que: '🔔 ' + r.avisos.length + ' aviso(s) al WhatsApp del dueño' });
+  if (bajas.length) gas(neg, 'pushBaja', { ids: bajas }).catch(() => {});
+  est.avisosWa = (est.avisosWa || 0) + nWa; est.push = (est.push || 0) + nPush;
+  anotar({ bid, que: '🔔 ' + r.avisos.length + ' aviso(s): ' + nWa + ' al WhatsApp del dueño, ' + nPush + ' notificación(es) de la app' + (bajas.length ? ' (' + bajas.length + ' celular(es) ya no las reciben)' : '') });
+}
+// 🔔 3.55 · llaves de las notificaciones (se crean solas en la carpeta de datos) y su parte pública, que la página necesita para pedir el permiso
+const PUSH = require('./push');
+let _llavesPush = null;
+function llavesPush() { return _llavesPush || (_llavesPush = PUSH.llaves(CFG.datos)); }
+async function publicarLlavePush() {
+  const K = llavesPush(); if (MEM.pushPublicada === K.publica) return;
+  const neg = negocios()[0]; if (!neg || !CFG.gas || !CFG.maryKey) return;
+  const r = await gas(neg, 'pushLlave', { publica: K.publica });
+  if (r && r.ok) { MEM.pushPublicada = K.publica; memGuardar(); log('🔔 llave de notificaciones publicada'); }
 }
 // el dueño responde 1 o 2 al último comprobante que se le avisó (vale 24 horas)
 async function respuestaDelDueno(c, neg) {
@@ -974,6 +995,7 @@ async function sincronizarConectados() {
 async function tickPedidosWa() {
   if (!CFG.gas || !CFG.maryKey) return;
   await limpiarSinVincular().catch((e) => log('limpiar', e.message));
+  if (Date.now() - (publicarLlavePush.t || 0) > 10 * 60000) { publicarLlavePush.t = Date.now(); await publicarLlavePush().catch((e) => log('push llave', e.message)); }   // 3.55
   await renovarQr().catch((e) => log('qr', e.message));
   if (Date.now() - SINC.t > 30 * 60000) { SINC.t = Date.now(); await sincronizarConectados().catch((e) => log('sincronizar', e.message)); }
   let pend = {};
@@ -1057,5 +1079,5 @@ if (require.main === module) {
   servidor.listen(CFG.puerto, () => { log('👩‍💼 ' + VERSION + ' escuchando en ' + CFG.puerto + ' · modo ' + CFG.modo); negocios(); arrancarRelojes(); });
 }
 // 🧪 solo para el banco de escenarios (banco/escenarios.js): deja a Mary como recién encendida
-const _banco = { ASIS, BOT, yaLoDije, memDicho: () => (MEM.dicho = MEM.dicho || {}), memHumano: () => MEM.humano, memRobot: () => (MEM.robot = MEM.robot || {}), memConv: () => (MEM.conv = MEM.conv || {}), tickRecordatorios, tickVolver, tickRetomar, tickEstadisticas, tickEstados, publicarGuia, audienciaDe, AUDIENCIA, memLids: () => (MEM.lids = MEM.lids || {}), entregarAvisos, tickPedidosWa, memAvisoPago: () => (MEM.avisoPago = MEM.avisoPago || {}), avisados, botOff: BOT_OFF, apagarGlobal, botAlDia, botDe, memGuia: () => (MEM.guia = MEM.guia || {}), memStats: () => (MEM.stats = MEM.stats || {}), publicarEstado, alMensaje, alEventoConexion, ultimos, reiniciar() { CL = null; MEM.volver = {}; MEM.stats = {}; MEM.piePrueba = {}; MEM.lids = {}; MEM.lidAviso = {}; LID_NO.clear(); MEM.guia = {}; MEM.avisoPago = {}; avisados.clear(); leer.avisado = false; BOT_LEIDO.clear(); MEM.sinbot = {}; MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; MEM.conv = {}; MEM.clientes = {}; MEM.conectados = {}; MEM.pendientesWa = {}; MEM.codigos = {}; MEM.robot = {}; MEM.dicho = {}; AGRUPA.clear(); ASIS._cat.clear(); BOT.clear(); CONTACTOS.clear(); AUDIENCIA.clear(); vinculando.clear(); delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
+const _banco = { ASIS, BOT, yaLoDije, memDicho: () => (MEM.dicho = MEM.dicho || {}), memHumano: () => MEM.humano, memRobot: () => (MEM.robot = MEM.robot || {}), memConv: () => (MEM.conv = MEM.conv || {}), tickRecordatorios, tickVolver, tickRetomar, tickEstadisticas, tickEstados, publicarGuia, publicarLlavePush, llavesPush, audienciaDe, AUDIENCIA, memLids: () => (MEM.lids = MEM.lids || {}), entregarAvisos, tickPedidosWa, memAvisoPago: () => (MEM.avisoPago = MEM.avisoPago || {}), avisados, botOff: BOT_OFF, apagarGlobal, botAlDia, botDe, memGuia: () => (MEM.guia = MEM.guia || {}), memStats: () => (MEM.stats = MEM.stats || {}), publicarEstado, alMensaje, alEventoConexion, ultimos, reiniciar() { CL = null; MEM.volver = {}; MEM.stats = {}; MEM.piePrueba = {}; delete MEM.pushPublicada; MEM.lids = {}; MEM.lidAviso = {}; LID_NO.clear(); MEM.guia = {}; MEM.avisoPago = {}; avisados.clear(); leer.avisado = false; BOT_LEIDO.clear(); MEM.sinbot = {}; MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; MEM.conv = {}; MEM.clientes = {}; MEM.conectados = {}; MEM.pendientesWa = {}; MEM.codigos = {}; MEM.robot = {}; MEM.dicho = {}; AGRUPA.clear(); ASIS._cat.clear(); BOT.clear(); CONTACTOS.clear(); AUDIENCIA.clear(); vinculando.clear(); delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
 module.exports = { _banco, botNormal, frenoRobot, estadosQueTocan, atenderPedidoWa, sincronizarConectados, renovarQr, telEnAviso, deWaha, esWaha, debeResponder, alEventoConexion, tickPedidosWa, limpiarSinVincular, leerMensaje, atiende, PREGUNTA, numeroWa, ahoraLocal, enFila, yaVisto, quienVeEstados, CFG };

@@ -14,7 +14,7 @@
  * Instalación: pega este archivo, ejecuta activarMary() una vez, copia la clave que sale en el registro
  * y ponla en el mary.env del VPS (MARY_KEY). Vuelve a implementar la aplicación web (Implementar > Administrar > editar > Nueva versión).
  */
-const MARY_VERSION = 'agendador-ia-3.54';
+const MARY_VERSION = 'agendador-ia-3.55';
 
 // Se registra como acción pública del servidor (sin sesión: entra con la clave de Mary).
 // ⚠️ Este archivo debe quedar DEBAJO del archivo principal en la lista de archivos de Apps Script (los nuevos quedan al final: así está bien).
@@ -62,7 +62,9 @@ function maryAgenda(b) {
     case 'reconocer': return maryReconocer_(b);         // 3.52 · el cliente dio su correo: ¿está en los clientes del negocio?
     case 'guardarContacto': return maryGuardarContacto_(b);   // 3.52 · guardado inteligente (si el dueño lo activó)
     case 'historia': return maryHistoria_(b);           // 3.51 · el estado que publicó el bot también va a los estados de la página
-    case 'avisos': return maryAvisos_();                // 3.47 · avisos al dueño por WhatsApp (el VPS los recoge solo cuando hay)
+    case 'avisos': return maryAvisos_();
+    case 'pushBaja': return maryPushBaja_(b);           // 3.55 · suscripción que ya no existe
+    case 'pushLlave': return maryPushLlave_(b);         // 3.55 · la llave pública de notificaciones del VPS                // 3.47 · avisos al dueño por WhatsApp (el VPS los recoge solo cuando hay)
     case 'revisarPago': return maryRevisarPago_(b);     // 3.47 · el dueño respondió 1 (aprobar) o 2 (rechazar) por WhatsApp
     case 'estadisticas': return maryEstadisticas_(b);   // 3.37 · reporte del bot (el VPS lo manda una vez por hora)
   }
@@ -980,35 +982,81 @@ function maryAvisosCfg_(st) {
   const negocio = String(((st.maryWa || {}).numero) || '').replace(/\D/g, '');
   return { activo: a.activo === true && n.length >= 11 && n !== negocio, numero: n };
 }
-function maryAvisoWa_(texto, code) {
+// 🔔 3.55 · Un aviso sale por DOS caminos además de Telegram: el WhatsApp personal del dueño (si lo activó) y las NOTIFICACIONES DE LA APP
+//    (si alguien del negocio las activó en su celular). `siempre` = reserva nueva o cancelación: llegan sin importar el plan (orden de Alex).
+function maryPushSubs_() { try { return ((fsGet(bp('private/maryPush')) || {}).subs) || {}; } catch (e) { return {}; } }
+function maryAvisoWa_(texto, code, siempre) {
   try {
     const st = loadSettings(), cfg = maryBotCfg_(st).avisos;
-    if (!cfg.activo || !planHas('whatsapp') || !((st.maryWa || {}).conectado)) return;
+    const wa = cfg.activo && planHas('whatsapp') && !!((st.maryWa || {}).conectado);
+    const push = Object.keys(maryPushSubs_()).length > 0;
+    if (!wa && !push) return;
     const limpio = String(texto || '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').trim().slice(0, 900);
     if (!limpio) return;
     const ruta = bp('private/maryAvisos'), ya = fsGet(ruta) || {}, ahora = Date.now();
     const cola = (ya.cola || []).filter(function (x) { return ahora - Number(x.t || 0) < 6 * 3600000; }).slice(-19);
-    cola.push({ t: ahora, texto: limpio, code: String(code || '') });
+    cola.push({ t: ahora, texto: limpio, code: String(code || ''), wa: wa, push: push });
     commit([wPatch(ruta, { cola: cola }),
       { update: { name: docName('platform/public'), fields: encFields({ maryAvisoPend: (function () { const o = {}; o[BID] = ahora; return o; })() }) }, updateMask: { fieldPaths: [fp(['maryAvisoPend', BID])] } }]);
-  } catch (e) { console.error('Aviso por WhatsApp: ' + e); }
+  } catch (e) { console.error('Aviso: ' + e); }
 }
+// Reserva nueva y cancelación avisan SIEMPRE (sin importar el plan). El código principal pregunta `tgEventOn('newBooking')` justo antes de avisar:
+// aquí se responde «sí» para esos dos, y se recuerda si el plan de verdad los traía; si no los traía, NO se manda a Telegram (eso sigue siendo del plan),
+// pero sí salen la notificación de la app y el WhatsApp del dueño.
+let MARY_EV = null;
+const MARY_SIEMPRE = { newBooking: true, cancel: true };
 try {
-  const _tgNotify = tgNotify, _tgPhoto = tgPhoto;
-  tgNotify = function (staffIds, text, onlyStaff, system) { const r = _tgNotify.apply(this, arguments); if (!onlyStaff) maryAvisoWa_(text, ''); return r; };
+  const _tgEventOn = tgEventOn, _tgNotify = tgNotify, _tgPhoto = tgPhoto;
+  tgEventOn = function (ev) { let real = false; try { real = !!_tgEventOn.apply(this, arguments); } catch (e) { real = false; } const si = real || MARY_SIEMPRE[ev] === true; MARY_EV = si ? { ev: ev, real: real } : null; return si; };   // si responde «no», no queda nada pendiente (el siguiente aviso no se confunde)
+  tgNotify = function (staffIds, text, onlyStaff, system) {
+    const E = MARY_EV; MARY_EV = null;
+    const forzado = !!(E && !E.real);   // el plan no trae este aviso: Telegram no; app y WhatsApp sí
+    const r = forzado ? undefined : _tgNotify.apply(this, arguments);
+    if (!onlyStaff) maryAvisoWa_(text, '', !!(E && MARY_SIEMPRE[E.ev])); return r;
+  };
   tgPhoto = function (staffIds, blob, caption, buttons) {
-    const r = _tgPhoto.apply(this, arguments);
+    const E = MARY_EV; MARY_EV = null;
+    const r = E && !E.real ? undefined : _tgPhoto.apply(this, arguments);
     let code = ''; try { code = String((((buttons || [])[0] || [])[0] || {}).callback_data || '').split('|')[2] || ''; } catch (e) { code = ''; }
     maryAvisoWa_(caption, code); return r;
   };
-} catch (e) { console.error('Avisos por WhatsApp: ' + e); }
-// el VPS recoge la cola (y se vacía)
+} catch (e) { console.error('Avisos: ' + e); }
+// el VPS recoge la cola (y se vacía). También le entrega las suscripciones de la app para mandar las notificaciones.
 function maryAvisos_() {
-  const ruta = bp('private/maryAvisos'), ya = fsGet(ruta) || {}, cfg = maryBotCfg_(loadSettings()).avisos;
+  const ruta = bp('private/maryAvisos'), ya = fsGet(ruta) || {}, cfg = maryBotCfg_(loadSettings()).avisos, subs = maryPushSubs_();
   const cola = (ya.cola || []).filter(function (x) { return Date.now() - Number(x.t || 0) < 6 * 3600000; });
   commit([wPatch(ruta, { cola: [] }), { update: { name: docName('platform/public'), fields: {} }, updateMask: { fieldPaths: [fp(['maryAvisoPend', BID])] } }]);
-  return { avisos: cfg.activo ? cola : [], numero: cfg.numero };
+  return { avisos: cola, numero: cfg.activo ? cfg.numero : '', negocio: String(loadSettings().businessName || (BIZ && BIZ.name) || ''),
+    subs: Object.keys(subs).map(function (k) { return { id: k, endpoint: subs[k].endpoint, p256dh: subs[k].p256dh, auth: subs[k].auth }; }) };
 }
+// la suscripción de un celular ya no existe (desinstaló la app o quitó el permiso): se borra
+function maryPushBaja_(b) {
+  const ids = (b.ids || []).map(function (x) { return String(x).replace(/[^a-f0-9]/g, ''); }).filter(Boolean); if (!ids.length) return { ok: true };
+  const subs = maryPushSubs_(); ids.forEach(function (k) { delete subs[k]; });
+  commit([wSet(bp('private/maryPush'), { subs: subs, updatedAt: new Date() })]); return { ok: true, quedan: Object.keys(subs).length };
+}
+// el VPS publica su llave pública de notificaciones (la necesita la página para pedir el permiso)
+function maryPushLlave_(b) {
+  const k = String(b.publica || ''); if (!/^[A-Za-z0-9_-]{80,100}$/.test(k)) return { ok: false };
+  if (platformPublic().pushKey !== k) commit([{ update: { name: docName('platform/public'), fields: encFields({ pushKey: k }) }, updateMask: { fieldPaths: ['pushKey'] } }]);
+  return { ok: true };
+}
+// 📱 el dueño (o alguien de su equipo) activa o quita las notificaciones en ESTE celular, desde el panel
+ACTIONS.maryPushSub = function (b, auth) {
+  const adm = getAdmin(auth), sub = (b && b.sub) || {}, keys = sub.keys || {};
+  const ep = String(sub.endpoint || '');
+  if (!/^https:\/\/[^\s]{20,500}$/.test(ep)) fail('Suscripción inválida.');
+  const id = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, ep).map(function (x) { return ('0' + (x & 255).toString(16)).slice(-2); }).join('').slice(0, 24);
+  const subs = maryPushSubs_();
+  if (b.quitar) delete subs[id];
+  else {
+    if (!/^[A-Za-z0-9_-]{80,100}$/.test(String(keys.p256dh || '')) || !/^[A-Za-z0-9_-]{16,40}$/.test(String(keys.auth || ''))) fail('Suscripción inválida.');
+    const ids = Object.keys(subs); if (ids.length >= 20 && !subs[id]) delete subs[ids.sort(function (x, y) { return Number(subs[x].t || 0) - Number(subs[y].t || 0); })[0]];   // máximo 20 celulares por negocio
+    subs[id] = { endpoint: ep, p256dh: String(keys.p256dh), auth: String(keys.auth), uid: auth.uid, rol: adm.role || '', t: Date.now() };
+  }
+  commit([wSet(bp('private/maryPush'), { subs: subs, updatedAt: new Date() })]);
+  return { ok: true, activos: Object.keys(subs).length, id: id };
+};
 // el dueño respondió por WhatsApp: 1 = aprobar el pago, 2 = rechazarlo (la misma revisión del panel)
 function maryRevisarPago_(b) {
   const cfg = maryBotCfg_(loadSettings()).avisos;

@@ -488,7 +488,7 @@ test('3.47 · 🔔 Servidor: los avisos (los mismos de Telegram) quedan en la co
   let st, OFF = [], escrito = [], cola = {}, tgLlamado = 0, revisado = null;
   const G = { ACTIONS: {}, PUBLIC_ACTIONS: {}, console, BID: 'barba', bp: (x) => x, fp: (x) => x.join('.'), docName: (x) => x, encFields: (x) => x, platformPublic: () => ({ botOff: OFF }),
     loadSettings: () => st, planHas: () => true, fsGet: (p) => (p === 'private/maryAvisos' ? cola : null), wPatch: (p, v) => ({ p, v }), commit: (w) => { escrito = w; if (w[0].p === 'private/maryAvisos') cola = w[0].v; },
-    tgNotify: () => { tgLlamado++; }, tgPhoto: () => { tgLlamado++; }, doReview: (code, ap, motivo, por) => { revisado = { code, ap, por }; } };
+    tgEventOn: () => true, BIZ: { name: 'Barba' }, tgNotify: () => { tgLlamado++; }, tgPhoto: () => { tgLlamado++; }, doReview: (code, ap, motivo, por) => { revisado = { code, ap, por }; } };
   const F = new Function(...Object.keys(G), src + '\nreturn { tgNotify, tgPhoto, maryAvisos_, maryRevisarPago_, maryBotCfg_ };')(...Object.values(G));
   st = { maryWa: { conectado: true, numero: '573110000000' }, maryBot: { avisos: { activo: true, numero: '300 999 8877' } } };
   F.tgNotify(['s1'], '✅ <b>NUEVA RESERVA</b>\nJuan &amp; Ana · R-1');
@@ -562,4 +562,44 @@ test('3.53 · Servidor: cancelar faltando poco SÍ se puede con motivo (y le lle
   let p = F.ACTIONS.cancelAppointment({ code: 'R-1', reason: 'me enfermé', tarde: true }, {});
   assert.equal(paginaMinH, 0); assert.match(p.reason, /Faltando poco: me enfermé/); assert.equal(st.rescheduleMinHours, 2, 'el límite vuelve a quedar igual');
   F.ACTIONS.cancelAppointment({ code: 'R-1', reason: '', tarde: true }, {}); assert.equal(paginaMinH, 2, 'sin motivo no se quita');
+});
+
+test('3.55 · 🔔 Notificaciones de la app: el cifrado es el del estándar (ejemplo oficial del RFC 8291) y la firma VAPID tiene sus 3 partes', () => {
+  const PU = require('../push');
+  const out = PU.cifrar({ p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4', auth: 'BTBZMqHH6r4Tts7J_aSIgg' },
+    'When I grow up, I want to be a watermelon', { privada: 'yfWPiYE-n46HLnH0KqZOF1fJJU3MYrct3AELtAQ-oRw', sal: 'DGv6ra1nlYgDCS1FRnbzlw' });
+  assert.equal(PU.b64(out), 'DGv6ra1nlYgDCS1FRnbzlwAAEABBBP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27mlmlMoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A_yl95bQpu6cVPTpK4Mqgkf1CXztLVBSt2Ks3oZwbuwXPXLWyouBWLVWGNWQexSgSxsj_Qulcy4a-fN');
+  const dir = require('fs').mkdtempSync(require('path').join(require('os').tmpdir(), 'push-')), K = PU.llaves(dir);
+  assert.deepEqual(PU.llaves(dir), K, 'las llaves se crean una vez y se guardan');
+  const f = PU.firma('https://fcm.googleapis.com/fcm/send/abc', K);
+  assert.match(f, /^vapid t=[\w-]+\.[\w-]+\.[\w-]+, k=[\w-]{80,}$/);
+  assert.equal(JSON.parse(Buffer.from(f.split('.')[1], 'base64').toString()).aud, 'https://fcm.googleapis.com');
+});
+test('3.55 · 🔔 Notificaciones: solo a servicios conocidos; si el celular ya no existe (410) se da de baja; si responde bien, ok', async () => {
+  const PU = require('../push'), K = PU.llaves(require('fs').mkdtempSync(require('path').join(require('os').tmpdir(), 'push-')));
+  const sub = { endpoint: 'https://fcm.googleapis.com/fcm/send/abc', p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4', auth: 'BTBZMqHH6r4Tts7J_aSIgg' };
+  let visto = null;
+  assert.deepEqual(await PU.enviar(sub, { title: 'x' }, K, async (u, o) => { visto = o; return { status: 201 }; }), { ok: true });
+  assert.equal(visto.headers['Content-Encoding'], 'aes128gcm'); assert.match(visto.headers.Authorization, /^vapid t=/);
+  assert.equal((await PU.enviar(sub, { title: 'x' }, K, async () => ({ status: 410 }))).baja, true);
+  assert.equal((await PU.enviar(Object.assign({}, sub, { endpoint: 'https://sitio-raro.com/x' }), { title: 'x' }, K, async () => ({ status: 201 }))).baja, true, 'a una dirección desconocida no se le manda nada');
+});
+test('3.55 · 🔔 Servidor: reserva nueva y cancelación avisan SIEMPRE, aunque el plan no traiga avisos (Telegram no se manda; la app y el WhatsApp sí); lo demás sigue las reglas del plan', { skip: !require('fs').existsSync(GS_MARY) && 'dentro de la imagen no está gs/' }, () => {
+  const src = require('fs').readFileSync(GS_MARY, 'utf8');
+  let planTrae = false, tg = 0, cola = {}, SUBS = { abc: { endpoint: 'https://fcm.googleapis.com/x', p256dh: 'p', auth: 'a' } };
+  const G = { ACTIONS: {}, PUBLIC_ACTIONS: {}, console, BID: 'barba', BIZ: { name: 'Barba' }, bp: (x) => x, fp: (x) => x.join('.'), docName: (x) => x, encFields: (x) => x, platformPublic: () => ({}),
+    loadSettings: () => ({}), planHas: () => true, fsGet: (p) => (p === 'private/maryAvisos' ? cola : p === 'private/maryPush' ? { subs: SUBS } : null), wPatch: (p, v) => ({ p, v }), wSet: (p, v) => ({ p, v }),
+    commit: (w) => { if (w[0].p === 'private/maryAvisos') cola = w[0].v; if (w[0].p === 'private/maryPush') SUBS = w[0].v.subs; },
+    tgEventOn: () => planTrae, tgNotify: () => { tg++; }, tgPhoto: () => { tg++; } };
+  const F = new Function(...Object.keys(G), src + '\nreturn { tgEventOn, tgNotify, maryAvisos_, maryPushBaja_ };')(...Object.values(G));
+  // plan SIN avisos: reserva nueva → igual queda para la app; Telegram no
+  if (F.tgEventOn('newBooking')) F.tgNotify(['s1'], '✅ <b>NUEVA RESERVA</b>\nJuan · R-1');
+  assert.equal(tg, 0, 'Telegram sigue siendo del plan'); assert.equal(cola.cola.length, 1); assert.equal(cola.cola[0].push, true);
+  if (F.tgEventOn('cancel')) F.tgNotify(['s1'], '🚫 <b>CITA CANCELADA</b>'); assert.equal(cola.cola.length, 2, 'la cancelación también');
+  if (F.tgEventOn('breaks')) F.tgNotify([], '☕ descanso'); assert.equal(cola.cola.length, 2, 'un aviso que el plan no trae y no es reserva ni cancelación: no sale');
+  F.tgNotify([], 'aviso del sistema'); assert.equal(tg, 1, 'un aviso normal después NO se confunde: sí va a Telegram');
+  // plan CON avisos: va a Telegram y a la app
+  planTrae = true; if (F.tgEventOn('newBooking')) F.tgNotify(['s1'], 'otra'); assert.equal(tg, 2);
+  const r = F.maryAvisos_(); assert.equal(r.subs.length, 1); assert.equal(r.subs[0].id, 'abc'); assert.equal(r.negocio, 'Barba'); assert.equal(cola.cola.length, 0);
+  F.maryPushBaja_({ ids: ['abc'] }); assert.deepEqual(SUBS, {}, 'el celular que ya no existe se borra');
 });

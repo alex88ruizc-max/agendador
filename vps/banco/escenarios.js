@@ -54,7 +54,9 @@ global.fetch = async (url, o) => {
     if (b.op === 'reconocer') { W.reconocido = { phone: b.phone, email: b.email }; const c = (W.porCorreo || {})[b.email]; return resp({ ok: true, data: c ? { ok: true, nombre: c.nombre, citas: c.citas || [] } : { ok: false } }); }   // 3.52
     if (b.op === 'guardarContacto') { (W.guardados = W.guardados || []).push({ phone: b.phone, nombre: b.nombre }); return resp({ ok: true, data: { ok: true, nuevo: true } }); }   // 3.52
     if (b.op === 'historia') { (W.historias = W.historias || []).push({ id: b.id, label: b.label, horas: b.horas, img: String(b.img).slice(0, 22) }); return resp({ ok: true, data: { ok: true } }); }   // 3.51
-    if (b.op === 'avisos') { const A = W.avisos || []; W.avisos = []; return resp({ ok: true, data: { avisos: A, numero: W.avisosNum || '' } }); }   // 3.47
+    if (b.op === 'avisos') { const A = W.avisos || []; W.avisos = []; return resp({ ok: true, data: { avisos: A, numero: W.avisosNum || '', subs: W.subs || [], negocio: 'Lina Spa' } }); }
+    if (b.op === 'pushBaja') { W.bajas = b.ids; return resp({ ok: true, data: { ok: true } }); }
+    if (b.op === 'pushLlave') { W.llavePush = b.publica; return resp({ ok: true, data: { ok: true } }); }   // 3.47
     if (b.op === 'revisarPago') { W.revisado = { code: b.code, aprobar: b.aprobar, de: b.de }; return resp({ ok: true, data: { ok: true, aprobado: b.aprobar } }); }
     if (b.op === 'waPedido') { const p = W.pedido; W.pedido = null; return resp({ ok: true, data: { pedido: p } }); }
     if (b.op === 'waResultado') { W.resultados.push(b); return resp({ ok: true, data: { ok: true } }); }
@@ -81,6 +83,7 @@ global.fetch = async (url, o) => {
   }
   if (/\/api\/contacts\/all/.test(u)) return W.wahaLibreta ? resp(W.wahaLibreta) : resp({ error: 'no' }, 404);   // 3.51: la libreta del WhatsApp
   if (/\/api\/[^/]+\/chats\?/.test(u)) return W.wahaChats ? resp(W.wahaChats) : resp({ error: 'no' }, 404);        // 3.51: quienes le han escrito
+  if (/^https:\/\/fcm\.googleapis\.com\//.test(u)) { (W.pushes = W.pushes || []).push(u); return new Response('', { status: /muerto/.test(u) ? 410 : 201 }); }   // 3.55: el servicio de notificaciones
   const lidM = u.match(/\/api\/[^/]+\/lids\/([^/?]+)$/);   // 3.49: WAHA dice (o no) el número real de un código …@lid
   if (lidM) { const pn = (W.lids || {})[decodeURIComponent(lidM[1])]; return pn ? resp({ lid: decodeURIComponent(lidM[1]), pn }) : resp({ error: 'no lo sé' }, 404); }
   if (/\/api\/sendText$/.test(u)) { const id = 'W' + W.enviados.length; W.enviados.push({ id, motor: 'waha', a: b.chatId.split('@')[0], chatId: b.chatId, texto: b.text, sesion: b.session }); return resp({ id }); }
@@ -1379,4 +1382,15 @@ test('3.54 · «Quiero cancelar» → «¿Deseas cancelarla o reagendarla?» →
   P._banco.reiniciar(); W.citas[CLIENTE] = [{ code: 'R-ABC123', status: 'confirmed', dia: 'Viernes 14', hora: '3:00 p. m.', servicio: 'Manicure', link: 'L', ids: ['e1'], staffId: 's1' }];
   await llega(wahaMsg(CLIENTE, 'quiero cancelar mi cita')); await llega(wahaMsg(CLIENTE, 'reagendar'));
   assert.match(ultimo().texto, /Vamos a cambiar tu cita/);
+});
+
+test('3.55 · 🔔 El VPS manda la notificación de la app a cada celular suscrito (aunque la tienda no tenga bot de WhatsApp), da de baja los que ya no existen y publica su llave', async () => {
+  const sub = (id) => ({ id, endpoint: 'https://fcm.googleapis.com/fcm/send/' + id, p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4', auth: 'BTBZMqHH6r4Tts7J_aSIgg' });
+  W.subs = [sub('vivo'), sub('muerto')]; W.avisos = [{ t: 1, texto: '✅ NUEVA RESERVA\nJuan Pérez · R-1\nMañana 10:00 a. m.', code: '', wa: false, push: true }];
+  await B.entregarAvisos('tienda-sin-bot', Date.now());
+  assert.deepEqual(W.pushes, ['https://fcm.googleapis.com/fcm/send/vivo', 'https://fcm.googleapis.com/fcm/send/muerto']);
+  await new Promise((ok) => setTimeout(ok, 20)); assert.deepEqual(W.bajas, ['muerto']);
+  assert.match(ultimoRegistro(), /1 aviso\(s\): 0 al WhatsApp del dueño, 1 notificación\(es\) de la app \(1 celular/);
+  await B.publicarLlavePush(); assert.match(W.llavePush, /^[\w-]{80,}$/, 'la página necesita esta llave para pedir el permiso');
+  W.subs = null; W.pushes = null; W.bajas = null;
 });
