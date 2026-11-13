@@ -461,7 +461,7 @@ test('3.1 · Recordatorio → «modificar» → días → horas → «cambio tu 
 test('3.1 · Sin recordatorio de por medio: «quiero cancelar mi cita» → pregunta si está seguro → sí → cancelada', async () => {
   W.citas[CLIENTE] = [{ code: 'R-ABC123', status: 'confirmed', dia: 'Viernes 14', hora: '3:00 p. m.', servicio: 'Manicure', link: 'L', ids: ['e1'], staffId: 's1' }];
   await llega(wahaMsg(CLIENTE, 'quiero cancelar mi cita'));
-  assert.match(ultimo().texto, /Seguro que cancelo tu cita del \*viernes 14 a las 3:00 p\. m\.\*/); assert.deepEqual(ids(ultimo()), ['can:si', 'can:no']);
+  assert.match(ultimo().texto, /Tu cita es el \*viernes 14 a las 3:00 p\. m\.\*[\s\S]*¿Deseas \*cancelarla\* o \*reagendarla\*\?/); assert.deepEqual(ids(ultimo()), ['can:si', 'can:mover', 'can:no']);
   await llega(toca('can:si', '🚫 Sí, cancelarla'));
   assert.equal(W.llamadas.find((x) => x.op === 'cancelar').code, 'R-ABC123');
 });
@@ -1356,7 +1356,7 @@ test('3.53 · 🚫 «Necesito cancelar mi reserva R-G2GKAH» en medio de las lis
   await llega(wahaMsg(CLIENTE, 'quiero agendar'));                       // deja una lista viva, como en el chat de Alex
   await llega(wahaMsg(CLIENTE, 'cancelar mi reserva R-G2GKAH'));   // corto: en la prueba llega al instante y el freno anti-bots pausa los textos largos
   assert.doesNotMatch(ultimo().texto, /Qué te quieres hacer/, 'ya no arranca a agendar');
-  assert.match(ultimo().texto, /Seguro que cancelo tu cita del \*hoy a las 11:00 a\. m\.\*/);
+  assert.match(ultimo().texto, /Tu cita es el \*hoy a las 11:00 a\. m\.\*[\s\S]*¿Deseas \*cancelarla\* o \*reagendarla\*\?/);
   await llega(wahaMsg(CLIENTE, 'sí'));
   assert.match(ultimo().texto, /Falta poco para tu cita/); assert.match(ultimo().texto, /por qué no puedes ir/);
   await llega(wahaMsg(CLIENTE, 'se me dañó la moto'));
@@ -1367,4 +1367,16 @@ test('3.53 · 🚫 «Necesito cancelar mi reserva R-G2GKAH» en medio de las lis
 test('3.53 · Quiere cancelar y no se le encuentra cita: se le dice y se le pide el número de reserva (antes arrancaba a agendar)', async () => {
   await llega(wahaMsg(CLIENTE, 'necesito cancelar mi reserva'));
   assert.match(ultimo().texto, /No encontré una cita activa/); assert.match(ultimo().texto, /cancelar R-ABC123/); assert.ok(!ultimo().lista, 'sin lista de servicios');
+});
+
+test('3.54 · «Quiero cancelar» → «¿Deseas cancelarla o reagendarla?» → elige REAGENDAR → sigue el flujo de cambiar la cita (pide el día), sin cancelar nada', async () => {
+  W.citas[CLIENTE] = [{ code: 'R-ABC123', status: 'confirmed', dia: 'Viernes 14', hora: '3:00 p. m.', servicio: 'Manicure', link: 'L', ids: ['e1'], staffId: 's1' }];
+  await llega(wahaMsg(CLIENTE, 'quiero cancelar mi cita'));
+  await llega(toca('can:mover', '🔄 Reagendarla'));
+  assert.match(ultimo().texto, /Vamos a cambiar tu cita/); assert.equal(ultimo().lista.button, 'Elegir día');
+  assert.ok(!W.llamadas.some((x) => x.op === 'cancelar'), 'no canceló nada');
+  // y escrito a mano también lo entiende
+  P._banco.reiniciar(); W.citas[CLIENTE] = [{ code: 'R-ABC123', status: 'confirmed', dia: 'Viernes 14', hora: '3:00 p. m.', servicio: 'Manicure', link: 'L', ids: ['e1'], staffId: 's1' }];
+  await llega(wahaMsg(CLIENTE, 'quiero cancelar mi cita')); await llega(wahaMsg(CLIENTE, 'reagendar'));
+  assert.match(ultimo().texto, /Vamos a cambiar tu cita/);
 });

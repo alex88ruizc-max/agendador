@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.53** · Página **2026-11-13s** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.54** · Página **2026-11-13s** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -115,6 +115,10 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## ⏳ Pendientes
+000. **🔔 Notificaciones de la app (push) — pedido por Alex, NO hecho todavía:** que al dueño le llegue una notificación cada vez que reserven y cada vez que cancelen.
+     Idea técnica: Web Push enviado desde el VPS (Node), usando la misma cola de avisos (`private/maryAvisos` + `platform/public.maryAvisoPend`); el panel guarda la suscripción; `sw.js` muestra la notificación.
+     Ojo: hoy los avisos dependen de las reglas del plan (`tgEventOn`); Alex los quiere SIEMPRE para reserva nueva y cancelación.
+0000. **📋 Vista de servicios «por categoría» o «una sola lista» — Alex pidió confirmar si se entendió (NO hecho):** una opción (en Servicios o en WhatsApp Bot) que decide cómo se muestran los servicios, y el bot de WhatsApp usa la misma.
 00. **💡 Idea de Alex (solo anotada, NO hecha): línea de ayuda para dueños.** Su WhatsApp 318 como «máster»: en el panel de cada dueño un botón «¿Necesitas ayuda?» que le escribe a ese número.
     Un bot ahí responde SOLO a los dueños de tiendas (los reconoce por su número) con autoayuda de Tu Agenda, y Alex puede responder él mismo. A nadie más de su agenda le responde.
     Antes de hacerlo: confirmar con Alex el número, vincularlo (regla del servidor: preguntar y esperar su confirmación) y definir de dónde salen las respuestas.
@@ -136,6 +140,12 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-13 · agendador-ia-3.54 · el bot pregunta «¿cancelar o reagendar?»
+- Alex: «si piden cancelar: listo, perfecto, ¿deseas cancelar o reagendar? Y si dice reagendar, que siga el flujo».
+- Al pedir cancelar, el bot responde «Listo, perfecto. 👌 Tu cita es el … ¿Deseas *cancelarla* o *reagendarla*?» con tres opciones: 🚫 Cancelarla · 🔄 Reagendarla · ↩️ Dejarla igual.
+  «Reagendarla» (tocada o escrita) entra al flujo de cambiar la cita (elige día y hora). «Cancelarla» cancela (y pide el motivo si falta poco, 3.53).
+- Banco: 179 pasan aquí; como el VPS: 154 pasan, 19 saltadas, 0 fallas. La página no cambia (sigue 2026-11-13s).
 
 ### 2026-11-13 · agendador-ia-3.53 · página 2026-11-13s · 🚫 cancelar faltando poco, con motivo · el bot entiende «cancelar mi reserva R-…»
 - **Caso de Alex:** la página no lo dejó cancelar («menos de 2 horas»), y al escribirle al bot «necesito cancelar mi reserva R-G2GKAH» le respondió «¿Qué te quieres hacer?».

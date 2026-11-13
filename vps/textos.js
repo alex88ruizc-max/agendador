@@ -52,7 +52,7 @@ const asistio = (c, nombre) => `🙌 ¡Gracias${nombre1(nombre) ? ', ' + nombre1
 const cancelada = (r) => `🚫 Listo, cancelé tu cita${r.cita && r.cita.dia ? ' del ' + String(r.cita.dia).toLowerCase() + ' a las ' + r.cita.hora : ''}. El cupo quedó libre.\n\nSi quieres agendar otra: ${r.link || ''}`.trim();
 const reagendada = (c) => `🔄 *¡Listo! Tu cita quedó para ${c.dia.toLowerCase()} a las ${c.hora}.*\n✂️ ${c.servicio}${c.con ? ' · con ' + c.con : ''}\n\nPara verla: ${c.link}`;
 const parafrasisCambio = (x) => `📝 *Entendí esto:* cambio tu cita de *${x.antes}* para *${x.dia} a las ${x.hora}*${x.con ? ' con ' + x.con : ''}.\n\n¿Lo confirmo?`;
-const preguntaCancelar = (c) => `¿Seguro que cancelo tu cita del *${c.dia.toLowerCase()} a las ${c.hora}* (${c.servicio})?`;
+const preguntaCancelar = (c) => `Listo, perfecto. 👌 Tu cita es el *${c.dia.toLowerCase()} a las ${c.hora}* (${c.servicio}).\n\n¿Deseas *cancelarla* o *reagendarla*?`;
 const decision = (c) => c.decision === 'approved'
   ? `✅ *Tu pago fue aprobado.* Tu cita quedó confirmada.\n📅 ${c.dia} · ${c.hora}\n${c.servicio}${c.con ? ' · con ' + c.con : ''}\n\nPara verla o cambiarla: ${c.link}`
   : `❌ *No pudimos verificar tu pago*${c.motivo && !/telegram/i.test(c.motivo) ? ' (' + c.motivo + ')' : ''}, así que el cupo quedó libre.\nSi ya pagaste, escríbenos aquí y lo revisamos. Para agendar de nuevo: ${c.linkAgenda || ''}`.trim();

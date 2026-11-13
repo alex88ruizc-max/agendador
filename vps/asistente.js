@@ -479,7 +479,9 @@ function crear(dep) {
       return cancelarCita(neg, c, Object.assign({}, conv.cita, { motivo: m }), true);
     }
     if (conv.paso === 'cancelarSeguro') {
-      if (SI.test(t) || c.rowId === 'can:si') return cancelarCita(neg, c, conv.cita, true);
+      // 3.54 (Alex): «¿Deseas cancelar o reagendar?» → si dice reagendar, sigue el flujo de cambiar la cita
+      if (c.rowId === 'can:mover' || (!c.rowId && (QUIERE_MODIFICAR.test(t) || /reagend|otro dia|otra hora|cambi/.test(t)))) return modificarCita(neg, c, conv.cita);
+      if (c.rowId === 'can:si' || (!c.rowId && (SI.test(t) || QUIERE_CANCELAR.test(t)))) return cancelarCita(neg, c, conv.cita, true);
       fin(c.k); return dep.texto(neg, c.tel, '👌 Listo, tu cita sigue igual. ¡Te esperamos!');
     }
     if (SALIR.test(t)) { fin(c.k); return dep.texto(neg, c.tel, 'Listo, lo dejamos así 👌 Cuando quieras, escribe *agendar*.'); }
@@ -731,7 +733,7 @@ function crear(dep) {
       if (cita) {
         const sal = saludo(c.k, info.negocio, c.nombre, !b.saludoDiario);
         if (QUIERE_CANCELAR.test(t) && !cod && (info.citas || []).length >= 2) return (await elegirCualCancelar(neg, Object.assign({}, c, { negocio: info.negocio }), info.citas, sal), 'flujo');
-        if (QUIERE_CANCELAR.test(t)) { const cv = { paso: 'cancelarSeguro', cita }; return (await lista(neg, c, cv, { texto: sal + T.preguntaCancelar(cita), boton: 'Ver opciones', pie: info.negocio + ' · asistente virtual', secciones: [{ titulo: 'Tu cita', filas: [{ id: 'can:si', titulo: '🚫 Sí, cancelarla', desc: '' }, { id: 'can:no', titulo: '↩️ No, la mantengo', desc: '' }] }] }), 'flujo'); }
+        if (QUIERE_CANCELAR.test(t)) { const cv = { paso: 'cancelarSeguro', cita }; return (await lista(neg, c, cv, { texto: sal + T.preguntaCancelar(cita), boton: 'Ver opciones', pie: info.negocio + ' · asistente virtual', secciones: [{ titulo: 'Tu cita', filas: [{ id: 'can:si', titulo: '🚫 Cancelarla', desc: 'El cupo queda libre' }, { id: 'can:mover', titulo: '🔄 Reagendarla', desc: 'Cambiar el día o la hora' }, { id: 'can:no', titulo: '↩️ Dejarla igual', desc: '' }] }] }), 'flujo'); }
         await modificarCita(neg, c, cita); return 'flujo';
       }
     }
