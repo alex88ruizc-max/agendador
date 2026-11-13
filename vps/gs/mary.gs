@@ -14,7 +14,7 @@
  * Instalación: pega este archivo, ejecuta activarMary() una vez, copia la clave que sale en el registro
  * y ponla en el mary.env del VPS (MARY_KEY). Vuelve a implementar la aplicación web (Implementar > Administrar > editar > Nueva versión).
  */
-const MARY_VERSION = 'agendador-ia-3.38';
+const MARY_VERSION = 'agendador-ia-3.41';
 
 // Se registra como acción pública del servidor (sin sesión: entra con la clave de Mary).
 // ⚠️ Este archivo debe quedar DEBAJO del archivo principal en la lista de archivos de Apps Script (los nuevos quedan al final: así está bien).
@@ -428,6 +428,86 @@ function maryVolverAvisado_(b) {
   const L = (b.codes || []).slice(0, 20).map(function (c) { return wPatch(bp('appointments/' + String(c).toUpperCase()), { maryVolver: true }); });
   if (L.length) commit(L);
   return { ok: true };
+}
+// ---------- 3.41 · 💳 PAGO DE LA SUSCRIPCIÓN DE LAS TIENDAS (solo el plan que le pagan a la plataforma; nada de los cobros de cada tienda) ----------
+// Copia del cobro automático que ya tiene el servidor (y Epic): pedido con MONTO ÚNICO + lector del Gmail del servidor.
+// Formas de pago: 'breb' (llave de negocios, sin comisión) · 'nequi' (link de Nequi Negocios pagando desde Nequi o Bancolombia:
+// 1,5 % + IVA) · 'banco' (link pagando desde otros bancos: 2,69 % + IVA). Con link se suma la comisión para que llegue el precio completo.
+const PAGO_COMISION = { breb: 0, nequi: 0.015 * 1.19, banco: 0.0269 * 1.19 };
+function pagoConComision_(base, metodo) {
+  const f = PAGO_COMISION[metodo] || 0;
+  return f ? Math.ceil(base / (1 - f) / 10) * 10 : base;
+}
+try {
+  const _crearOrden = ACTIONS.createPlanOrder;
+  if (_crearOrden) ACTIONS.createPlanOrder = function (b, auth) {
+    const metodo = Object.prototype.hasOwnProperty.call(PAGO_COMISION, String(b && b.metodo || '')) ? String(b.metodo) : 'breb';
+    const pp = fsGet('platform/public') || {};
+    if (metodo !== 'breb' && !pp.nequiLink) fail('El pago por link no está disponible. Paga por Bre-B.');
+    const o = _crearOrden(b, auth);
+    if (!o || o.free || !o.id) return o;
+    if ((o.metodo || 'breb') === metodo && o.metodoListo) return o;   // el mismo pedido vigente, ya con su forma de pago
+    const bruto = pagoConComision_(Number(o.baseCOP || o.amountCOP), metodo);
+    const usados = {};
+    fsQueryAt('', 'platformOrders', [['status', 'EQUAL', 'pending']]).forEach(function (x) { if (x.id !== o.id && toMillis(x.expiresAt) > Date.now() - ORDER_GRACE_HOURS * 3600000) usados[Number(x.amountCOP)] = true; });
+    let amount = 0;
+    for (let k = 0; k < 100000; k++) { if (!usados[bruto + k]) { amount = bruto + k; break; } }   // como el original: el menor excedente libre
+    if (!amount) fail('Intenta de nuevo en unos minutos.');
+    const extra = { amountCOP: amount, metodo: metodo, comisionCOP: bruto - Number(o.baseCOP || 0), metodoListo: true };
+    commit([wPatch('platformOrders/' + o.id, extra), wPatch(bp('private/billing'), { pendingOrder: Object.assign({}, o, extra) })]);
+    return Object.assign({}, o, extra);
+  };
+} catch (e) { console.error('Pago con link: ' + e); }
+// 3.41 · el lector de pagos del servidor (copia de revisarPagosBreb del principal) que además entiende el correo de Nequi Negocios /
+//        Wompi («Transacción APROBADA · Venta exitosa por $35,640») y descarta los rechazados. Lee SOLO el Gmail de la cuenta del
+//        servidor (tuagenda.servidor), al que Alex reenvía con un filtro las copias de los avisos de Nequi. Nunca su Gmail personal.
+const PAGO_SI = /(recib|te envi|te lleg|abono|bre-?b|transferencia|transacci[oó]n aprobada|venta exitosa)/i;
+const PAGO_NO = /(rechazad|declinad|fallid|anulad|reversad|no fue aprobada)/i;
+function montosPago_(txt) {
+  return (txt.match(/\$\s?\d{1,3}(?:[.,]\d{3})+(?:,\d{2})?|\$\s?\d{4,9}/g) || []).map(function (m) {
+    return Number(m.replace(/[$\s]/g, '').replace(/,\d{2}$/, '').replace(/[.,]/g, ''));
+  });
+}
+function revisarPagosBreb() {
+  const pp = fsGet('platform/public') || {};
+  if (!pp.brebEnabled) return;
+  BID = '';
+  const pend = fsQueryAt('', 'platformOrders', [['status', 'EQUAL', 'pending']]);
+  if (!pend.length) return;
+  const label = GmailApp.getUserLabelByName('agendador-ok') || GmailApp.createLabel('agendador-ok');
+  const sender = String(pp.brebSender || 'nequi').replace(/[^a-z0-9@._-]/gi, '');
+  const threads = GmailApp.search('from:(' + sender + ') newer_than:2d -label:agendador-ok', 0, 100);
+  threads.forEach(function (th) {
+    let matched = false;
+    th.getMessages().forEach(function (msg) {
+      const txt = (msg.getSubject() + ' ' + msg.getPlainBody()).replace(/\s+/g, ' ');
+      if (!PAGO_SI.test(txt) || PAGO_NO.test(txt)) return;
+      const amounts = montosPago_(txt), at = msg.getDate().getTime();
+      const cands = pend.filter(function (o) {
+        return o.status === 'pending' && amounts.indexOf(Number(o.amountCOP)) >= 0
+          && at >= toMillis(o.createdAt) - 120000 && at <= toMillis(o.expiresAt) + ORDER_GRACE_HOURS * 3600000;
+      }).sort(function (x, y) {
+        const ax = at <= toMillis(x.expiresAt) ? 0 : 1, ay = at <= toMillis(y.expiresAt) ? 0 : 1;
+        return ax - ay || toMillis(y.createdAt) - toMillis(x.createdAt);
+      });
+      [cands[0]].filter(Boolean).forEach(function (o) {
+        try {
+          setBusiness(o.businessId);
+          const como = { nequi: 'link de Nequi', banco: 'link (otro banco)' }[o.metodo] || 'Bre-B';
+          const r = registerPlanPayment(o.months, o.amountCOP, como + ' automático', 'breb', o.creditCOP, o.plan);
+          commit([wPatch('platformOrders/' + o.id, { status: 'paid', paidAt: new Date() }), wPatch(bp('private/billing'), { pendingOrder: null })]);
+          o.status = 'paid'; matched = true;
+          superNotify('⚡ <b>Pago de plan recibido</b> (' + como + ')\n' + esc(o.businessName) + ' · ' + cop(o.amountCOP) + ' · ' + o.months + ' mes(es)' + (o.comisionCOP ? '\nIncluye ' + cop(o.comisionCOP) + ' de comisión de Wompi' : '') + (r.paidUntil ? '\nActivo hasta ' + fechaLarga(r.paidUntil) : ''));
+        } catch (e) { console.error(e); }
+      });
+    });
+    if (matched) th.addLabel(label);
+  });
+  pend.forEach(function (o) {   // las órdenes vencidas se cierran (igual que el original)
+    if (o.status === 'pending' && toMillis(o.expiresAt) + ORDER_GRACE_HOURS * 3600000 < Date.now()) {
+      try { setBusiness(o.businessId); commit([wPatch('platformOrders/' + o.id, { status: 'expired' }), wPatch(bp('private/billing'), { pendingOrder: null })]); } catch (e) { console.error(e); }
+    }
+  });
 }
 // ---------- 3.38 · 🏷️ ADICIONAL «SIN MARCA DE AGUA» (+$20.000/mes): lo activa el superusuario al editar el negocio ----------
 // Se envuelve la acción del superusuario: la de siempre revisa que sea el superusuario y guarda; después se guarda el adicional.

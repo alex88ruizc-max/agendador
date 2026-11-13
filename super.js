@@ -3,9 +3,9 @@ import { onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordRe
 import {
   doc, getDoc, setDoc, addDoc, deleteDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp, where
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { PLAN_KEYS, PLAN_FEATURES, plansOf, planOfBiz, DEFAULT_PAY_WARNING, TG_EVENTS, BIZ_TYPES, planBenefits, planBenefitsIntro } from "./common.js?v=2026-11-13c";
-import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-13c";
-import { APP_VERSION, SERVER_VERSION, RULES_VERSION, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, readPublishedVersion, reloadFresh, startUpdateWatcher, warmServer, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-11-13c";
+import { PLAN_KEYS, PLAN_FEATURES, plansOf, planOfBiz, DEFAULT_PAY_WARNING, TG_EVENTS, BIZ_TYPES, planBenefits, planBenefitsIntro } from "./common.js?v=2026-11-13d";
+import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-13d";
+import { APP_VERSION, SERVER_VERSION, RULES_VERSION, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, readPublishedVersion, reloadFresh, startUpdateWatcher, warmServer, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-11-13d";
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on) => $(id).classList.toggle("hidden", !on);
@@ -627,7 +627,7 @@ async function loadPlanCfg() {
   const top = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5);
   $("rfTop").innerHTML = top.length ? `<p class="mb-1 text-sm font-semibold">Los que más invitan</p>${top.map(([id, n], i) => `<p class="flex justify-between border-t border-line py-1.5 text-sm"><span>${i + 1}. ${esc(Z.list.find((b) => b.id === id)?.name || id)}</span><b>${n} invitada${n === 1 ? "" : "s"}</b></p>`).join("")}` : `<p class="soft text-xs">Todavía nadie ha invitado tiendas.</p>`;
 
-  $("bbOn").checked = !!pp.brebEnabled; $("bbKey").value = pp.brebKey || ""; $("bbHolder").value = pp.brebHolder || ""; $("bbSender").value = pp.brebSender || "nequi";
+  $("bbOn").checked = !!pp.brebEnabled; $("bbKey").value = pp.brebKey || ""; $("bbHolder").value = pp.brebHolder || ""; $("bbSender").value = pp.brebSender || "nequi"; $("bbLink").value = pp.nequiLink || "";
   PL.brebQr = pp.brebQr || ""; $("bbQrImg").src = PL.brebQr; $("bbQrImg").classList.toggle("hidden", !PL.brebQr);
   renderPlMethods();
 }
@@ -723,6 +723,7 @@ $("plSave").onclick = async () => {
       payMethods: PL.methods.filter((m) => m.label && m.account),
       brebEnabled: $("bbOn").checked, brebKey: $("bbKey").value.trim(), brebHolder: $("bbHolder").value.trim(),
       brebSender: $("bbSender").value.trim() || "nequi", brebQr: PL.brebQr || "",
+      nequiLink: /^https:\/\/[\w.-]+\.(?:wompi\.co|nequi\.com\.co)\//.test($("bbLink").value.trim()) ? $("bbLink").value.trim() : "",   // 3.41: solo links de Wompi/Nequi
       referral: { enabled: $("rfOn").checked, levels: [...document.querySelectorAll("[data-rfl]")].map((x) => Math.min(50, Math.max(0, Number(x.value || 0)))),
         capMonths: Math.min(12, Math.max(1, Number($("rfCap").value || 3))), bonusDays: Math.min(60, Math.max(0, Number($("rfBonus").value || 0))) },
       planBundles: { 3: 0, 6: 0, 12: 0 } // ahora se usa el % de planDiscounts

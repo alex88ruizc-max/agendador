@@ -382,3 +382,48 @@ test('3.38 · 🏷️ Servidor: el superusuario activa o quita el adicional «si
   assert.throws(() => A.superUpdateBusiness({ businessId: 'elbarba', sinMarca: true, noSuper: true }, {}), /superusuario/); assert.equal(DB['businesses/elbarba'].addons.sinMarca, false, 'sin permiso no cambia');
   assert.equal(llamadas.length, 3, 'siempre pasa por la acción original (que revisa al superusuario)');
 });
+test('3.41 · 💳 Pago del plan: Bre-B al precio exacto; link Nequi/Bancolombia y otros bancos con la comisión de Wompi (siempre te llega el precio completo); montos únicos', { skip: !require('fs').existsSync(GS_MARY) && 'dentro de la imagen no está gs/' }, () => {
+  const src = require('fs').readFileSync(GS_MARY, 'utf8');
+  const DB = { 'platform/public': { brebEnabled: true, brebKey: '@llave', nequiLink: 'https://checkout.nequi.wompi.co/l/X' } }; let n = 0;
+  const G = { ACTIONS: { createPlanOrder: (b) => { const id = 'barba_' + (++n); const o = { id, businessId: 'barba', baseCOP: 35000, amountCOP: 35000 + (b.ocupado ? 1 : 0), status: 'pending', expiresAt: new Date(Date.now() + 1800000), months: 1, plan: 'gold' }; DB['platformOrders/' + id] = o; return o; } }, PUBLIC_ACTIONS: {}, console,
+    fsGet: (p) => DB[p] || null, fsQueryAt: (r, col) => Object.entries(DB).filter(([k, v]) => k.startsWith('platformOrders/') && v.status === 'pending').map(([k, v]) => v),
+    wPatch: (p, d) => ({ p, d }), commit: (w) => w.forEach((x) => { DB[x.p] = Object.assign({}, DB[x.p], x.d); }), bp: (x) => 'b/' + x, toMillis: (v) => new Date(v).getTime(), ORDER_GRACE_HOURS: 3, fail: (m) => { throw new Error(m); } };
+  const F = new Function(...Object.keys(G), src + '\nreturn { ACTIONS, pagoConComision_, montosPago_, PAGO_SI, PAGO_NO };')(...Object.values(G));
+  // las cuentas: lo que queda después de la comisión (con IVA) nunca es menos que el precio
+  for (const [base, met, pct] of [[35000, 'nequi', 0.015], [35000, 'banco', 0.0269], [20000, 'nequi', 0.015], [20000, 'banco', 0.0269], [100000, 'banco', 0.0269]]) {
+    const v = F.pagoConComision_(base, met), llega = v - Math.round(v * pct) - Math.round(v * pct * 0.19);
+    assert.ok(llega >= base && llega - base < 20, base + ' ' + met + ' → ' + v + ' llega ' + llega);
+  }
+  assert.equal(F.pagoConComision_(35000, 'nequi'), 35640); assert.equal(F.pagoConComision_(35000, 'banco'), 36160); assert.equal(F.pagoConComision_(35000, 'breb'), 35000);
+  const a = F.ACTIONS.createPlanOrder({ metodo: 'breb' }, {}); assert.equal(a.amountCOP, 35000);
+  const b = F.ACTIONS.createPlanOrder({ metodo: 'nequi' }, {}); assert.equal(b.amountCOP, 35640); assert.equal(b.comisionCOP, 640); assert.equal(DB['platformOrders/' + b.id].metodo, 'nequi');
+  const c = F.ACTIONS.createPlanOrder({ metodo: 'nequi' }, {}); assert.equal(c.amountCOP, 35641, 'otra tienda pagando a la vez: +$1 (como en Epic)');
+  assert.equal(F.ACTIONS.createPlanOrder({ metodo: 'raro' }, {}).metodo, 'breb', 'forma desconocida = Bre-B');
+  DB['platform/public'].nequiLink = ''; assert.throws(() => F.ACTIONS.createPlanOrder({ metodo: 'banco' }, {}), /no está disponible/);
+  // el correo real de Nequi Negocios (Wompi)
+  const correo = 'Transacción APROBADA en ALEX alexander ruiz - ref. APP-1794535061767 Venta exitosa por $35,640 Método de pago de Wompi Monto: COP $35,640 Estado: APROBADA Método de pago: Nequi';
+  assert.ok(F.PAGO_SI.test(correo) && !F.PAGO_NO.test(correo)); assert.ok(F.montosPago_(correo).includes(35640));
+  assert.ok(F.PAGO_NO.test('Transacción RECHAZADA por $35,640'), 'un pago rechazado nunca activa');
+  assert.ok(F.montosPago_('Recibiste $35.000 de Laura por Bre-B').includes(35000), 'Bre-B sigue igual');
+});
+test('3.41 · 💳 El lector del Gmail del servidor activa SOLO el pedido con el monto exacto (los pagos de Epic y los rechazados se ignoran)', { skip: !require('fs').existsSync(GS_MARY) && 'dentro de la imagen no está gs/' }, () => {
+  const src = require('fs').readFileSync(GS_MARY, 'utf8'), ahora = Date.now();
+  const orden = { id: 'barba_1', businessId: 'barba', businessName: 'Barba', amountCOP: 35640, metodo: 'nequi', comisionCOP: 640, status: 'pending', createdAt: new Date(ahora - 600000), expiresAt: new Date(ahora + 1200000), months: 1, plan: 'gold', creditCOP: 0 };
+  const DB = { 'platform/public': { brebEnabled: true }, 'platformOrders/barba_1': orden }, pagados = [], avisos = [], etiquetados = [];
+  const msg = (sub, body) => ({ getSubject: () => sub, getPlainBody: () => body, getDate: () => new Date(ahora - 60000) });
+  const hilos = [
+    { m: [msg('Transacción APROBADA en ALEX', 'Venta exitosa por $52,000 Estado: APROBADA')], tag: 'epic' },            // pago de Epic: no coincide
+    { m: [msg('Transacción RECHAZADA en ALEX', 'Venta por $35,640 Estado: RECHAZADA')], tag: 'rechazado' },
+    { m: [msg('Transacción APROBADA en ALEX alexander ruiz', 'Venta exitosa por $35,640 Monto: COP $35,640 Estado: APROBADA')], tag: 'bueno' }
+  ].map((h) => ({ getMessages: () => h.m, addLabel: () => etiquetados.push(h.tag) }));
+  const G = { ACTIONS: {}, PUBLIC_ACTIONS: {}, console, BID: '', fsGet: (p) => DB[p] || null, fsQueryAt: () => Object.values(DB).filter((v) => v.status === 'pending'),
+    GmailApp: { getUserLabelByName: () => ({}), createLabel: () => ({}), search: (q) => { assert.match(q, /^from:\(nequi\) newer_than:2d -label:agendador-ok$/); return hilos; } },
+    setBusiness: () => {}, registerPlanPayment: (m, a, nota) => { pagados.push([a, nota]); return { paidUntil: '2026-12-13' }; },
+    wPatch: (p, d) => ({ p, d }), commit: (w) => w.forEach((x) => { if (DB[x.p]) Object.assign(DB[x.p], x.d); }), bp: (x) => x, toMillis: (v) => new Date(v).getTime(), ORDER_GRACE_HOURS: 3,
+    superNotify: (t) => avisos.push(t), esc: (x) => x, cop: (n) => '$' + n, fechaLarga: (d) => d, fail: (m) => { throw new Error(m); } };
+  const F = new Function(...Object.keys(G), src + '\nreturn { revisarPagosBreb };')(...Object.values(G));
+  F.revisarPagosBreb();
+  assert.deepEqual(pagados, [[35640, 'link de Nequi automático']], 'solo el pago correcto activa el plan');
+  assert.equal(DB['platformOrders/barba_1'].status, 'paid'); assert.deepEqual(etiquetados, ['bueno']);
+  assert.match(avisos[0], /Pago de plan recibido.*link de Nequi/s); assert.match(avisos[0], /640 de comisión/);
+});

@@ -72,9 +72,9 @@
     "semantic_hash": "b3af3c94a56105757f5909562ace2d9b"
   },
   "vps/cartero.py": {
-    "mtime": 1794527350.794071,
-    "seen": 1794527501.179393,
-    "ast_hash": "3b3a67e2945c09c4b0c032b552f538b1",
+    "mtime": 1794536473.7487319,
+    "seen": 1794536586.17988,
+    "ast_hash": "8313969e6d8c15a695d07e7d309086a4",
     "semantic_hash": ""
   },
   "vps/conectar.sh": {
@@ -152,9 +152,9 @@
     "semantic_hash": "5009abfe30c8d8ffe5acf888999b674b"
   },
   "vps/principal.js": {
-    "mtime": 1794533263.8246078,
-    "seen": 1794533329.3376138,
-    "ast_hash": "f8e85996e698cbfc12cd830e6c5702b4",
+    "mtime": 1794536584.0169802,
+    "seen": 1794536586.17999,
+    "ast_hash": "2b981308f13a54aef50040e5980d0362",
     "semantic_hash": ""
   },
   "vps/textos.js": {
@@ -182,9 +182,9 @@
     "semantic_hash": ""
   },
   "BITACORA.md": {
-    "mtime": 1794533264.143769,
-    "seen": 1794533329.337648,
-    "ast_hash": "84b8c0d66128abb8e5a41e56c235ff93",
+    "mtime": 1794536584.033305,
+    "seen": 1794536586.1800187,
+    "ast_hash": "6949142a40b93d33d37c9b5c448f734a",
     "semantic_hash": ""
   },
   "CLAUDE.md": {
@@ -218,15 +218,15 @@
     "semantic_hash": ""
   },
   "vps/LEEME.txt": {
-    "mtime": 1794533264.1448638,
-    "seen": 1794533329.3377187,
-    "ast_hash": "3af37bdcf0f0fc21ca040dbc9f24b865",
+    "mtime": 1794536584.0342684,
+    "seen": 1794536586.180082,
+    "ast_hash": "6b6db8d336326d2a136bd320ea22c69a",
     "semantic_hash": ""
   },
   "vps/banco/reglas.js": {
-    "mtime": 1794527326.3456306,
-    "seen": 1794527501.1793754,
-    "ast_hash": "7f2a2a93217458aedc59369be65d9095",
+    "mtime": 1794536508.45842,
+    "seen": 1794536586.1798635,
+    "ast_hash": "27531a17ec30104ce02bebc115c91351",
     "semantic_hash": ""
   },
   "LEEME-REGLA-UNIVERSAL.txt": {

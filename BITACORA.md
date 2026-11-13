@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.40** · Página **2026-11-13c** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.41** · Página **2026-11-13d** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -132,6 +132,23 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-13 · agendador-ia-3.41 · página 2026-11-13d · 💳 pago automático de la suscripción por Bre-B o por el link de Nequi Negocios
+- Con el código que mandó /servidor se vio que el servidor YA tiene el cobro automático copiado de Epic:
+  - `createPlanOrder`: pedido con monto único (+$0, +$1…), dura 30 min + 3 h de gracia;
+  - `revisarPagosBreb`: lee cada minuto el Gmail de la cuenta del servidor y activa el plan.
+  Se usó eso mismo sin tocar el código principal (envolturas en mary.gs).
+- **mary.gs 3.41:**
+  - `ACTIONS.createPlanOrder` acepta `metodo`:
+    - `breb`: sin comisión;
+    - `nequi`: link pagando desde Nequi o Bancolombia, +1,5 % + IVA;
+    - `banco`: link pagando desde otro banco, +2,69 % + IVA.
+    Gold: $35.000 / $35.640 / $36.160, con monto único. Probado: siempre llega el precio completo.
+  - `revisarPagosBreb` (copia del principal): además entiende «Transacción APROBADA · Venta exitosa por $35,640» de Nequi Negocios/Wompi y descarta los RECHAZADOS.
+- **Panel › Mi plan:** «¿Cómo quieres pagar?» con las 3 formas y su precio, y la explicación de la comisión. Con link: «1️⃣ copia el valor exacto · 2️⃣ abre el link y pégalo · 3️⃣ se activa solo».
+- **Super panel › Pago automático:** campo «Link de pago de Nequi Negocios» (solo acepta links de wompi.co / nequi.com.co).
+- **Correo:** el lector solo ve el Gmail de **tuagenda.servidor**. Alex pone en su Gmail un filtro que solo REENVÍA una copia de notificaciones@nequi.com.co (sin archivar ni marcar como leído), así Epic sigue igual. Los pagos de Epic que lleguen se ignoran: solo cuenta el monto exacto de un pedido pendiente (probado).
+- Banco: 158 pruebas, 0 fallas.
 
 ### 2026-11-13 · agendador-ia-3.40 · /servidor (código del servidor de Google sin claves) · plan de pagos de suscripción por Nequi Negocios
 - **Pagos de la suscripción de las tiendas (acordado con Alex, en construcción).** Solo para que las tiendas le paguen su plan a Alex; nada de los cobros de cada tienda a sus clientes.
