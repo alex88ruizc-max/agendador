@@ -7,21 +7,18 @@
   <title>Panel del negocio</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Archivo+Narrow:wght@500;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&&family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
-  <link rel="preconnect" href="https://cdn.tailwindcss.com">
   <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
   <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
   <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js">
   <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js">
   <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js">
-  <link rel="modulepreload" href="common.js?v=2026-11-13k">
-  <link rel="modulepreload" href="admin.js?v=2026-11-13k">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="theme.js?v=2026-11-13k"></script>
+  <link rel="modulepreload" href="common.js?v=2026-11-13m">
+  <link rel="modulepreload" href="admin.js?v=2026-11-13m">
   <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
-  <link rel="stylesheet" href="styles.css?v=2026-11-13k">
+  <link rel="stylesheet" href="styles.css?v=2026-11-13m">
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="theme-color" content="#121216">
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
@@ -30,7 +27,9 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Tu Agenda">
-  <link rel="stylesheet" href="panel-premium.css?v=2026-11-13k">
+  <link rel="stylesheet" href="panel-premium.css?v=2026-11-13m">
+  <!-- estilos ya armados (antes los calculaba el celular con cdn.tailwindcss.com): va de ÚLTIMO, igual que antes -->
+  <link rel="stylesheet" href="tailwind.css?v=2026-11-13m">
 </head>
 <body class="sp pp antialiased">
 
@@ -38,7 +37,7 @@
     <div class="mx-auto flex max-w-6xl items-center gap-3 px-4 pb-2 pt-5">
       <div id="hdrLogo" class="hidden h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-[14px] text-sm font-extrabold text-white"></div>
       <div class="min-w-0 flex-1">
-        <h1 id="hdrTitle" class="disp truncate text-[24px] font-extrabold leading-none">Panel de tu negocio</h1>
+        <h1 id="hdrTitle" class="nombre-completo disp text-[24px] font-extrabold leading-none">Panel de tu negocio</h1>
         <p id="hdrSub" class="soft mt-1 truncate text-[13px]"></p>
         <p id="who" class="hidden"></p>
       </div>
@@ -142,6 +141,6 @@
     </div>
   </div>
 
-  <script type="module" src="admin.js?v=2026-11-13k"></script>
+  <script type="module" src="admin.js?v=2026-11-13m"></script>
 </body>
 </html>

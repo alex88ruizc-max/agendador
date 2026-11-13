@@ -9,22 +9,19 @@
   <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Archivo+Narrow:wght@500;700&family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
-  <link rel="preconnect" href="https://cdn.tailwindcss.com">
   <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
   <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
   <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js">
   <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js">
   <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js">
-  <link rel="modulepreload" href="common.js?v=2026-11-13k">
-  <link rel="modulepreload" href="app.js?v=2026-11-13k">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="theme.js?v=2026-11-13k"></script>
+  <link rel="modulepreload" href="common.js?v=2026-11-13m">
+  <link rel="modulepreload" href="app.js?v=2026-11-13m">
   <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
-  <link rel="stylesheet" href="styles.css?v=2026-11-13k">
-  <link rel="stylesheet" href="premium.css?v=2026-11-13k">
+  <link rel="stylesheet" href="styles.css?v=2026-11-13m">
+  <link rel="stylesheet" href="premium.css?v=2026-11-13m">
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="theme-color" content="#121216">
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
@@ -33,6 +30,8 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Tu Agenda">
+  <!-- estilos ya armados (antes los calculaba el celular con cdn.tailwindcss.com): va de ÚLTIMO, igual que antes -->
+  <link rel="stylesheet" href="tailwind.css?v=2026-11-13m">
 </head>
 <body class="premium bg-paper text-ink font-sans antialiased">
 
@@ -46,7 +45,7 @@
           <span id="bizLogo" class="logo-in">?</span>
         </button>
         <div class="min-w-0">
-          <h1 id="bizName" class="truncate font-narrow text-2xl font-bold leading-tight">Reserva tu cita</h1>
+          <h1 id="bizName" class="nombre-completo font-narrow text-2xl font-bold leading-tight">Reserva tu cita</h1>
           <p id="bizSlogan" class="hidden line-clamp-2 text-sm leading-snug text-white/80"></p>
           <button id="storyHint" type="button" class="mt-0.5 hidden text-left text-[11.5px] font-extrabold" style="color:#fbbf24">● Toca el logo para ver los estados</button>
           <p id="bizAddress" class="hidden"></p>
@@ -140,7 +139,7 @@
           <div><b>Bot de WhatsApp 24/7</b><small>Agenda, dice tus cupos y escucha audios</small></div>
           <div><b>Estados automáticos</b><small>Tus cupos y «Cómo agendar»</small></div>
           <div><b>Tu equipo</b><small>Cada profesional con su horario</small></div>
-          <div><b>Avisos a Telegram</b><small>Reservas, pagos y cambios</small></div>
+          <div><b>Avisos al instante</b><small>A tu WhatsApp o Telegram</small></div>
           <div><b>Clientes e historial</b><small>Quién viene y quién falta</small></div>
           <div><b>Entrada con Google</b><small>Tus clientes, en un toque</small></div>
           <div><b>Vuelven solos</b><small>El bot les recuerda volver</small></div>
@@ -416,6 +415,6 @@
     </div>
   </div>
 
-  <script type="module" src="app.js?v=2026-11-13k"></script>
+  <script type="module" src="app.js?v=2026-11-13m"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 // Página pública: ver cupos, registrarse, apartar, pagar con screenshot, mis cupos
-import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro, ventanaReserva, OFERTA_TXT } from "./common.js?v=2026-11-13k";
-import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-13k";
+import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro, ventanaReserva, OFERTA_TXT, nombreCompleto } from "./common.js?v=2026-11-13m";
+import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-13m";
 import {
   onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, sendPasswordResetEmail,
   GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult
@@ -12,7 +12,7 @@ import {
   startUpdateWatcher, applyBrandColors, warmServer, uiConfirm, setDialogBrand, viewImage, pushOverlay, dropOverlay, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, dow, hora12, fechaLarga, fechaCorta, toMillis, cop, esc,
   normalizePhone, waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, computeSlots, dayCapacityUnits, staffHours, mapLinks, headerBgCss,
   toast, openModal, closeModal, setBusy, copyText, tmin, mstr, UNIT
-} from "./common.js?v=2026-11-13k";
+} from "./common.js?v=2026-11-13m";
 
 const $ = (id) => document.getElementById(id);
 const S = {
@@ -49,7 +49,7 @@ if (!/^[a-z0-9][a-z0-9-]{1,29}$/.test(BIZ_ID)) {
     const b = e.target.closest("[data-lp]"); if (!b) return;
     if (b.dataset.lp === "trial") $("btnTrial").click(); else openAuth("login");
   });
-  // 🚀 2026-11-13k · viene de la invitación de una página de negocio: se abre «Probar gratis» de una vez
+  // 🚀 2026-11-13m · viene de la invitación de una página de negocio: se abre «Probar gratis» de una vez
   if (new URLSearchParams(location.search).has("probar")) setTimeout(() => $("btnTrial").click(), 400);
 } else {
   setBusiness(BIZ_ID);
@@ -208,7 +208,7 @@ function renderBiz() {
   const promoOn = s.promo?.text && s.promo.until >= bogNow().date;
   $("promoBar").classList.toggle("hidden", !promoOn);
   if (promoOn) $("promoBar").textContent = "🔥 " + s.promo.text;
-  $("bizName").textContent = s.businessName || "Reserva tu cita";
+  nombreCompleto($("bizName"), s.businessName || "Reserva tu cita");
   // redes sociales del negocio como íconos de marca
   const SOC = [["instagram", "fa-instagram", "Instagram"], ["facebook", "fa-facebook-f", "Facebook"], ["tiktok", "fa-tiktok", "TikTok"], ["youtube", "fa-youtube", "YouTube"]];
   const soc = s.showSocial === false ? [] : SOC.filter(([k]) => /^https?:\/\//.test(s.social?.[k] || ""));
@@ -1174,7 +1174,7 @@ getDoc(doc(db, "platform", "public")).then((d) => {
   if (S.settings) renderAll();
   const on = PLAT.trialEnabled !== false;
   $("trialCta").classList.toggle("hidden", !on);
-  // 2026-11-13k · en la página de un negocio NO hay «Probar gratis» mientras el cliente agenda (no se pierde la cita):
+  // 2026-11-13m · en la página de un negocio NO hay «Probar gratis» mientras el cliente agenda (no se pierde la cita):
   //   solo el sello chiquito abajo; la invitación sale DESPUÉS (cita confirmada y «Mis citas"), en otra pestaña.
   $("trialTop").classList.add("hidden"); $("trialTop").classList.remove("inline-flex");
   $("trialCta").classList.add("hidden");
@@ -1212,12 +1212,14 @@ function renderTrialPlans() {
   $("trialPlans").querySelectorAll("[data-tplan]").forEach((b) => b.onclick = () => { T_PLAN = b.dataset.tplan; renderTrialPlans(); });
   $("trialNext").onclick = () => showTrialForm();
 }
-function showTrialForm() {
+function showTrialForm(directo) {
   const P = plansOf(PLAT);
   $("trialPlans").classList.add("hidden"); $("trialForm").classList.remove("hidden");
-  $("trialTitle").textContent = "Tus datos";
-  $("trialSub").textContent = `Paso 2 de ${T_PLAN === "free" ? 2 : 3}`;
-  $("trialPlanLine").innerHTML = `<span>Plan elegido: <b>${PSTYLE[T_PLAN][2]} ${esc(P[T_PLAN].name)}</b> · ${T_PLAN === "free" ? P.free.days + " días gratis" : cop(P[T_PLAN].priceCOP) + "/mes"}</span><button type="button" id="trialChange" class="font-bold underline">Cambiar</button>`;
+  $("trialTitle").textContent = directo ? "Crea tu agenda gratis" : "Tus datos";
+  $("trialSub").textContent = directo ? "Lista en 2 minutos · sin tarjeta" : `Paso 2 de ${T_PLAN === "free" ? 2 : 3}`;
+  $("trialPlanLine").innerHTML = directo
+    ? `<span>🎁 <b>${P.free.days} días gratis</b> para probarla. El plan lo eliges después.</span><button type="button" id="trialChange" class="shrink-0 font-bold underline">Ver planes</button>`
+    : `<span>Plan elegido: <b>${PSTYLE[T_PLAN][2]} ${esc(P[T_PLAN].name)}</b> · ${T_PLAN === "free" ? P.free.days + " días gratis" : cop(P[T_PLAN].priceCOP) + "/mes"}</span><button type="button" id="trialChange" class="font-bold underline">Cambiar</button>`;
   $("trialChange").onclick = () => { $("trialForm").classList.add("hidden"); $("trialPlans").classList.remove("hidden"); $("trialTitle").textContent = "Crea tu agenda"; $("trialSub").textContent = ""; renderTrialPlans(); };
   $("trialForm").querySelector("button[type=submit]").textContent = T_PLAN === "free" ? "Crear mi agenda gratis" : "Crear mi agenda y pagar";
   $("trialFoot").textContent = T_PLAN === "free" ? "Al terminar la prueba eliges un plan para seguir." : "En el siguiente paso pagas con Bre-B y tu plan se activa solo.";
@@ -1234,6 +1236,8 @@ $("btnTrial").onclick = () => {
   const f = $("trialForm");
   if (S.profile) { f.ownerName.value = `${S.profile.firstName || ""} ${S.profile.lastName || ""}`.trim(); f.whatsapp.value = S.profile.whatsapp || ""; }
   $("trialForm").classList.add("hidden"); $("trialDone").classList.add("hidden");
+  // 🚀 2026-11-13m · «Probar gratis» entra DIRECTO a la prueba (sin elegir plan): una sola pantalla. Los planes quedan en «Ver planes y precios».
+  if (PLAT.trialEnabled !== false) { T_PLAN = "free"; showTrialForm(true); }
   openModal("trialModal");
 };
 // «Probar gratis» también con Google: la cuenta del dueño queda con su Gmail

@@ -7,11 +7,11 @@ import {
   startUpdateWatcher, applyBrandColors, uiConfirm, uiPrompt, setDialogBrand, viewImage, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, hora12, tmin, fechaLarga, fechaCorta, toMillis, cop, esc, normalizePhone,
   waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, DEFAULT_WA_RESCHEDULE, computeSlots, staffHours, mapLinks, headerBgCss, onColor, darken,
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
-  PLAN_KEYS, plansOf, planOfBiz, planPriceOf, ventanaReserva, OFERTA_TXT, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
+  PLAN_KEYS, plansOf, planOfBiz, planPriceOf, ventanaReserva, OFERTA_TXT, nombreCompleto, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-11-13k";
-import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-13k";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-13k";
+} from "./common.js?v=2026-11-13m";
+import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-13m";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-13m";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -54,7 +54,7 @@ onAuthStateChanged(auth, async (u) => {
   A.biz = bizSnap?.data() || { name: bid, status: "active" };
   setDialogBrand(A.biz.name);
   $("who").textContent = `${A.biz.name} · ${u.email} (${isSuper ? "superusuario" : isOwner() ? "dueño" : "equipo"})`;
-  $("hdrTitle").textContent = A.biz.name;
+  nombreCompleto($("hdrTitle"), A.biz.name);
   show("deniedView", false); show("appView", true); show("spNav", true); $("btnQuickSide").classList.remove("hidden");
   renderPlanBanner();
   start();
@@ -253,7 +253,7 @@ function applyPanelBrand() {
   logo.classList.remove("hidden"); logo.classList.add("grid");
   logo.style.background = (P.useBrand && ap.colors?.primary) || "var(--sink)";
   const name = A.settings?.businessName || A.biz?.name || "";
-  if (name) $("hdrTitle").textContent = name;
+  if (name) nombreCompleto($("hdrTitle"), name);
   logo.innerHTML = ap.logo ? `<img src="${ap.logo}" alt="" class="h-full w-full object-cover">` : esc(name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase());
 }
 $("tabs").addEventListener("click", (e) => {
@@ -1245,7 +1245,7 @@ function renderSettings() {
       <label class="field mt-4"><span>Instrucciones para el cliente</span><textarea id="stPayInstr" rows="2">${esc(s.paymentInstructions || "")}</textarea></label>
     </fieldset>
 
-    <fieldset class="rounded-xl border border-line bg-white p-4"><legend class="px-1 font-narrow text-xl font-bold">Reglas de la silla</legend>
+    <fieldset class="rounded-xl border border-line bg-white p-4"><legend class="px-1 font-narrow text-xl font-bold">Reglas de las citas</legend>
       <div class="grid gap-3 md:grid-cols-2">
         ${num("stReschedH", "Horas mínimas para reagendar o cancelar", s.rescheduleMinHours ?? 2, 'min="0"')}
         ${num("stMaxResched", "Máximo de cambios por cita", s.maxReschedules ?? 2, 'min="0"')}
@@ -1256,7 +1256,7 @@ function renderSettings() {
     </fieldset>
 
     <fieldset class="rounded-xl border border-line bg-white p-4"><legend class="px-1 font-narrow text-xl font-bold">Telegram</legend>
-      <p class="text-sm text-ink/70">Recibe en tu Telegram las reservas, los comprobantes (con botones para aprobar), los reagendamientos y el resumen del día.</p>
+      <div class="mt-2">${tgPorQue()}</div>
       <div class="mt-3 flex flex-wrap items-center gap-2">
         <button type="button" id="tgOwner" class="btn-dark">${A.tg?.owner ? "Reconectar mi Telegram de dueño" : "Conectar mi Telegram de dueño"}</button>
         <span class="text-sm text-ink/70">${A.tg?.owner ? "Conectado ✓" : "Sin conectar"}</span>
@@ -1463,7 +1463,7 @@ function renderAppearance() {
       </div>
       <div class="rounded-xl border border-line bg-white p-4">
         <h3 class="mb-1 font-narrow text-xl font-bold">Imagen de fondo del encabezado</h3>
-        <p class="mb-3 text-xs text-ink/60">Una foto de tu local, tu silla o un corte. Se degrada sola para que tu nombre y tus botones se lean bien.</p>
+        <p class="mb-3 text-xs text-ink/60">Una foto de tu local o de tu trabajo. Se degrada sola para que tu nombre y tus botones se lean bien.</p>
         <div class="mb-3 flex items-center gap-3">
           <div id="apBgPrev" class="grid h-16 w-28 shrink-0 place-items-center overflow-hidden rounded-xl border border-line bg-paper bg-cover bg-center text-xl"></div>
           <div class="flex flex-wrap gap-2"><label class="btn-sm cursor-pointer">📷 ${ap.headerBg?.img ? "Cambiar" : "Subir"} imagen<input id="apBgFile" type="file" accept="image/*" class="hidden"></label><button id="apBgDel" type="button" class="btn-sm">Quitar</button></div>
@@ -2365,7 +2365,7 @@ function renderHome() {
         <button class="rounded-2xl py-2.5 text-[16px]" style="background:rgba(255,255,255,.18)" data-bl="qr" aria-label="Ver QR del enlace"><i class="fa-solid fa-qrcode"></i></button>
       </div></div>` : "";
   el.innerHTML = `${linkHtml}${isOwner() ? guideCard() : ""}<div class="home-grid"><div class="home-col">${liveHtml}${teamHtml}
-    <div class="sp-card mt-3" id="chairCard"><div class="flex items-center justify-between gap-2"><h2 class="disp text-[18px] font-bold">Hoy en la silla</h2>
+    <div class="sp-card mt-3" id="chairCard"><div class="flex items-center justify-between gap-2"><h2 class="disp text-[18px] font-bold">Hoy en tu agenda</h2>
       ${freeLater.length ? `<button class="rounded-full px-3 py-1.5 text-xs font-bold ${H.showFree ? "" : "t-late"}" style="${H.showFree ? "background:var(--sink);color:#fff" : ""}" data-hfree="1" aria-expanded="${!!H.showFree}">${freeLater.length} hueco${freeLater.length === 1 ? "" : "s"} libre${freeLater.length === 1 ? "" : "s"} ${H.showFree ? "▴" : "▾"}</button>` : `<span class="soft text-xs">Sin huecos libres</span>`}</div>${chair}
       ${H.showFree && freeLater.length ? `<div class="q-pop mt-3 rounded-2xl p-3" style="background:var(--canvas)">
         <p class="mb-2 text-sm font-bold">Toca un hueco para agendar a alguien ahí</p>
@@ -2987,12 +2987,24 @@ async function loadLost() {
 const guideDone = () => A.settings?.guideDone || [];
 // lo que ya se hizo en el asistente de inicio cuenta como hecho en la guía
 const WIZ_ORDER = ["hi", "biz", "social", "team", "hours", "services", "deposit", "geo", "telegram", "done"];
-const wizPassed = (id) => !!A.settings?.setupDone || Number(A.settings?.setupStep || 0) > WIZ_ORDER.indexOf(id);
+// 2026-11-13m · el asistente de inicio ahora son 4 pasos (negocio, horario, servicios y listo). Lo demás queda en la guía.
+//   Quien terminó el asistente viejo (10 pasos) ya pasó por todo; quien termina el nuevo (setupVer 2) solo pasó por esos 4.
+const WIZ_NUEVO = ["biz", "hours", "services", "done"];
+const wizPassed = (id) => {
+  const st = A.settings || {};
+  if (st.setupVer === 2) return WIZ_NUEVO.includes(id) && (!!st.setupDone || Number(st.setupStep || 0) > WIZ_NUEVO.indexOf(id));
+  return !!st.setupDone || Number(st.setupStep || 0) > WIZ_ORDER.indexOf(id);
+};
+const palabraEquipo = () => String(A.settings?.staffLabel || staffWord(A.settings?.businessType) || "profesional").toLowerCase();
+const hayBot = () => !((A.plat && A.plat.botOff) || []).includes("activo");
 const stepDone = (id, wizId) => guideDone().includes(id) || wizPassed(wizId || id);
 function guideSteps() {
   const s = A.settings || {};
   const hasHours = Object.values(s.businessHours || {}).some((d) => (d || []).length);
   return [
+    { id: "wa", ic: "fa-comments", t: "Vincula tu WhatsApp (2 min)", d: "Tu asistente responde, agenda y recuerda las citas por ti, las 24 horas. Sigues usando tu WhatsApp igual.",
+      ok: !!s.maryWa?.conectado || lockedNow("whatsapp") || !hayBot(), tab: "wabot",
+      tip: "Escribe el número de tu negocio y toca «Vincular mi WhatsApp». Ahí mismo está la guía paso a paso." },
     { id: "biz", ic: "fa-store", t: "Datos de tu negocio", d: "Nombre, WhatsApp, dirección y ciudad. Así te encuentran y te escriben tus clientes.",
       ok: !!(s.businessName && s.whatsapp && s.address), tab: "settings", focus: "stName",
       tip: "Escribe el nombre, el WhatsApp y la dirección. Al final de la página toca Guardar." },
@@ -3012,7 +3024,7 @@ function guideSteps() {
       tip: "Toca “Agregar medio de pago”, escribe tu número o llave y sube el QR. Revisa el valor del abono arriba y toca Guardar." },
     { id: "telegram", ic: "fa-paper-plane", t: "Avisos en tu Telegram", d: "Te llegan las reservas, los comprobantes con botón para aprobar y los recordatorios.",
       ok: !!A.tg?.owner || lockedNow("telegram"), guide: "telegram" },
-    { id: "team", ic: "fa-users", t: "Tu equipo y sus horarios", d: "Agrega a cada barbero, su horario propio y sus días libres. Si trabajas solo, revisa el tuyo.",
+    { id: "team", ic: "fa-users", t: "Tu equipo y sus horarios", d: `Agrega a cada ${palabraEquipo()}, su horario propio y sus días libres. Si trabajas solo, revisa el tuyo.`,
       ok: stepDone("team"), tab: "staff", manual: true,
       tip: "En Disponibilidad toca Editar horario. Para agregar personas usa “Agregar al equipo”." },
     { id: "brand", ic: "fa-palette", t: "Tu logo y colores", d: "Que tu página se vea como tu negocio.", optional: true,
@@ -3087,10 +3099,20 @@ document.addEventListener("click", (e) => {
   if (e.target.closest("[data-link]")) markGuide("share");
 });
 // Telegram paso a paso, con el estado en vivo
+// 🔔 para qué sirve Telegram (la misma explicación en la guía, en Configuración y en Equipo)
+function tgPorQue() {
+  return `<div class="-mt-1 mb-4 text-sm">
+    <p><b>¿Para qué sirve?</b> Es por donde <b>te avisamos a ti</b>: cada reserva nueva te llega al instante y <b>apruebas los abonos con un toque</b>, sin abrir el panel.</p>
+    <div class="my-3 rounded-2xl p-2.5" style="background:#e7f1fb"><div class="rounded-2xl rounded-bl-sm bg-white p-2.5 text-[12.5px] leading-snug shadow-sm">📅 <b>NUEVA RESERVA</b> R-8K2PQ<br>Juan Pérez · mañana 10:00 a. m.<br>Abono: $10.000 · comprobante adjunto
+      <div class="mt-1.5 grid grid-cols-2 gap-1.5 text-center text-xs font-bold" style="color:#2a7bc0"><span class="rounded-xl py-2" style="background:#e7f1fb">✅ Aprobar</span><span class="rounded-xl py-2" style="background:#e7f1fb">❌ Rechazar</span></div></div></div>
+    <p class="soft text-[13px]"><b>¿Por qué Telegram?</b> Tu WhatsApp del negocio queda libre para tus clientes. Telegram es <b>gratis</b>, se instala en 1 minuto y solo lo usas para recibir tus avisos.</p>
+    <p class="soft mt-1.5 text-[13px]"><b>¿No quieres instalar nada?</b> Si tienes otro número personal, activa <b>«Avisos a tu WhatsApp»</b> en <b>WhatsApp Bot</b>.</p>
+  </div>`;
+}
 function openTelegramGuide() {
   const on = !!A.tg?.owner;
   openM("Avisos en tu Telegram", `
-    <p class="soft -mt-2 mb-4 text-sm">Te llegan las reservas nuevas, los comprobantes de pago con botones para aprobar o rechazar, los recordatorios y los avisos de tu plan.</p>
+    ${tgPorQue()}
     <ol class="space-y-3">
       <li class="flex gap-3"><span class="grid h-7 w-7 shrink-0 place-items-center rounded-full t-trial text-sm font-bold">1</span><div class="flex-1 text-sm"><b>Instala Telegram</b> en tu celular si aún no lo tienes.
         <div class="mt-1.5 flex flex-wrap gap-2"><a class="btn-sm" target="_blank" rel="noopener" href="https://play.google.com/store/apps/details?id=org.telegram.messenger">Android</a><a class="btn-sm" target="_blank" rel="noopener" href="https://apps.apple.com/app/telegram-messenger/id686449807">iPhone</a></div></div></li>
@@ -3099,7 +3121,7 @@ function openTelegramGuide() {
       <li class="flex gap-3"><span class="grid h-7 w-7 shrink-0 place-items-center rounded-full t-trial text-sm font-bold">3</span><div class="flex-1 text-sm">En Telegram toca <b>Iniciar</b> (o <i>Start</i>) abajo. Te llega un mensaje de bienvenida.</div></li>
       <li class="flex gap-3"><span class="grid h-7 w-7 shrink-0 place-items-center rounded-full ${on ? "t-ok" : "t-off"} text-sm font-bold">${on ? "✓" : "4"}</span><div class="flex-1 text-sm"><b>Listo.</b> <span id="tgState">${on ? "Tu Telegram está conectado. 🎉" : `<span class="spin mr-1"></span>Esperando la conexión… esta pantalla se actualiza sola.`}</span></div></li>
     </ol>
-    <p class="soft mt-4 rounded-xl p-3 text-xs" style="background:var(--canvas)">💡 Cada barbero puede recibir sus propias citas: en <b>Equipo</b>, toca “Conectar Telegram” en su tarjeta y envíale el enlace.</p>`);
+    <p class="soft mt-4 rounded-xl p-3 text-xs" style="background:var(--canvas)">💡 Cada ${palabraEquipo()} puede recibir sus propias citas: en <b>Equipo</b>, toca «Conectar su Telegram» en su tarjeta y envíale el enlace por WhatsApp.</p>`);
   $("tgGo").onclick = async () => {
     const btn = $("tgGo"); setBusy(btn, true, "Creando enlace…");
     let bot = "";
@@ -3332,7 +3354,7 @@ function renderReferrals() {
       return `<div class="who-row"><span class="who-av ${tone}">${i + 1}</span>
         <span class="min-w-0 flex-1"><b>Referido ${i + 1}</b><br><span class="soft text-[11px]">Desde ${new Date(toMillis(k.createdAt)).toLocaleDateString("es-CO", { timeZone: "America/Bogota", day: "numeric", month: "short" })}</span></span>
         <span class="${tone} rounded-full px-2 py-0.5 text-[11px] font-bold">${paying ? "✓ Pagando" : k.status !== "active" ? "Pausada" : "En prueba"}</span></div>`;
-    }).join("") : `<p class="soft py-3 text-sm">Aún no tienes invitados. Comparte tu enlace con otros barberos, salones o spas.</p>`}</div>
+    }).join("") : `<p class="soft py-3 text-sm">Aún no tienes invitados. Comparte tu enlace con otros negocios que trabajen con citas.</p>`}</div>
 
     <div class="sp-h"><h2>Movimientos</h2><span>${saved ? "ahorrado: " + cop(saved) : ""}</span></div>
     <div class="sp-card !py-1">${moves.length ? moves.slice(0, 30).map((m) => {
@@ -3411,7 +3433,7 @@ function wizTurns() {
   parts.forEach(([o, c]) => { for (let t = toMinW(o); t + slot <= toMinW(c); t += slot) out.push(t); });
   return out;
 }
-const STEPS = [
+const STEPS_TODOS = [
   { id: "hi", essential: true, next: "Empezar", html: () => `<p class="text-5xl">💈</p><h3 class="wz-h">Armemos tu agenda en 3 minutos</h3>
       <p class="wz-sub">Te hacemos unas preguntas y dejamos todo listo para que tus clientes reserven solos. Puedes cambiar todo después.</p>
       <div class="sp-card text-[14px] leading-8">✓ Tu negocio y tu logo<br>✓ Tus redes sociales<br>✓ Tu equipo, horario y turnos<br>✓ Servicios y abono<br>✓ Ubicación para Waze<br>⭐ <b>Avisos en tu Telegram</b></div>` },
@@ -3596,7 +3618,7 @@ const STEPS = [
       return `<span class="inline-block rounded-full px-2.5 py-1 text-[11px] font-extrabold" style="background:#fff3dc;color:#9a5a00">⭐ PASO MÁS IMPORTANTE</span>
       <h3 class="wz-h mt-2">Recibe tus citas en Telegram</h3>
       <p class="wz-sub">Te llega cada reserva al instante y <b>apruebas los abonos con un toque</b>, sin abrir el panel.</p>
-      <div class="rounded-2xl p-2.5" style="background:#e7f1fb"><div class="rounded-2xl rounded-bl-sm bg-white p-2.5 text-[12.5px] leading-snug shadow-sm">💈 <b>NUEVA RESERVA</b> R-8K2PQ<br>Juan Pérez · Corte + barba<br>Hoy 3:30 p. m.<br>Abono $5.000 · 📎 comprobante</div>
+      <div class="rounded-2xl p-2.5" style="background:#e7f1fb"><div class="rounded-2xl rounded-bl-sm bg-white p-2.5 text-[12.5px] leading-snug shadow-sm">📅 <b>NUEVA RESERVA</b> R-8K2PQ<br>Juan Pérez · Corte + barba<br>Hoy 3:30 p. m.<br>Abono $5.000 · 📎 comprobante</div>
         <div class="mt-1.5 grid grid-cols-2 gap-1.5 text-center text-xs font-bold" style="color:#2a7bc0"><span class="rounded-xl bg-white py-2">✅ Aprobar</span><span class="rounded-xl bg-white py-2">❌ Rechazar</span></div></div>
       ${on ? `<div class="mt-3 rounded-2xl p-4 text-center font-extrabold" style="background:#e2f5ec;color:#16774b">✓ ¡Telegram conectado! Te llegó un mensaje de bienvenida.</div>` : `
       <div class="sp-card mt-3 text-[13.5px] leading-relaxed">
@@ -3616,10 +3638,11 @@ const STEPS = [
       <div class="mt-2 grid grid-cols-4 gap-2 text-center text-[11.5px] font-semibold">
         <button class="link-act" data-link="wa"><i class="fa-brands fa-whatsapp"></i>WhatsApp</button><button class="link-act" data-link="qr"><i class="fa-solid fa-qrcode"></i>QR</button>
         <button class="link-act" data-link="share"><i class="fa-solid fa-share-nodes"></i>Compartir</button><button class="link-act" data-link="copy"><i class="fa-regular fa-copy"></i>Copiar</button></div>
-      <div class="sp-card mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[12.5px]">${ok(d.name, "Negocio")}${ok(d.logo, "Logo")}${ok(Object.values(d.social).some(Boolean), "Redes")}${ok(true, d.count + (d.count === 1 ? " persona" : " personas"))}${ok(d.days.size, "Horario")}${ok(true, "Servicios")}${ok(true, d.deposit ? "Abono" : "Sin abono")}${ok(d.geo || d.geoMode === "address", "Ubicación")}${ok(A.tg?.owner, "Telegram")}</div>
-      <p class="soft mt-2 text-xs">Lo pendiente queda en la Guía de configuración (menú de tu inicial).</p>`;
+      <div class="sp-card mt-3 text-[13.5px]"><b>👉 Lo que sigue (cuando quieras):</b><br>🤖 Vincular tu WhatsApp para que tu asistente atienda por ti<br>🔔 Recibir tus avisos · 💳 Cobrar abonos · 👥 Tu equipo</div>
+      <p class="soft mt-2 text-xs">Todo eso te lo vamos mostrando en tu Inicio, en «Deja tu agenda lista», un paso a la vez.</p>`;
     } }
 ];
+const STEPS = STEPS_TODOS.filter((x) => WIZ_NUEVO.includes(x.id));
 function wizReadSvcs() {
   document.querySelectorAll("[data-sname]").forEach((i) => { const r = W.d.svcList[Number(i.dataset.sname)]; if (r) r.name = i.value; });
   document.querySelectorAll("[data-sprice]").forEach((i) => { const r = W.d.svcList[Number(i.dataset.sprice)]; if (r) r.price = Number(i.value.replace(/\D/g, "") || 0); });
@@ -3660,7 +3683,7 @@ async function wizClick(e) {
       return closeWizard(true);
     }
     if (act === "back") { W.i--; return drawWizard(); }
-    if (act === "skip") { W.i++; updateDoc(doc(db, bpath("settings", "general")), { setupStep: W.i }).catch(() => {}); return drawWizard(); }
+    if (act === "skip") { W.i++; updateDoc(doc(db, bpath("settings", "general")), { setupStep: W.i, setupVer: 2 }).catch(() => {}); return drawWizard(); }
     if (act === "next") {
       const st = STEPS[W.i];
       if (st.id === "done") return closeWizard(true);
@@ -3668,7 +3691,7 @@ async function wizClick(e) {
       try {
         if (st.save) await fastSave(st.save(), (err) => toast("No se pudo guardar el paso anterior: " + err.message, "error"));
         W.i++;
-        updateDoc(doc(db, bpath("settings", "general")), { setupStep: W.i }).catch(() => {});
+        updateDoc(doc(db, bpath("settings", "general")), { setupStep: W.i, setupVer: 2 }).catch(() => {});
         drawWizard();
       } catch (err) { toast(err.message, "error"); setBusy(x, false); }
       return;
@@ -3744,7 +3767,7 @@ function closeWizard(done, fromBack) {
   if (!fromBack && W.inHistory) { W.inHistory = false; dropOverlay("wizard"); }
   W.open = false; clearInterval(W.tgT);
   $("wizard")?.remove(); document.body.classList.remove("wiz-on");
-  if (done) updateDoc(doc(db, bpath("settings", "general")), { setupDone: true }).catch(() => {});
+  if (done) updateDoc(doc(db, bpath("settings", "general")), { setupDone: true, setupVer: 2 }).catch(() => {});
   renderHome();
 }
 document.addEventListener("click", (e) => { if (e.target.closest("[data-wizopen]")) { closeMenus(); openWizard(0); } });
@@ -4119,10 +4142,10 @@ document.addEventListener("click", async (e) => {
 });
 
 // Opciones del asistente (settings.maryBot). Los valores por defecto son los mismos del servidor (maryBotCfg_).
-const BOT_DEF = { audios: true, activo: true, agendar: true, cupos: true, saludoDiario: true, pedirNombre: true, pedirCorreo: true, loDeSiempre: true, recordatorioMin: 120, recordatorioConfirmar: true, cambios: true, pausaMin: 30, estados: { activo: true, horas: ["11:00"], manana: true, semanal: false }, volver: { activo: false, dias: 0 }, guia: { activo: true, hora: "08:00", cadaDias: 3 } };
+const BOT_DEF = { audios: true, activo: true, agendar: true, cupos: true, saludoDiario: true, pedirNombre: true, pedirCorreo: true, loDeSiempre: true, recordatorioMin: 120, recordatorioConfirmar: true, cambios: true, pausaMin: 30, estados: { activo: true, horas: ["11:00"], manana: true, semanal: false }, volver: { activo: false, dias: 0 }, guia: { activo: true, hora: "08:00", cadaDias: 3 }, avisos: { activo: false, numero: "" } };
 function botCfg() {
   const s = A.settings || {}, b = s.maryBot || {};
-  const c = { ...BOT_DEF, ...b, estados: { ...BOT_DEF.estados, ...(b.estados || {}) }, volver: { ...BOT_DEF.volver, ...(b.volver || {}) }, guia: { ...BOT_DEF.guia, ...(b.guia || {}) } };
+  const c = { ...BOT_DEF, ...b, estados: { ...BOT_DEF.estados, ...(b.estados || {}) }, volver: { ...BOT_DEF.volver, ...(b.volver || {}) }, guia: { ...BOT_DEF.guia, ...(b.guia || {}) }, avisos: { ...BOT_DEF.avisos, ...(b.avisos || {}) } };
   if (b.recordatorioMin === undefined && s.maryReminderMinutes !== undefined) c.recordatorioMin = Number(s.maryReminderMinutes);
   c.estados.horas = (c.estados.horas || []).filter((h) => /^\d{2}:\d{2}$/.test(h)).slice(0, 2);
   if (!c.estados.horas.length) c.estados.horas = ["11:00"];
@@ -4163,6 +4186,15 @@ function renderWaBot() {
       <div class="flex items-center gap-3 p-3.5"><span class="text-xl">🙊</span><span class="min-w-0 flex-1"><b class="block text-[14.5px]">Si escribes tú en un chat, se calla</b><span class="block text-xs text-ink/65">El asistente se hace a un lado en ese chat para que hables tú.</span></span>
         ${sel("pausaMin", c.pausaMin, [[15, "15 min"], [30, "30 min"], [60, "1 hora"], [120, "2 horas"]])}</div>
     </div>
+    ${hay("avisosWa") ? `<div class="sp-h mt-5"><h2>🔔 Avisos a tu WhatsApp</h2><span>sin instalar Telegram</span></div>
+    <div class="sp-card !p-0 divide-y divide-line">
+      ${fila("avisos.activo", "🔔", "Avisarme por WhatsApp de cada reserva", "Tu asistente te escribe a TU número personal: reservas nuevas, cancelaciones y comprobantes. Para aprobar un pago respondes 1.", c.avisos.activo)}
+      ${c.avisos.activo ? `<div class="p-3.5"><label class="field"><span>Tu WhatsApp personal (distinto al del negocio)</span><input id="avNum" type="tel" inputmode="numeric" placeholder="57 300 123 4567" value="${esc(c.avisos.numero || "")}"></label>
+        <button type="button" id="avSave" class="btn-dark mt-2 text-sm">Guardar mi número</button>
+        ${!A.settings?.maryWa?.conectado ? `<p class="mt-2 text-xs font-bold" style="color:#B45309">⚠️ Primero vincula el WhatsApp de tu negocio (arriba): desde ahí te escribimos.</p>` : ""}
+        ${c.avisos.numero && String(c.avisos.numero).replace(/\D/g, "").slice(-10) === String(A.settings?.maryWa?.numero || "").slice(-10) ? `<p class="mt-2 text-xs font-bold" style="color:#B45309">⚠️ Ese es el número del negocio. Pon otro (tu número personal): WhatsApp no deja escribirse a sí mismo.</p>` : ""}</div>` : ""}
+    </div>
+    <p class="soft mt-3 text-xs">Si solo tienes un celular con un número, usa los avisos de Telegram (en Configuración).</p>` : ""}
     ${hay("estados") ? `<div class="sp-h mt-5"><h2>📸 Estados con tus cupos</h2><span>máximo 2 al día</span></div>
     <div class="sp-card !p-0 divide-y divide-line">
       ${fila("estados.activo", "📸", "Publicar estados con los cupos del día", "Una imagen con tus horas libres. Si hoy ya no hay cupos, publica los de mañana. Si tampoco hay, no publica.", e.activo)}
@@ -4264,7 +4296,7 @@ function pintarReporte() {
 document.addEventListener("click", (e) => { const b = e.target.closest("#tab-wabot [data-rep]"); if (!b) return; REP.modo = b.dataset.rep; REP.clave = ""; renderWaBot(); });
 document.addEventListener("change", (e) => { if (e.target.id === "repDesde" || e.target.id === "repHasta") { REP.desde = $("repDesde").value; REP.hasta = $("repHasta").value; REP.clave = ""; pintarReporte(); } });
 async function botGuardar(patch) {
-  const c = botCfg(), n = { ...c, ...patch, estados: { ...c.estados, ...(patch.estados || {}) }, volver: { ...c.volver, ...(patch.volver || {}) }, guia: { ...c.guia, ...(patch.guia || {}) } };
+  const c = botCfg(), n = { ...c, ...patch, estados: { ...c.estados, ...(patch.estados || {}) }, volver: { ...c.volver, ...(patch.volver || {}) }, guia: { ...c.guia, ...(patch.guia || {}) }, avisos: { ...c.avisos, ...(patch.avisos || {}) } };
   A.settings.maryBot = n; renderWaBot();
   try { await setDoc(doc(db, bpath("settings", "general")), { maryBot: n }, { merge: true }); toast("✓ Guardado."); }
   catch (err) { toast("No se pudo guardar: " + err.message, "error"); }
@@ -4275,7 +4307,15 @@ document.addEventListener("click", (e) => {
   if (k.startsWith("estados.")) { const kk = k.slice(8); botGuardar({ estados: { [kk]: !c.estados[kk] } }); }
   else if (k === "volver.activo") botGuardar({ volver: { activo: !c.volver.activo } });
   else if (k === "guia.activo") botGuardar({ guia: { activo: !c.guia.activo } });
+  else if (k === "avisos.activo") botGuardar({ avisos: { activo: !c.avisos.activo } });
   else botGuardar({ [k]: !c[k] });
+});
+document.addEventListener("click", (e) => {
+  if (!e.target.closest("#avSave")) return;
+  let n = String($("avNum").value || "").replace(/\D/g, ""); if (n.length === 10) n = "57" + n;
+  if (n.length < 11) return toast("Escribe tu número completo, con el 57 adelante.", "error");
+  if (n.slice(-10) === String(A.settings?.maryWa?.numero || "").slice(-10)) return toast("Ese es el número del negocio. Pon tu número personal.", "error");
+  botGuardar({ avisos: { numero: n } });
 });
 document.addEventListener("change", (e) => {
   const s = e.target.closest("#tab-wabot [data-botsel]"); if (!s) return;
