@@ -83,7 +83,9 @@ function emailClient(a, subject, intro) {
       '<p style="margin:14px 0 18px;font-size:12.5px;line-height:1.5;color:#8A8A93;text-align:center">Tolerancia de espera: ' + Number(st.toleranceMinutes || 10) +
       ' minutos. Para cancelar o cambiar tu cita, hazlo con al menos ' + Number(st.rescheduleMinHours != null ? st.rescheduleMinHours : 2) + ' horas de anticipación.</p>' +
       '</div></div>' +
-      '<p style="max-width:520px;margin:14px auto 0;text-align:center;font-size:11.5px;color:#A3A3AB">Enviado con Tu Agenda · tuagenda.vip</p></div>';
+      // 3.42 · una sola línea al pie invitando a crear su agenda (no sale con el adicional «sin marca»)
+      ((BIZ && BIZ.addons && BIZ.addons.sinMarca) ? '<p style="max-width:520px;margin:14px auto 0;text-align:center;font-size:11.5px;color:#A3A3AB">&nbsp;</p></div>'
+        : '<p style="max-width:520px;margin:14px auto 0;text-align:center;font-size:11.5px;color:#A3A3AB">Agenda creada con <a href="https://tuagenda.vip/?probar=1" style="color:#24508A;font-weight:700;text-decoration:none">tuagenda.vip</a> · <a href="https://tuagenda.vip/?probar=1" style="color:#24508A;text-decoration:underline">Crea la tuya gratis</a></p></div>');
     // 📅 3.0 · invitación de calendario: al confirmar o cambiar de hora (misma cita = mismo UID, el calendario la MUEVE)
     //    y al cancelar se manda la cancelación de ESA invitación (desaparece del calendario del cliente)
     let ics = null;

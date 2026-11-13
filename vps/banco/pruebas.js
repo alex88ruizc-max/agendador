@@ -430,3 +430,11 @@ test('3.41 · 💳 El lector del Gmail del servidor activa SOLO el pedido con el
   assert.equal(DB['platformOrders/barba_1'].status, 'paid'); assert.deepEqual(etiquetados, ['bueno']);
   assert.match(avisos[0], /Pago de plan recibido.*link de Nequi/s); assert.match(avisos[0], /640 de comisión/);
 });
+
+test('3.42 · 🚀 El correo trae al pie «Crea la tuya gratis» (abre la prueba) y NO sale con el adicional «sin marca»', { skip: !require('fs').existsSync(GS_MARY) && 'dentro de la imagen no está gs/' }, () => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'gs', 'correo.gs'), 'utf8');
+  const pie = src.slice(src.indexOf('3.42 · una sola línea'), src.indexOf('// 📅 3.0 · invitación'));
+  assert.match(pie, /BIZ\.addons\.sinMarca/, 'respeta el adicional sin marca');
+  assert.match(pie, /Crea la tuya gratis/);
+  assert.match(pie, /tuagenda\.vip\/\?probar=1/, 'abre directo «Probar gratis»');
+});

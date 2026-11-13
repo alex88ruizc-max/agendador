@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.41** · Página **2026-11-13e** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.42** · Página **2026-11-13f** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -132,6 +132,18 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-13 · agendador-ia-3.42 · página 2026-11-13f · 🚀 «Probar gratis» solo DESPUÉS de agendar (página blanca, colores de Tu Agenda)
+- Idea de Alex: si el «Probar gratis» está mientras el cliente agenda, se puede perder la cita. Ahora:
+  - **Página del negocio:** se quitaron el botón amarillo de arriba y la tarjeta punteada. Solo queda el sello chiquito «⚡ Hecho con tuagenda.vip» abajo.
+  - **«Cita confirmada»** (el ticket y la pantalla del link de pago del bot): tarjeta azul clarita «✨ ¿Te gustó lo fácil que fue?» + «Probar gratis N días →».
+  - **«Mis citas»:** tarjeta pequeña al FINAL, debajo de las citas: «💼 ¿Tienes un negocio? Crea tu agenda gratis».
+  - **Correo de la cita** (gs/correo.gs): pie «Agenda creada con tuagenda.vip · Crea la tuya gratis».
+  - **WhatsApp:** sigue solo en «Cita confirmada» (PIE_GRATIS); nada en recordatorios.
+- Todo abre en **otra pestaña** `tuagenda.vip/?probar=1`, que abre «Probar gratis» de una vez. El cliente no pierde su cita.
+- Con el adicional **«sin marca»** (`businesses.addons.sinMarca`) no sale nada de esto. Si la plataforma apaga la prueba (`trialEnabled:false`), tampoco.
+- Diseño propio de Tu Agenda (blanco, azul #24508A, rojo, latón). Nada del verde oscuro de Epic.
+- Banco: 159 pasan (escenario nuevo del pie del correo). Página: 0 fallas.
 
 ### 2026-11-13 · página 2026-11-13e · 👑 el dueño en «Equipo»: ¿también atiendes?, sin ID y enlace de Telegram por WhatsApp
 - **Pregunta de una sola vez** en «Equipo»: «👤 ¿Tú también atiendes clientes?» → «✂️ Sí, también atiendo» / «💼 No, solo administro».
