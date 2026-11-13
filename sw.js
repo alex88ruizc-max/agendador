@@ -17,3 +17,21 @@ self.addEventListener('fetch', (e) => {
       '<div><h2 style="margin:0 0 8px">Sin conexión</h2><p style="opacity:.75">Revisa tu internet y vuelve a abrir Tu Agenda.</p></div></body>',
       { headers: { 'Content-Type': 'text/html; charset=utf-8' } })));
 });
+
+// 🔔 2026-11-13t · NOTIFICACIONES: cuando el servidor del agendador avisa (reserva nueva, cancelación…), se muestra aunque la app esté cerrada.
+self.addEventListener('push', (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (err) { d = { title: 'Tu Agenda', body: e.data ? e.data.text() : '' }; }
+  e.waitUntil(self.registration.showNotification(d.title || 'Tu Agenda', {
+    body: d.body || '', icon: '/icon-192.png', badge: '/icon-192.png', tag: d.tag || undefined, data: { url: d.url || '/admin.html' }
+  }));
+});
+// al tocar la notificación: abre el panel (o lo trae al frente si ya estaba abierto)
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const url = (e.notification.data || {}).url || '/admin.html';
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((L) => {
+    for (const c of L) if (c.url.indexOf('/admin.html') >= 0 && 'focus' in c) return c.focus();
+    return self.clients.openWindow(url);
+  }));
+});
