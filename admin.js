@@ -9,9 +9,9 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, ventanaReserva, OFERTA_TXT, nombreCompleto, planEjemplos, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-11-13t";
-import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-13t";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-13t";
+} from "./common.js?v=2026-11-13u";
+import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-13u";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-13u";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -130,7 +130,7 @@ function start() {
     // recién creada desde "Probar gratis": abre la guía de primeros pasos
     // asistente de inicio: la primera vez (o al llegar desde "Probar gratis")
     if (!A.wizAuto && isOwner() && !A.me?.isSuper && !document.body.classList.contains("plan-gate") && !A.bill?.planWanted && (!A.settings.setupDone || !A.settings.tutorial2 || new URLSearchParams(location.search).get("guia") === "1")) {
-      // 2026-11-13t · los primeros pasos (nuevos, 4 pasos) se muestran UNA vez más a todas las tiendas, también a las que ya los habían hecho (tutorial2)
+      // 2026-11-13u · los primeros pasos (nuevos, 4 pasos) se muestran UNA vez más a todas las tiendas, también a las que ya los habían hecho (tutorial2)
       const otraVez = !!A.settings.setupDone && !A.settings.tutorial2;
       A.wizAuto = true; A.geoAsked = true;
       if (!A.settings.tutorial2) updateDoc(doc(db, bpath("settings", "general")), { tutorial2: true }).catch(() => {});
@@ -1076,7 +1076,16 @@ function renderServices() {
       <p class="text-sm text-ink/70"><b class="text-ink">${list.length}</b> servicio(s)${hidden ? ` · ${hidden} oculto(s)` : ""}</p>
       <div class="flex flex-wrap gap-2"><button class="btn-light text-sm" data-tpl="1">Cargar plantilla</button><button class="btn-primary text-sm" data-svc="">+ Nuevo servicio</button></div>
     </div>
-    ${list.some((s) => !(s.category || "").trim()) ? `<div class="mb-4 rounded-xl border p-3 text-sm" style="background:#FFF8E6;border-color:#F3D58B">
+    <div class="mb-4 rounded-xl border border-line bg-white p-3 text-sm">
+      <p class="font-semibold">👀 ¿Cómo ve tu cliente los servicios?</p>
+      <p class="mb-2 text-xs text-ink/60">Aplica igual en tu página de citas y en la lista de tu WhatsApp.</p>
+      <div class="grid grid-cols-2 gap-2">
+        <button type="button" class="rounded-xl border px-3 py-2.5 text-left ${A.settings?.serviceView === "lista" ? "border-line bg-white" : "border-ink bg-ink text-white"}" data-svista="categorias"><b class="block text-sm">🗂️ Por categoría</b><span class="block text-[11.5px] opacity-80">Primero elige Cortes, Barba… y luego el servicio</span></button>
+        <button type="button" class="rounded-xl border px-3 py-2.5 text-left ${A.settings?.serviceView === "lista" ? "border-ink bg-ink text-white" : "border-line bg-white"}" data-svista="lista"><b class="block text-sm">📋 Una sola lista</b><span class="block text-[11.5px] opacity-80">Todos los servicios juntos, de una vez</span></button>
+      </div>
+      ${A.settings?.serviceView === "lista" && list.filter((s) => s.active !== false).length > 8 ? `<p class="mt-2 text-xs" style="color:#B45309">💡 Tienes más de 8 servicios: en WhatsApp la lista sale por páginas («Ver más»). Con muchos servicios, «Por categoría» es más cómodo.</p>` : ""}
+    </div>
+    ${list.some((s) => !(s.category || "").trim()) && A.settings?.serviceView !== "lista" ? `<div class="mb-4 rounded-xl border p-3 text-sm" style="background:#FFF8E6;border-color:#F3D58B">
       <p><b>🗂️ ${list.filter((s) => !(s.category || "").trim()).length} servicio(s) sin categoría.</b> Las categorías ordenan tu página y la lista del asistente de WhatsApp (Cortes, Barba, Cejas…).</p>
       <button class="btn-primary mt-2 text-sm" data-svcat="1"><i class="fa-solid fa-wand-magic-sparkles"></i> Organizar por categorías</button></div>` : ""}
     <details class="mb-4 rounded-xl border border-line bg-white p-3 text-sm">
@@ -1089,6 +1098,14 @@ function renderServices() {
     : `<div class="rounded-xl border border-dashed border-line bg-white p-6 text-center text-sm text-ink/70">Aún no tienes servicios. Toca <b>Cargar plantilla</b> para empezar con una lista lista, o <b>+ Nuevo servicio</b>.</div>`}`;
 }
 $("tab-services").addEventListener("click", async (e) => {
+  const sv = e.target.closest("[data-svista]");
+  if (sv) {   // 👀 por categoría o una sola lista (página y WhatsApp)
+    const v = sv.dataset.svista === "lista" ? "lista" : "categorias"; if ((A.settings?.serviceView || "categorias") === v) return;
+    A.settings.serviceView = v; renderServices();
+    try { await setDoc(doc(db, bpath("settings", "general")), { serviceView: v }, { merge: true }); toast(v === "lista" ? "✓ Una sola lista. En WhatsApp se ve en unos 10 minutos." : "✓ Por categoría. En WhatsApp se ve en unos 10 minutos."); }
+    catch (err) { toast("No se pudo guardar: " + err.message, "error"); }
+    return;
+  }
   if (e.target.closest("[data-tpl]")) return openTemplates();
   if (e.target.closest("[data-svcat]")) {   // pone una categoría a cada servicio que no tiene (según su nombre); después se puede cambiar en «Editar»
     const sin = A.services.filter((s) => !(s.category || "").trim()), plan = sin.map((s) => [s, categoriaAuto(s.name)]);
@@ -2994,7 +3011,7 @@ async function loadLost() {
 const guideDone = () => A.settings?.guideDone || [];
 // lo que ya se hizo en el asistente de inicio cuenta como hecho en la guía
 const WIZ_ORDER = ["hi", "biz", "social", "team", "hours", "services", "deposit", "geo", "telegram", "done"];
-// 2026-11-13t · el asistente de inicio ahora son 4 pasos (negocio, horario, servicios y listo). Lo demás queda en la guía.
+// 2026-11-13u · el asistente de inicio ahora son 4 pasos (negocio, horario, servicios y listo). Lo demás queda en la guía.
 //   Quien terminó el asistente viejo (10 pasos) ya pasó por todo; quien termina el nuevo (setupVer 2) solo pasó por esos 4.
 const WIZ_NUEVO = ["biz", "hours", "services", "done"];
 const wizPassed = (id) => {

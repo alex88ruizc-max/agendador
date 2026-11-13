@@ -69,7 +69,11 @@ global.fetch = async (url, o) => {
     if (b.op === 'chat') return ok(Object.assign({}, NEGOCIO, { activo: W.activo, citas: W.citas[b.phone] || [] }, b.conNombre && W.nombreBase ? { cliente: W.nombreBase } : {}));
     if (b.op === 'info') return ok(NEGOCIO);
     if (b.op === 'proof') return ok(W.proof || { ok: false, motivo: 'sin_cita_pendiente' });
-    if (b.op === 'catalogo') return ok(Object.assign({}, CATALOGO, { abono: W.abono, activo: W.activo }));
+    if (b.op === 'catalogo') {
+      const base = Object.assign({}, CATALOGO, { abono: W.abono, activo: W.activo });
+      if (W.unaLista) { let t = []; base.categorias.forEach((c) => { t = t.concat(c.servicios); }); base.categorias = [{ nombre: 'Servicios', desde: 8000, servicios: t }]; base.vista = 'lista'; }   // 3.56: como responde el servidor con «una sola lista»
+      return ok(base);
+    }
     if (b.op === 'cupos') return ok(Object.assign({ dias: W.cupos }, NEGOCIO, { prueba: !!W.prueba, marca: W.marca !== false }));
     if (b.op === 'dias') return ok({ dias: W.cupos.filter((x) => x.horas.length).map((x) => ({ date: x.date, dia: x.dia, n: x.horas.length })), link: NEGOCIO.link });   // como el servidor: solo días con horas
     if (b.op === 'horas') { const d = W.cupos.find((x) => x.date === b.date) || { horas: [], libres: [] }; return ok({ date: b.date, dia: d.dia, horas: d.libres.map((t, i) => ({ time: t, hora: d.horas[i], staff: b.staffId ? [{ id: b.staffId, nombre: b.staffId === 's1' ? 'Lina' : 'Andrés' }] : [{ id: 's1', nombre: 'Lina' }, { id: 's2', nombre: 'Andrés' }] })), link: NEGOCIO.link }); }
@@ -1393,4 +1397,14 @@ test('3.55 · 🔔 El VPS manda la notificación de la app a cada celular suscri
   assert.match(ultimoRegistro(), /1 aviso\(s\): 0 al WhatsApp del dueño, 1 notificación\(es\) de la app \(1 celular/);
   await B.publicarLlavePush(); assert.match(W.llavePush, /^[\w-]{80,}$/, 'la página necesita esta llave para pedir el permiso');
   W.subs = null; W.pushes = null; W.bajas = null;
+});
+
+test('3.56 · 📋 «Una sola lista» (elegido en Servicios): el bot NO pregunta la categoría; muestra todos los servicios de una vez. Por categoría: sigue igual', async () => {
+  await llega(wahaMsg(CLIENTE, 'quiero agendar'));
+  assert.deepEqual(ids(ultimo()).slice(0, 3), ['cat:0', 'cat:1', 'cat:2'], 'por categoría: primero las categorías');
+  P._banco.reiniciar(); W.unaLista = true;
+  await llega(wahaMsg(CLIENTE, 'quiero agendar'));
+  assert.deepEqual(ids(ultimo()), ['svc:c1', 'svc:c2', 'svc:b1', 'svc:e1'], 'una sola lista: todos los servicios, sin «Otra categoría»');
+  assert.match(ultimo().texto, /\*Servicios\*/);
+  W.unaLista = false;
 });

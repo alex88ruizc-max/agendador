@@ -14,7 +14,7 @@
  * Instalación: pega este archivo, ejecuta activarMary() una vez, copia la clave que sale en el registro
  * y ponla en el mary.env del VPS (MARY_KEY). Vuelve a implementar la aplicación web (Implementar > Administrar > editar > Nueva versión).
  */
-const MARY_VERSION = 'agendador-ia-3.55';
+const MARY_VERSION = 'agendador-ia-3.56';
 
 // Se registra como acción pública del servidor (sin sesión: entra con la clave de Mary).
 // ⚠️ Este archivo debe quedar DEBAJO del archivo principal en la lista de archivos de Apps Script (los nuevos quedan al final: así está bien).
@@ -677,6 +677,13 @@ function maryCatalogo_(st) {
   const staff = loadStaff().filter(function (x) { return x.active !== false; }).map(function (x) { return { id: x._id, nombre: x.name, servicios: x.serviceIds || [] }; });
   const out = maryInfo_(st);
   out.categorias = orden.map(function (c) { return { nombre: c, desde: Math.min.apply(null, cats[c].map(function (x) { return x.precio; })), servicios: cats[c] }; });
+  // 3.56 · el dueño eligió «una sola lista» en Servicios: el bot no pregunta la categoría; muestra todos juntos (principales primero, luego agregados)
+  if (st.serviceView === 'lista' && out.categorias.length > 1) {
+    let todos = []; out.categorias.forEach(function (c) { todos = todos.concat(c.servicios); });
+    todos = todos.filter(function (x) { return x.tipo !== 'addon'; }).concat(todos.filter(function (x) { return x.tipo === 'addon'; }));
+    out.categorias = [{ nombre: 'Servicios', desde: Math.min.apply(null, todos.map(function (x) { return x.precio; })), servicios: todos }];
+  }
+  out.vista = st.serviceView === 'lista' ? 'lista' : 'categorias';
   out.staff = staff; out.staffLabel = st.staffLabel || 'Profesional';
   out.abono = Number(st.depositAmountCOP || 0);
   return out;

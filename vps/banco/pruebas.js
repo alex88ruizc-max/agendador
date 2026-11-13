@@ -603,3 +603,15 @@ test('3.55 · 🔔 Servidor: reserva nueva y cancelación avisan SIEMPRE, aunque
   const r = F.maryAvisos_(); assert.equal(r.subs.length, 1); assert.equal(r.subs[0].id, 'abc'); assert.equal(r.negocio, 'Barba'); assert.equal(cola.cola.length, 0);
   F.maryPushBaja_({ ids: ['abc'] }); assert.deepEqual(SUBS, {}, 'el celular que ya no existe se borra');
 });
+
+test('3.56 · 📋 Servidor: con «una sola lista» el catálogo del bot trae una sola categoría «Servicios» (principales primero, agregados después); por categoría, igual que antes', { skip: !require('fs').existsSync(GS_MARY) && 'dentro de la imagen no está gs/' }, () => {
+  const src = require('fs').readFileSync(GS_MARY, 'utf8');
+  const SV = [{ _id: 'b1', name: 'Barba', category: 'Barba', priceCOP: 12000, minutes: 20, type: 'addon', order: 1 }, { _id: 'c1', name: 'Corte', category: 'Cortes', priceCOP: 20000, minutes: 40, type: 'base', order: 2 }, { _id: 'k1', name: 'Combo', category: 'Combos', priceCOP: 30000, minutes: 60, type: 'base', order: 3 }];
+  const G = { ACTIONS: {}, PUBLIC_ACTIONS: {}, console, BID: 'barba', BIZ: { name: 'Barba' }, loadServices: () => SV, loadStaff: () => [], siteUrl: () => 'https://x', platformPublic: () => ({}), plansCfg: () => ({ gold: {} }), bizPlan: () => 'gold' };
+  const F = new Function(...Object.keys(G), src.replace(/function maryInfo_\(st\) \{/, 'function maryInfo_VIEJA(st) {') + '\nfunction maryInfo_() { return {}; }\nreturn { maryCatalogo_ };')(...Object.values(G));
+  let c = F.maryCatalogo_({});
+  assert.deepEqual(c.categorias.map((x) => x.nombre), ['Barba', 'Cortes', 'Combos']); assert.equal(c.vista, 'categorias');
+  c = F.maryCatalogo_({ serviceView: 'lista' });
+  assert.equal(c.categorias.length, 1); assert.equal(c.categorias[0].nombre, 'Servicios'); assert.equal(c.categorias[0].desde, 12000);
+  assert.deepEqual(c.categorias[0].servicios.map((x) => x.id), ['c1', 'k1', 'b1'], 'principales primero, el agregado al final'); assert.equal(c.vista, 'lista');
+});

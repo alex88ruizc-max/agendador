@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.55** · Página **2026-11-13t** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.56** · Página **2026-11-13u** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -115,7 +115,6 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## ⏳ Pendientes
-0000. **📋 Vista de servicios «por categoría» o «una sola lista» — Alex pidió confirmar si se entendió (NO hecho):** una opción (en Servicios o en WhatsApp Bot) que decide cómo se muestran los servicios, y el bot de WhatsApp usa la misma.
 00. **💡 Idea de Alex (solo anotada, NO hecha): línea de ayuda para dueños.** Su WhatsApp 318 como «máster»: en el panel de cada dueño un botón «¿Necesitas ayuda?» que le escribe a ese número.
     Un bot ahí responde SOLO a los dueños de tiendas (los reconoce por su número) con autoayuda de Tu Agenda, y Alex puede responder él mismo. A nadie más de su agenda le responde.
     Antes de hacerlo: confirmar con Alex el número, vincularlo (regla del servidor: preguntar y esperar su confirmación) y definir de dónde salen las respuestas.
@@ -137,6 +136,14 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-13 · agendador-ia-3.56 · página 2026-11-13u · 📋 servicios «por categoría» o «una sola lista»
+- **Alex:** en Servicios, elegir cómo se ven; y que el WhatsApp dispare la lista igual. Confirmó: la opción va en Servicios y manda para los dos lados.
+- **Panel › Servicios:** «👀 ¿Cómo ve tu cliente los servicios?» → 🗂️ Por categoría (por defecto, como antes) · 📋 Una sola lista. Se guarda en `settings.serviceView`.
+- **Página de citas:** con «una sola lista» salen todos los servicios juntos, sin los botones de categoría.
+- **Bot:** el servidor (`maryCatalogo_`) entrega una sola categoría «Servicios» (principales primero, agregados después): el bot ya no pregunta la categoría y muestra la lista de una vez.
+  WhatsApp admite pocas filas por lista: con más de 8 servicios sale por páginas («Ver más»); el panel lo avisa. El bot tarda hasta 10 min en tomar el cambio (guarda el catálogo ese tiempo).
+- Banco: 185 pasan aquí; como el VPS: 158 pasan, 21 saltadas, 0 fallas. Página: 0 fallas.
 
 ### 2026-11-13 · agendador-ia-3.55 · página 2026-11-13t · 🔔 notificaciones de la app: cada reserva y cada cancelación, en todos los planes
 - **Alex:** «cada vez que reserven una nueva cita, cada vez que cancelen, que llegue la notificación… sin importar el plan».
