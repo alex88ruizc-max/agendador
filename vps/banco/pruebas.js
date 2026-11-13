@@ -369,3 +369,16 @@ test('3.37 · 📊 Servidor: guarda el resumen del día y el reporte suma un ran
   assert.equal(F.ACTIONS.maryReporte({ desde: '2030-01-02', hasta: '2030-01-02' }, {}).tot.mensajes, undefined);
   rol = 'staff'; assert.throws(() => F.ACTIONS.maryReporte({ desde: '2030-01-01', hasta: '2030-01-02' }, {}), /Solo el dueño/);
 });
+
+test('3.38 · 🏷️ Servidor: el superusuario activa o quita el adicional «sin marca de agua» (y la info lo dice)', { skip: !require('fs').existsSync(GS_MARY) && 'dentro de la imagen no está gs/' }, () => {
+  const src = require('fs').readFileSync(GS_MARY, 'utf8');
+  const DB = { 'businesses/elbarba': { name: 'Barba', addons: { otro: 1 } } }, llamadas = [];
+  const G = { ACTIONS: { superUpdateBusiness: (b) => { llamadas.push(b); if (b.noSuper) throw new Error('Solo el superusuario'); return { ok: true }; } }, PUBLIC_ACTIONS: {}, console,
+    fsGet: (p) => DB[p] || null, wPatch: (p, d) => ({ p, d }), commit: (w) => w.forEach((x) => { DB[x.p] = Object.assign({}, DB[x.p], x.d); }), fail: (m) => { throw new Error(m); } };
+  const A = new Function(...Object.keys(G), src + '\nreturn ACTIONS;')(...Object.values(G));
+  A.superUpdateBusiness({ businessId: 'elbarba', sinMarca: true }, {});
+  assert.deepEqual(DB['businesses/elbarba'].addons, { otro: 1, sinMarca: true }, 'no borra otros adicionales');
+  A.superUpdateBusiness({ businessId: 'elbarba', sinMarca: false }, {}); assert.equal(DB['businesses/elbarba'].addons.sinMarca, false);
+  assert.throws(() => A.superUpdateBusiness({ businessId: 'elbarba', sinMarca: true, noSuper: true }, {}), /superusuario/); assert.equal(DB['businesses/elbarba'].addons.sinMarca, false, 'sin permiso no cambia');
+  assert.equal(llamadas.length, 3, 'siempre pasa por la acción original (que revisa al superusuario)');
+});

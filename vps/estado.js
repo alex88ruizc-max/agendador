@@ -20,6 +20,15 @@ function marca(info, x, y, oscuro, ac) {
     `<text x="${x + 130}" y="${y + 64}" font-family="${FONT}" font-weight="700" font-size="40" fill="${oscuro ? '#FFFFFF' : '#121216'}">${n}</text>`;
 }
 
+// 🏷️ 3.38 · MARCA DE AGUA de la página en TODOS los estados (salvo el adicional «sin marca de agua»): pequeña, abajo al centro
+function marcaAgua(info, oscuro) {
+  if (info && info.marca === false) return '';
+  const y = 1868, w = 300, x = 540 - w / 2, fg = oscuro ? '#FFFFFF' : '#121216';
+  return `<g opacity="0.78"><rect x="${x}" y="${y}" width="${w}" height="40" rx="20" fill="${oscuro ? '#FFFFFF' : '#121216'}" fill-opacity="0.12"/>` +
+    `<rect x="${x + 16}" y="${y + 10}" width="22" height="20" rx="5" fill="none" stroke="${fg}" stroke-width="2.4"/><path d="M${x + 16} ${y + 16}h22M${x + 22} ${y + 7}v5M${x + 32} ${y + 7}v5" stroke="${fg}" stroke-width="2.4" stroke-linecap="round"/>` +
+    `<text x="${x + 168}" y="${y + 28}" text-anchor="middle" font-family="${FONT}" font-weight="700" font-size="24" fill="${fg}">tuagenda.vip</text></g>`;
+}
+
 // ---------- Cupos de hoy (fondo oscuro) ----------
 function svgHoy(info, dia) {
   const ac = color(info.color, '#5B3FE0'), on = sobre(ac);
@@ -50,7 +59,8 @@ ${cats ? `<text x="72" y="${extra ? yFin + 90 : yFin + 40}" font-family="${FONT}
 <text x="124" y="1663" font-family="${FONT}" font-weight="700" font-size="50" fill="${on}">Aparta el tuyo</text>
 <text x="124" y="1720" font-family="${FONT}" font-weight="500" font-size="32" fill="${on}" opacity="0.85">${X(linkCorto(info.link))}</text>
 <text x="940" y="1695" text-anchor="end" font-family="${FONT}" font-weight="600" font-size="64" fill="${on}">→</text>
-<text x="540" y="1840" text-anchor="middle" font-family="${FONT}" font-weight="500" font-size="30" fill="#9A9AA4">O respóndeme este estado y te paso el link</text>
+<text x="540" y="1830" text-anchor="middle" font-family="${FONT}" font-weight="500" font-size="30" fill="#9A9AA4">O respóndeme este estado y te paso el link</text>
+${marcaAgua(info, true)}
 </svg>`;
 }
 
@@ -83,6 +93,7 @@ ${filas}
 <text x="124" y="1735" font-family="${FONT}" font-weight="700" font-size="46" fill="#FFFFFF">Agenda con abono</text>
 <text x="124" y="1790" font-family="${FONT}" font-weight="500" font-size="32" fill="#C9C9D1">${X(linkCorto(info.link))}</text>
 <text x="940" y="1765" text-anchor="end" font-family="${FONT}" font-weight="600" font-size="64" fill="#FFFFFF">→</text>
+${marcaAgua(info, false)}
 </svg>`;
 }
 
@@ -93,4 +104,6 @@ function png(svg) {
 const textoHoy = (info, dia) => dia.horas.length ? `Cupos de hoy en ${info.negocio}: ${dia.horas.slice(0, 6).join(', ')}${dia.horas.length > 6 ? '…' : ''}. Aparta aquí: ${info.link}` : `Hoy estamos llenos ✨ Aparta para los próximos días: ${info.link}`;
 const textoSemana = (info) => `Cupos de la semana en ${info.negocio}. Aparta aquí: ${info.link}`;
 
-module.exports = { svgHoy, svgSemana, png, textoHoy, textoSemana, fechaLarga };
+// 🚀 3.38 · en la PRUEBA GRATIS, debajo de un estado al día: la invitación a crear su agenda (en el texto, donde el link sí se toca)
+const PIE_PRUEBA = '\n\n🚀 Regístrate gratis y crea tu agenda aquí: https://tuagenda.vip/';
+module.exports = { PIE_PRUEBA, marcaAgua, svgHoy, svgSemana, png, textoHoy, textoSemana, fechaLarga };

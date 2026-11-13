@@ -3,9 +3,9 @@ import { onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordRe
 import {
   doc, getDoc, setDoc, addDoc, deleteDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp, where
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { PLAN_KEYS, PLAN_FEATURES, plansOf, planOfBiz, DEFAULT_PAY_WARNING, TG_EVENTS, BIZ_TYPES, planBenefits, planBenefitsIntro } from "./common.js?v=2026-11-13a";
-import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-13a";
-import { APP_VERSION, SERVER_VERSION, RULES_VERSION, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, readPublishedVersion, reloadFresh, startUpdateWatcher, warmServer, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-11-13a";
+import { PLAN_KEYS, PLAN_FEATURES, plansOf, planOfBiz, DEFAULT_PAY_WARNING, TG_EVENTS, BIZ_TYPES, planBenefits, planBenefitsIntro } from "./common.js?v=2026-11-13b";
+import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-13b";
+import { APP_VERSION, SERVER_VERSION, RULES_VERSION, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, readPublishedVersion, reloadFresh, startUpdateWatcher, warmServer, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-11-13b";
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on) => $(id).classList.toggle("hidden", !on);
@@ -462,12 +462,13 @@ async function handleAct(act, biz, b) {
       <label class="field mb-2"><span>Tipo de negocio</span><select id="eType"><option value="">Sin cambiar</option>${BIZ_TYPES.map(([k, t, , e]) => `<option value="${k}">${e} ${t}</option>`).join("")}</select></label>
       <label id="eTypeOther" class="field mb-4 hidden"><span>Escribe el tipo de negocio</span><input id="eTypeLabel" maxlength="40"></label>
       ${planForm(bl)}
+      <label class="mb-4 flex items-start gap-2 rounded-xl border border-line p-3 text-sm"><input id="eSinMarca" type="checkbox" class="mt-0.5 h-4 w-4" ${biz.addons?.sinMarca ? "checked" : ""}><span><b>🏷️ Sin marca de agua</b> <span class="soft">(adicional +$20.000/mes)</span><br><span class="soft text-xs">Sus estados salen sin «tuagenda.vip». Cóbralo aparte.</span></span></label>
       <button id="eSave" class="btn-primary w-full">Guardar</button>`);
     wirePlanForm();
     $("eType").onchange = (e) => $("eTypeOther").classList.toggle("hidden", e.target.value !== "otro");
     $("eSave").onclick = async () => {
       const btn = $("eSave"); setBusy(btn, true, "Guardando…");
-      try { await api("superUpdateBusiness", { businessId: biz.id, name: $("eName").value.trim(), billing: readPlan(), plan: document.querySelector('input[name="ePlan"]:checked')?.value, businessType: $("eType").value || undefined, businessTypeLabel: $("eTypeLabel").value.trim() }); closeModal("modal"); toast("Plan actualizado."); }
+      try { await api("superUpdateBusiness", { businessId: biz.id, sinMarca: $("eSinMarca").checked, name: $("eName").value.trim(), billing: readPlan(), plan: document.querySelector('input[name="ePlan"]:checked')?.value, businessType: $("eType").value || undefined, businessTypeLabel: $("eTypeLabel").value.trim() }); closeModal("modal"); toast("Plan actualizado."); }
       catch (err) { toast(err.message, "error"); setBusy(btn, false); }
     };
   }

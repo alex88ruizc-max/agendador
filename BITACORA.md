@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.37** · Página **2026-11-13a** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.38** · Página **2026-11-13b** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -132,6 +132,24 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-13 · agendador-ia-3.38 · página 2026-11-13b · 🏷️ marca de agua + «Regístrate gratis» en la prueba (parte 1 de los planes)
+- Pedidos de Alex:
+  - todo estado que salga del agendador lleva la marca de agua de la página (tuagenda.vip), pegada en la imagen;
+  - quitarla es un adicional de +$20.000/mes;
+  - en la prueba gratis no se publica ninguna imagen de Tu Agenda, pero un estado al día dice «Regístrate gratis y crea tu agenda aquí».
+- **Marca de agua** (cápsula pequeña abajo al centro, con ícono de calendario + «tuagenda.vip»):
+  - Estados automáticos del VPS (cupos de hoy y semana): `estado.js` → `marcaAgua()`.
+  - Panel: todo «Nuevo estado» (8 diseños y «subir mi diseño») y el generador de imágenes con horarios. Elige blanco o negro según el fondo. Revisado en diseños oscuros, claros y con marco.
+- **Adicional «sin marca de agua»** (+$20.000/mes): super panel › Editar negocio › casilla «🏷️ Sin marca de agua». Se guarda en `businesses/<id>.addons.sinMarca` envolviendo `superUpdateBusiness` (la acción original sigue revisando que sea el superusuario). El panel y el servidor (`info.marca`) la respetan.
+- **Prueba gratis** (`BIZ.trial`): el primer estado automático del día lleva en el texto «🚀 Regístrate gratis y crea tu agenda aquí: https://tuagenda.vip/». En un plan de pago, nunca.
+- Banco: 155 pruebas, 0 fallas.
+- **Pendiente (parte 2, ya conversada con Alex):** planes con bloqueos del bot.
+  - Prueba: todo menos 💰 Ingresos.
+  - Básico: bot que responde, cupos con link y recordatorio; el resto 🔒.
+  - Gold: todo.
+  - Después: segundo WhatsApp +$20.000 (solo Gold).
+  - Ojo: los planes guardados en el super panel mandan sobre los valores por defecto. Las funciones nuevas necesitan cuidado para no quitárselas a un Gold.
 
 ### 2026-11-13 · agendador-ia-3.37 · página 2026-11-13a · 📊 reporte del bot, del link y de los ingresos
 - Pedido de Alex: en el WhatsApp Bot, un reporte por día, mes, año y fechas libres, con:

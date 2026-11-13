@@ -14,7 +14,7 @@
  * Instalación: pega este archivo, ejecuta activarMary() una vez, copia la clave que sale en el registro
  * y ponla en el mary.env del VPS (MARY_KEY). Vuelve a implementar la aplicación web (Implementar > Administrar > editar > Nueva versión).
  */
-const MARY_VERSION = 'agendador-ia-3.37';
+const MARY_VERSION = 'agendador-ia-3.38';
 
 // Se registra como acción pública del servidor (sin sesión: entra con la clave de Mary).
 // ⚠️ Este archivo debe quedar DEBAJO del archivo principal en la lista de archivos de Apps Script (los nuevos quedan al final: así está bien).
@@ -95,7 +95,8 @@ function maryInfo_(st) {
     version: MARY_VERSION, negocio: st.businessName || BIZ.name || '', activo: BIZ.status === 'active',
     link: maryLinkAgenda_(), direccion: [st.address, st.city].filter(Boolean).join(', '),
     color: (ap.colors || {}).primary || '', logo: ap.logo || '', categorias: maryCategorias_(), medios: maryMedios_(st),
-    holdMinutes: Math.max(5, Number(st.holdMinutes || 30)), bot: maryBotCfg_(st)
+    holdMinutes: Math.max(5, Number(st.holdMinutes || 30)), bot: maryBotCfg_(st),
+    marca: !((BIZ.addons || {}).sinMarca), prueba: !!BIZ.trial   // 3.38: marca de agua (salvo el adicional) · prueba gratis
   };
 }
 // 3.1 · «💬 WhatsApp Bot» del panel del dueño (settings.maryBot). Todo tiene un valor por defecto.
@@ -428,6 +429,19 @@ function maryVolverAvisado_(b) {
   if (L.length) commit(L);
   return { ok: true };
 }
+// ---------- 3.38 · 🏷️ ADICIONAL «SIN MARCA DE AGUA» (+$20.000/mes): lo activa el superusuario al editar el negocio ----------
+// Se envuelve la acción del superusuario: la de siempre revisa que sea el superusuario y guarda; después se guarda el adicional.
+try {
+  const _superEditar = ACTIONS.superUpdateBusiness;
+  if (_superEditar) ACTIONS.superUpdateBusiness = function (b, auth) {
+    const r = _superEditar(b, auth);
+    if (b && b.businessId && b.sinMarca !== undefined) {
+      const ruta = 'businesses/' + String(b.businessId).replace(/[^\w-]/g, ''), ya = fsGet(ruta) || {};
+      commit([wPatch(ruta, { addons: Object.assign({}, ya.addons || {}, { sinMarca: b.sinMarca === true }) })]);
+    }
+    return r;
+  };
+} catch (e) { console.error('Adicional sin marca: ' + e); }
 // ---------- 3.37 · 📊 REPORTE DEL BOT ----------
 // El VPS manda el resumen del día (cuentas + huellas cortas de las personas, nunca el número) → businesses/<bid>/stats/<fecha>
 function maryEstadisticas_(b) {

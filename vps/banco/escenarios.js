@@ -61,7 +61,7 @@ global.fetch = async (url, o) => {
     if (b.op === 'info') return ok(NEGOCIO);
     if (b.op === 'proof') return ok(W.proof || { ok: false, motivo: 'sin_cita_pendiente' });
     if (b.op === 'catalogo') return ok(Object.assign({}, CATALOGO, { abono: W.abono, activo: W.activo }));
-    if (b.op === 'cupos') return ok(Object.assign({ dias: W.cupos }, NEGOCIO));
+    if (b.op === 'cupos') return ok(Object.assign({ dias: W.cupos }, NEGOCIO, { prueba: !!W.prueba, marca: W.marca !== false }));
     if (b.op === 'dias') return ok({ dias: W.cupos.filter((x) => x.horas.length).map((x) => ({ date: x.date, dia: x.dia, n: x.horas.length })), link: NEGOCIO.link });   // como el servidor: solo días con horas
     if (b.op === 'horas') { const d = W.cupos.find((x) => x.date === b.date) || { horas: [], libres: [] }; return ok({ date: b.date, dia: d.dia, horas: d.libres.map((t, i) => ({ time: t, hora: d.horas[i], staff: b.staffId ? [{ id: b.staffId, nombre: b.staffId === 's1' ? 'Lina' : 'Andrés' }] : [{ id: 's1', nombre: 'Lina' }, { id: 's2', nombre: 'Andrés' }] })), link: NEGOCIO.link }); }
     if (b.op === 'crear') {
@@ -1178,4 +1178,23 @@ test('3.37 · 📊 Recordatorio de servicio y «¿Seguimos?»: enviados y cuánt
   await llega(toca('vol:si')); await llega(toca('dia:' + HOY)); await llega(toca('hora:15:00'));
   await B.tickEstadisticas();
   assert.equal(W.stats.pop().n.volverOk, 1);
+});
+
+// =====================================================================
+//  3.38 · 🏷️ marca de agua y «Regístrate gratis» en la prueba
+// =====================================================================
+test('3.38 · 🏷️ Todo estado lleva la marca de agua tuagenda.vip; con el adicional «sin marca» no', () => {
+  const E = require('../estado'), info = Object.assign({}, NEGOCIO, { color: '#2B59C3', categorias: [] }), dia = { date: HOY, horas: ['3:00 p. m.'] };
+  assert.match(E.svgHoy(info, dia), /tuagenda\.vip<\/text><\/g>/); assert.match(E.svgSemana(info, [{ date: HOY, dow: 1, abierto: true, libres: ['15:00'] }]), /tuagenda\.vip<\/text><\/g>/);
+  assert.doesNotMatch(E.svgHoy(Object.assign({}, info, { marca: false }), dia), /tuagenda\.vip<\/text><\/g>/);
+});
+test('3.38 · 🚀 Prueba gratis: UN estado al día lleva «Regístrate gratis y crea tu agenda aquí: https://tuagenda.vip/»; en un plan de pago, nunca', async () => {
+  W.prueba = true;
+  await B.publicarEstado({ bid: 'lina-spa', instancia: 'lina-spa', motor: 'waha', sesion: 'default' }, 'hoy');
+  assert.match(W.estados[0].caption, /Regístrate gratis y crea tu agenda aquí: https:\/\/tuagenda\.vip\/$/);
+  await B.publicarEstado({ bid: 'lina-spa', instancia: 'lina-spa', motor: 'waha', sesion: 'default' }, 'hoy');
+  assert.doesNotMatch(W.estados[1].caption, /Regístrate gratis/, 'solo uno al día');
+  W.prueba = false; P._banco.reiniciar(); W.estados = [];
+  await B.publicarEstado({ bid: 'lina-spa', instancia: 'lina-spa', motor: 'waha', sesion: 'default' }, 'hoy');
+  assert.doesNotMatch(W.estados[0].caption, /Regístrate gratis/, 'plan de pago: sin invitación');
 });
