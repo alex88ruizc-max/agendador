@@ -14,11 +14,11 @@
   <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js">
   <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js">
   <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js">
-  <link rel="modulepreload" href="common.js?v=2026-11-13z">
-  <link rel="modulepreload" href="super.js?v=2026-11-13z">
+  <link rel="modulepreload" href="common.js?v=2026-11-13zb">
+  <link rel="modulepreload" href="super.js?v=2026-11-13zb">
   <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
-  <link rel="stylesheet" href="styles.css?v=2026-11-13z">
+  <link rel="stylesheet" href="styles.css?v=2026-11-13zb">
   <style>
     /* ===== Panel del superusuario: claro, frío, con un solo elemento protagonista (el carril de cobros) ===== */
     .sp { --canvas:#F2F5F8; --paperw:#FFFFFF; --sink:#14213D; --soft:#5B6782; --hair:#DDE3EA; --sblue:#2B59C3; --sred:#D7263D; --mint:#1E9E63; --sky:#3F8FD6; --amber:#C77700;
@@ -97,9 +97,9 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Tu Agenda">
-  <link rel="stylesheet" href="panel-premium.css?v=2026-11-13z">
+  <link rel="stylesheet" href="panel-premium.css?v=2026-11-13zb">
   <!-- estilos ya armados (antes los calculaba el celular con cdn.tailwindcss.com): va de ÚLTIMO, igual que antes -->
-  <link rel="stylesheet" href="tailwind.css?v=2026-11-13z">
+  <link rel="stylesheet" href="tailwind.css?v=2026-11-13zb">
 </head>
 <body class="sp pp antialiased">
 
@@ -189,6 +189,14 @@
               <p class="soft mb-3 text-sm">Si apagas una, desaparece del panel de cada tienda y el bot deja de hacerla en todas. Al prenderla de nuevo, cada tienda queda como la tenía. Se guarda con el botón de abajo.</p>
               <div id="plBot" class="grid gap-1.5 sm:grid-cols-2"></div>
               <p class="soft mt-2 text-xs">«Si escribes tú en un chat, se calla» siempre queda: protege las conversaciones de cada tienda.</p>
+            </div>
+            <div class="sp-card">
+              <h2 class="disp mb-1 text-[18px] font-bold">🆘 Línea de soporte (tu WhatsApp)</h2>
+              <p class="soft mb-3 text-sm">Si la prendes, en el panel de cada tienda sale el botón «¿Necesitas ayuda?», que abre un chat con este número. Ahí un ayudante responde solo a dueños y empleados de las tiendas. A nadie más le escribe. Se guarda con el botón de abajo.</p>
+              <label class="flex items-center gap-2 rounded-xl p-2 text-[13px]" style="background:var(--canvas)"><input type="checkbox" class="h-4 w-4" id="sopOn"> Prender la línea de soporte</label>
+              <label class="mt-2 block text-[13px] font-bold">Tu número de WhatsApp, con el 57 adelante
+                <input id="sopNum" type="tel" inputmode="numeric" maxlength="15" placeholder="573001234567" class="mt-1 w-full rounded-xl border border-line px-3 py-2.5 text-[15px]"></label>
+              <p class="soft mt-2 text-xs">Antes hay que vincular ese WhatsApp una sola vez: escríbele al bot de Telegram «Agendador VPS» <b>/soporte vincular</b> y tu número. Si tú escribes en un chat, el ayudante se calla ahí 12 horas.</p>
             </div>
             <div class="sp-card">
               <h2 class="disp mb-1 text-[18px] font-bold">Descuento por pagar varios meses</h2>
@@ -297,6 +305,6 @@
     </div>
   </div>
 
-  <script type="module" src="super.js?v=2026-11-13z"></script>
+  <script type="module" src="super.js?v=2026-11-13zb"></script>
 </body>
 </html>
