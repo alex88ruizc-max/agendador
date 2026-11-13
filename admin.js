@@ -7,11 +7,11 @@ import {
   startUpdateWatcher, applyBrandColors, uiConfirm, uiPrompt, setDialogBrand, viewImage, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, hora12, tmin, fechaLarga, fechaCorta, toMillis, cop, esc, normalizePhone,
   waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, DEFAULT_WA_RESCHEDULE, computeSlots, staffHours, mapLinks, headerBgCss, onColor, darken,
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
-  PLAN_KEYS, plansOf, planOfBiz, planPriceOf, ventanaReserva, OFERTA_TXT, nombreCompleto, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
+  PLAN_KEYS, plansOf, planOfBiz, planPriceOf, ventanaReserva, OFERTA_TXT, nombreCompleto, planEjemplos, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-11-13m";
-import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-13m";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-13m";
+} from "./common.js?v=2026-11-13p";
+import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-13p";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-13p";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -129,9 +129,12 @@ function start() {
     if (A.tab === "wabot" && !document.activeElement?.closest?.("#tab-wabot input, #tab-wabot select")) renderWaBot(); // p. ej. al quedar vinculado el WhatsApp
     // recién creada desde "Probar gratis": abre la guía de primeros pasos
     // asistente de inicio: la primera vez (o al llegar desde "Probar gratis")
-    if (!A.wizAuto && isOwner() && !A.me?.isSuper && !document.body.classList.contains("plan-gate") && !A.bill?.planWanted && (!A.settings.setupDone || new URLSearchParams(location.search).get("guia") === "1")) {
+    if (!A.wizAuto && isOwner() && !A.me?.isSuper && !document.body.classList.contains("plan-gate") && !A.bill?.planWanted && (!A.settings.setupDone || !A.settings.tutorial2 || new URLSearchParams(location.search).get("guia") === "1")) {
+      // 2026-11-13p · los primeros pasos (nuevos, 4 pasos) se muestran UNA vez más a todas las tiendas, también a las que ya los habían hecho (tutorial2)
+      const otraVez = !!A.settings.setupDone && !A.settings.tutorial2;
       A.wizAuto = true; A.geoAsked = true;
-      setTimeout(() => { if (new URLSearchParams(location.search).get("guia")) history.replaceState(null, "", location.pathname + "?b=" + encodeURIComponent(bpath().split("/")[1])); openWizard(); }, 700);
+      if (!A.settings.tutorial2) updateDoc(doc(db, bpath("settings", "general")), { tutorial2: true }).catch(() => {});
+      setTimeout(() => { if (new URLSearchParams(location.search).get("guia")) history.replaceState(null, "", location.pathname + "?b=" + encodeURIComponent(bpath().split("/")[1])); openWizard(otraVez ? 0 : undefined); }, 700);
     } else if (!A.geoAsked && isOwner() && !A.me?.isSuper && !A.settings.geo) { A.geoAsked = true; setTimeout(() => requestGeo(false), 2500); }
     renderAgenda(); renderStaffTab(); if (typeof renderHome === "function" && A.tab === "home") renderHome();
   }, onErr));
@@ -2100,11 +2103,12 @@ function renderPlan() {
     <table class="mt-2 w-full border-collapse">
       <tr><td></td>${PLAN_KEYS.map((k) => `<td class="pt-1 text-center text-[10.5px] font-extrabold text-ink/55 ${k === sel ? "bg-amber-50" : ""}">${esc(P[k].name.replace("Prueba gratis", "Prueba"))}</td>`).join("")}</tr>
       ${featRow("Agenda y cita rápida", () => `<b style="color:var(--mint)">✓</b>`)}
-      ${featRow("Avisos en Telegram", (k) => !(P[k].features || []).includes("telegram") ? `<span class="text-ink/30">—</span>` : (P[k].tgChoose ? "<b>Eliges</b>" : `<b>${(P[k].tgEvents || []).length === 1 ? "Reservas" : (P[k].tgEvents || []).length}</b>`))}
+      ${featRow("Avisos en Telegram", (k) => !(P[k].features || []).includes("telegram") ? `<span class="text-ink/30">—</span>` : (P[k].tgChoose ? "<b>Eliges</b>" : `<b>${(P[k].tgEvents || []).length === 1 ? "Reservas" : (P[k].tgEvents || []).length >= TG_EVENTS.length ? "Todos" : (P[k].tgEvents || []).length + " tipos"}</b>`))}
       ${featRow("Días para reservar", (k) => `<b>${P[k].daysAhead}</b>`)}
       ${featRow("Profesionales", (k) => `<b>${P[k].maxStaff ? P[k].maxStaff : "Sin límite"}</b>`)}
       ${[["whatsapp", "Bot de WhatsApp 24/7"], ["appearance", "Portada y colores"], ["clients", "Clientes"], ["images", "Imágenes"], ["marketing", "Marketing y estados"], ["activity", "Actividad"]].map(([key, label]) => featRow(label, (k) => yes(k, key))).join("")}
-    </table>`;
+    </table>
+    ${planEjemplos({ feats: P[sel].features || [], servicio: (A.services.find((x) => x.type === "base" && x.active !== false) || A.services[0] || {}).name, profesional: (A.staff.find((x) => x.active !== false) || {}).name })}`;
   let action = "";
   if (sel === "free") {
     action = gate ? `<button id="pFree" class="btn-light mt-4 w-full py-3">Empezar con la prueba gratis (${P.free.days} días)</button>`
@@ -2987,7 +2991,7 @@ async function loadLost() {
 const guideDone = () => A.settings?.guideDone || [];
 // lo que ya se hizo en el asistente de inicio cuenta como hecho en la guía
 const WIZ_ORDER = ["hi", "biz", "social", "team", "hours", "services", "deposit", "geo", "telegram", "done"];
-// 2026-11-13m · el asistente de inicio ahora son 4 pasos (negocio, horario, servicios y listo). Lo demás queda en la guía.
+// 2026-11-13p · el asistente de inicio ahora son 4 pasos (negocio, horario, servicios y listo). Lo demás queda en la guía.
 //   Quien terminó el asistente viejo (10 pasos) ya pasó por todo; quien termina el nuevo (setupVer 2) solo pasó por esos 4.
 const WIZ_NUEVO = ["biz", "hours", "services", "done"];
 const wizPassed = (id) => {
@@ -3101,12 +3105,29 @@ document.addEventListener("click", (e) => {
 // Telegram paso a paso, con el estado en vivo
 // 🔔 para qué sirve Telegram (la misma explicación en la guía, en Configuración y en Equipo)
 function tgPorQue() {
-  return `<div class="-mt-1 mb-4 text-sm">
-    <p><b>¿Para qué sirve?</b> Es por donde <b>te avisamos a ti</b>: cada reserva nueva te llega al instante y <b>apruebas los abonos con un toque</b>, sin abrir el panel.</p>
-    <div class="my-3 rounded-2xl p-2.5" style="background:#e7f1fb"><div class="rounded-2xl rounded-bl-sm bg-white p-2.5 text-[12.5px] leading-snug shadow-sm">📅 <b>NUEVA RESERVA</b> R-8K2PQ<br>Juan Pérez · mañana 10:00 a. m.<br>Abono: $10.000 · comprobante adjunto
+  const li = (ic, t) => `<li class="flex gap-2"><span>${ic}</span><span>${t}</span></li>`;
+  return `<div class="-mt-1 mb-4 text-[14px] leading-snug">
+    <p class="text-[15px] font-extrabold">🔔 ¿Qué es esto?</p>
+    <p class="mt-1">Telegram es una app <b>igualita a WhatsApp</b>. Es <b>gratis</b>.</p>
+    <p class="mt-1">La usamos para <b>avisarte a ti</b> cuando pasa algo en tu negocio.</p>
+    <p class="mt-3 text-[15px] font-extrabold">👀 Mira un ejemplo</p>
+    <p class="mt-1">Juan aparta una cita. A ti te suena el celular y te llega esto:</p>
+    <div class="my-2 rounded-2xl p-2.5" style="background:#e7f1fb"><div class="rounded-2xl rounded-bl-sm bg-white p-2.5 text-[12.5px] leading-snug shadow-sm">📅 <b>NUEVA RESERVA</b><br>Juan Pérez · mañana 10:00 a. m.<br>Pagó $10.000 · aquí está la foto del pago
       <div class="mt-1.5 grid grid-cols-2 gap-1.5 text-center text-xs font-bold" style="color:#2a7bc0"><span class="rounded-xl py-2" style="background:#e7f1fb">✅ Aprobar</span><span class="rounded-xl py-2" style="background:#e7f1fb">❌ Rechazar</span></div></div></div>
-    <p class="soft text-[13px]"><b>¿Por qué Telegram?</b> Tu WhatsApp del negocio queda libre para tus clientes. Telegram es <b>gratis</b>, se instala en 1 minuto y solo lo usas para recibir tus avisos.</p>
-    <p class="soft mt-1.5 text-[13px]"><b>¿No quieres instalar nada?</b> Si tienes otro número personal, activa <b>«Avisos a tu WhatsApp»</b> en <b>WhatsApp Bot</b>.</p>
+    <p>Tocas <b>✅ Aprobar</b> y ya. No tienes que entrar a ningún lado.</p>
+    <p class="mt-3 text-[15px] font-extrabold">📣 ¿Qué te avisa?</p>
+    <ul class="mt-1 space-y-1">
+      ${li("📅", "Cuando alguien <b>aparta una cita</b>.")}
+      ${li("💸", "Cuando alguien <b>te paga</b>. Te llega la foto del pago.")}
+      ${li("🚫", "Cuando alguien <b>cancela</b> o cambia la hora.")}
+      ${li("⏰", "Un rato <b>antes de cada cita</b>, para que no se te olvide.")}
+      ${li("👥", "Si tienes empleados, a <b>cada uno le llegan sus citas</b>.")}
+    </ul>
+    <p class="mt-3 text-[15px] font-extrabold">🙋 Preguntas</p>
+    <p class="mt-1"><b>¿Y mi WhatsApp?</b> Sigue igual. WhatsApp es para hablar con tus clientes. Telegram es solo para tus avisos.</p>
+    <p class="mt-1"><b>¿Cuesta plata?</b> No. Es gratis.</p>
+    <p class="mt-1"><b>¿Es difícil?</b> No. Son 3 toques. Mira abajo. 👇</p>
+    <p class="soft mt-2 text-[12px]">Los avisos que te llegan dependen de tu plan.</p>
   </div>`;
 }
 function openTelegramGuide() {
@@ -3651,6 +3672,8 @@ function wizReadSvcs() {
 function openWizard(start) {
   if (!A.settings) return;
   wizInit();
+  W.ver2 = !(A.settings.setupDone && A.settings.setupVer !== 2);
+  W.pasoVisto = -1; W.repaso = !!A.settings.setupDone;   // tienda que ya estaba configurada: es un repaso → cada paso SOLO se guarda si cambió algo (no se pisa su horario ni sus servicios)   // quien ya hizo el asistente viejo conserva sus pasos hechos
   W.i = Math.min(Number(start ?? A.settings.setupStep ?? 0) || 0, STEPS.length - 1);
   W.open = true;
   let el = $("wizard");
@@ -3667,14 +3690,16 @@ function openWizard(start) {
 function drawWizard() {
   const st = STEPS[W.i], el = $("wizard");
   el.innerHTML = `<div class="wz-top"><button type="button" class="wz-x" data-wx="close" aria-label="Cerrar">✕</button><span class="soft text-xs font-bold">Paso ${W.i + 1} de ${STEPS.length}</span><span class="wz-bar"><i style="width:${((W.i + 1) / STEPS.length) * 100}%"></i></span></div>
-    <div class="wz-body q-pop">${st.html()}</div>
+    <div class="wz-body q-pop">${W.repaso && st.id !== "done" ? `<p class="mb-3 rounded-xl p-2.5 text-[12.5px]" style="background:#e2f5ec;color:#16774b">✓ Ya tienes esto configurado. Revísalo y toca <b>Siguiente</b>: solo se guarda si cambias algo.</p>` : ""}${st.html()}</div>
     ${st.essential || st.noSkip?.() ? "" : `<button type="button" class="wz-skip" data-wx="skip">${st.skipTxt || "Lo hago después"}</button>`}
     <div class="wz-foot">${W.i ? `<button type="button" class="btn-light !px-5" data-wx="back">Atrás</button>` : ""}<button type="button" class="btn-primary flex-1 py-3.5 text-base" data-wx="next">${st.next || "Siguiente"}</button></div>`;
   el.querySelector(".wz-body").scrollTop = 0;
+  if (W.pasoVisto !== W.i) { W.pasoVisto = W.i; W.tocado = false; }   // paso nuevo: aún no ha cambiado nada
   if (st.id === "telegram") wizWatchTg();
 }
 async function wizClick(e) {
   const d = W.d, t = e.target;
+  if (t.closest(".wz-body") && t.closest("button, label, input, select, [data-wday], [data-wslot]")) W.tocado = true;
   const x = t.closest("[data-wx]");
   if (x) {
     const act = x.dataset.wx;
@@ -3683,15 +3708,15 @@ async function wizClick(e) {
       return closeWizard(true);
     }
     if (act === "back") { W.i--; return drawWizard(); }
-    if (act === "skip") { W.i++; updateDoc(doc(db, bpath("settings", "general")), { setupStep: W.i, setupVer: 2 }).catch(() => {}); return drawWizard(); }
+    if (act === "skip") { W.i++; updateDoc(doc(db, bpath("settings", "general")), { setupStep: W.i, ...(W.ver2 ? { setupVer: 2 } : {}) }).catch(() => {}); return drawWizard(); }
     if (act === "next") {
       const st = STEPS[W.i];
       if (st.id === "done") return closeWizard(true);
       setBusy(x, true, "Guardando…");
       try {
-        if (st.save) await fastSave(st.save(), (err) => toast("No se pudo guardar el paso anterior: " + err.message, "error"));
+        if (st.save && (!W.repaso || W.tocado)) await fastSave(st.save(), (err) => toast("No se pudo guardar el paso anterior: " + err.message, "error"));
         W.i++;
-        updateDoc(doc(db, bpath("settings", "general")), { setupStep: W.i, setupVer: 2 }).catch(() => {});
+        updateDoc(doc(db, bpath("settings", "general")), { setupStep: W.i, ...(W.ver2 ? { setupVer: 2 } : {}) }).catch(() => {});
         drawWizard();
       } catch (err) { toast(err.message, "error"); setBusy(x, false); }
       return;
@@ -3740,6 +3765,7 @@ async function wizClick(e) {
   }
 }
 function wizInput(e) {
+  W.tocado = true;
   const t = e.target, d = W.d;
   if (t.id === "wDepOther") {
     const n = Number(t.value.replace(/\D/g, "") || 0); t.value = n ? n.toLocaleString("es-CO") : "";
@@ -3751,6 +3777,7 @@ function wizInput(e) {
   if (t.dataset.wt) { d[t.dataset.wt] = t.value; clearTimeout(W.tT); W.tT = setTimeout(() => { const pos = t.dataset.wt; drawWizard(); document.querySelector(`[data-wt="${pos}"]`)?.focus(); }, 700); }
 }
 async function wizChange(e) {
+  W.tocado = true;
   const t = e.target, d = W.d;
   if (t.id === "wCoverFile" && t.files[0]) { d.name = $("wName").value; d.address = $("wAddr").value; d.city = $("wCity").value; d.phone = $("wPhone").value; d.coverNew = await imgToDataUrl(t.files[0], 1100, "image/jpeg"); d.coverY = 50; d.coverDel = false; drawWizard(); return; }
   if (t.id === "wLogo" && t.files[0]) { d.name = $("wName").value; d.address = $("wAddr").value; d.city = $("wCity").value; d.phone = $("wPhone").value; d.logoNew = await imgToDataUrl(t.files[0], 420, "image/jpeg"); drawWizard(); }
@@ -3767,7 +3794,7 @@ function closeWizard(done, fromBack) {
   if (!fromBack && W.inHistory) { W.inHistory = false; dropOverlay("wizard"); }
   W.open = false; clearInterval(W.tgT);
   $("wizard")?.remove(); document.body.classList.remove("wiz-on");
-  if (done) updateDoc(doc(db, bpath("settings", "general")), { setupDone: true, setupVer: 2 }).catch(() => {});
+  if (done) updateDoc(doc(db, bpath("settings", "general")), { setupDone: true, ...(W.ver2 ? { setupVer: 2 } : {}) }).catch(() => {});
   renderHome();
 }
 document.addEventListener("click", (e) => { if (e.target.closest("[data-wizopen]")) { closeMenus(); openWizard(0); } });
@@ -4186,15 +4213,24 @@ function renderWaBot() {
       <div class="flex items-center gap-3 p-3.5"><span class="text-xl">🙊</span><span class="min-w-0 flex-1"><b class="block text-[14.5px]">Si escribes tú en un chat, se calla</b><span class="block text-xs text-ink/65">El asistente se hace a un lado en ese chat para que hables tú.</span></span>
         ${sel("pausaMin", c.pausaMin, [[15, "15 min"], [30, "30 min"], [60, "1 hora"], [120, "2 horas"]])}</div>
     </div>
-    ${hay("avisosWa") ? `<div class="sp-h mt-5"><h2>🔔 Avisos a tu WhatsApp</h2><span>sin instalar Telegram</span></div>
+    ${hay("avisosWa") ? `<div class="sp-h mt-5"><h2>🔔 Que te avisen a tu celular</h2><span>por WhatsApp</span></div>
     <div class="sp-card !p-0 divide-y divide-line">
-      ${fila("avisos.activo", "🔔", "Avisarme por WhatsApp de cada reserva", "Tu asistente te escribe a TU número personal: reservas nuevas, cancelaciones y comprobantes. Para aprobar un pago respondes 1.", c.avisos.activo)}
-      ${c.avisos.activo ? `<div class="p-3.5"><label class="field"><span>Tu WhatsApp personal (distinto al del negocio)</span><input id="avNum" type="tel" inputmode="numeric" placeholder="57 300 123 4567" value="${esc(c.avisos.numero || "")}"></label>
+      ${fila("avisos.activo", "🔔", "Avisarme por WhatsApp", "Cada vez que alguien aparte una cita o te pague, te escribimos a TU celular.", c.avisos.activo)}
+      ${c.avisos.activo ? `<div class="p-3.5"><p class="mb-2 text-[13px]"><b>Pon aquí TU número.</b> El tuyo, no el del negocio.<br><span class="soft">Ejemplo: el negocio usa el 301… y tú tienes otro celular con el 300… Aquí va el 300…</span></p>
+        <label class="field"><span>Tu número personal</span><input id="avNum" type="tel" inputmode="numeric" placeholder="57 300 123 4567" value="${esc(c.avisos.numero || "")}"></label>
         <button type="button" id="avSave" class="btn-dark mt-2 text-sm">Guardar mi número</button>
+        <p class="mt-3 rounded-xl p-2.5 text-[13px]" style="background:var(--canvas)"><b>¿Cómo apruebo un pago?</b><br>1️⃣ Te llega el aviso a tu WhatsApp.<br>2️⃣ Miras la foto del pago en tu panel (Agenda).<br>3️⃣ Respondes con el número <b>1</b>. Listo, quedó aprobado.<br><span class="soft">Si no te pagaron, respondes <b>2</b>.</span></p>
         ${!A.settings?.maryWa?.conectado ? `<p class="mt-2 text-xs font-bold" style="color:#B45309">⚠️ Primero vincula el WhatsApp de tu negocio (arriba): desde ahí te escribimos.</p>` : ""}
         ${c.avisos.numero && String(c.avisos.numero).replace(/\D/g, "").slice(-10) === String(A.settings?.maryWa?.numero || "").slice(-10) ? `<p class="mt-2 text-xs font-bold" style="color:#B45309">⚠️ Ese es el número del negocio. Pon otro (tu número personal): WhatsApp no deja escribirse a sí mismo.</p>` : ""}</div>` : ""}
     </div>
-    <p class="soft mt-3 text-xs">Si solo tienes un celular con un número, usa los avisos de Telegram (en Configuración).</p>` : ""}
+    <div class="sp-card mt-3 text-[13.5px] leading-snug">
+      <p class="text-[15px] font-extrabold">🤔 ¿Cuál uso: WhatsApp o Telegram?</p>
+      <p class="mt-2">📱📱 <b>Tengo 2 números</b> (el del negocio y el mío)<br>👉 Usa <b>WhatsApp</b>. Es lo más fácil: no instalas nada.</p>
+      <p class="mt-2">📱 <b>Tengo 1 solo número</b><br>👉 Usa <b>Telegram</b>. WhatsApp no puede escribirse a sí mismo.</p>
+      <p class="mt-2">📸 <b>Quiero ver la foto del pago en el mismo aviso</b><br>👉 Usa <b>Telegram</b>. Ahí llega la foto con el botón Aprobar.</p>
+      <p class="soft mt-2">También puedes usar los dos al tiempo.</p>
+      <button type="button" id="avTg" class="btn-dark mt-2 text-sm">${A.tg?.owner ? "✓ Ya tienes Telegram · ver cómo funciona" : "Poner Telegram (gratis, 3 toques)"}</button>
+    </div>` : ""}
     ${hay("estados") ? `<div class="sp-h mt-5"><h2>📸 Estados con tus cupos</h2><span>máximo 2 al día</span></div>
     <div class="sp-card !p-0 divide-y divide-line">
       ${fila("estados.activo", "📸", "Publicar estados con los cupos del día", "Una imagen con tus horas libres. Si hoy ya no hay cupos, publica los de mañana. Si tampoco hay, no publica.", e.activo)}
@@ -4310,6 +4346,7 @@ document.addEventListener("click", (e) => {
   else if (k === "avisos.activo") botGuardar({ avisos: { activo: !c.avisos.activo } });
   else botGuardar({ [k]: !c[k] });
 });
+document.addEventListener("click", (e) => { if (e.target.closest("#avTg")) openTelegramGuide(); });
 document.addEventListener("click", (e) => {
   if (!e.target.closest("#avSave")) return;
   let n = String($("avNum").value || "").replace(/\D/g, ""); if (n.length === 10) n = "57" + n;

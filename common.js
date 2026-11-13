@@ -2,7 +2,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js?v=2026-11-13m";
+import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js?v=2026-11-13p";
 
 export const app = initializeApp(firebaseConfig);
 // Caché en el dispositivo: muestra al instante lo último que se vio y luego actualiza en vivo
@@ -21,7 +21,7 @@ export function businessFromUrl() {
 export const bpath = (...parts) => ["businesses", BID, ...parts].join("/");
 
 // Versión de la página: cámbiala en cada actualización para comprobar que se publicó
-export const APP_VERSION = '2026-11-13m';
+export const APP_VERSION = '2026-11-13p';
 // Versiones que esta página espera del servidor y de las reglas de Firebase
 export const SERVER_VERSION = '2026-10-10n';
 export const RULES_VERSION = '2026-10-10l';
@@ -512,6 +512,31 @@ export function nombreCompleto(el, txt) {
   const base = parseFloat(getComputedStyle(el).fontSize) || 24, n = String(txt || "").length;
   const f = n <= 14 ? 1 : n <= 20 ? 0.86 : n <= 28 ? 0.76 : n <= 40 ? 0.66 : 0.58;
   if (f < 1) el.style.fontSize = Math.max(15, Math.round(base * f)) + "px";
+}
+// 👀 «Mira cómo funciona»: la misma lista de beneficios, con un ejemplo de cómo se ve cada cosa (según lo que trae el plan elegido).
+//    d = { feats: funciones del plan, negocio, servicio, profesional, cliente } → los ejemplos salen con los datos del propio negocio.
+export function planEjemplos(d = {}) {
+  const F = new Set(d.feats || []), sv = esc(d.servicio || "tu servicio"), pro = esc(d.profesional || "tu equipo"), cli = esc(d.cliente || "Juan");
+  const burb = (lado, t, h, quien) => `<div style="max-width:86%;align-self:${lado === "in" ? "flex-start" : "flex-end"};background:${lado === "in" ? "#fff" : "#D9FDD3"};padding:7px 10px;border-radius:12px;font-size:13px;line-height:1.35;box-shadow:0 1px 0 rgba(0,0,0,.06)">${quien ? `<div style="font-size:10.5px;font-weight:700;color:#128C7E">${quien}</div>` : ""}${t}<div style="text-align:right;color:#8a8f93;font-size:10px;margin-top:2px">${h}</div></div>`;
+  const chat = (x, bg) => `<div style="background:${bg || "#EFEAE2"};border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:6px">${x}</div>`;
+  const gana = (t) => `<p style="margin:9px 0 0;font-size:12.5px;font-weight:600;color:#0f7a4d;background:#F1FBF6;border-radius:10px;padding:7px 10px">${t}</p>`;
+  const caja = (t, s, cuerpo) => `<div style="background:#fff;border:1px solid #e7e5e0;border-radius:18px;padding:13px;margin-top:10px"><p style="margin:0;font-weight:800;font-size:15px">${t}</p><p style="margin:1px 0 9px;color:#6b6b76;font-size:12.5px">${s}</p>${cuerpo}</div>`;
+  const out = [];
+  out.push(caja("📅 Tu página de citas", "Tu cliente ve tus horas libres y aparta solo, a cualquier hora.",
+    `<div style="background:#F5F4F1;border-radius:14px;padding:10px"><p style="margin:0 0 6px;font-weight:700;font-size:13px">Mañana · elige tu hora</p><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px">${["9:00 a. m.", "10:30 a. m.", "2:00 p. m."].map((h, i) => `<span style="border-radius:9px;padding:7px 0;text-align:center;font-weight:700;font-size:12px;${i === 1 ? "background:#121216;color:#fff" : "background:#fff;border:1px solid #e7e5e0"}">${h}</span>`).join("")}</div></div>` + gana("🌙 Reservas aunque tengas el local cerrado.")));
+  if (F.has("whatsapp")) out.push(caja("🤖 Bot de WhatsApp 24/7", "Atiende, dice tus cupos y agenda, aunque estés dormido.",
+    chat(burb("in", "Hola, ¿tienes cupo mañana?", "11:40 p. m.") + burb("out", `¡Hola ${cli}! 👋 Mañana tengo 9:00, 10:30 y 2:00. ¿Cuál te aparto?`, "11:40 p. m. ✓✓", "Tu asistente") + burb("in", "10:30", "11:41 p. m.") + burb("out", `✅ ¡Cita confirmada, ${cli}! Mañana 10:30 a. m. con ${pro}.`, "11:41 p. m. ✓✓", "Tu asistente")) + gana("😴 Tú estabas dormido y la cita quedó agendada.")));
+  if (F.has("telegram")) out.push(caja("🔔 Avisos al instante", "Por Telegram (con la foto del pago) o a tu WhatsApp personal.",
+    chat(`<div style="background:#fff;border-radius:12px;padding:8px 10px;font-size:13px;max-width:92%">📅 <b>NUEVA RESERVA</b> · R-8K2PQ<br>${cli} Pérez · mañana 10:30 a. m.<br>${sv} · comprobante adjunto<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:6px">${["✅ Aprobar", "❌ Rechazar"].map((x) => `<span style="background:#e7f1fb;border-radius:9px;padding:6px;text-align:center;font-weight:700;font-size:12px;color:#2a7bc0">${x}</span>`).join("")}</div></div>`, "#e7f1fb") + gana("👆 Un toque y el pago queda aprobado, sin abrir el panel.")));
+  if (F.has("whatsapp")) {
+    out.push(caja("⏰ Recordatorio antes de la cita", "Tu asistente le escribe al cliente y le pide confirmar.",
+      chat(burb("out", `Hola ${cli} 👋 Recuerda que tu cita es hoy a las 10:30 a. m. ¿Puedes continuar? Responde sí.`, "8:30 a. m. ✓✓", "Tu asistente") + burb("in", "Sí, allá estaré 👍", "8:34 a. m.")) + gana("📉 Menos clientes que no llegan.")));
+    out.push(caja("🔁 Le escribe al cliente para que vuelva", "A los días que tú elijas después de su última cita.",
+      chat(burb("out", `Hola ${cli} 👋 Ya van 3 semanas desde tu última cita de ${sv} con ${pro}. ¿Te agendo de nuevo?`, "10:05 a. m. ✓✓", "Tu asistente") + burb("in", "Sí, lo mismo 🙌", "10:12 a. m.")) + gana("💰 Clientes que vuelven sin que tú les escribas.")));
+    out.push(caja("📸 Estados automáticos y 📊 reporte", "Publica tus cupos en tu estado y te cuenta cómo va el mes.",
+      `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">${[["84", "citas este mes"], ["31", "agendó el bot"], ["$2.350.000", "ingresos"]].map(([n, t]) => `<div style="background:#F5F4F1;border-radius:12px;padding:8px"><b style="display:block;font-size:16px">${n}</b><span style="font-size:10.5px;color:#6b6b76;font-weight:600">${t}</span></div>`).join("")}</div>` + gana("📈 Sabes cuánto entra y por dónde llegan tus clientes.")));
+  }
+  return `<div style="margin-top:18px"><p style="margin:0;font-weight:800;font-size:18px">👀 Mira cómo funciona</p><p style="margin:1px 0 0;color:#6b6b76;font-size:12.5px">Ejemplos de lo que trae este plan. Los nombres y números son de muestra.</p>${out.join("")}</div>`;
 }
 export const DEFAULT_PAY_WARNING = "Ni un peso más ni uno menos. Así tu pago se reconoce solo y tu plan se activa de inmediato. Si envías otro valor, tendremos que revisarlo a mano y puede tardar.";
 
