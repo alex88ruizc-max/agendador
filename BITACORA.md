@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.43** · Página **2026-11-13g** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.43** · Página **2026-11-13h** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -132,6 +132,17 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-13 · página 2026-11-13h · 📝 reseña de los planes y página de venta al día
+- **Reseña de los planes** (`DEFAULT_BENEFITS` en common.js) con lo nuevo que ya está hecho:
+  - Gold: bot de WhatsApp 24/7 (listas, cupos, audios), recordatorio con confirmación, estados automáticos (cupos y «Cómo agendar»), «vuelven solos», reporte de ingresos.
+  - Prueba: correo con calendario, horario por profesional y bloqueo de horas.
+  - Básico: Telegram también a cada profesional.
+  - Las listas viejas guardadas sin cambios en el súper panel se cambian solas (`BENEFITS_VIEJOS`). La frase «Todo lo del plan Gratis» pasó a «Todo lo de la prueba».
+- **Tabla de planes:** ahora trae los nombres de cada columna (Prueba · Básico · Gold) y la fila «Bot de WhatsApp 24/7» (según lo marcado en el súper panel).
+- **Precios por defecto del código** al día con los del súper panel: Básico $30.000 y Gold $40.000 (antes decía $20.000 y $35.000). Los precios que se cobran siguen saliendo del súper panel.
+- **Página de venta:** ya no dice «Mary les pasa tu link». Ahora dice «Bot de WhatsApp 24/7 · agenda, dice tus cupos y escucha audios», trae el orden correcto (día, hora y servicio), «Cómo agendar» en los estados y 2 tarjetas nuevas: «Vuelven solos» y «Reporte».
+- **Regla nueva (Alex):** cada mejora que vean las tiendas se agrega a la reseña y a la página de venta en el mismo cambio (CLAUDE.md).
 
 ### 2026-11-13 · agendador-ia-3.43 · página 2026-11-13g · 📲 estado «Cómo agendar»
 - `vps/guia.js`: 2 imágenes 1080×1920 (pasos 1-2 «Entra · Día y hora» y 3-4 «Servicio · Aparta y ¡listo!») con nombre, tipo, servicios, equipo y horas reales del negocio. Diseño blanco de Tu Agenda.

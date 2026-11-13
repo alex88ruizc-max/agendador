@@ -9,9 +9,9 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-11-13g";
-import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-13g";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-13g";
+} from "./common.js?v=2026-11-13h";
+import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-13h";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-13h";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -2069,11 +2069,12 @@ function renderPlan() {
       <ul class="space-y-1 text-[13px]">${planBenefits(P, sel).map((b) => `<li>${esc(b)}</li>`).join("")}</ul>
     </div>
     <table class="mt-2 w-full border-collapse">
+      <tr><td></td>${PLAN_KEYS.map((k) => `<td class="pt-1 text-center text-[10.5px] font-extrabold text-ink/55 ${k === sel ? "bg-amber-50" : ""}">${esc(P[k].name.replace("Prueba gratis", "Prueba"))}</td>`).join("")}</tr>
       ${featRow("Agenda y cita rápida", () => `<b style="color:var(--mint)">✓</b>`)}
       ${featRow("Avisos en Telegram", (k) => !(P[k].features || []).includes("telegram") ? `<span class="text-ink/30">—</span>` : (P[k].tgChoose ? "<b>Eliges</b>" : `<b>${(P[k].tgEvents || []).length === 1 ? "Reservas" : (P[k].tgEvents || []).length}</b>`))}
       ${featRow("Días para reservar", (k) => `<b>${P[k].daysAhead}</b>`)}
       ${featRow("Profesionales", (k) => `<b>${P[k].maxStaff ? P[k].maxStaff : "Sin límite"}</b>`)}
-      ${[["appearance", "Portada y colores"], ["clients", "Clientes"], ["images", "Imágenes"], ["marketing", "Marketing y estados"], ["activity", "Actividad"]].map(([key, label]) => featRow(label, (k) => yes(k, key))).join("")}
+      ${[["whatsapp", "Bot de WhatsApp 24/7"], ["appearance", "Portada y colores"], ["clients", "Clientes"], ["images", "Imágenes"], ["marketing", "Marketing y estados"], ["activity", "Actividad"]].map(([key, label]) => featRow(label, (k) => yes(k, key))).join("")}
     </table>`;
   let action = "";
   if (sel === "free") {
