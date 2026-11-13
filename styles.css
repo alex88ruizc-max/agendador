@@ -504,3 +504,14 @@ body.premium.has-install #bookBar { bottom:84px; }
 
 /* 2026-11-13l · el nombre del negocio se ve COMPLETO (sin «…»): baja de tamaño si es largo y pasa a 2 renglones */
 .nombre-completo { white-space:normal !important; overflow:visible !important; text-overflow:clip !important; overflow-wrap:anywhere; line-height:1.08 !important; min-width:0; }
+
+/* 2026-11-13v · PANTALLA FIJA, COMO UNA APP: sin zoom (ni pellizco ni doble toque) y nada se sale hacia los lados.
+   Antes una tarjeta con un correo largo ensanchaba toda la página y dejaba «mover» la pantalla. */
+html { touch-action: pan-x pan-y; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+html { overflow-x: hidden; }   /* navegadores viejos */
+html, body { max-width: 100%; overscroll-behavior-x: none; }
+@supports (overflow: clip) { html, body { overflow-x: clip; } }
+/* lo que va dentro de una rejilla o una fila puede encogerse (así el texto largo se corta con «…» o baja de renglón, en vez de empujar) */
+[id^="tab-"], [id^="tab-"] > *, [id^="tab-"] .grid > *, [id^="tab-"] article, [id^="tab-"] article > *, #appView > *, main, main > *, .sp-card, .modal-card { min-width: 0; max-width: 100%; }
+[id^="tab-"] article p, .sp-card p { overflow-wrap: anywhere; }
+img, canvas, video { max-width: 100%; }
