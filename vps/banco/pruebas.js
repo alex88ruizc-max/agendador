@@ -461,3 +461,23 @@ test('3.45 · 🤖 Servidor de Google: maryBotCfg_ también respeta lo que el su
   assert.equal(c.cambios, false); assert.equal(c.estados.activo, false); assert.equal(c.agendar, true);
   OFF = []; c = F.maryBotCfg_({ maryBot: { cambios: true } }); assert.equal(c.cambios, true);
 });
+
+test('3.46 · 🔄 Reactivar un apartado vencido: «ya pagó» → confirmada; «más tiempo» → espera el comprobante; si la hora ya la tomó otro o ya pasó, no', { skip: !require('fs').existsSync(GS_MARY) && 'dentro de la imagen no está gs/' }, () => {
+  const src = require('fs').readFileSync(GS_MARY, 'utf8');
+  let apt, tomada = false, escrito = null;
+  const G = { ACTIONS: {}, PUBLIC_ACTIONS: {}, console, fail: (m) => { throw new Error(m); }, bp: (x) => x,
+    getAdmin: () => ({ role: 'owner' }), withLock: (fn) => fn(), getApt: () => JSON.parse(JSON.stringify(apt)), loadSettings: () => ({ holdMinutes: 30 }),
+    mkDate: (d, t) => new Date(d + 'T' + t + ':00-05:00'), tmin: (t) => Number(t.split(':')[0]) * 60 + Number(t.split(':')[1]),
+    reserveLocks: () => { if (tomada) throw new Error('Ese horario ya fue tomado. Elige otra hora.'); return { all: ['L1', 'L2'], create: ['L1', 'L2'], overwrite: [], timeOf: {} }; },
+    lockWrites: (r, s, d, state) => [{ lock: state }], incWrites: () => [], addDelta: () => ({}), hist: (a, x) => [x], wPatch: (p, v) => ({ p, v }), commit: (w) => { escrito = w; } };
+  const F = new Function(...Object.keys(G), src + '\nreturn { ACTIONS };')(...Object.values(G));
+  const manana = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  apt = { code: 'R-1', status: 'expired', staffId: 's1', date: manana, startTime: '16:30', endTime: '17:30', occupiedMinutes: 60, payment: { mode: 'deposit', status: 'awaiting' } };
+  let r = F.ACTIONS.maryReactivar({ code: 'R-1', modo: 'pagada' }, { uid: 'u' });
+  assert.equal(r.status, 'confirmed'); assert.equal(escrito[0].v.payment.status, 'approved'); assert.deepEqual(escrito[1], { lock: 'booked' });
+  r = F.ACTIONS.maryReactivar({ code: 'R-1', modo: 'tiempo' }, { uid: 'u' });
+  assert.equal(r.status, 'pending_payment'); assert.ok(escrito[0].v.holdExpiresAt > new Date()); assert.deepEqual(escrito[1], { lock: 'hold' });
+  tomada = true; assert.throws(() => F.ACTIONS.maryReactivar({ code: 'R-1', modo: 'pagada' }, { uid: 'u' }), /ya fue tomado/);
+  tomada = false; apt.date = '2020-01-01'; assert.throws(() => F.ACTIONS.maryReactivar({ code: 'R-1' }, { uid: 'u' }), /ya pasó/);
+  apt.date = manana; apt.status = 'confirmed'; assert.throws(() => F.ACTIONS.maryReactivar({ code: 'R-1' }, { uid: 'u' }), /no está vencida/);
+});

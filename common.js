@@ -2,7 +2,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js?v=2026-11-13j";
+import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js?v=2026-11-13k";
 
 export const app = initializeApp(firebaseConfig);
 // Caché en el dispositivo: muestra al instante lo último que se vio y luego actualiza en vivo
@@ -21,7 +21,7 @@ export function businessFromUrl() {
 export const bpath = (...parts) => ["businesses", BID, ...parts].join("/");
 
 // Versión de la página: cámbiala en cada actualización para comprobar que se publicó
-export const APP_VERSION = '2026-11-13j';
+export const APP_VERSION = '2026-11-13k';
 // Versiones que esta página espera del servidor y de las reglas de Firebase
 export const SERVER_VERSION = '2026-10-10n';
 export const RULES_VERSION = '2026-10-10l';
@@ -98,7 +98,7 @@ export const STATUS = {
   no_show: ["No asistió", "bg-rose-100 text-rose-900"],
   cancelled: ["Cancelada", "bg-slate-200 text-slate-600"],
   rejected: ["Pago rechazado", "bg-rose-100 text-rose-900"],
-  expired: ["Vencida", "bg-slate-200 text-slate-600"]
+  expired: ["⌛ No pagó a tiempo", "bg-amber-100 text-amber-900"]
 };
 export const statusBadge = (s) => {
   const [t, c] = STATUS[s] || [s, "bg-slate-200"];

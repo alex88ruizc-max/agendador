@@ -14,7 +14,7 @@
  * Instalación: pega este archivo, ejecuta activarMary() una vez, copia la clave que sale en el registro
  * y ponla en el mary.env del VPS (MARY_KEY). Vuelve a implementar la aplicación web (Implementar > Administrar > editar > Nueva versión).
  */
-const MARY_VERSION = 'agendador-ia-3.45';
+const MARY_VERSION = 'agendador-ia-3.46';
 
 // Se registra como acción pública del servidor (sin sesión: entra con la clave de Mary).
 // ⚠️ Este archivo debe quedar DEBAJO del archivo principal en la lista de archivos de Apps Script (los nuevos quedan al final: así está bien).
@@ -888,3 +888,26 @@ function maryWaResultado_(b) {
   if (nuevo) tgSys('✅ <b>WhatsApp vinculado</b>\nTu asistente ya atiende en +' + esc(r.numero) + '.');
   return { ok: true };
 }
+
+// ---------- 🔄 3.46 · REACTIVAR UN APARTADO VENCIDO (no subió el comprobante del abono a tiempo) ----------
+// Lo hace el dueño (o el profesional de esa cita) desde la agenda. Solo si la hora no ha pasado y SIGUE LIBRE (reserveLocks falla si alguien la tomó).
+//   modo 'pagada' → la cita queda confirmada (el dueño ya vio el pago) · modo 'tiempo' → vuelve a esperar el comprobante otro rato (holdMinutes).
+ACTIONS.maryReactivar = function (b, auth) {
+  const adm = getAdmin(auth);
+  return withLock(function () {
+    const a = getApt(String((b && b.code) || ''));
+    if (a.status !== 'expired') fail('Esta cita no está vencida.');
+    if (adm.role !== 'owner' && adm.staffId !== a.staffId) fail('Solo el dueño o quien atiende esa cita puede reactivarla.');
+    if (mkDate(a.date, a.startTime).getTime() < Date.now()) fail('Esa hora ya pasó. Agenda una cita nueva.');
+    const st = loadSettings(), pagada = b.modo === 'pagada';
+    const occ = Number(a.occupiedMinutes || 0) || Math.max(15, tmin(a.endTime) - tmin(a.startTime));
+    const r = reserveLocks(a.staffId, a.date, a.startTime, occ);   // si ya la tomó otro: «Ese horario ya fue tomado»
+    const now = new Date(), exp = pagada ? null : new Date(Date.now() + Math.max(5, Number(st.holdMinutes || 30)) * 60000);
+    const patch = { status: pagada ? 'confirmed' : 'pending_payment', lockIds: r.all, holdExpiresAt: exp, updatedAt: now,
+      history: hist(a, pagada ? 'reactivated_paid' : 'reactivated', auth.uid) };
+    if (pagada) patch.payment = Object.assign({}, a.payment, { status: 'approved', mode: a.payment.mode || 'manual', method: a.payment.method || 'transferencia', verifiedAt: now });
+    else patch.payment = Object.assign({}, a.payment, { status: 'awaiting' });
+    commit([wPatch(bp('appointments/' + a.code), patch)].concat(lockWrites(r, a.staffId, a.date, pagada ? 'booked' : 'hold', a.code, exp)).concat(incWrites(addDelta({}, a.date, a.staffId, r.create.length))));
+    return { ok: true, status: patch.status, code: a.code };
+  });
+};

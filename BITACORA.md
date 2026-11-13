@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.45** · Página **2026-11-13j** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.46** · Página **2026-11-13k** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -133,6 +133,14 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-13 · agendador-ia-3.46 · página 2026-11-13k · ⌛ «Vencida» se entiende y se puede reactivar
+- Alex: «¿Por qué sale vencida si la cita aún no se concreta?». Era el APARTADO: no subió el comprobante del abono en los minutos de Configuración y el cupo se liberó.
+- **1.** La etiqueta «Vencida» ahora dice «⌛ No pagó a tiempo» y la tarjeta explica: «No subió el comprobante del abono a tiempo: el apartado se venció y el cupo quedó libre para otros».
+- **2.** En esas citas, «WhatsApp: confirmar» cambia por «WhatsApp: ¿aún quieres la cita?», con un mensaje listo (si ya pagó, que mande la captura; o el link para apartar de nuevo).
+- **3.** Botón «🔄 Reactivar» (solo si la hora no ha pasado): «✅ Ya pagó: confirmar la cita» o «⏳ Darle N minutos más para pagar». Servidor `ACTIONS.maryReactivar` (gs/mary.gs):
+  revisa que la hora SIGA LIBRE (si alguien la tomó, avisa), vuelve a apartar los cupos y deja la historia de quién la reactivó.
+- Banco: 166 pasan (prueba nueva). Página: 0 fallas.
 
 ### 2026-11-13 · agendador-ia-3.45 · página 2026-11-13j · 🤖 bot general en el súper panel · 🔥 súper oferta · 📖 guía para vincular WhatsApp
 - **Súper panel › Planes › «🤖 Opciones del bot de WhatsApp (todas las tiendas)»:** un interruptor por opción
