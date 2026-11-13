@@ -32,7 +32,7 @@
 ## 📒 Bitácora y pruebas (en cada cambio)
 - **Cada cambio se anota en `BITACORA.md`** (Historial, versión actual y pendientes) en el mismo commit del cambio.
 - **Cada mejora que vean las tiendas se agrega a la reseña de los planes** (`DEFAULT_BENEFITS` en `common.js`, la lista vieja a `BENEFITS_VIEJOS`) y a la página de venta (`index.html`), en el mismo cambio. Solo lo que ya está hecho; nunca precios ni funciones que no existen (orden de Alex, 2026-11-13).
-- Antes de entregar un zip de Mary: `cd vps && node --test banco/pruebas.js banco/escenarios.js banco/reglas.js` (0 fallas). Un arreglo de Mary trae su escenario nuevo en `vps/banco/escenarios.js`.
+- Antes de entregar un zip de Mary: `cd vps && node --test banco/pruebas.js banco/escenarios.js banco/reglas.js` (0 fallas). **Y además `sh banco/como-vps.sh`** (corre el banco como el VPS, sin `gs/`): si eso falla, el cartero no instala (pasó con la 3.47). Un arreglo de Mary trae su escenario nuevo en `vps/banco/escenarios.js`.
 - Antes de entregar un zip de la página: `node vps/banco/web.js <carpeta>` (0 fallas). Todas las `?v=` iguales a `APP_VERSION`.
 - **Estilos armados:** la página ya no usa `cdn.tailwindcss.com`. Si se agregan clases de Tailwind en los `.html` o `.js` de la página, se rearma `tailwind.css` (`npx tailwindcss@3.4.17 -c tailwind.config.js -i tailwind.entrada.css -o tailwind.css --minify`) y va en el zip de la página. Va enlazado de ÚLTIMO en el `<head>`.
 - Después: `graphify update .` para que el mapa del código quede al día (si falta: `pip install graphifyy`).

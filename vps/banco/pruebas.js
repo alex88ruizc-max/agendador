@@ -447,6 +447,7 @@ test('3.44 · 📅 Días para reservar: MANDA EL SÚPER PANEL (el 5 guardado al 
   assert.equal(ventana({ bookingWindowDays: 10, bookingWindowOwner: true }, { plan: 'gold' }, plat), 10, 'el dueño eligió menos: se respeta');
   assert.equal(ventana({ bookingWindowDays: 500, bookingWindowOwner: true }, { plan: 'basic' }, plat), 45, 'nunca más que el plan');
   assert.equal(ventana({}, { plan: 'gold' }, {}), 90, 'sin súper panel: respaldo de Gold');
+  if (!require('fs').existsSync(GS_MARY)) return;   // dentro de la imagen del VPS no está gs/: lo del servidor se revisa fuera
   const gs = require('fs').readFileSync(GS_MARY, 'utf8');
   assert.match(gs, /loadSettings = function \(\)[\s\S]*bookingWindowOwner === true/, 'el servidor de Google usa la misma regla');
   assert.doesNotMatch(gs.match(/function maryVentana_[^\n]*/)[0], /, 21\)/, 'sin tope escondido de 21 días');

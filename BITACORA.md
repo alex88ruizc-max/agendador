@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.47** · Página **2026-11-13n** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.48** · Página **2026-11-13n** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -133,6 +133,14 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-13 · agendador-ia-3.48 · la 3.47 no se instaló: el banco fallaba SOLO en el VPS
+- **Qué pasó:** el cartero respondió «La versión nueva NO pasó el banco de pruebas» con la 3.47. El bot estaba bien; la que fallaba era una prueba (la de «días para reservar», de la 3.44)
+  que leía `gs/mary.gs` sin revisar que existiera. Aquí pasa porque el repositorio trae `gs/`; dentro de la imagen del VPS no está. Por lo mismo, 3.44, 3.45 y 3.46 tampoco habrían instalado.
+- **Error de proceso (mío):** entregué el zip corriendo el banco solo en el repositorio, no como lo corre el VPS.
+- **Arreglo:** la prueba ya revisa que `gs/` exista. **Candados nuevos:** `banco/como-vps.sh` (corre el banco solo con los archivos de la imagen; obligatorio antes de cada zip, en CLAUDE.md)
+  y una regla en `banco/reglas.js` que falla si alguna prueba lee `gs/` sin revisar.
+- Banco aquí: 169 pasan. Como el VPS: 147 pasan, 16 saltadas (las del servidor de Google), 0 fallas.
 
 ### 2026-11-13 · página 2026-11-13n · 🔁 los primeros pasos se muestran una vez más a todas las tiendas
 - Alex: «el tutorial de primeros pasos se debe activar una vez más». Al entrar al panel, cada dueño ve UNA vez los primeros pasos nuevos (4 pasos), aunque ya los hubiera hecho (`settings.tutorial2`).

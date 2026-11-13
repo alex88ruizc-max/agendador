@@ -70,3 +70,14 @@ test('3.40 · /servidor manda el código del servidor de Google SIN claves (llav
   for (const malo of ['MIIEsecreto', 'AAHk-abc', 'prv_prod_ABC', 'superclave123', 'no-debe-salir']) assert.ok(!r.stdout.includes(malo), 'se coló: ' + malo);
   assert.match(r.stdout, /function superApproveOrder/, 'el código sí va');
 });
+
+test('3.48 · 🧪 Ninguna prueba del banco lee gs/ sin revisar antes que exista (dentro de la imagen del VPS no está: la 3.47 no se pudo instalar por eso)', () => {
+  const fs = require('fs'), path = require('path');
+  for (const f of ['pruebas.js', 'escenarios.js']) {
+    const src = fs.readFileSync(path.join(__dirname, f), 'utf8');
+    src.split(/\n(?=test\()/).forEach((bloque) => {
+      if (!/^test\(/.test(bloque) || !/readFileSync\((GS_MARY|[^\n]*'gs')/.test(bloque)) return;
+      assert.ok(/existsSync/.test(bloque), f + ': la prueba «' + bloque.slice(6, 70) + '…» lee gs/ sin revisar que exista (ponle skip o un existsSync)');
+    });
+  }
+});
