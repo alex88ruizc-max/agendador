@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.46** · Página **2026-11-13k** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.46** · Página **2026-11-13l** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -133,6 +133,9 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-13 · página 2026-11-13l · 🏷️ el nombre del negocio se ve completo
+- Alex: «ESTÉTICA MAR…» se cortaba arriba en la página de reservas y en el panel. Ahora el nombre sale completo: si es largo, baja de tamaño y pasa a 2 renglones (`nombreCompleto()` en common.js, clase `.nombre-completo` en styles.css). Nunca «…».
 
 ### 2026-11-13 · agendador-ia-3.46 · página 2026-11-13k · ⌛ «Vencida» se entiende y se puede reactivar
 - Alex: «¿Por qué sale vencida si la cita aún no se concreta?». Era el APARTADO: no subió el comprobante del abono en los minutos de Configuración y el cupo se liberó.

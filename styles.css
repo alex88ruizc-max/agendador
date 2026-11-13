@@ -501,3 +501,6 @@ body.premium #bookBar ~ * .install-pill, body.gate-open .install-pill { display:
 body.premium.has-install #bookBar { bottom:84px; }
 #appView.hidden { display:none !important; }   /* lg:grid le ganaba a «hidden»: sin sesión se veía el menú vacío */
 .field.hidden, label.hidden { display:none !important; }   /* .field (display:block) le ganaba a «hidden» */
+
+/* 2026-11-13l · el nombre del negocio se ve COMPLETO (sin «…»): baja de tamaño si es largo y pasa a 2 renglones */
+.nombre-completo { white-space:normal !important; overflow:visible !important; text-overflow:clip !important; overflow-wrap:anywhere; line-height:1.08 !important; min-width:0; }

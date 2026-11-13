@@ -7,11 +7,11 @@ import {
   startUpdateWatcher, applyBrandColors, uiConfirm, uiPrompt, setDialogBrand, viewImage, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, hora12, tmin, fechaLarga, fechaCorta, toMillis, cop, esc, normalizePhone,
   waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, DEFAULT_WA_RESCHEDULE, computeSlots, staffHours, mapLinks, headerBgCss, onColor, darken,
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
-  PLAN_KEYS, plansOf, planOfBiz, planPriceOf, ventanaReserva, OFERTA_TXT, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
+  PLAN_KEYS, plansOf, planOfBiz, planPriceOf, ventanaReserva, OFERTA_TXT, nombreCompleto, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-11-13k";
-import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-13k";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-13k";
+} from "./common.js?v=2026-11-13l";
+import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-13l";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-13l";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -54,7 +54,7 @@ onAuthStateChanged(auth, async (u) => {
   A.biz = bizSnap?.data() || { name: bid, status: "active" };
   setDialogBrand(A.biz.name);
   $("who").textContent = `${A.biz.name} · ${u.email} (${isSuper ? "superusuario" : isOwner() ? "dueño" : "equipo"})`;
-  $("hdrTitle").textContent = A.biz.name;
+  nombreCompleto($("hdrTitle"), A.biz.name);
   show("deniedView", false); show("appView", true); show("spNav", true); $("btnQuickSide").classList.remove("hidden");
   renderPlanBanner();
   start();
@@ -253,7 +253,7 @@ function applyPanelBrand() {
   logo.classList.remove("hidden"); logo.classList.add("grid");
   logo.style.background = (P.useBrand && ap.colors?.primary) || "var(--sink)";
   const name = A.settings?.businessName || A.biz?.name || "";
-  if (name) $("hdrTitle").textContent = name;
+  if (name) nombreCompleto($("hdrTitle"), name);
   logo.innerHTML = ap.logo ? `<img src="${ap.logo}" alt="" class="h-full w-full object-cover">` : esc(name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase());
 }
 $("tabs").addEventListener("click", (e) => {

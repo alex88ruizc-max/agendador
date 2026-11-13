@@ -1,6 +1,6 @@
 // Página pública: ver cupos, registrarse, apartar, pagar con screenshot, mis cupos
-import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro, ventanaReserva, OFERTA_TXT } from "./common.js?v=2026-11-13k";
-import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-13k";
+import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro, ventanaReserva, OFERTA_TXT, nombreCompleto } from "./common.js?v=2026-11-13l";
+import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-13l";
 import {
   onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, sendPasswordResetEmail,
   GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult
@@ -12,7 +12,7 @@ import {
   startUpdateWatcher, applyBrandColors, warmServer, uiConfirm, setDialogBrand, viewImage, pushOverlay, dropOverlay, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, dow, hora12, fechaLarga, fechaCorta, toMillis, cop, esc,
   normalizePhone, waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, computeSlots, dayCapacityUnits, staffHours, mapLinks, headerBgCss,
   toast, openModal, closeModal, setBusy, copyText, tmin, mstr, UNIT
-} from "./common.js?v=2026-11-13k";
+} from "./common.js?v=2026-11-13l";
 
 const $ = (id) => document.getElementById(id);
 const S = {
@@ -49,7 +49,7 @@ if (!/^[a-z0-9][a-z0-9-]{1,29}$/.test(BIZ_ID)) {
     const b = e.target.closest("[data-lp]"); if (!b) return;
     if (b.dataset.lp === "trial") $("btnTrial").click(); else openAuth("login");
   });
-  // 🚀 2026-11-13k · viene de la invitación de una página de negocio: se abre «Probar gratis» de una vez
+  // 🚀 2026-11-13l · viene de la invitación de una página de negocio: se abre «Probar gratis» de una vez
   if (new URLSearchParams(location.search).has("probar")) setTimeout(() => $("btnTrial").click(), 400);
 } else {
   setBusiness(BIZ_ID);
@@ -208,7 +208,7 @@ function renderBiz() {
   const promoOn = s.promo?.text && s.promo.until >= bogNow().date;
   $("promoBar").classList.toggle("hidden", !promoOn);
   if (promoOn) $("promoBar").textContent = "🔥 " + s.promo.text;
-  $("bizName").textContent = s.businessName || "Reserva tu cita";
+  nombreCompleto($("bizName"), s.businessName || "Reserva tu cita");
   // redes sociales del negocio como íconos de marca
   const SOC = [["instagram", "fa-instagram", "Instagram"], ["facebook", "fa-facebook-f", "Facebook"], ["tiktok", "fa-tiktok", "TikTok"], ["youtube", "fa-youtube", "YouTube"]];
   const soc = s.showSocial === false ? [] : SOC.filter(([k]) => /^https?:\/\//.test(s.social?.[k] || ""));
@@ -1174,7 +1174,7 @@ getDoc(doc(db, "platform", "public")).then((d) => {
   if (S.settings) renderAll();
   const on = PLAT.trialEnabled !== false;
   $("trialCta").classList.toggle("hidden", !on);
-  // 2026-11-13k · en la página de un negocio NO hay «Probar gratis» mientras el cliente agenda (no se pierde la cita):
+  // 2026-11-13l · en la página de un negocio NO hay «Probar gratis» mientras el cliente agenda (no se pierde la cita):
   //   solo el sello chiquito abajo; la invitación sale DESPUÉS (cita confirmada y «Mis citas"), en otra pestaña.
   $("trialTop").classList.add("hidden"); $("trialTop").classList.remove("inline-flex");
   $("trialCta").classList.add("hidden");
