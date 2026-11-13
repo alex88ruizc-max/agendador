@@ -6,7 +6,7 @@
 const http = require('http'), fs = require('fs'), path = require('path');
 const T = require('./textos'), C = require('./correo'), E = require('./estado'), A = require('./asistente');
 
-const VERSION = 'agendador-ia-3.58';
+const VERSION = 'agendador-ia-3.59';
 const env = (k, d) => (process.env[k] === undefined || process.env[k] === '' ? d : process.env[k]);
 const CFG = {
   puerto: parseInt(env('PUERTO', '3060'), 10),
@@ -402,7 +402,30 @@ function alMensaje(b) {
 // 🤐 3.24 · LEY /sinbot: «/sinbot» escrito por el dueño en un chat → el asistente queda MUDO en ese chat (sin respuestas, recordatorios
 //    ni preguntas), sin límite de tiempo. Otro «/sinbot» en ese chat (del dueño o del cliente) lo vuelve a activar. Nada lo salta.
 const esSinbot = (t) => /^\/\s*sin\s*bot\s*$/i.test(String(t || '').trim());
-const mudo = (k) => !!(MEM.sinbot && MEM.sinbot[k]);
+const mudo = (k) => !!(MEM.sinbot && MEM.sinbot[k]) || mudoPanel(k);
+// 🤐 3.59 · «Sin bot» desde el PANEL (Clientes › botón rojo): el dueño lo marca y el bot no atiende a ese cliente. El panel deja una marca de
+//    hora en los ajustes (marySinBotT, sin datos de nadie); solo cuando esa marca cambia se le pide la lista a Google. Sin cambios, no gasta nada.
+function mudoPanel(k) {
+  const i = String(k).indexOf(':'), P = MEM.sinbotPanel && MEM.sinbotPanel[k.slice(0, i)];
+  return !!(P && P.L && P.L[numeroWa(k.slice(i + 1))]);
+}
+const SINBOT_T = new Map();
+async function sinBotAlDia(neg) {
+  if (!neg || !neg.bid || Date.now() - (SINBOT_T.get(neg.bid) || 0) < 30000) return;
+  SINBOT_T.set(neg.bid, Date.now());
+  try {
+    const r = await fetch(FS.url + '/v1/projects/' + FS.proyecto + '/databases/(default)/documents/businesses/' + encodeURIComponent(neg.bid) + '/settings/general?key=' + FS.llave + '&mask.fieldPaths=marySinBotT', { signal: AbortSignal.timeout(5000) });
+    if (!r.ok) return;
+    const t = Number(deFs((((await r.json()) || {}).fields || {}).marySinBotT)) || 0;
+    MEM.sinbotPanel = MEM.sinbotPanel || {};
+    const P0 = MEM.sinbotPanel[neg.bid] || {};
+    if (!t || (t === (P0.t || 0) && Date.now() - (P0.leida || 0) < 6 * 3600000)) return;   // sin cambios: nada (cada 6 h se repasa por si acaso)
+    const g = await gas(neg, 'sinBot'); if (!g || !g.ok) return;
+    const L = {}; (g.numeros || []).forEach((n) => { L[numeroWa(n)] = true; });
+    MEM.sinbotPanel[neg.bid] = { t, L, leida: Date.now() }; memGuardar();
+    anotar({ bid: neg.bid, que: '🤐 «Sin bot» del panel: ' + Object.keys(L).length + ' cliente(s) sin bot' });
+  } catch (e) { /* queda lo último que se supo */ }
+}
 // 🧠 3.52 · GUARDADO INTELIGENTE: quien escribe queda en «Clientes» con su número y su nombre de WhatsApp (una vez por persona; si el dueño lo activó)
 function guardarContacto(neg, c, cl) {
   if (!botDe(neg).guardado || !c.tel || cl.guardado) return;
@@ -466,6 +489,23 @@ async function soporteTienda(bid) {
   SOP_TIENDAS.set(bid, { nombre, t: Date.now() });
   return nombre;
 }
+// 🆘 3.59 · los números REGISTRADOS de cada tienda (dueño, WhatsApp del negocio, avisos): quien escribe desde uno de esos es dueño,
+//    aunque no haya tocado el botón del panel. La lista la da el servidor de Google (una llamada cada 30 min, solo si la línea está prendida).
+const SOP_GENTE = { L: {}, t: 0, tiendas: 0, nota: 'aún no la pedí' };
+async function soporteGente() {
+  if (Date.now() - SOP_GENTE.t < 30 * 60000) return SOP_GENTE.L;
+  SOP_GENTE.t = Date.now();
+  let ultimo = 'no hay ninguna tienda con bot para preguntar';
+  for (const neg of negocios().slice(0, 3)) {
+    try {
+      const r = await gas(neg, 'soporteGente');
+      if (r && r.ok && r.numeros) { SOP_GENTE.L = r.numeros; SOP_GENTE.tiendas = r.tiendas || 0; SOP_GENTE.nota = r.sinId ? r.sinId + ' tienda(s) sin identificar' : 'ok'; return SOP_GENTE.L; }
+      ultimo = (r && r.motivo) || 'el servidor no la dio';
+    } catch (e) { ultimo = String(e.message).slice(0, 100); }
+  }
+  SOP_GENTE.nota = '⚠️ ' + ultimo; SOP_GENTE.t = Date.now() - 25 * 60000;   // falló: se reintenta en 5 min (queda la lista anterior)
+  return SOP_GENTE.L;
+}
 const memSoporte = () => (MEM.soporte = MEM.soporte || { gente: {}, callado: {} });
 async function atenderSoporte(c) {
   const S = memSoporte();
@@ -488,6 +528,10 @@ async function atenderSoporte(c) {
       if (!g) anotar({ bid: 'soporte', chat: tel.slice(-4), que: '🆘 persona nueva de la tienda «' + bid + '»' });
       g = S.gente[tel] = Object.assign(g || { desde: Date.now() }, { bid, tienda: nombre }); delete S.callado[tel]; memGuardar();
     }
+  }
+  if (!g) {                                                  // 3.59: ¿escribe desde un número registrado en alguna tienda? Entonces es dueño
+    const d = (await soporteGente())[numeroWa(tel)];
+    if (d && d.bid) { g = S.gente[tel] = { desde: Date.now(), bid: String(d.bid), tienda: String(d.tienda || d.bid), dueno: true }; memGuardar(); anotar({ bid: 'soporte', chat: tel.slice(-4), que: '🆘 dueño reconocido por su número («' + g.bid + '»)' }); }
   }
   if (!g) return;                                            // 🔒 LEY: no es de ninguna tienda → no se responde ni se anota
   if (Date.now() - (S.callado[tel] || 0) < SOP.CALLADO_MS) return;
@@ -532,11 +576,12 @@ async function soporteSesion(accion, numero) {
     return { ok: true, estado: 'codigo', codigo, minutos: 5 };
   }
   const e = await ver(), cfg = await soporteCfg();
-  return { ok: true, estado: e.estado, numero: e.numero, prendidaEnElSuperPanel: cfg.activo, numeroEnElSuperPanel: cfg.numero, personasDeTiendas: Object.keys(memSoporte().gente).length };
+  return { ok: true, estado: e.estado, numero: e.numero, prendidaEnElSuperPanel: cfg.activo, numeroEnElSuperPanel: cfg.numero, personasDeTiendas: Object.keys(memSoporte().gente).length, numerosDeDuenos: Object.keys(cfg.activo ? await soporteGente() : SOP_GENTE.L).length, tiendasRevisadas: SOP_GENTE.tiendas, listaDeDuenos: SOP_GENTE.nota };
 }
 async function atenderMensaje(c, neg) {
   if (!c.tel && !c.deMi && /@lid$/.test(c.jid)) c.tel = await telDeLid(neg, c.jid);
   const k = neg.bid + ':' + (c.tel || c.jid);
+  await sinBotAlDia(neg);   // 3.59
   if (await respuestaDelDueno(c, neg)) return;   // 🔔 3.47: el dueño aprobó o rechazó un pago respondiendo 1 o 2
   if (esSinbot(c.texto)) {
     MEM.sinbot = MEM.sinbot || {};
@@ -1180,5 +1225,5 @@ if (require.main === module) {
   servidor.listen(CFG.puerto, () => { log('👩‍💼 ' + VERSION + ' escuchando en ' + CFG.puerto + ' · modo ' + CFG.modo); negocios(); arrancarRelojes(); });
 }
 // 🧪 solo para el banco de escenarios (banco/escenarios.js): deja a Mary como recién encendida
-const _banco = { negocios, atenderSoporte, soporteSesion, SOP_CFG, SOP_TIENDAS, memSoporte, ASIS, BOT, yaLoDije, memDicho: () => (MEM.dicho = MEM.dicho || {}), memHumano: () => MEM.humano, memRobot: () => (MEM.robot = MEM.robot || {}), memConv: () => (MEM.conv = MEM.conv || {}), tickRecordatorios, tickVolver, tickRetomar, tickEstadisticas, tickEstados, publicarGuia, publicarLlavePush, llavesPush, audienciaDe, AUDIENCIA, memLids: () => (MEM.lids = MEM.lids || {}), entregarAvisos, tickPedidosWa, memAvisoPago: () => (MEM.avisoPago = MEM.avisoPago || {}), avisados, botOff: BOT_OFF, apagarGlobal, botAlDia, botDe, memGuia: () => (MEM.guia = MEM.guia || {}), memStats: () => (MEM.stats = MEM.stats || {}), publicarEstado, alMensaje, alEventoConexion, ultimos, reiniciar() { CL = null; MEM.soporte = { gente: {}, callado: {} }; SOP_CFG.t = 0; SOP_CFG.activo = false; SOP_TIENDAS.clear(); MEM.volver = {}; MEM.stats = {}; MEM.piePrueba = {}; delete MEM.pushPublicada; MEM.lids = {}; MEM.lidAviso = {}; LID_NO.clear(); MEM.guia = {}; MEM.avisoPago = {}; avisados.clear(); leer.avisado = false; BOT_LEIDO.clear(); MEM.sinbot = {}; MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; MEM.conv = {}; MEM.clientes = {}; MEM.conectados = {}; MEM.pendientesWa = {}; MEM.codigos = {}; MEM.robot = {}; MEM.dicho = {}; AGRUPA.clear(); ASIS._cat.clear(); BOT.clear(); CONTACTOS.clear(); AUDIENCIA.clear(); vinculando.clear(); delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
+const _banco = { olvidarSinBotT: () => SINBOT_T.clear(), sinBotAlDia, negocios, atenderSoporte, soporteSesion, SOP_CFG, SOP_TIENDAS, memSoporte, ASIS, BOT, yaLoDije, memDicho: () => (MEM.dicho = MEM.dicho || {}), memHumano: () => MEM.humano, memRobot: () => (MEM.robot = MEM.robot || {}), memConv: () => (MEM.conv = MEM.conv || {}), tickRecordatorios, tickVolver, tickRetomar, tickEstadisticas, tickEstados, publicarGuia, publicarLlavePush, llavesPush, audienciaDe, AUDIENCIA, memLids: () => (MEM.lids = MEM.lids || {}), entregarAvisos, tickPedidosWa, memAvisoPago: () => (MEM.avisoPago = MEM.avisoPago || {}), avisados, botOff: BOT_OFF, apagarGlobal, botAlDia, botDe, memGuia: () => (MEM.guia = MEM.guia || {}), memStats: () => (MEM.stats = MEM.stats || {}), publicarEstado, alMensaje, alEventoConexion, ultimos, reiniciar() { CL = null; MEM.soporte = { gente: {}, callado: {} }; SOP_CFG.t = 0; SOP_CFG.activo = false; SOP_TIENDAS.clear(); SOP_GENTE.L = {}; SOP_GENTE.t = 0; MEM.sinbotPanel = {}; SINBOT_T.clear(); MEM.volver = {}; MEM.stats = {}; MEM.piePrueba = {}; delete MEM.pushPublicada; MEM.lids = {}; MEM.lidAviso = {}; LID_NO.clear(); MEM.guia = {}; MEM.avisoPago = {}; avisados.clear(); leer.avisado = false; BOT_LEIDO.clear(); MEM.sinbot = {}; MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; MEM.conv = {}; MEM.clientes = {}; MEM.conectados = {}; MEM.pendientesWa = {}; MEM.codigos = {}; MEM.robot = {}; MEM.dicho = {}; AGRUPA.clear(); ASIS._cat.clear(); BOT.clear(); CONTACTOS.clear(); AUDIENCIA.clear(); vinculando.clear(); delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
 module.exports = { _banco, botNormal, frenoRobot, estadosQueTocan, atenderPedidoWa, sincronizarConectados, renovarQr, telEnAviso, deWaha, esWaha, debeResponder, alEventoConexion, tickPedidosWa, limpiarSinVincular, leerMensaje, atiende, PREGUNTA, numeroWa, ahoraLocal, enFila, yaVisto, quienVeEstados, CFG };

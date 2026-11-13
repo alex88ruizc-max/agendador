@@ -647,3 +647,22 @@ test('3.58 · 🆘 Soporte: el mensaje del botón del panel es el mismo que el b
   assert.equal(soporteUrl({}, 'elbarba'), '');
   assert.equal(S.tiendaEnTexto('hola, mi tienda es elbarba'), '', 'un texto cualquiera no abre la puerta');
 });
+
+test('3.59 · 🆘 Servidor: la lista de números de dueños junta el del registro, el WhatsApp del negocio y el de avisos, de TODAS las tiendas', { skip: !require('fs').existsSync(GS_MARY) && 'sin gs/ aquí' }, () => {
+  const src = require('fs').readFileSync(GS_MARY, 'utf8');
+  const DB = { 'businesses/elbarba/settings/general': { businessName: 'El Barba', whatsapp: '+57 300 111 0000', maryBot: { avisos: { numero: '3002220000' } } }, 'businesses/elbarba/private/billing': { ownerPhone: '573003330000' },
+    'businesses/anto/settings/general': { whatsapp: '3004440000' } };
+  const G = { ACTIONS: {}, PUBLIC_ACTIONS: {}, console, fsListAll: (c) => (c === 'businesses' ? [{ _id: 'elbarba', name: 'El Barba SAS' }, { id: 'anto', name: 'Anto' }, { name: 'sin id' }] : []), fsBatchGet: (L) => Object.fromEntries(L.filter((p) => DB[p]).map((p) => [p, DB[p]])) };
+  const F = new Function(...Object.keys(G), src + '\nreturn { marySoporteGente_ };')(...Object.values(G));
+  const r = F.marySoporteGente_();
+  assert.equal(r.ok, true); assert.equal(r.tiendas, 2); assert.equal(r.sinId, 1);
+  assert.deepEqual(Object.keys(r.numeros).sort(), ['573001110000', '573002220000', '573003330000', '573004440000']);
+  assert.deepEqual(r.numeros['573003330000'], { bid: 'elbarba', tienda: 'El Barba' }); assert.equal(r.numeros['573004440000'].tienda, 'Anto');
+});
+
+test('3.59 · 🤐 Servidor: «Sin bot» devuelve solo los números de los clientes marcados en rojo', { skip: !require('fs').existsSync(GS_MARY) && 'sin gs/ aquí' }, () => {
+  const src = require('fs').readFileSync(GS_MARY, 'utf8');
+  const G = { ACTIONS: {}, PUBLIC_ACTIONS: {}, console, bp: (x) => x, fsListAll: () => [{ whatsapp: '+57 300 111 0000', sinBot: true }, { whatsapp: '3002220000' }, { whatsapp: '3003330000', sinBot: false }, { whatsapp: '', sinBot: true }] };
+  const F = new Function(...Object.keys(G), src + '\nreturn { marySinBot_ };')(...Object.values(G));
+  assert.deepEqual(F.marySinBot_(), { ok: true, numeros: ['573001110000'] });
+});

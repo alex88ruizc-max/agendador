@@ -14,7 +14,7 @@
  * Instalación: pega este archivo, ejecuta activarMary() una vez, copia la clave que sale en el registro
  * y ponla en el mary.env del VPS (MARY_KEY). Vuelve a implementar la aplicación web (Implementar > Administrar > editar > Nueva versión).
  */
-const MARY_VERSION = 'agendador-ia-3.58';
+const MARY_VERSION = 'agendador-ia-3.59';
 
 // Se registra como acción pública del servidor (sin sesión: entra con la clave de Mary).
 // ⚠️ Este archivo debe quedar DEBAJO del archivo principal en la lista de archivos de Apps Script (los nuevos quedan al final: así está bien).
@@ -55,6 +55,7 @@ function maryAgenda(b) {
     case 'cancelar': return maryCancelar_(st, b);
     case 'reagendar': return maryReagendar_(st, b);
     case 'contactos': return maryContactos_();
+    case 'sinBot': return marySinBot_();                // 3.59 · clientes que el dueño marcó «Sin bot» en su panel
     case 'dobleAvisado': return maryDobleAvisado_(b);
     case 'volver': return maryVolver_(st, b);           // 3.32 · recordatorio de servicio
     case 'volverAvisado': return maryVolverAvisado_(b);
@@ -64,6 +65,7 @@ function maryAgenda(b) {
     case 'historia': return maryHistoria_(b);           // 3.51 · el estado que publicó el bot también va a los estados de la página
     case 'avisos': return maryAvisos_();
     case 'pushBaja': return maryPushBaja_(b);           // 3.55 · suscripción que ya no existe
+    case 'soporteGente': return marySoporteGente_();   // 3.59 · números de los dueños de TODAS las tiendas (para la línea de soporte)
     case 'pushLlave': return maryPushLlave_(b);         // 3.55 · la llave pública de notificaciones del VPS                // 3.47 · avisos al dueño por WhatsApp (el VPS los recoge solo cuando hay)
     case 'revisarPago': return maryRevisarPago_(b);     // 3.47 · el dueño respondió 1 (aprobar) o 2 (rechazar) por WhatsApp
     case 'estadisticas': return maryEstadisticas_(b);   // 3.37 · reporte del bot (el VPS lo manda una vez por hora)
@@ -278,6 +280,12 @@ function maryReagendar_(st, b) {
     const m = String((e && (e.userMessage || e.message)) || e);
     return { ok: false, motivo: /tomado|ya no está disponible|fuera del horario|no alcanza/i.test(m) ? 'ocupada' : m };
   }
+}
+// 🤐 3.59 · «Sin bot»: los clientes que el dueño puso en rojo en su panel (Clientes). El bot no les responde ni les escribe.
+function marySinBot_() {
+  const L = {};
+  fsListAll(bp('customers')).forEach(function (c) { if (!c || c.sinBot !== true) return; let n = String(c.whatsapp || '').replace(/\D/g, ''); if (n.length === 10) n = '57' + n; if (n.length >= 11) L[n] = true; });
+  return { ok: true, numeros: Object.keys(L).slice(0, 2000) };
 }
 // números de los clientes del negocio: para que los estados les lleguen a ELLOS (WAHA solo conoce a quien escribió hace poco)
 function maryContactos_() {
@@ -1043,6 +1051,27 @@ function maryPushBaja_(b) {
   commit([wSet(bp('private/maryPush'), { subs: subs, updatedAt: new Date() })]); return { ok: true, quedan: Object.keys(subs).length };
 }
 // el VPS publica su llave pública de notificaciones (la necesita la página para pedir el permiso)
+// 🆘 3.59 · LÍNEA DE SOPORTE: los números registrados de cada tienda (el del dueño al crear la cuenta, el WhatsApp del negocio,
+//    el del bot y el de «Avisos a tu WhatsApp»). Con eso el ayudante reconoce al dueño aunque escriba directo, sin tocar el botón del panel.
+//    Solo lo puede pedir el VPS (con la clave de Mary). Devuelve { numeros: { '57300…': { bid, tienda } }, tiendas, sinId }.
+function marySoporteGente_() {
+  const out = {}; let tiendas = 0, sinId = 0;
+  const meter = function (n, bid, nombre) { n = String(n || '').replace(/\D/g, ''); if (n.length === 10 && n.charAt(0) === '3') n = '57' + n; if (n.length >= 11 && n.length <= 15 && !out[n]) out[n] = { bid: bid, tienda: nombre }; };
+  let L = []; try { L = fsListAll('businesses') || []; } catch (e) { return { ok: false, motivo: String(e && e.message || e).slice(0, 120) }; }
+  const T = [];
+  L.forEach(function (b) { const id = String((b && (b._id || b.id || b.slug || b.businessId)) || '').replace(/[^\w-]/g, ''); if (!id) { sinId++; return; } T.push([id, String((b && b.name) || id).slice(0, 60)]); });
+  for (let i = 0; i < T.length; i += 40) {
+    const parte = T.slice(i, i + 40), rutas = [];
+    parte.forEach(function (x) { rutas.push('businesses/' + x[0] + '/settings/general', 'businesses/' + x[0] + '/private/billing'); });
+    let got = {}; try { got = fsBatchGet(rutas) || {}; } catch (e) { got = {}; }
+    parte.forEach(function (x) {
+      const st = got['businesses/' + x[0] + '/settings/general'] || {}, bi = got['businesses/' + x[0] + '/private/billing'] || {}, nombre = String(st.businessName || x[1]);
+      tiendas++;
+      meter(bi.ownerPhone, x[0], nombre); meter(st.whatsapp, x[0], nombre); meter((((st.maryBot || {}).avisos) || {}).numero, x[0], nombre); meter((st.maryWa || {}).numero, x[0], nombre);
+    });
+  }
+  return { ok: true, numeros: out, tiendas: tiendas, sinId: sinId };
+}
 function maryPushLlave_(b) {
   const k = String(b.publica || ''); if (!/^[A-Za-z0-9_-]{80,100}$/.test(k)) return { ok: false };
   if (platformPublic().pushKey !== k) commit([{ update: { name: docName('platform/public'), fields: encFields({ pushKey: k }) }, updateMask: { fieldPaths: ['pushKey'] } }]);

@@ -269,7 +269,8 @@ def atender(m):
         elif accion == 'estado':
             decir('🆘 Línea de soporte\nConexión: ' + ('✅ vinculada (' + str(j.get('numero')) + ')' if j.get('estado') == 'WORKING' else '⚪ ' + str(j.get('estado')))
                   + '\nSúper panel: ' + ('✅ prendida' if j.get('prendidaEnElSuperPanel') else '⚪ apagada') + (' · número ' + str(j.get('numeroEnElSuperPanel')) if j.get('numeroEnElSuperPanel') else '')
-                  + '\nPersonas de tiendas que ya escribieron: ' + str(j.get('personasDeTiendas', 0)))
+                  + '\nPersonas de tiendas que ya escribieron: ' + str(j.get('personasDeTiendas', 0))
+                  + '\nNúmeros de dueños que reconoce: ' + str(j.get('numerosDeDuenos', 0)) + ' (de ' + str(j.get('tiendasRevisadas', 0)) + ' tiendas) · ' + str(j.get('listaDeDuenos', '')))
         else: decir('🆘 ' + str(j.get('estado')) + ((' (' + str(j.get('numero')) + ')') if j.get('numero') else ''))
     elif texto.startswith('/guia') or texto.startswith('/guía'):   # 3.50: publica YA el estado «Cómo agendar» de una tienda (para probar sin esperar)
         bid = re.sub(r'[^a-z0-9-]', '', (texto.split() + [''])[1].lower())

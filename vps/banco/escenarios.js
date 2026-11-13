@@ -56,6 +56,8 @@ global.fetch = async (url, o) => {
     if (b.op === 'historia') { (W.historias = W.historias || []).push({ id: b.id, label: b.label, horas: b.horas, img: String(b.img).slice(0, 22) }); return resp({ ok: true, data: { ok: true } }); }   // 3.51
     if (b.op === 'avisos') { const A = W.avisos || []; W.avisos = []; return resp({ ok: true, data: { avisos: A, numero: W.avisosNum || '', subs: W.subs || [], negocio: 'Lina Spa' } }); }
     if (b.op === 'pushBaja') { W.bajas = b.ids; return resp({ ok: true, data: { ok: true } }); }
+    if (b.op === 'sinBot') return resp({ ok: true, data: { ok: true, numeros: W.sinBot || [] } });   // 3.59
+    if (b.op === 'soporteGente') return resp({ ok: true, data: W.duenosFalla ? { ok: false, motivo: 'no pude' } : { ok: true, numeros: W.duenos || {}, tiendas: Object.keys(W.duenos || {}).length, sinId: 0 } });   // 3.59
     if (b.op === 'pushLlave') { W.llavePush = b.publica; return resp({ ok: true, data: { ok: true } }); }   // 3.47
     if (b.op === 'revisarPago') { W.revisado = { code: b.code, aprobar: b.aprobar, de: b.de }; return resp({ ok: true, data: { ok: true, aprobado: b.aprobar } }); }
     if (b.op === 'waPedido') { const p = W.pedido; W.pedido = null; return resp({ ok: true, data: { pedido: p } }); }
@@ -112,6 +114,7 @@ global.fetch = async (url, o) => {
     return resp(Object.assign({ name: n }, W.sesiones[n])); }
   const ac = u.match(/\/api\/([^/]+)\/auth\/(request-code|qr)/);
   if (ac) { W.wahaLlamadas.push(ac[2] + ' ' + decodeURIComponent(ac[1])); return ac[2] === 'qr' ? resp({ mimetype: 'image/png', data: 'UVI=' }) : resp({ code: 'ABCD1234' }); }
+  if (/settings\/general/.test(u) && /fieldPaths=marySinBotT/.test(u)) return resp({ fields: W.sinBotT ? { marySinBotT: { integerValue: String(W.sinBotT) } } : {} });   // 3.59
   if (/\/documents\/platform\/public/.test(u) && /fieldPaths=soporte/.test(u)) return resp({ fields: W.soporte ? { soporte: { mapValue: { fields: { activo: { booleanValue: W.soporte.activo }, numero: { stringValue: W.soporte.numero || '' } } } } } : {} });   // 3.58
   if (/\/documents\/businesses\/[a-z0-9-]+\?[^/]*fieldPaths=name/.test(u)) { const t = (W.tiendas || {})[u.match(/businesses\/([a-z0-9-]+)\?/)[1]]; return t ? resp({ fields: { name: { stringValue: t } } }) : resp({ error: 'no existe' }, 404); }   // 3.58
   if (/\/documents\/platform\/public/.test(u) && W.avisoPend) return resp({ fields: { maryAvisoPend: { mapValue: { fields: { 'lina-spa': { integerValue: String(W.avisoPend) } } } } } });   // 3.47: bandera de avisos
@@ -1423,7 +1426,8 @@ test('3.58 · 🆘 Soporte: a quien NO es de una tienda no se le responde NUNCA 
   await llega(sopMsg('573009998877', 'Hola, necesito ayuda con mi agenda. (Tienda: tienda-inventada)'));
   assert.equal(W.enviados.length, 0, 'un amigo de Alex (o una tienda que no existe): silencio total');
   assert.deepEqual(P._banco.memSoporte().gente, {}, 'no queda guardado');
-  assert.equal(W.gas.length, 0, 'no se llama a Google');
+  assert.deepEqual(W.gas, ['soporteGente'], 'solo se pide UNA vez la lista de dueños (sin mandar el número de nadie)');
+  assert.ok(W.llamadas.every((x) => !JSON.stringify(x).includes('573009998877')), 'el número del amigo no viaja a ningún lado');
   // apagada en el súper panel: ni a la gente de las tiendas
   mundoNuevo(); W.soporte = { activo: false, numero: '573180000000' }; W.tiendas = { elbarba: 'El Barba' };
   await llega(sopMsg('573001110000', BOTON('elbarba')));
@@ -1481,4 +1485,39 @@ test('3.58 · 🆘 Soporte: se vincula con /soporte (código), no se vuelve una 
   assert.ok(!W.gas.includes('waResultado'), 'no le avisa a Google como si fuera una tienda');
   const e = await P._banco.soporteSesion('estado'); assert.equal(e.estado, 'WORKING'); assert.equal(e.numero, '573180000000');
   await P._banco.soporteSesion('desvincular'); assert.equal(W.sesiones[SOPX.SESION], undefined);
+});
+
+test('3.59 · 🆘 Soporte: el dueño escribe DIRECTO (sin botón) desde su número registrado → el ayudante lo reconoce y le responde; los demás siguen en silencio', async () => {
+  mundoNuevo(); W.soporte = { activo: true, numero: '573180000000' };
+  W.duenos = { '573005550000': { bid: 'antoluxury', tienda: 'Antoluxury STUDIO' } };
+  await llega(sopMsg('573005550000', 'hola alex buenas'));
+  assert.equal(W.enviados.length, 1); assert.match(ultimo().texto, /Alex ya ve tu mensaje/, 'pidió a Alex: se le dice y el ayudante se calla');
+  mundoNuevo(); W.soporte = { activo: true, numero: '573180000000' };
+  W.duenos = { '573005550000': { bid: 'antoluxury', tienda: 'Antoluxury STUDIO' } };
+  await llega(sopMsg('573005550000', 'buenas tardes'));
+  assert.match(ultimo().texto, /equipo de \*Antoluxury STUDIO\*/); assert.equal(ultimo().sesion, SOPX.SESION);
+  await llega(sopMsg('573005550000', 'como vinculo el whatsapp')); assert.match(ultimo().texto, /Vincular mi WhatsApp/);
+  await llega(sopMsg('573009998877', 'buenas tardes')); await llega(sopMsg('573009998877', '1'));
+  assert.equal(W.enviados.length, 2, 'quien no está registrado en ninguna tienda: silencio');
+  assert.equal(W.gas.filter((x) => x === 'soporteGente').length, 1, 'la lista se pide una vez cada 30 min, no por cada mensaje');
+  assert.equal(P._banco.memSoporte().gente['573005550000'].dueno, true);
+  // si Google falla, nadie nuevo se reconoce (silencio), pero no se cae
+  mundoNuevo(); W.soporte = { activo: true, numero: '573180000000' }; W.duenosFalla = true;
+  await llega(sopMsg('573005550000', 'hola')); assert.equal(W.enviados.length, 0); W.duenosFalla = false;
+});
+
+test('3.59 · 🤐 «Sin bot» desde el panel: al cliente marcado en rojo el bot NO le responde; al quitarlo, vuelve. Sin cambios en el panel no se llama a Google', async () => {
+  mundoNuevo();
+  await llega(wahaMsg(CLIENTE, 'hola')); const n0 = W.enviados.length; assert.ok(n0 >= 1, 'normal: sí responde');
+  assert.ok(!W.gas.includes('sinBot'), 'nadie marcado: ni se pregunta');
+  // el dueño lo pone en rojo
+  mundoNuevo(); W.sinBot = [CLIENTE]; W.sinBotT = 1700000000000;
+  await llega(wahaMsg(CLIENTE, 'hola')); await llega(wahaMsg(CLIENTE, 'quiero agendar'));
+  assert.equal(W.enviados.length, 0, 'en rojo: silencio');
+  assert.equal(W.gas.filter((x) => x === 'sinBot').length, 1, 'la lista se pide una sola vez por cambio');
+  await llega(wahaMsg('573009990000', 'hola')); assert.ok(W.enviados.length >= 1, 'a los demás clientes sí');
+  // lo quita
+  const antes = W.enviados.length; W.sinBot = []; W.sinBotT = 1700000009999; P._banco.sinBotAlDia.reset && P._banco.sinBotAlDia.reset();
+  await new Promise((ok) => setTimeout(ok, 5)); B.olvidarSinBotT();
+  await llega(wahaMsg(CLIENTE, 'hola de nuevo')); assert.ok(W.enviados.length > antes, 'sin rojo: el bot vuelve');
 });

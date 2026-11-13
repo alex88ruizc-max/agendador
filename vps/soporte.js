@@ -1,7 +1,7 @@
 // 🆘 3.58 · LÍNEA DE SOPORTE DE TU AGENDA. Va en el WhatsApp PERSONAL de Alex, en una sesión aparte («agendador-soporte»).
 //    LEY: aquí el bot SOLO le responde a gente de las tiendas (dueños y empleados). A cualquier otra persona NO le escribe nunca.
 //    ¿Cómo sabe quién es de una tienda? Porque entró por el botón «¿Necesitas ayuda?» de su panel: ese botón abre el chat con un mensaje
-//    que dice su tienda. Ese número queda recordado. También reconoce los números que la tienda ya puso en su panel.
+//    que dice su tienda. Ese número queda recordado. 3.59: y si escribe desde un número REGISTRADO en una tienda, es dueño: se le responde sin botón.
 //    Esta sesión NO es una tienda: no está en negocios.json, así que no publica estados, no manda recordatorios, no guarda contactos, nada.
 //    Solo responde ayuda. Si Alex escribe a mano en un chat, el bot se calla ahí 12 horas.
 'use strict';

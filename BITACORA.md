@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.58** · Página **2026-11-13za** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.59** · Página **2026-11-13zb** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -136,6 +136,18 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-13 · agendador-ia-3.59 · página 2026-11-13zb · 🆘 soporte reconoce al dueño por su número · 🤐 botón «Sin bot» por cliente
+- **Corrección de Alex al soporte:** «si tiene mi WhatsApp ya no va a buscar el botón… si tiene el número registrado, el bot lo debe saber y registrar como dueño». Ahora el ayudante **reconoce al dueño por su número registrado**, aunque escriba directo. El botón del panel se queda (sirve para empleados, que no tienen número guardado).
+  - Servidor: op `soporteGente` (`marySoporteGente_`): de TODAS las tiendas junta `private/billing.ownerPhone`, `settings.whatsapp`, `maryBot.avisos.numero` y `maryWa.numero`.
+  - VPS: `soporteGente()` pide esa lista una vez cada 30 min, solo si la línea está prendida y solo cuando escribe alguien que aún no conoce. El número de quien escribe NO viaja a Google.
+  - `/soporte estado` dice cuántos números de dueños reconoce y de cuántas tiendas. **Si dice 0, la lista no llegó** (usa `fsListAll('businesses')` del servidor, que no se pudo probar aquí): avisar para corregir.
+- **«Sin bot» por cliente (pedido con captura de Clientes):** en cada tarjeta de cliente, botón **«Sin bot»**. En rojo = el bot no le responde ni le escribe (usa el mismo freno `mudo()` de `/sinbot`: respuestas, recordatorios, «vuelve»). Otro toque y vuelve. Filtro nuevo «🤐 Sin bot».
+  - Panel: guarda `customers/<id>.sinBot` y deja una marca de hora `settings.marySinBotT` (sin datos del cliente).
+  - VPS: `sinBotAlDia()` mira esa marca (máx. cada 30 s, al llegar un mensaje); solo si cambió le pide la lista a Google (op `sinBot`). Repaso cada 6 h.
+  - El `/sinbot` escrito en el chat sigue igual y es aparte (no pinta el botón de rojo).
+- Reseña Gold e `index.html`: «🤐 «Sin bot» por cliente». Pruebas: 4 nuevas (195 pasan; como VPS también). Banco de la página: 0 fallas.
+- **Sin probar en real:** que las reglas de Firestore dejen guardar `sinBot` en el cliente; la lista de dueños.
 
 ### 2026-11-13 · agendador-ia-3.58 · página 2026-11-13za · 🆘 línea de soporte en el WhatsApp personal de Alex
 - **Pedido de Alex:** su número personal como soporte de Tu Agenda; el bot ahí solo le responde a dueños y empleados de las tiendas.
