@@ -3,9 +3,9 @@ import { onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordRe
 import {
   doc, getDoc, setDoc, addDoc, deleteDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp, where
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { PLAN_KEYS, PLAN_FEATURES, plansOf, planOfBiz, DEFAULT_PAY_WARNING, TG_EVENTS, BIZ_TYPES, planBenefits, planBenefitsIntro, OFERTA_TXT, BOT_GLOBAL } from "./common.js?v=2026-11-13v";
-import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-13v";
-import { APP_VERSION, SERVER_VERSION, RULES_VERSION, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, readPublishedVersion, reloadFresh, startUpdateWatcher, warmServer, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-11-13v";
+import { PLAN_KEYS, PLAN_FEATURES, plansOf, planOfBiz, DEFAULT_PAY_WARNING, TG_EVENTS, BIZ_TYPES, planBenefits, planBenefitsIntro, OFERTA_TXT, BOT_GLOBAL } from "./common.js?v=2026-11-13w";
+import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-13w";
+import { APP_VERSION, SERVER_VERSION, RULES_VERSION, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, readPublishedVersion, reloadFresh, startUpdateWatcher, warmServer, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-11-13w";
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on) => $(id).classList.toggle("hidden", !on);
