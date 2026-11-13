@@ -6,7 +6,7 @@
 const http = require('http'), fs = require('fs'), path = require('path');
 const T = require('./textos'), C = require('./correo'), E = require('./estado'), A = require('./asistente');
 
-const VERSION = 'agendador-ia-3.49';
+const VERSION = 'agendador-ia-3.50';
 const env = (k, d) => (process.env[k] === undefined || process.env[k] === '' ? d : process.env[k]);
 const CFG = {
   puerto: parseInt(env('PUERTO', '3060'), 10),
@@ -596,7 +596,7 @@ async function publicarEstado(neg, tipo) {
   if (tipo === 'hoy' && !png) return { ok: false, motivo: 'no hay cupos hoy ni mañana: no publiqué' };
   await enviarEstado(neg, quien, png, caption);
   if (conPie) { MEM.piePrueba[neg.bid] = ahoraLocal().fecha; memGuardar(); }
-  est.estados++; anotar({ bid: neg.bid, que: 'estado ' + tipo + ' publicado' + (dia && dia !== d.dias[0] ? ' (cupos de mañana)' : '') });
+  est.estados++; anotar({ bid: neg.bid, que: 'estado ' + tipo + ' publicado' + (dia && dia !== d.dias[0] ? ' (cupos de mañana)' : '') + aQuienes() });
   return { ok: true };
 }
 async function enviarEstado(neg, quien, png, caption) {
@@ -604,12 +604,16 @@ async function enviarEstado(neg, quien, png, caption) {
   try {
     // 3.1: WAHA solo conoce a quien escribió hace poco → el estado va a TODOS los clientes del negocio (sus números)
     let para = quien.allContacts ? null : quien.statusJidList.map((j) => j.replace('@s.whatsapp.net', '@c.us'));
-    if (!para && esWaha(neg)) { const r = await contactosDe(neg); if (r.length) para = r.map((n) => n + '@c.us'); }
+    if (!para && esWaha(neg)) { const r = await contactosDe(neg); if (r.length) para = [...new Set(r.concat(CFG.prueba.map(numeroWa)))].filter((n) => n.length >= 11).map((n) => n + '@c.us'); }   // 3.50: + los números de prueba de Alex (así puede revisar los estados de cualquier tienda)
+    ENVIO_ESTADO.n = para ? para.length : 0; ENVIO_ESTADO.fallo = '';
     if (esWaha(neg)) await waha('post', '/api/' + encodeURIComponent(sesionDe(neg)) + '/status/image', Object.assign({ file: { mimetype: 'image/png', url }, caption }, para ? { contacts: para } : {}), 120000);
     else await evo('post', '/message/sendStatus/' + encodeURIComponent(neg.instancia), Object.assign({ type: 'image', content: url, caption }, quien), 120000);
   }
-  catch (e) { if (!/timeout|aborted|524|504/i.test(e.message)) throw e; }   // ⏳ publicar a muchos contactos tarda: Evolution lo sigue haciendo solo
+  catch (e) { if (!/timeout|aborted|524|504/i.test(e.message)) throw e; ENVIO_ESTADO.fallo = 'WhatsApp tardó en confirmar'; }   // ⏳ publicar a muchos contactos tarda: Evolution lo sigue haciendo solo
 }
+// 3.50 · para el registro: a cuántos contactos se mandó el último estado y si WhatsApp confirmó (antes solo decía «publicado»)
+const ENVIO_ESTADO = { n: 0, fallo: '' };
+const aQuienes = () => (ENVIO_ESTADO.n ? ' · a ' + ENVIO_ESTADO.n + ' contacto' + (ENVIO_ESTADO.n === 1 ? '' : 's') : ' · a todos los contactos') + (ENVIO_ESTADO.fallo ? ' · ⚠️ ' + ENVIO_ESTADO.fallo : '');
 // 📲 3.43 · ESTADO «CÓMO AGENDAR»: 2 imágenes seguidas (pasos 1-2 y 3-4) con el nombre, servicios, equipo y horas reales.
 //    Los datos salen de la base (cuposLocal.guia): no gasta llamadas de Google. Sale en todos los planes (prueba incluida).
 const GUIA = require('./guia');
@@ -624,7 +628,7 @@ async function publicarGuia(neg) {
     await enviarEstado(neg, quien, E.png(GUIA.svgGuia(info, p, E.marcaAgua)), GUIA.textoGuia(info, p));
     if (p < GUIA.PARTES) await esperar(CFG.guiaEspacioMs);
   }
-  est.estados++; anotar({ bid: neg.bid, que: 'estado «cómo agendar» publicado (' + GUIA.PARTES + ' imágenes)' });
+  est.estados++; anotar({ bid: neg.bid, que: 'estado «cómo agendar» publicado (' + GUIA.PARTES + ' imágenes)' + aQuienes() });
   return { ok: true };
 }
 const esperar = (ms) => new Promise((ok) => setTimeout(ok, ms));

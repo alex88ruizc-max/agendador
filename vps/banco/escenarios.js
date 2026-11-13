@@ -472,7 +472,7 @@ test('3.1 · Estados: 1 al día a las 11:00 a. m. (máximo 2), una sola vez cada
 });
 test('3.1 · Estado: con cupos hoy → hoy; sin cupos hoy → los de mañana; sin cupos → no publica · va a los clientes del negocio', async () => {
   let r = await B.publicarEstado({ bid: 'lina-spa', instancia: 'lina-spa', motor: 'waha', sesion: 'default' }, 'hoy');
-  assert.equal(r.ok, true); assert.deepEqual(W.estados[0].contacts, ['573001112233@c.us', '573004445566@c.us']); assert.match(ultimoRegistro(), /estado hoy publicado$/);
+  assert.equal(r.ok, true); assert.deepEqual(W.estados[0].contacts, ['573001112233@c.us', '573004445566@c.us', '573187920386@c.us'], 'los clientes del negocio + el número de prueba de Alex (3.50)'); assert.match(ultimoRegistro(), /estado hoy publicado · a 3 contactos$/);
   W.cupos[0].libres = []; W.cupos[0].horas = [];
   r = await B.publicarEstado({ bid: 'lina-spa', instancia: 'lina-spa', motor: 'waha', sesion: 'default' }, 'hoy');
   assert.equal(r.ok, true); assert.match(ultimoRegistro(), /cupos de mañana/);

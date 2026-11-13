@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.49** · Página **2026-11-13p** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.50** · Página **2026-11-13p** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -133,6 +133,15 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-13 · agendador-ia-3.50 · 🔎 estados: saber a quién se mandaron
+- **Alex:** «los estados de El Barba no me llegaron a mí, y yo puedo ver sus estados». El registro decía «publicado», pero eso solo prueba que se le entregó a WhatsApp.
+- **Cómo funciona (no cambió):** por WAHA el estado se manda a la lista de **Clientes** del negocio (`maryContactos_`: clientes con WhatsApp y no bloqueados). Quien no está en esa lista no lo recibe, aunque tenga el contacto guardado.
+- **Cambios:** el registro ahora dice «publicado · a N contactos» y avisa si WhatsApp tardó en confirmar. Los **números de prueba de Alex** (`MARY_PRUEBA`) se agregan siempre a los destinatarios, para que pueda revisar los estados de cualquier tienda.
+  Comando nuevo del cartero: **`/guia <tienda>`** publica ya «Cómo agendar» (para probar sin esperar los días).
+- **Epic (solo lectura):** se miró el repositorio `epic-channels` para ver cómo maneja los números ocultos. Ahí solo está la página web de la tienda; el código del bot de Epic no está en ese repositorio ni tiene mapa. No se tocó nada.
+- Pendiente: confirmar con `/registro` cuántos contactos tiene El Barba y si a Alex le llega con `/guia elbarba`. Si la lista está bien y no llega, es entrega de WhatsApp (el mismo síntoma del pendiente 7 de Luisa).
+- Banco: 170 pasan; como el VPS: 148 pasan, 16 saltadas, 0 fallas.
 
 ### 2026-11-13 · agendador-ia-3.49 · 🕵️ clientes con número oculto: ya no se quedan sin respuesta
 - **Lo que vio Alex en /registro (El Barba):** 5 mensajes en 2 horas con «sin número visible (LID): no respondo». WhatsApp no mandó el número del cliente, solo un código (…@lid), y el bot se callaba.

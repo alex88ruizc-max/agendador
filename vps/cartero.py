@@ -253,6 +253,14 @@ def atender(m):
     elif texto.startswith('/apk'): decir('📱 Generando la app de Android… (tarda 1 a 3 minutos)'); decir(hacer_apk())
     elif texto.startswith('/estado'): decir(curl('/salud'))
     elif texto.startswith('/registro'): decir(curl('/registro?n=12'))
+    elif texto.startswith('/guia') or texto.startswith('/guía'):   # 3.50: publica YA el estado «Cómo agendar» de una tienda (para probar sin esperar)
+        bid = re.sub(r'[^a-z0-9-]', '', (texto.split() + [''])[1].lower())
+        if not bid: decir('Dime la tienda. Ejemplo: /guia elbarba'); return
+        decir('📲 Publicando «Cómo agendar» de ' + bid + '… (tarda cerca de 1 minuto)')
+        try:
+            req = urllib.request.Request('http://127.0.0.1:3070/publicar?tipo=guia&bid=' + bid, data=b'', method='POST')
+            with urllib.request.urlopen(req, timeout=240) as r: decir(r.read().decode() + '\n\nMira /registro para ver a cuántos contactos se mandó.')
+        except Exception as e: decir('No se pudo: ' + str(e))
     elif texto.startswith('/auditoria') or texto.startswith('/auditoría'): decir(auditoria())
     elif texto.startswith('/limpiar'): decir(limpiar())
     elif texto.startswith('/servidor'):
