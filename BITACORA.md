@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.56** · Página **2026-11-13x** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.56** · Página **2026-11-13y** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -136,6 +136,12 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-13 · página 2026-11-13y · ✏️ «Otro tiempo» en los turnos del asistente de inicio · campos de hora en iPhone
+- Alex: «hay gente que tiene turno cada 2 horas y media». En el paso «¿Cuándo atiendes?» ahora hay 15, 30, 45 min, 1 h, 1 h 30, 2 h y **«✏️ Otro tiempo»** (horas + minutos de 15 en 15, hasta 8 h 45).
+  La vista previa de turnos se actualiza sola. (En Configuración ya se podía con «Personalizado».)
+- iPhone: «Abres» y «Cierras» se montaban uno sobre el otro (los campos de hora traen un ancho mínimo propio). Corregido en styles.css.
+- Banco de la página: 0 fallas.
 
 ### 2026-11-13 · página 2026-11-13x · 👥 el equipo arriba del Inicio
 - Alex: las personas que atienden deben quedar ARRIBA para marcar rápido un descanso o un almuerzo. Las tarjetas del equipo (Disponible / Descanso) pasaron a ser lo primero del Inicio, encima de los accesos directos.

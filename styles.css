@@ -515,3 +515,9 @@ html, body { max-width: 100%; overscroll-behavior-x: none; }
 [id^="tab-"], [id^="tab-"] > *, [id^="tab-"] .grid > *, [id^="tab-"] article, [id^="tab-"] article > *, #appView > *, main, main > *, .sp-card, .modal-card { min-width: 0; max-width: 100%; }
 [id^="tab-"] article p, .sp-card p { overflow-wrap: anywhere; }
 img, canvas, video { max-width: 100%; }
+
+/* 2026-11-13y · iPhone: los campos de hora («Abres» / «Cierras») traían un ancho mínimo propio y se montaban uno sobre el otro */
+.field { min-width: 0; }
+.field input, .field select, .field textarea { min-width: 0; max-width: 100%; box-sizing: border-box; }
+input[type="time"], input[type="date"] { -webkit-appearance: none; appearance: none; min-width: 0; max-width: 100%; }
+.wizard .grid > * , .modal-card .grid > * { min-width: 0; }
