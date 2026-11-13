@@ -15,13 +15,13 @@
   <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js">
   <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js">
   <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js">
-  <link rel="modulepreload" href="common.js?v=2026-11-13h">
-  <link rel="modulepreload" href="super.js?v=2026-11-13h">
+  <link rel="modulepreload" href="common.js?v=2026-11-13j">
+  <link rel="modulepreload" href="super.js?v=2026-11-13j">
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="theme.js?v=2026-11-13h"></script>
+  <script src="theme.js?v=2026-11-13j"></script>
   <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
-  <link rel="stylesheet" href="styles.css?v=2026-11-13h">
+  <link rel="stylesheet" href="styles.css?v=2026-11-13j">
   <style>
     /* ===== Panel del superusuario: claro, frío, con un solo elemento protagonista (el carril de cobros) ===== */
     .sp { --canvas:#F2F5F8; --paperw:#FFFFFF; --sink:#14213D; --soft:#5B6782; --hair:#DDE3EA; --sblue:#2B59C3; --sred:#D7263D; --mint:#1E9E63; --sky:#3F8FD6; --amber:#C77700;
@@ -100,7 +100,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Tu Agenda">
-  <link rel="stylesheet" href="panel-premium.css?v=2026-11-13h">
+  <link rel="stylesheet" href="panel-premium.css?v=2026-11-13j">
 </head>
 <body class="sp pp antialiased">
 
@@ -184,6 +184,12 @@
               <div id="plPlans" class="space-y-3"></div>
               <label class="mt-3 flex items-center gap-2 text-sm"><input id="plTrial" type="checkbox" class="h-4 w-4"> Mostrar “Probar gratis” en las páginas de las tiendas</label>
               <label class="field mt-3 max-w-xs"><span>Máximo de estados activos por tienda</span><input id="plStories" type="number" min="1" max="30" value="10"></label>
+            </div>
+            <div class="sp-card">
+              <h2 class="disp mb-1 text-[18px] font-bold">🤖 Opciones del bot de WhatsApp (todas las tiendas)</h2>
+              <p class="soft mb-3 text-sm">Si apagas una, desaparece del panel de cada tienda y el bot deja de hacerla en todas. Al prenderla de nuevo, cada tienda queda como la tenía. Se guarda con el botón de abajo.</p>
+              <div id="plBot" class="grid gap-1.5 sm:grid-cols-2"></div>
+              <p class="soft mt-2 text-xs">«Si escribes tú en un chat, se calla» siempre queda: protege las conversaciones de cada tienda.</p>
             </div>
             <div class="sp-card">
               <h2 class="disp mb-1 text-[18px] font-bold">Descuento por pagar varios meses</h2>
@@ -292,6 +298,6 @@
     </div>
   </div>
 
-  <script type="module" src="super.js?v=2026-11-13h"></script>
+  <script type="module" src="super.js?v=2026-11-13j"></script>
 </body>
 </html>
