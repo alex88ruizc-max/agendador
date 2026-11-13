@@ -112,6 +112,8 @@ global.fetch = async (url, o) => {
     return resp(Object.assign({ name: n }, W.sesiones[n])); }
   const ac = u.match(/\/api\/([^/]+)\/auth\/(request-code|qr)/);
   if (ac) { W.wahaLlamadas.push(ac[2] + ' ' + decodeURIComponent(ac[1])); return ac[2] === 'qr' ? resp({ mimetype: 'image/png', data: 'UVI=' }) : resp({ code: 'ABCD1234' }); }
+  if (/\/documents\/platform\/public/.test(u) && /fieldPaths=soporte/.test(u)) return resp({ fields: W.soporte ? { soporte: { mapValue: { fields: { activo: { booleanValue: W.soporte.activo }, numero: { stringValue: W.soporte.numero || '' } } } } } : {} });   // 3.58
+  if (/\/documents\/businesses\/[a-z0-9-]+\?[^/]*fieldPaths=name/.test(u)) { const t = (W.tiendas || {})[u.match(/businesses\/([a-z0-9-]+)\?/)[1]]; return t ? resp({ fields: { name: { stringValue: t } } }) : resp({ error: 'no existe' }, 404); }   // 3.58
   if (/\/documents\/platform\/public/.test(u) && W.avisoPend) return resp({ fields: { maryAvisoPend: { mapValue: { fields: { 'lina-spa': { integerValue: String(W.avisoPend) } } } } } });   // 3.47: bandera de avisos
   if (/\/documents\/platform\/public/.test(u) && W.botOff) return resp({ fields: { botOff: { arrayValue: { values: W.botOff.map((x) => ({ stringValue: x })) } } } });   // 3.45: lo que el superusuario apagó
   if (W.fsDirecto && /firestore|\/documents\/businesses\//.test(u)) {   // 3.30: la base de datos que el VPS lee directo (configuración, equipo, servicios, cupos ocupados)
@@ -1407,4 +1409,76 @@ test('3.56 · 📋 «Una sola lista» (elegido en Servicios): el bot NO pregunta
   assert.deepEqual(ids(ultimo()), ['svc:c1', 'svc:c2', 'svc:b1', 'svc:e1'], 'una sola lista: todos los servicios, sin «Otra categoría»');
   assert.match(ultimo().texto, /\*Servicios\*/);
   W.unaLista = false;
+});
+
+// ---------- 🆘 3.58 · LÍNEA DE SOPORTE (el WhatsApp personal de Alex) ----------
+const SOPX = require('../soporte');
+const sopMsg = (de, texto, x) => Object.assign(wahaMsg(de, texto, x), { session: SOPX.SESION, me: { id: '573180000000@c.us' } });
+const BOTON = (bid) => SOPX.textoBoton(bid);
+test('3.58 · 🆘 Soporte: a quien NO es de una tienda no se le responde NUNCA (ni se anota su número); apagada en el súper panel, tampoco a los de tiendas', async () => {
+  mundoNuevo(); W.soporte = { activo: true, numero: '573180000000' }; W.tiendas = { elbarba: 'El Barba' };
+  const antes = P._banco.registro ? P._banco.registro().length : 0;
+  await llega(sopMsg('573009998877', 'hola parce, ¿almorzamos?'));
+  await llega(sopMsg('573009998877', '¿cómo cambio mi horario?'));
+  await llega(sopMsg('573009998877', 'Hola, necesito ayuda con mi agenda. (Tienda: tienda-inventada)'));
+  assert.equal(W.enviados.length, 0, 'un amigo de Alex (o una tienda que no existe): silencio total');
+  assert.deepEqual(P._banco.memSoporte().gente, {}, 'no queda guardado');
+  assert.equal(W.gas.length, 0, 'no se llama a Google');
+  // apagada en el súper panel: ni a la gente de las tiendas
+  mundoNuevo(); W.soporte = { activo: false, numero: '573180000000' }; W.tiendas = { elbarba: 'El Barba' };
+  await llega(sopMsg('573001110000', BOTON('elbarba')));
+  assert.equal(W.enviados.length, 0, 'el súper panel manda');
+  void antes;
+});
+test('3.58 · 🆘 Soporte: el dueño o empleado entra por el botón del panel → menú; escribe un número o una palabra → los pasos; todo sale por la sesión de soporte', async () => {
+  mundoNuevo(); W.soporte = { activo: true, numero: '573180000000' }; W.tiendas = { elbarba: 'El Barba' };
+  const D = '573001110000';
+  await llega(sopMsg(D, BOTON('elbarba')));
+  assert.equal(W.enviados.length, 1); assert.match(ultimo().texto, /equipo de \*El Barba\*/); assert.match(ultimo().texto, /\*1\.\* Vincular/); assert.match(ultimo().texto, /\*0\.\* Hablar con Alex/);
+  assert.equal(ultimo().sesion, SOPX.SESION, 'sale por el WhatsApp de soporte, no por el de una tienda'); assert.equal(ultimo().a, D);
+  await llega(sopMsg(D, '3'));
+  assert.match(ultimo().texto, /Horario de atención/); assert.match(ultimo().texto, /Configuración/);
+  await llega(sopMsg(D, 'como pongo un servicio nuevo'));
+  assert.match(ultimo().texto, /Nuevo servicio/);
+  await llega(sopMsg(D, 'cuanto vale el precio del plan'));
+  assert.match(ultimo().texto, /Mi plan/, '«precio del plan» es el plan, no un servicio');
+  await llega(sopMsg(D, 'menú')); await llega(sopMsg(D, 'menu'));
+  assert.match(ultimo().texto, /Escribe el número/, 'el menú se puede pedir las veces que quiera');
+  assert.equal(W.enviados.length, 6);
+  assert.equal(W.gas.length, 0, 'la ayuda no gasta llamadas de Google');
+  assert.ok(W.enviados.every((x) => x.sesion === SOPX.SESION));
+  // un empleado de la misma tienda, desde otro número, entra por el mismo botón
+  await llega(sopMsg('573002220000', BOTON('elbarba'))); assert.equal(ultimo().a, '573002220000'); assert.match(ultimo().texto, /Soy el ayudante/);
+});
+test('3.58 · 🆘 Soporte: «0» (o una foto, o dos veces sin entender) → «ya te atiende Alex» y el ayudante se calla; si Alex escribe a mano, también se calla', async () => {
+  mundoNuevo(); W.soporte = { activo: true, numero: '573180000000' }; W.tiendas = { elbarba: 'El Barba' };
+  const D = '573001110000';
+  await llega(sopMsg(D, BOTON('elbarba'))); await llega(sopMsg(D, '0'));
+  assert.match(ultimo().texto, /Alex ya ve tu mensaje/); const n = W.enviados.length;
+  await llega(sopMsg(D, 'es que no me deja entrar')); await llega(sopMsg(D, '2'));
+  assert.equal(W.enviados.length, n, 'callado: ahora atiende Alex');
+  await llega(sopMsg(D, BOTON('elbarba'))); assert.equal(W.enviados.length, n + 1, 'si vuelve a tocar el botón del panel, el ayudante vuelve');
+  await llega(sopMsg(D, 'xyzzy plugh')); assert.match(ultimo().texto, /No te entendí/);
+  await llega(sopMsg(D, 'qwerty asdf')); assert.match(ultimo().texto, /Alex ya ve tu mensaje/, 'dos veces sin entender: mejor Alex');
+  // Alex escribe a mano en el chat de otra persona de una tienda
+  const E = '573002220000';
+  await llega(sopMsg(E, BOTON('elbarba'))); const m = W.enviados.length;
+  await llega(sopMsg(E, 'ya te ayudo', { id: 'true_' + E + '@c.us_MANUAL', from: '573180000000@c.us', to: E + '@c.us', fromMe: true }));
+  await llega(sopMsg(E, '1')); assert.equal(W.enviados.length, m, 'Alex escribió: el ayudante se calla en ese chat');
+  // y Alex escribiéndole a un amigo no deja rastro
+  await llega(sopMsg('573009998877', 'listo, nos vemos', { id: 'true_X', from: '573180000000@c.us', to: '573009998877@c.us', fromMe: true }));
+  assert.equal(P._banco.memSoporte().callado['573009998877'], undefined);
+});
+test('3.58 · 🆘 Soporte: se vincula con /soporte (código), no se vuelve una tienda y ningún reloj la recorre', async () => {
+  mundoNuevo();
+  const r = await P._banco.soporteSesion('vincular', '3180000000');
+  assert.equal(r.ok, true); assert.equal(r.codigo, 'ABCD1234');
+  assert.ok(W.wahaLlamadas.includes('crear ' + SOPX.SESION)); assert.ok(W.wahaLlamadas.includes('request-code ' + SOPX.SESION));
+  assert.equal((await P._banco.soporteSesion('vincular', '123')).ok, false, 'sin número no se vincula nada');
+  W.sesiones[SOPX.SESION].status = 'WORKING'; W.sesiones[SOPX.SESION].me = { id: '573180000000@c.us' };
+  await P.alEventoConexion(P.deWaha({ event: 'session.status', session: SOPX.SESION, payload: { status: 'WORKING' }, me: { id: '573180000000@c.us' } }));
+  assert.ok(!P._banco.negocios().some((n) => n.bid === SOPX.SESION || n.instancia === SOPX.SESION), 'no entra a negocios.json');
+  assert.ok(!W.gas.includes('waResultado'), 'no le avisa a Google como si fuera una tienda');
+  const e = await P._banco.soporteSesion('estado'); assert.equal(e.estado, 'WORKING'); assert.equal(e.numero, '573180000000');
+  await P._banco.soporteSesion('desvincular'); assert.equal(W.sesiones[SOPX.SESION], undefined);
 });

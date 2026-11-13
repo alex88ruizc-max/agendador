@@ -3,9 +3,9 @@ import { onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordRe
 import {
   doc, getDoc, setDoc, addDoc, deleteDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp, where
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { PLAN_KEYS, PLAN_FEATURES, plansOf, planOfBiz, DEFAULT_PAY_WARNING, TG_EVENTS, BIZ_TYPES, planBenefits, planBenefitsIntro, OFERTA_TXT, BOT_GLOBAL } from "./common.js?v=2026-11-13z";
-import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-13z";
-import { APP_VERSION, SERVER_VERSION, RULES_VERSION, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, readPublishedVersion, reloadFresh, startUpdateWatcher, warmServer, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-11-13z";
+import { PLAN_KEYS, PLAN_FEATURES, plansOf, planOfBiz, DEFAULT_PAY_WARNING, TG_EVENTS, BIZ_TYPES, planBenefits, planBenefitsIntro, OFERTA_TXT, BOT_GLOBAL } from "./common.js?v=2026-11-13za";
+import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-13za";
+import { APP_VERSION, SERVER_VERSION, RULES_VERSION, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, readPublishedVersion, reloadFresh, startUpdateWatcher, warmServer, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-11-13za";
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on) => $(id).classList.toggle("hidden", !on);
@@ -617,6 +617,7 @@ async function loadPlanCfg() {
   $("plWarn").value = pp.payWarning || DEFAULT_PAY_WARNING;
   $("plStories").value = pp.storyLimit || 10;
   PL.botOff = Array.isArray(pp.botOff) ? [...pp.botOff] : []; renderBotGlobal();
+  if ($("sopOn")) { $("sopOn").checked = pp.soporte?.activo === true; $("sopNum").value = pp.soporte?.numero || ""; }   // 🆘 línea de soporte
   renderPlanEditor(); renderDisc();
   PL.methods = (pp.payMethods || []).map((m) => ({ ...m }));
 
@@ -720,6 +721,10 @@ $("bbQr").onchange = async (e) => {
 };
 $("plSave").onclick = async () => {
   readPl();
+  // 🆘 línea de soporte: sin un número completo no se puede prender (el botón de las tiendas no tendría a dónde ir)
+  const sopNum = (() => { let n = ($("sopNum")?.value || "").replace(/\D/g, ""); if (n.length === 10 && n[0] === "3") n = "57" + n; return n; })();
+  if ($("sopOn")?.checked && sopNum.length < 11) return toast("Para prender el soporte, escribe tu número con el 57 adelante.", "error");
+  const sop = { activo: !!$("sopOn")?.checked, numero: sopNum };
   const btn = $("plSave"); setBusy(btn, true, "Guardando…");
   try {
     await setDoc(doc(db, "platform", "public"), {
@@ -728,6 +733,7 @@ $("plSave").onclick = async () => {
       planName: PL.plans.basic.name, planPriceCOP: Number(PL.plans.basic.priceCOP || 0), trialDays: Math.min(365, Math.max(1, Number(PL.plans.free.days || 15))),
       trialRules: { daysAhead: Math.max(1, Number(PL.plans.free.daysAhead || 5)), locked: [] },
       botOff: [...document.querySelectorAll("[data-botg]")].filter((x) => !x.checked).map((x) => x.dataset.botg),
+      soporte: sop,
       trialEnabled: $("plTrial").checked, storyLimit: Math.min(30, Math.max(1, Number($("plStories").value || 10))),
       payMethods: PL.methods.filter((m) => m.label && m.account),
       brebEnabled: $("bbOn").checked, brebKey: $("bbKey").value.trim(), brebHolder: $("bbHolder").value.trim(),

@@ -4,7 +4,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm install --omit=dev --no-audit --no-fund
-COPY principal.js textos.js correo.js estado.js asistente.js cuposLocal.js guia.js push.js ./
+COPY principal.js textos.js correo.js estado.js asistente.js cuposLocal.js guia.js push.js soporte.js ./
 COPY fuentes ./fuentes
 COPY banco ./banco
 ENV DATOS=/datos NEGOCIOS=/config/negocios.json TZ=America/Bogota

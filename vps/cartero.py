@@ -3,7 +3,7 @@
 #    Le mandas al bot un archivo y él lo instala (solo si viene de TU chat):
 #      agendador-ia-*.zip    → el Agendador IA del VPS (Mary por dentro) + su Apps Script en Google (actualizar.sh: banco de pruebas; si falla NO instala)
 #      agendador-web-*.zip   → la página tuagenda.vip (sube los archivos a GitHub, rama main, con respaldo de lo anterior)
-#    Comandos:  /estado  (cómo está Mary)   /registro  (qué hizo Mary)   /ayuda
+#    Comandos:  /estado  (cómo está Mary)   /registro  (qué hizo Mary)   /soporte  (línea de soporte)   /ayuda
 #    Solo usa la librería estándar de Python. Corre como servicio de systemd (agendador-cartero), lo instala instalar-cartero.sh.
 import json, os, re, subprocess, sys, time, urllib.request, urllib.parse, zipfile, io, base64
 
@@ -253,6 +253,24 @@ def atender(m):
     elif texto.startswith('/apk'): decir('📱 Generando la app de Android… (tarda 1 a 3 minutos)'); decir(hacer_apk())
     elif texto.startswith('/estado'): decir(curl('/salud'))
     elif texto.startswith('/registro'): decir(curl('/registro?n=12'))
+    elif texto.startswith('/soporte'):   # 3.58: la línea de soporte (el WhatsApp personal de Alex). El número lo escribe Alex aquí mismo.
+        p = texto.split(); accion = p[1] if len(p) > 1 else 'estado'; numero = re.sub(r'\D', '', p[2]) if len(p) > 2 else ''
+        if accion not in ('vincular', 'desvincular', 'estado'):
+            decir('🆘 Línea de soporte:\n/soporte vincular 573001234567  (tu número, con el 57)\n/soporte estado\n/soporte desvincular'); return
+        if accion == 'vincular' and len(numero) < 11: decir('Escribe tu número con el 57 adelante. Ejemplo: /soporte vincular 573001234567'); return
+        try:
+            req = urllib.request.Request('http://127.0.0.1:3070/soporte?accion=' + accion + '&numero=' + numero, data=b'', method='POST')
+            with urllib.request.urlopen(req, timeout=120) as r: j = json.loads(r.read().decode())
+        except Exception as e: decir('⚠️ No pude: ' + str(e)[:200]); return
+        if not j.get('ok'): decir('❌ ' + str(j.get('error') or 'no se pudo'))
+        elif j.get('codigo'):
+            decir('🆘 Código para vincular tu WhatsApp ' + numero + ':\n\n' + j['codigo'] + '\n\nTienes 5 minutos.\nEn TU celular: WhatsApp › Dispositivos vinculados › Vincular un dispositivo › Vincular con el número de teléfono › escribe el código.\n\n'
+                  '⚠️ Solo tu número personal. Nunca el de una tienda ni el de Epic.\nDespués: en tu súper panel prende «Línea de soporte» y pon ese mismo número.')
+        elif accion == 'estado':
+            decir('🆘 Línea de soporte\nConexión: ' + ('✅ vinculada (' + str(j.get('numero')) + ')' if j.get('estado') == 'WORKING' else '⚪ ' + str(j.get('estado')))
+                  + '\nSúper panel: ' + ('✅ prendida' if j.get('prendidaEnElSuperPanel') else '⚪ apagada') + (' · número ' + str(j.get('numeroEnElSuperPanel')) if j.get('numeroEnElSuperPanel') else '')
+                  + '\nPersonas de tiendas que ya escribieron: ' + str(j.get('personasDeTiendas', 0)))
+        else: decir('🆘 ' + str(j.get('estado')) + ((' (' + str(j.get('numero')) + ')') if j.get('numero') else ''))
     elif texto.startswith('/guia') or texto.startswith('/guía'):   # 3.50: publica YA el estado «Cómo agendar» de una tienda (para probar sin esperar)
         bid = re.sub(r'[^a-z0-9-]', '', (texto.split() + [''])[1].lower())
         if not bid: decir('Dime la tienda. Ejemplo: /guia elbarba'); return

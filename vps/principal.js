@@ -6,7 +6,7 @@
 const http = require('http'), fs = require('fs'), path = require('path');
 const T = require('./textos'), C = require('./correo'), E = require('./estado'), A = require('./asistente');
 
-const VERSION = 'agendador-ia-3.57';
+const VERSION = 'agendador-ia-3.58';
 const env = (k, d) => (process.env[k] === undefined || process.env[k] === '' ? d : process.env[k]);
 const CFG = {
   puerto: parseInt(env('PUERTO', '3060'), 10),
@@ -380,6 +380,7 @@ const AGRUPA = new Map();
 function alMensaje(b) {
   const c = leerMensaje(b);
   if (!/^messages\.upsert$/.test(c.evento) || !c.jid || c.grupo || c.estado || yaVisto(c.id)) return Promise.resolve();
+  if (c.inst === SOP.SESION) return enFila(NEG_SOP.bid + ':' + (c.tel || c.jid), () => atenderSoporte(c));   // 🆘 3.58: la línea de soporte NO es una tienda
   const neg = negDe(c.inst); if (!neg) { if (!c.deMi) anotar({ que: '⚠️ mensaje de «' + c.inst + '», que no está en negocios.json: no respondo' }); return Promise.resolve(); }
   const k = neg.bid + ':' + (c.tel || c.jid);
   c.llegada = Date.now();
@@ -437,6 +438,101 @@ async function responderSinNumero(c, neg, k) {
   const id = r && (r.id && (r.id._serialized || r.id.id || r.id)); if (typeof id === 'string' && id) { MEM.enviados.push(id); memGuardar(); }   // para no confundirlo con el dueño escribiendo
   ULT_ENVIO.set(k, Date.now()); est.respondidos++;
   anotar({ bid: neg.bid, que: '🕵️ número oculto: le respondí con el link de la agenda' });
+}
+// 🆘 3.58 · LÍNEA DE SOPORTE (soporte.js): el WhatsApp personal de Alex, en la sesión «agendador-soporte» del WAHA del agendador.
+//    LEY: solo se le responde a gente de las tiendas (entró por el botón «¿Necesitas ayuda?» de su panel). A nadie más, nunca.
+//    De los demás chats de Alex no se anota NADA (ni número ni texto). No es una tienda: ningún reloj (estados, recordatorios…) la recorre.
+const SOP = require('./soporte');
+const NEG_SOP = { bid: '_soporte', instancia: SOP.SESION, sesion: SOP.SESION, motor: 'waha' };
+const SOP_CFG = { activo: false, numero: '', t: 0 }, SOP_TIENDAS = new Map();
+async function soporteCfg() {   // el súper panel manda: platform/public.soporte = { activo, numero }
+  if (Date.now() - SOP_CFG.t < 60000) return SOP_CFG;
+  SOP_CFG.t = Date.now();
+  try {
+    const r = await fetch(FS.url + '/v1/projects/' + FS.proyecto + '/databases/(default)/documents/platform/public?key=' + FS.llave + '&mask.fieldPaths=soporte', { signal: AbortSignal.timeout(5000) });
+    if (r.ok) { const x = deFs((((await r.json()) || {}).fields || {}).soporte) || {}; SOP_CFG.activo = x.activo === true; SOP_CFG.numero = String(x.numero || '').replace(/\D/g, ''); }
+  } catch (e) { /* queda lo último leído */ }
+  return SOP_CFG;
+}
+// ¿esa tienda existe? Devuelve su nombre, o null si no existe (así un texto inventado no abre la puerta)
+async function soporteTienda(bid) {
+  const ya = SOP_TIENDAS.get(bid); if (ya && Date.now() - ya.t < 6 * 3600000) return ya.nombre;
+  let nombre = null;
+  try {
+    const r = await fetch(FS.url + '/v1/projects/' + FS.proyecto + '/databases/(default)/documents/businesses/' + encodeURIComponent(bid) + '?key=' + FS.llave + '&mask.fieldPaths=name', { signal: AbortSignal.timeout(5000) });
+    if (r.ok) nombre = String(deFs((((await r.json()) || {}).fields || {}).name) || bid);
+    else if (r.status !== 404) return null;   // falla pasajera: no se recuerda
+  } catch (e) { return null; }
+  SOP_TIENDAS.set(bid, { nombre, t: Date.now() });
+  return nombre;
+}
+const memSoporte = () => (MEM.soporte = MEM.soporte || { gente: {}, callado: {} });
+async function atenderSoporte(c) {
+  const S = memSoporte();
+  if (!c.tel && /@lid$/.test(c.jid)) c.tel = await telDeLid(NEG_SOP, c.jid);
+  const tel = c.tel; if (!tel) return;                       // sin número no se sabe quién es: silencio
+  const k = NEG_SOP.bid + ':' + tel;
+  if (c.deMi) {   // Alex escribió a mano en el chat de alguien de una tienda → el bot se calla ahí 12 horas
+    if (!S.gente[tel]) return;
+    if (c.id && MEM.enviados.indexOf(c.id) === -1 && Date.now() - (ULT_ENVIO.get(k) || 0) < 20000) await new Promise((ok) => setTimeout(ok, 3000));
+    if (c.id && MEM.enviados.indexOf(c.id) === -1) { S.callado[tel] = Date.now(); memGuardar(); anotar({ bid: 'soporte', chat: tel.slice(-4), que: '🙋 Alex escribió: el ayudante se calla 12 h en este chat' }); }
+    return;
+  }
+  const cfg = await soporteCfg();
+  if (!cfg.activo || !atiende(c)) return;                    // apagado en el súper panel (o Mary apagada / modo prueba): silencio
+  let g = S.gente[tel];
+  const bid = SOP.tiendaEnTexto(c.texto);
+  if (bid) {                                                 // viene del botón «¿Necesitas ayuda?» del panel
+    const nombre = await soporteTienda(bid);
+    if (nombre !== null) {
+      if (!g) anotar({ bid: 'soporte', chat: tel.slice(-4), que: '🆘 persona nueva de la tienda «' + bid + '»' });
+      g = S.gente[tel] = Object.assign(g || { desde: Date.now() }, { bid, tienda: nombre }); delete S.callado[tel]; memGuardar();
+    }
+  }
+  if (!g) return;                                            // 🔒 LEY: no es de ninguna tienda → no se responde ni se anota
+  if (Date.now() - (S.callado[tel] || 0) < SOP.CALLADO_MS) return;
+  const hoy = new Date().toISOString().slice(0, 10); if (g.dia !== hoy) { g.dia = hoy; g.n = 0; }
+  if (g.n >= SOP.TOPE_DIA) return;
+  const r = SOP.responder(g, c.media || c.audio ? '' : c.texto, g.tienda);
+  g.n++; if (r.callar) S.callado[tel] = Date.now();
+  if (MEM.dicho) delete MEM.dicho[k];                        // aquí sí se puede repetir (pidió el menú otra vez)
+  memGuardar();
+  try { await escribir(NEG_SOP, tel, r.texto); est.soporte = (est.soporte || 0) + 1; anotar({ bid: 'soporte', chat: tel.slice(-4), que: r.callar ? '🙋 pidió hablar con Alex: el ayudante se calla 12 h' : '🆘 respondí ayuda (' + g.bid + ')' }); }
+  catch (e) { est.errores++; log('❌ soporte', e.message); }
+}
+// vincular / ver / desvincular la sesión de soporte (lo pide Alex por Telegram: /soporte …)
+async function soporteSesion(accion, numero) {
+  const ses = encodeURIComponent(SOP.SESION);
+  const ver = async () => { try { const r = await waha('get', '/api/sessions/' + ses, null, 8000); return { estado: String(r.status || '').toUpperCase(), numero: String((r.me && r.me.id) || '').split('@')[0].replace(/\D/g, '') }; } catch (e) { return { estado: 'NO_EXISTE', numero: '' }; } };
+  const borrar = async () => { await waha('post', '/api/sessions/' + ses + '/logout').catch(() => {}); await waha('delete', '/api/sessions/' + ses).catch(() => {}); };
+  if (CFG.motor !== 'waha') return { ok: false, error: 'La línea de soporte necesita el WAHA del agendador.' };
+  if (accion === 'desvincular') { clearTimeout(soporteSesion.t); await borrar(); anotar({ bid: 'soporte', que: '🆘 línea de soporte desvinculada' }); return { ok: true, estado: 'desvinculada' }; }
+  if (accion === 'vincular') {
+    const n = numeroWa(numero); if (n.length < 11) return { ok: false, error: 'Falta el número. Ejemplo: /soporte vincular 573001234567' };
+    const e0 = await ver(); if (e0.estado === 'WORKING') return { ok: true, estado: 'ya estaba vinculada', numero: e0.numero };
+    const webhooks = [{ url: CFG.publico + '/webhook', events: ['message.any', 'session.status'] }];
+    // se le pide a WAHA que ni mire grupos, estados ni canales de ese WhatsApp (si esa versión no lo acepta, va sin eso: igual aquí se ignoran)
+    const conf = [{ webhooks, ignore: { status: true, groups: true, channels: true } }, { webhooks }];
+    let listo = false, falla = '';
+    for (const config of conf) {
+      try {
+        if (e0.estado === 'NO_EXISTE' && !listo) await waha('post', '/api/sessions', { name: SOP.SESION, start: true, config });
+        else { await waha('put', '/api/sessions/' + ses, { name: SOP.SESION, config }); await waha('post', '/api/sessions/' + ses + '/start').catch(() => {}); }
+        listo = true; break;
+      } catch (e) { falla = e.message; }
+    }
+    if (!listo) return { ok: false, error: 'No pude preparar la conexión: ' + falla.slice(0, 120) };
+    for (let i = 0; i < 15; i++) { const e = await ver(); if (e.estado === 'WORKING' || e.estado === 'SCAN_QR_CODE') break; await new Promise((ok) => setTimeout(ok, CFG.esperaMs)); }
+    let codigo = '';
+    try { codigo = String((await waha('post', '/api/' + ses + '/auth/request-code', { phoneNumber: n })).code || ''); } catch (e) { await borrar(); return { ok: false, error: 'WhatsApp no dio el código: ' + e.message.slice(0, 120) }; }
+    clearTimeout(soporteSesion.t);
+    soporteSesion.t = setTimeout(async () => { if ((await ver()).estado !== 'WORKING') { await borrar(); anotar({ bid: 'soporte', que: '🧹 soporte: no se vinculó en 5 min, borré la conexión vacía' }); } }, 5 * 60000);
+    soporteSesion.t.unref();
+    anotar({ bid: 'soporte', que: '🆘 código para vincular la línea de soporte' });
+    return { ok: true, estado: 'codigo', codigo, minutos: 5 };
+  }
+  const e = await ver(), cfg = await soporteCfg();
+  return { ok: true, estado: e.estado, numero: e.numero, prendidaEnElSuperPanel: cfg.activo, numeroEnElSuperPanel: cfg.numero, personasDeTiendas: Object.keys(memSoporte().gente).length };
 }
 async function atenderMensaje(c, neg) {
   if (!c.tel && !c.deMi && /@lid$/.test(c.jid)) c.tel = await telDeLid(neg, c.jid);
@@ -920,6 +1016,7 @@ async function numeroInstancia(bid) {
   try { const r = await evo('get', '/instance/fetchInstances?instanceName=' + encodeURIComponent(bid)); const x = (Array.isArray(r) ? r[0] : r) || {}; const i = x.instance || x; return String(i.ownerJid || i.owner || i.number || '').split('@')[0].replace(/\D/g, ''); } catch (e) { return ''; }
 }
 async function atenderPedidoWa(bid) {
+  if (bid === SOP.SESION) return;   // 3.58: ese nombre es de la línea de soporte, nunca de una tienda
   const neg = { bid, instancia: bid };
   const { pedido } = await gas(neg, 'waPedido');
   if (!pedido) return;
@@ -1018,6 +1115,7 @@ async function tickPedidosWa() {
 async function alEventoConexion(b) {
   const ev = String(b.event || '').toLowerCase().replace(/_/g, '.'), bid = String(b.instance || ''), d = b.data || {};
   if (!/^[a-z0-9][a-z0-9-]{1,29}$/.test(bid)) return;
+  if (bid === SOP.SESION) { if (ev === 'connection.update') anotar({ bid: 'soporte', que: String(d.state || '') === 'open' ? '🆘 línea de soporte vinculada' : '🆘 línea de soporte: sin conexión' }); return; }   // 3.58: no es una tienda
   if (ev === 'connection.update' && String(d.state || '') === 'open') {
     // 2.9: solo cuenta si ese negocio existe o lo pidió desde su panel (antes, la sesión «default» de WAHA se volvía un negocio falso)
     const pedido = !!(MEM.pendientesWa && MEM.pendientesWa[bid]) || vinculando.has(bid);
@@ -1071,6 +1169,7 @@ const servidor = http.createServer(async (req, res) => {
     // 🧪 vista previa del estado (no publica): curl -s "127.0.0.1:3060/vista?bid=mi-negocio&tipo=hoy" -o hoy.png
     if (req.method === 'GET' && url.pathname === '/vista') { const neg = negocios().find((n) => n.bid === url.searchParams.get('bid')); if (!neg) return json(res, 404, { ok: false, error: 'negocio no está en negocios.json' }); const { png } = await armarEstado(neg, url.searchParams.get('tipo') === 'semana' ? 'semana' : 'hoy'); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(png); }
     if (req.method === 'POST' && url.pathname === '/publicar') { const neg = negocios().find((n) => n.bid === url.searchParams.get('bid')); if (!neg) return json(res, 404, { ok: false, error: 'negocio no está en negocios.json' }); const tp = url.searchParams.get('tipo'); return json(res, 200, tp === 'guia' ? await publicarGuia(neg) : await publicarEstado(neg, tp === 'semana' ? 'semana' : 'hoy')); }
+    if (req.method === 'POST' && url.pathname === '/soporte') return json(res, 200, await soporteSesion(String(url.searchParams.get('accion') || 'estado'), url.searchParams.get('numero') || ''));   // 3.58
     if (req.method === 'POST' && url.pathname === '/correo-ya') { await revisarCorreos(); return json(res, 200, { ok: true, est }); }
     json(res, 404, { ok: false });
   } catch (e) { est.errores++; json(res, 500, { ok: false, error: e.message }); }
@@ -1081,5 +1180,5 @@ if (require.main === module) {
   servidor.listen(CFG.puerto, () => { log('👩‍💼 ' + VERSION + ' escuchando en ' + CFG.puerto + ' · modo ' + CFG.modo); negocios(); arrancarRelojes(); });
 }
 // 🧪 solo para el banco de escenarios (banco/escenarios.js): deja a Mary como recién encendida
-const _banco = { ASIS, BOT, yaLoDije, memDicho: () => (MEM.dicho = MEM.dicho || {}), memHumano: () => MEM.humano, memRobot: () => (MEM.robot = MEM.robot || {}), memConv: () => (MEM.conv = MEM.conv || {}), tickRecordatorios, tickVolver, tickRetomar, tickEstadisticas, tickEstados, publicarGuia, publicarLlavePush, llavesPush, audienciaDe, AUDIENCIA, memLids: () => (MEM.lids = MEM.lids || {}), entregarAvisos, tickPedidosWa, memAvisoPago: () => (MEM.avisoPago = MEM.avisoPago || {}), avisados, botOff: BOT_OFF, apagarGlobal, botAlDia, botDe, memGuia: () => (MEM.guia = MEM.guia || {}), memStats: () => (MEM.stats = MEM.stats || {}), publicarEstado, alMensaje, alEventoConexion, ultimos, reiniciar() { CL = null; MEM.volver = {}; MEM.stats = {}; MEM.piePrueba = {}; delete MEM.pushPublicada; MEM.lids = {}; MEM.lidAviso = {}; LID_NO.clear(); MEM.guia = {}; MEM.avisoPago = {}; avisados.clear(); leer.avisado = false; BOT_LEIDO.clear(); MEM.sinbot = {}; MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; MEM.conv = {}; MEM.clientes = {}; MEM.conectados = {}; MEM.pendientesWa = {}; MEM.codigos = {}; MEM.robot = {}; MEM.dicho = {}; AGRUPA.clear(); ASIS._cat.clear(); BOT.clear(); CONTACTOS.clear(); AUDIENCIA.clear(); vinculando.clear(); delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
+const _banco = { negocios, atenderSoporte, soporteSesion, SOP_CFG, SOP_TIENDAS, memSoporte, ASIS, BOT, yaLoDije, memDicho: () => (MEM.dicho = MEM.dicho || {}), memHumano: () => MEM.humano, memRobot: () => (MEM.robot = MEM.robot || {}), memConv: () => (MEM.conv = MEM.conv || {}), tickRecordatorios, tickVolver, tickRetomar, tickEstadisticas, tickEstados, publicarGuia, publicarLlavePush, llavesPush, audienciaDe, AUDIENCIA, memLids: () => (MEM.lids = MEM.lids || {}), entregarAvisos, tickPedidosWa, memAvisoPago: () => (MEM.avisoPago = MEM.avisoPago || {}), avisados, botOff: BOT_OFF, apagarGlobal, botAlDia, botDe, memGuia: () => (MEM.guia = MEM.guia || {}), memStats: () => (MEM.stats = MEM.stats || {}), publicarEstado, alMensaje, alEventoConexion, ultimos, reiniciar() { CL = null; MEM.soporte = { gente: {}, callado: {} }; SOP_CFG.t = 0; SOP_CFG.activo = false; SOP_TIENDAS.clear(); MEM.volver = {}; MEM.stats = {}; MEM.piePrueba = {}; delete MEM.pushPublicada; MEM.lids = {}; MEM.lidAviso = {}; LID_NO.clear(); MEM.guia = {}; MEM.avisoPago = {}; avisados.clear(); leer.avisado = false; BOT_LEIDO.clear(); MEM.sinbot = {}; MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; MEM.conv = {}; MEM.clientes = {}; MEM.conectados = {}; MEM.pendientesWa = {}; MEM.codigos = {}; MEM.robot = {}; MEM.dicho = {}; AGRUPA.clear(); ASIS._cat.clear(); BOT.clear(); CONTACTOS.clear(); AUDIENCIA.clear(); vinculando.clear(); delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
 module.exports = { _banco, botNormal, frenoRobot, estadosQueTocan, atenderPedidoWa, sincronizarConectados, renovarQr, telEnAviso, deWaha, esWaha, debeResponder, alEventoConexion, tickPedidosWa, limpiarSinVincular, leerMensaje, atiende, PREGUNTA, numeroWa, ahoraLocal, enFila, yaVisto, quienVeEstados, CFG };

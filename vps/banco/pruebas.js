@@ -633,3 +633,17 @@ test('3.57 · 🔤 La letra va DENTRO del bot: el estado se dibuja con texto aun
   if (fs2.existsSync(dk)) assert.match(fs2.readFileSync(dk, 'utf8'), /^COPY fuentes \.\/fuentes$/m);
   if (fs2.existsSync(ac)) assert.match(fs2.readFileSync(ac, 'utf8'), /CODIGOS="[^"]*\bfuentes\b/);
 });
+
+test('3.58 · 🆘 Soporte: el mensaje del botón del panel es el mismo que el bot reconoce (y solo abre si el súper panel la prendió con número)', { skip: !require('fs').existsSync(require('path').join(__dirname, '..', '..', 'common.js')) && 'sin la página aquí' }, () => {
+  const S = require('../soporte'), src = require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'common.js'), 'utf8');
+  const m = src.match(/export function soporteUrl\(plat, bid\) \{[\s\S]*?\n\}/); assert.ok(m, 'common.js trae soporteUrl');
+  const soporteUrl = new Function(m[0].replace('export function', 'return function'))();
+  const u = soporteUrl({ soporte: { activo: true, numero: '57 318 000 0000' } }, 'elbarba');
+  assert.ok(u.startsWith('https://wa.me/573180000000?text='));
+  const texto = decodeURIComponent(u.split('?text=')[1]);
+  assert.equal(texto, S.textoBoton('elbarba')); assert.equal(S.tiendaEnTexto(texto), 'elbarba');
+  assert.equal(soporteUrl({ soporte: { activo: false, numero: '573180000000' } }, 'elbarba'), '', 'apagada: no hay botón');
+  assert.equal(soporteUrl({ soporte: { activo: true, numero: '318' } }, 'elbarba'), '', 'sin número completo: no hay botón');
+  assert.equal(soporteUrl({}, 'elbarba'), '');
+  assert.equal(S.tiendaEnTexto('hola, mi tienda es elbarba'), '', 'un texto cualquiera no abre la puerta');
+});

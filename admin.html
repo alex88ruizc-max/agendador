@@ -14,11 +14,11 @@
   <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js">
   <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js">
   <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js">
-  <link rel="modulepreload" href="common.js?v=2026-11-13z">
-  <link rel="modulepreload" href="admin.js?v=2026-11-13z">
+  <link rel="modulepreload" href="common.js?v=2026-11-13za">
+  <link rel="modulepreload" href="admin.js?v=2026-11-13za">
   <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
-  <link rel="stylesheet" href="styles.css?v=2026-11-13z">
+  <link rel="stylesheet" href="styles.css?v=2026-11-13za">
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="theme-color" content="#121216">
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
@@ -27,9 +27,9 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Tu Agenda">
-  <link rel="stylesheet" href="panel-premium.css?v=2026-11-13z">
+  <link rel="stylesheet" href="panel-premium.css?v=2026-11-13za">
   <!-- estilos ya armados (antes los calculaba el celular con cdn.tailwindcss.com): va de ÚLTIMO, igual que antes -->
-  <link rel="stylesheet" href="tailwind.css?v=2026-11-13z">
+  <link rel="stylesheet" href="tailwind.css?v=2026-11-13za">
 </head>
 <body class="sp pp antialiased">
 
@@ -51,6 +51,7 @@
           <div class="mt-3 grid gap-1 border-t border-line pt-2">
             <button class="menu-item" data-wizopen="1"><i class="fa-solid fa-wand-magic-sparkles"></i>Asistente de inicio</button>
             <button class="menu-item" data-gopen="1"><i class="fa-solid fa-list-check"></i>Guía de configuración</button>
+            <a id="menuAyuda" class="menu-item hidden" target="_blank" rel="noopener"><i class="fa-brands fa-whatsapp"></i>¿Necesitas ayuda?</a>
             <a id="acctSuper" href="super.html" class="menu-item hidden"><i class="fa-solid fa-store"></i>Mis negocios</a>
             <button id="btnLogout" class="menu-item text-pole-red"><i class="fa-solid fa-right-from-bracket"></i>Cerrar sesión</button>
           </div>
@@ -141,6 +142,6 @@
     </div>
   </div>
 
-  <script type="module" src="admin.js?v=2026-11-13z"></script>
+  <script type="module" src="admin.js?v=2026-11-13za"></script>
 </body>
 </html>

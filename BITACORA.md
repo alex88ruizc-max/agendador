@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.57** · Página **2026-11-13z** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.58** · Página **2026-11-13za** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -115,7 +115,7 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## ⏳ Pendientes
-00. **💡 Idea de Alex (solo anotada, NO hecha): línea de ayuda para dueños.** Su WhatsApp 318 como «máster»: en el panel de cada dueño un botón «¿Necesitas ayuda?» que le escribe a ese número.
+00. **🆘 Línea de soporte (HECHA en la 3.58, falta probarla en real):** Alex la vincula con `/soporte vincular 57…`, la prende en el súper panel y prueba el botón «¿Necesitas ayuda?» desde el panel de una tienda. Ideas para después: reconocer al dueño que escribe directo sin el botón; ayuda con IA.
     Un bot ahí responde SOLO a los dueños de tiendas (los reconoce por su número) con autoayuda de Tu Agenda, y Alex puede responder él mismo. A nadie más de su agenda le responde.
     Antes de hacerlo: confirmar con Alex el número, vincularlo (regla del servidor: preguntar y esperar su confirmación) y definir de dónde salen las respuestas.
 0. Planes parte 2: con los interruptores del bot ya se puede apagar en general; falta por PLAN (Básico con candado «Desbloquéalo con Gold») y el panel de ingresos bloqueado en prueba y Básico. Segundo WhatsApp +$20.000 (Gold).
@@ -136,6 +136,20 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-13 · agendador-ia-3.58 · página 2026-11-13za · 🆘 línea de soporte en el WhatsApp personal de Alex
+- **Pedido de Alex:** su número personal como soporte de Tu Agenda; el bot ahí solo le responde a dueños y empleados de las tiendas.
+- **Cómo sabe quién es de una tienda:** entra por el botón **«¿Necesitas ayuda?»** del panel (Inicio y menú de la inicial). El botón abre el chat con «Hola, necesito ayuda con mi agenda. (Tienda: <id>)». El bot revisa que esa tienda exista y recuerda ese número. Los empleados no tienen número guardado en el sistema: por eso la puerta es el botón.
+- **LEY:** a quien no es de una tienda no se le responde NUNCA, y de esos chats no se anota nada (ni número ni texto). Hay prueba de eso.
+- **Qué responde** (`vps/soporte.js`, sin IA y sin llamadas a Google): menú de 8 temas (vincular WhatsApp, servicios, horario, equipo, avisos, link, estados, plan) con los pasos; entiende el número o palabras. **0 = hablar con Alex**: dice «Alex ya ve tu mensaje» y se calla 12 h en ese chat. También se calla si llega foto/audio, si no entiende 2 veces, o si **Alex escribe a mano**. Tope: 40 respuestas por chat al día.
+- **No es una tienda:** sesión aparte `agendador-soporte` en el WAHA del agendador; no entra a `negocios.json`; ningún reloj (estados, recordatorios, guardado de contactos) la recorre.
+- **El súper panel manda:** Cobros › «🆘 Línea de soporte»: prender/apagar y el número (`platform/public.soporte = { activo, numero }`). Apagada = no hay botón y el bot no responde.
+- **Vincular (lo hace Alex, con su número escrito por él):** Telegram `/soporte vincular 57318…` → código de 8 letras (5 min). También `/soporte estado` y `/soporte desvincular`.
+- **Reseña y página de venta:** «🆘 Ayuda por WhatsApp desde tu panel» (plan de prueba; lista vieja a `BENEFITS_VIEJOS`) e `index.html`.
+- **Pruebas:** 5 nuevas (191 pasan; como VPS también). Banco de la página: 0 fallas.
+- **Sin probar en real:** vincular el número, que WAHA acepte `ignore` de grupos/estados (si no, va sin eso y aquí igual se ignoran), y el número oculto (LID) en esa sesión.
+- **Ojo:** al vincular, el WAHA del agendador recibe los mensajes de TODOS los chats personales de Alex (los necesita para ver quién escribe). El bot los descarta sin guardarlos.
+- **Ideas para después:** reconocer también al dueño que escribe directo sin el botón; ayuda con IA.
 
 ### 2026-11-13 · agendador-ia-3.57 · 🔤 estados sin texto (en blanco): la letra ahora va dentro del bot
 - **Qué pasó:** el estado «Cómo agendar» de una tienda (Antoluxury STUDIO) salió con los recuadros y botones, pero **sin ninguna letra**. El dibujante (resvg) no encontró la letra en el servidor y, cuando no la encuentra, no avisa: simplemente no escribe nada.
