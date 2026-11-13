@@ -2,7 +2,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js?v=2026-11-13g";
+import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js?v=2026-11-13h";
 
 export const app = initializeApp(firebaseConfig);
 // Caché en el dispositivo: muestra al instante lo último que se vio y luego actualiza en vivo
@@ -21,7 +21,7 @@ export function businessFromUrl() {
 export const bpath = (...parts) => ["businesses", BID, ...parts].join("/");
 
 // Versión de la página: cámbiala en cada actualización para comprobar que se publicó
-export const APP_VERSION = '2026-11-13g';
+export const APP_VERSION = '2026-11-13h';
 // Versiones que esta página espera del servidor y de las reglas de Firebase
 export const SERVER_VERSION = '2026-10-10n';
 export const RULES_VERSION = '2026-10-10l';
@@ -434,12 +434,12 @@ export const PLAN_FEATURES = [
   ["images", "Imágenes con horarios para estados"],
   ["marketing", "Marketing: llenar huecos, estados en el logo y avisos"],
   ["activity", "Actividad de la página y recomendaciones"],
-  ["whatsapp", "Citas por WhatsApp (bot en el celular de la tienda)"]
+  ["whatsapp", "Bot de WhatsApp 24/7: agenda, cupos, recordatorios y estados"]
 ];
 export const DEFAULT_PLANS = {
   free: { name: "Prueba gratis", priceCOP: 0, days: 15, daysAhead: 5, maxStaff: 1, features: [], tagline: "Para empezar a recibir citas", tgEvents: [], tgChoose: false },
-  basic: { name: "Básico", priceCOP: 20000, daysAhead: 30, maxStaff: 3, features: ["telegram", "appearance", "clients", "images"], tagline: "Tu marca y tus clientes", tgEvents: ["newBooking"], tgChoose: false },
-  gold: { name: "Gold", priceCOP: 35000, daysAhead: 90, maxStaff: 0, features: ["telegram", "appearance", "clients", "images", "marketing", "activity", "whatsapp"], tagline: "Todo para llenar tu agenda", tgEvents: ["newBooking", "proof", "cancel", "reschedule", "reminder", "panelApt", "breaks", "noShow"], tgChoose: true }
+  basic: { name: "Básico", priceCOP: 30000, daysAhead: 30, maxStaff: 3, features: ["telegram", "appearance", "clients", "images"], tagline: "Tu marca y tus clientes", tgEvents: ["newBooking"], tgChoose: false },
+  gold: { name: "Gold", priceCOP: 40000, daysAhead: 90, maxStaff: 0, features: ["telegram", "appearance", "clients", "images", "marketing", "activity", "whatsapp"], tagline: "Todo para llenar tu agenda", tgEvents: ["newBooking", "proof", "cancel", "reschedule", "reminder", "panelApt", "breaks", "noShow"], tgChoose: true }
 };
 export function plansOf(plat = {}) {
   const out = {};
@@ -450,13 +450,21 @@ export function plansOf(plat = {}) {
   return out;
 }
 // Lo que se les dice al suscribirse (una línea por beneficio); el superusuario lo edita en Cobros > Planes
+//   📌 REGLA (Alex, 2026-11-13): cada mejora nueva que vean las tiendas se agrega AQUÍ (y en la página de venta, index.html),
+//   en el mismo cambio. La lista vieja va a BENEFITS_VIEJOS para que, si el superusuario no la editó, se cambie sola.
 export const DEFAULT_BENEFITS = {
-  free: ["📅 Tu página para que te agenden en línea", "⚡ Cita rápida y atender ahora", "💳 Cobro de abonos con Nequi o Bre-B"],
-  basic: ["🎨 Tu marca: portada, colores y logo", "🔔 Aviso en Telegram de cada reserva", "🗂️ Tus clientes: historial, preferenciales y bloqueos", "🖼️ Imágenes con tus horarios libres", "👥 Hasta 3 profesionales y reservas hasta 30 días"],
-  gold: ["🎨 Estados PRO: 8 diseños con tu logo", "📲 Publícalos en tu estado de WhatsApp con un toque", "📣 Marketing para llenar tus huecos libres", "🔔 Tú eliges qué avisos de Telegram recibir", "👥 Equipo sin límite y reservas hasta 90 días"]
+  free: ["📅 Tu página para que te agenden en línea, 24/7", "📧 Confirmación al correo y la cita en su calendario", "🕐 Horario de cada profesional y bloqueo de horas", "💳 Cobro de abonos con Nequi o Bre-B", "⚡ Cita rápida y «atender ahora»"],
+  basic: ["🎨 Tu marca: portada, colores y logo", "🔔 Aviso en Telegram de cada reserva (también a cada profesional)", "🗂️ Tus clientes: historial, preferenciales y bloqueos", "🖼️ Imágenes con tus horarios libres", "👥 Hasta 3 profesionales y reservas hasta 30 días"],
+  gold: ["🤖 Bot de WhatsApp 24/7: agenda con listas, dice tus cupos y escucha audios", "⏰ Recordatorio por WhatsApp antes de la cita, con confirmación", "📸 Estados automáticos: tus cupos del día y «Cómo agendar»", "🔁 Le escribe al cliente para que vuelva", "📊 Reporte del bot, del link y de tus ingresos", "🎨 Estados PRO con tu logo y marketing para llenar huecos", "👥 Equipo sin límite y reservas hasta 90 días"]
+};
+// listas que ya se usaron: si están guardadas sin cambios, se muestran las nuevas
+const BENEFITS_VIEJOS = {
+  free: ["📅 Tu página para que te agenden en línea|⚡ Cita rápida y atender ahora|💳 Cobro de abonos con Nequi o Bre-B"],
+  basic: ["🎨 Tu marca: portada, colores y logo|🔔 Aviso en Telegram de cada reserva|🗂️ Tus clientes: historial, preferenciales y bloqueos|🖼️ Imágenes con tus horarios libres|👥 Hasta 3 profesionales y reservas hasta 30 días"],
+  gold: ["🎨 Estados PRO: 8 diseños con tu logo|📲 Publícalos en tu estado de WhatsApp con un toque|📣 Marketing para llenar tus huecos libres|🔔 Tú eliges qué avisos de Telegram recibir|👥 Equipo sin límite y reservas hasta 90 días"]
 };
 // frase antes de la lista: cada plan muestra solo lo que suma sobre el anterior
-export const DEFAULT_BENEFITS_INTRO = { free: "", basic: "Todo lo del plan Gratis, y además:", gold: "Todo lo de Básico, y además:" };
+export const DEFAULT_BENEFITS_INTRO = { free: "", basic: "Todo lo de la prueba, y además:", gold: "Todo lo de Básico, y además:" };
 const OLD_GOLD = "🎨 Estados PRO: 8 diseños con tu logo|📲 Publícalos en tu estado de WhatsApp con un toque|📣 Marketing para llenar tus huecos libres|🔔 Eliges qué avisos de Telegram recibir|📊 Actividad de tu página y recomendaciones|👥 Equipo sin límite · reservas hasta 90 días";
 const OLD_BASIC_END = "👥 Hasta 3 profesionales · reservas hasta 30 días";
 export function planBenefits(plans, k) {
@@ -464,9 +472,13 @@ export function planBenefits(plans, k) {
   if (!Array.isArray(b) || !b.length) return DEFAULT_BENEFITS[k] || [];
   if (k === "gold" && b.join("|") === OLD_GOLD) return DEFAULT_BENEFITS.gold; // lista vieja guardada sin cambios
   if (k === "basic" && b[b.length - 1] === OLD_BASIC_END && b.length === 5) return DEFAULT_BENEFITS.basic;
+  if ((BENEFITS_VIEJOS[k] || []).includes(b.join("|"))) return DEFAULT_BENEFITS[k];   // guardada sin cambios: la nueva
   return b;
 }
-export const planBenefitsIntro = (plans, k) => (typeof plans[k]?.benefitsIntro === "string" ? plans[k].benefitsIntro : DEFAULT_BENEFITS_INTRO[k] || "");
+export const planBenefitsIntro = (plans, k) => {
+  const t = typeof plans[k]?.benefitsIntro === "string" ? plans[k].benefitsIntro : DEFAULT_BENEFITS_INTRO[k] || "";
+  return t === "Todo lo del plan Gratis, y además:" ? DEFAULT_BENEFITS_INTRO[k] : t;   // el plan «Gratis» ahora es la prueba
+};
 // tiendas antiguas sin plan: en prueba = Gratis; las que ya pagaban = Gold
 export const planOfBiz = (biz = {}) => (PLAN_KEYS.includes(biz.plan) ? biz.plan : biz.trial ? "free" : "gold");
 export function planPriceOf(plat, plan, months) {

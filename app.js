@@ -1,6 +1,6 @@
 // Página pública: ver cupos, registrarse, apartar, pagar con screenshot, mis cupos
-import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro } from "./common.js?v=2026-11-13g";
-import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-13g";
+import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro } from "./common.js?v=2026-11-13h";
+import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-13h";
 import {
   onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, sendPasswordResetEmail,
   GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult
@@ -12,7 +12,7 @@ import {
   startUpdateWatcher, applyBrandColors, warmServer, uiConfirm, setDialogBrand, viewImage, pushOverlay, dropOverlay, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, dow, hora12, fechaLarga, fechaCorta, toMillis, cop, esc,
   normalizePhone, waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, computeSlots, dayCapacityUnits, staffHours, mapLinks, headerBgCss,
   toast, openModal, closeModal, setBusy, copyText, tmin, mstr, UNIT
-} from "./common.js?v=2026-11-13g";
+} from "./common.js?v=2026-11-13h";
 
 const $ = (id) => document.getElementById(id);
 const S = {
@@ -49,7 +49,7 @@ if (!/^[a-z0-9][a-z0-9-]{1,29}$/.test(BIZ_ID)) {
     const b = e.target.closest("[data-lp]"); if (!b) return;
     if (b.dataset.lp === "trial") $("btnTrial").click(); else openAuth("login");
   });
-  // 🚀 2026-11-13g · viene de la invitación de una página de negocio: se abre «Probar gratis» de una vez
+  // 🚀 2026-11-13h · viene de la invitación de una página de negocio: se abre «Probar gratis» de una vez
   if (new URLSearchParams(location.search).has("probar")) setTimeout(() => $("btnTrial").click(), 400);
 } else {
   setBusiness(BIZ_ID);
@@ -1173,7 +1173,7 @@ getDoc(doc(db, "platform", "public")).then((d) => {
   if (S.settings) renderAll();
   const on = PLAT.trialEnabled !== false;
   $("trialCta").classList.toggle("hidden", !on);
-  // 2026-11-13g · en la página de un negocio NO hay «Probar gratis» mientras el cliente agenda (no se pierde la cita):
+  // 2026-11-13h · en la página de un negocio NO hay «Probar gratis» mientras el cliente agenda (no se pierde la cita):
   //   solo el sello chiquito abajo; la invitación sale DESPUÉS (cita confirmada y «Mis citas"), en otra pestaña.
   $("trialTop").classList.add("hidden"); $("trialTop").classList.remove("inline-flex");
   $("trialCta").classList.add("hidden");
@@ -1201,10 +1201,11 @@ function renderTrialPlans() {
       <ul class="space-y-1 text-[13px]">${planBenefits(P, T_PLAN).map((b) => `<li>${esc(b)}</li>`).join("")}</ul>
     </div>
     <table class="mt-1 w-full border-collapse">
+      <tr><td></td>${PLAN_KEYS.map((k) => `<td class="pt-1 text-center text-[10.5px] font-extrabold text-ink/55 ${k === T_PLAN ? "bg-amber-50" : ""}">${esc(P[k].name.replace("Prueba gratis", "Prueba"))}</td>`).join("")}</tr>
       ${row("Agenda y cita rápida", () => `<b class="text-emerald-600">✓</b>`)}
       ${row("Días para reservar", (k) => `<b>${P[k].daysAhead}</b>`)}
       ${row("Profesionales", (k) => `<b>${P[k].maxStaff || "Sin límite"}</b>`)}
-      ${[["telegram", "Avisos en Telegram"], ["appearance", "Portada y colores"], ["clients", "Clientes"], ["images", "Imágenes"], ["marketing", "Marketing y estados"], ["activity", "Actividad"]].map(([key, l]) => row(l, (k) => yes(k, key))).join("")}
+      ${[["whatsapp", "Bot de WhatsApp 24/7"], ["telegram", "Avisos en Telegram"], ["appearance", "Portada y colores"], ["clients", "Clientes"], ["images", "Imágenes"], ["marketing", "Marketing y estados"], ["activity", "Actividad"]].map(([key, l]) => row(l, (k) => yes(k, key))).join("")}
     </table>
     <button type="button" id="trialNext" class="btn-primary mt-3 w-full py-3">Siguiente</button>`;
   $("trialPlans").querySelectorAll("[data-tplan]").forEach((b) => b.onclick = () => { T_PLAN = b.dataset.tplan; renderTrialPlans(); });
