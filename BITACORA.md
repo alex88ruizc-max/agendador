@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.47** · Página **2026-11-13m** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.47** · Página **2026-11-13n** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -133,6 +133,11 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-13 · página 2026-11-13n · 🔁 los primeros pasos se muestran una vez más a todas las tiendas
+- Alex: «el tutorial de primeros pasos se debe activar una vez más». Al entrar al panel, cada dueño ve UNA vez los primeros pasos nuevos (4 pasos), aunque ya los hubiera hecho (`settings.tutorial2`).
+- En las tiendas ya configuradas es un **repaso**: sale el aviso «Ya tienes esto configurado» y cada paso SOLO se guarda si el dueño cambia algo (no se pisa su horario ni sus servicios).
+  Tampoco se les desmarcan los pasos que ya tenían hechos en la guía (`W.ver2`).
 
 ### 2026-11-13 · agendador-ia-3.47 · página 2026-11-13m · 🚀 activar el negocio más fácil y la página más rápida (auditoría aprobada por Alex: «hazlo todo»)
 1. **Asistente de inicio en 4 pasos** (antes 10): negocio → horario → servicios → «¡listo, este es tu link!». Redes, equipo, abono, ubicación y Telegram quedan en la guía.

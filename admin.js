@@ -9,9 +9,9 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, ventanaReserva, OFERTA_TXT, nombreCompleto, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-11-13m";
-import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-13m";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-13m";
+} from "./common.js?v=2026-11-13n";
+import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-13n";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-13n";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -129,9 +129,12 @@ function start() {
     if (A.tab === "wabot" && !document.activeElement?.closest?.("#tab-wabot input, #tab-wabot select")) renderWaBot(); // p. ej. al quedar vinculado el WhatsApp
     // recién creada desde "Probar gratis": abre la guía de primeros pasos
     // asistente de inicio: la primera vez (o al llegar desde "Probar gratis")
-    if (!A.wizAuto && isOwner() && !A.me?.isSuper && !document.body.classList.contains("plan-gate") && !A.bill?.planWanted && (!A.settings.setupDone || new URLSearchParams(location.search).get("guia") === "1")) {
+    if (!A.wizAuto && isOwner() && !A.me?.isSuper && !document.body.classList.contains("plan-gate") && !A.bill?.planWanted && (!A.settings.setupDone || !A.settings.tutorial2 || new URLSearchParams(location.search).get("guia") === "1")) {
+      // 2026-11-13n · los primeros pasos (nuevos, 4 pasos) se muestran UNA vez más a todas las tiendas, también a las que ya los habían hecho (tutorial2)
+      const otraVez = !!A.settings.setupDone && !A.settings.tutorial2;
       A.wizAuto = true; A.geoAsked = true;
-      setTimeout(() => { if (new URLSearchParams(location.search).get("guia")) history.replaceState(null, "", location.pathname + "?b=" + encodeURIComponent(bpath().split("/")[1])); openWizard(); }, 700);
+      if (!A.settings.tutorial2) updateDoc(doc(db, bpath("settings", "general")), { tutorial2: true }).catch(() => {});
+      setTimeout(() => { if (new URLSearchParams(location.search).get("guia")) history.replaceState(null, "", location.pathname + "?b=" + encodeURIComponent(bpath().split("/")[1])); openWizard(otraVez ? 0 : undefined); }, 700);
     } else if (!A.geoAsked && isOwner() && !A.me?.isSuper && !A.settings.geo) { A.geoAsked = true; setTimeout(() => requestGeo(false), 2500); }
     renderAgenda(); renderStaffTab(); if (typeof renderHome === "function" && A.tab === "home") renderHome();
   }, onErr));
@@ -2987,7 +2990,7 @@ async function loadLost() {
 const guideDone = () => A.settings?.guideDone || [];
 // lo que ya se hizo en el asistente de inicio cuenta como hecho en la guía
 const WIZ_ORDER = ["hi", "biz", "social", "team", "hours", "services", "deposit", "geo", "telegram", "done"];
-// 2026-11-13m · el asistente de inicio ahora son 4 pasos (negocio, horario, servicios y listo). Lo demás queda en la guía.
+// 2026-11-13n · el asistente de inicio ahora son 4 pasos (negocio, horario, servicios y listo). Lo demás queda en la guía.
 //   Quien terminó el asistente viejo (10 pasos) ya pasó por todo; quien termina el nuevo (setupVer 2) solo pasó por esos 4.
 const WIZ_NUEVO = ["biz", "hours", "services", "done"];
 const wizPassed = (id) => {
@@ -3651,6 +3654,8 @@ function wizReadSvcs() {
 function openWizard(start) {
   if (!A.settings) return;
   wizInit();
+  W.ver2 = !(A.settings.setupDone && A.settings.setupVer !== 2);
+  W.pasoVisto = -1; W.repaso = !!A.settings.setupDone;   // tienda que ya estaba configurada: es un repaso → cada paso SOLO se guarda si cambió algo (no se pisa su horario ni sus servicios)   // quien ya hizo el asistente viejo conserva sus pasos hechos
   W.i = Math.min(Number(start ?? A.settings.setupStep ?? 0) || 0, STEPS.length - 1);
   W.open = true;
   let el = $("wizard");
@@ -3667,14 +3672,16 @@ function openWizard(start) {
 function drawWizard() {
   const st = STEPS[W.i], el = $("wizard");
   el.innerHTML = `<div class="wz-top"><button type="button" class="wz-x" data-wx="close" aria-label="Cerrar">✕</button><span class="soft text-xs font-bold">Paso ${W.i + 1} de ${STEPS.length}</span><span class="wz-bar"><i style="width:${((W.i + 1) / STEPS.length) * 100}%"></i></span></div>
-    <div class="wz-body q-pop">${st.html()}</div>
+    <div class="wz-body q-pop">${W.repaso && st.id !== "done" ? `<p class="mb-3 rounded-xl p-2.5 text-[12.5px]" style="background:#e2f5ec;color:#16774b">✓ Ya tienes esto configurado. Revísalo y toca <b>Siguiente</b>: solo se guarda si cambias algo.</p>` : ""}${st.html()}</div>
     ${st.essential || st.noSkip?.() ? "" : `<button type="button" class="wz-skip" data-wx="skip">${st.skipTxt || "Lo hago después"}</button>`}
     <div class="wz-foot">${W.i ? `<button type="button" class="btn-light !px-5" data-wx="back">Atrás</button>` : ""}<button type="button" class="btn-primary flex-1 py-3.5 text-base" data-wx="next">${st.next || "Siguiente"}</button></div>`;
   el.querySelector(".wz-body").scrollTop = 0;
+  if (W.pasoVisto !== W.i) { W.pasoVisto = W.i; W.tocado = false; }   // paso nuevo: aún no ha cambiado nada
   if (st.id === "telegram") wizWatchTg();
 }
 async function wizClick(e) {
   const d = W.d, t = e.target;
+  if (t.closest(".wz-body") && t.closest("button, label, input, select, [data-wday], [data-wslot]")) W.tocado = true;
   const x = t.closest("[data-wx]");
   if (x) {
     const act = x.dataset.wx;
@@ -3683,15 +3690,15 @@ async function wizClick(e) {
       return closeWizard(true);
     }
     if (act === "back") { W.i--; return drawWizard(); }
-    if (act === "skip") { W.i++; updateDoc(doc(db, bpath("settings", "general")), { setupStep: W.i, setupVer: 2 }).catch(() => {}); return drawWizard(); }
+    if (act === "skip") { W.i++; updateDoc(doc(db, bpath("settings", "general")), { setupStep: W.i, ...(W.ver2 ? { setupVer: 2 } : {}) }).catch(() => {}); return drawWizard(); }
     if (act === "next") {
       const st = STEPS[W.i];
       if (st.id === "done") return closeWizard(true);
       setBusy(x, true, "Guardando…");
       try {
-        if (st.save) await fastSave(st.save(), (err) => toast("No se pudo guardar el paso anterior: " + err.message, "error"));
+        if (st.save && (!W.repaso || W.tocado)) await fastSave(st.save(), (err) => toast("No se pudo guardar el paso anterior: " + err.message, "error"));
         W.i++;
-        updateDoc(doc(db, bpath("settings", "general")), { setupStep: W.i, setupVer: 2 }).catch(() => {});
+        updateDoc(doc(db, bpath("settings", "general")), { setupStep: W.i, ...(W.ver2 ? { setupVer: 2 } : {}) }).catch(() => {});
         drawWizard();
       } catch (err) { toast(err.message, "error"); setBusy(x, false); }
       return;
@@ -3740,6 +3747,7 @@ async function wizClick(e) {
   }
 }
 function wizInput(e) {
+  W.tocado = true;
   const t = e.target, d = W.d;
   if (t.id === "wDepOther") {
     const n = Number(t.value.replace(/\D/g, "") || 0); t.value = n ? n.toLocaleString("es-CO") : "";
@@ -3751,6 +3759,7 @@ function wizInput(e) {
   if (t.dataset.wt) { d[t.dataset.wt] = t.value; clearTimeout(W.tT); W.tT = setTimeout(() => { const pos = t.dataset.wt; drawWizard(); document.querySelector(`[data-wt="${pos}"]`)?.focus(); }, 700); }
 }
 async function wizChange(e) {
+  W.tocado = true;
   const t = e.target, d = W.d;
   if (t.id === "wCoverFile" && t.files[0]) { d.name = $("wName").value; d.address = $("wAddr").value; d.city = $("wCity").value; d.phone = $("wPhone").value; d.coverNew = await imgToDataUrl(t.files[0], 1100, "image/jpeg"); d.coverY = 50; d.coverDel = false; drawWizard(); return; }
   if (t.id === "wLogo" && t.files[0]) { d.name = $("wName").value; d.address = $("wAddr").value; d.city = $("wCity").value; d.phone = $("wPhone").value; d.logoNew = await imgToDataUrl(t.files[0], 420, "image/jpeg"); drawWizard(); }
@@ -3767,7 +3776,7 @@ function closeWizard(done, fromBack) {
   if (!fromBack && W.inHistory) { W.inHistory = false; dropOverlay("wizard"); }
   W.open = false; clearInterval(W.tgT);
   $("wizard")?.remove(); document.body.classList.remove("wiz-on");
-  if (done) updateDoc(doc(db, bpath("settings", "general")), { setupDone: true, setupVer: 2 }).catch(() => {});
+  if (done) updateDoc(doc(db, bpath("settings", "general")), { setupDone: true, ...(W.ver2 ? { setupVer: 2 } : {}) }).catch(() => {});
   renderHome();
 }
 document.addEventListener("click", (e) => { if (e.target.closest("[data-wizopen]")) { closeMenus(); openWizard(0); } });
