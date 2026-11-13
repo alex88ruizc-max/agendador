@@ -9,9 +9,9 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-11-13b";
-import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-13b";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-13b";
+} from "./common.js?v=2026-11-13c";
+import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-13c";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-13c";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -2674,21 +2674,22 @@ async function drawStory(cv, S2) {
   }
 }
 // 🏷️ 3.38 · MARCA DE AGUA de la página en TODA imagen de estado que sale del agendador (salvo el adicional «sin marca de agua»)
-function marcaAgua(cv) {
+function marcaAgua(cv, abajo) {
   if (!cv || A.biz?.addons?.sinMarca) return;
-  const x = cv.getContext("2d"), W = cv.width, H = cv.height, s = W / 1080, w = 300 * s, h = 40 * s, px = W / 2 - w / 2, py = H - 64 * s;
+  // 3.39: ARRIBA a la derecha, grande y con fondo sólido (pedido de Alex: «que se vea»)
+  const x = cv.getContext("2d"), W = cv.width, H = cv.height, s = W / 1080, w = 380 * s, h = 72 * s, px = W - 56 * s - w, py = (abajo ? 200 : 150) * s;
   let claro = false;
-  try { const d = x.getImageData(Math.round(W / 2 - 60 * s), Math.round(py), Math.round(120 * s), Math.round(h)).data; let l = 0; for (let i = 0; i < d.length; i += 16) l += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]; claro = l / (d.length / 16) > 150; } catch { /* nada */ }
-  const fg = claro ? "#121216" : "#FFFFFF";
-  x.save(); x.globalAlpha = 0.9; x.shadowBlur = 0;
-  roundRect(x, px, py, w, h, h / 2); x.fillStyle = claro ? "rgba(255,255,255,.92)" : "rgba(12,12,16,.88)"; x.fill();
-  x.strokeStyle = fg; x.lineWidth = 2.4 * s; x.lineCap = "round";
-  roundRect(x, px + 16 * s, py + 10 * s, 22 * s, 20 * s, 5 * s); x.stroke();
-  x.beginPath(); x.moveTo(px + 16 * s, py + 16 * s); x.lineTo(px + 38 * s, py + 16 * s); x.moveTo(px + 22 * s, py + 7 * s); x.lineTo(px + 22 * s, py + 12 * s); x.moveTo(px + 32 * s, py + 7 * s); x.lineTo(px + 32 * s, py + 12 * s); x.stroke();
-  x.fillStyle = fg; x.font = `700 ${24 * s}px 'Segoe UI', Roboto, Arial, sans-serif`; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText("tuagenda.vip", px + 168 * s, py + h / 2 + 1 * s);
+  try { const d = x.getImageData(Math.round(px), Math.round(py), Math.round(w), Math.round(h)).data; let l = 0; for (let i = 0; i < d.length; i += 16) l += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]; claro = l / (d.length / 16) > 150; } catch { /* nada */ }
+  const fg = claro ? "#FFFFFF" : "#121216";
+  x.save(); x.shadowColor = "rgba(0,0,0,.35)"; x.shadowBlur = 18 * s;
+  roundRect(x, px, py, w, h, h / 2); x.fillStyle = claro ? "rgba(18,18,22,.94)" : "rgba(255,255,255,.94)"; x.fill(); x.shadowBlur = 0;
+  x.strokeStyle = fg; x.lineWidth = 3.6 * s; x.lineCap = "round";
+  roundRect(x, px + 26 * s, py + 20 * s, 34 * s, 32 * s, 7 * s); x.stroke();
+  x.beginPath(); x.moveTo(px + 26 * s, py + 30 * s); x.lineTo(px + 60 * s, py + 30 * s); x.moveTo(px + 35 * s, py + 14 * s); x.lineTo(px + 35 * s, py + 22 * s); x.moveTo(px + 51 * s, py + 14 * s); x.lineTo(px + 51 * s, py + 22 * s); x.stroke();
+  x.fillStyle = fg; x.font = `800 ${36 * s}px 'Segoe UI', Roboto, Arial, sans-serif`; x.textAlign = "left"; x.textBaseline = "middle"; x.fillText("tuagenda.vip", px + 76 * s, py + h / 2 + 1 * s);
   x.restore();
 }
-{ const _st = drawStory; drawStory = async (cv, S2) => { const r = await _st(cv, S2); marcaAgua(cv); return r; }; }
+{ const _st = drawStory; drawStory = async (cv, S2) => { const r = await _st(cv, S2); marcaAgua(cv, S2 && S2.mode === "own" && S2.ownLogo !== false); return r; }; }
 { const _im = drawImage; drawImage = async (...a) => { const r = await _im(...a); marcaAgua($("imgCanvas")); return r; }; }
 const storyLimit = () => Math.max(1, Number(A.plat?.storyLimit || 10));
 const activeStories = () => H.stories.filter((x) => toMillis(x.expiresAt) > Date.now()).length;

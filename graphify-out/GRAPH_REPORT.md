@@ -1,7 +1,7 @@
 # Graph Report - agendador  (2026-11-13)
 
 ## Corpus Check
-- 32 files · ~147,717 words
+- 32 files · ~147,894 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 13 file(s) not represented in the graph (top: (none) 7, .css 3, .ejemplo 2)
 
@@ -11,7 +11,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `a6a276ce`
+- Built from commit: `9cb51de2`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -263,7 +263,7 @@ Nodes (6): tarea-banco, cpus, image, mem_limit, network_mode, profiles
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `hora12()` connect `esc` to `switchTab`, `admin.js`, `common.js`, `bpath`, `bogNow`, `mary.gs`, `app.js`, `openModal`, `newStory`, `toMillis`?**
-  _High betweenness centrality (0.052) - this node is a cross-community bridge._
+  _High betweenness centrality (0.053) - this node is a cross-community bridge._
 - **Are the 10 inferred relationships involving `crear()` (e.g. with `asistente.js` and `cliente()`) actually correct?**
   _`crear()` has 10 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `RFC-5545` to the rest of the system?**
@@ -271,8 +271,8 @@ _Questions this graph is uniquely positioned to answer:_
 - **Should `principal.js` be split into smaller, more focused modules?**
   _Cohesion score 0.06273338312173264 - nodes in this community are weakly interconnected._
 - **Why does `maryCupos_()` connect `mary.gs` to `esc`?**
-  _High betweenness centrality (0.048) - this node is a cross-community bridge._
+  _High betweenness centrality (0.049) - this node is a cross-community bridge._
 - **Should `super.js` be split into smaller, more focused modules?**
   _Cohesion score 0.07765151515151515 - nodes in this community are weakly interconnected._
-- **Why does `esc()` connect `esc` to `super.js`, `switchTab`, `admin.js`, `common.js`, `bpath`, `bogNow`, `app.js`, `openModal`, `newStory`, `renderSettings`, `handleAct`, `plansOf`, `toMillis`?**
-  _High betweenness centrality (0.018) - this node is a cross-community bridge._
+- **Should `admin.js` be split into smaller, more focused modules?**
+  _Cohesion score 0.035443037974683546 - nodes in this community are weakly interconnected._

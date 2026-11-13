@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.38** · Página **2026-11-13b** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.39** · Página **2026-11-13c** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -132,6 +132,12 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-13 · agendador-ia-3.39 · página 2026-11-13c · la marca de agua ARRIBA y bien visible
+- Alex: «arriba debe salir tuagenda.vip, que se vea; abajo queda escondida».
+- La marca pasó a la esquina superior derecha, grande (380 × 72, letra de 36) y con fondo sólido: blanca sobre fondo oscuro y negra sobre fondo claro. En «subir mi diseño» con logo arriba a la derecha, va justo debajo del logo.
+- Revisada en los estados del bot (hoy y semana) y en los diseños Dorado, Cupón, Tarjeta y Cine.
+- Alex confirma que nunca cambió las funciones de los planes en el super panel (para la parte 2).
 
 ### 2026-11-13 · agendador-ia-3.38 · página 2026-11-13b · 🏷️ marca de agua + «Regístrate gratis» en la prueba (parte 1 de los planes)
 - Pedidos de Alex:
