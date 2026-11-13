@@ -9,9 +9,9 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-11-13d";
-import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-13d";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-13d";
+} from "./common.js?v=2026-11-13e";
+import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-13e";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-13e";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -603,7 +603,17 @@ function renderStaffTab() {
   const el = $("tab-staff");
   const list = isOwner() ? A.staff : A.staff.filter((s) => s.id === A.me.staffId);
   const ownerTg = A.tg?.owner;
+  const ownId = A.me.staffId || "";
+  const ownStaff = A.staff.find((x) => x.id === ownId);
+  // 👤 se pregunta UNA vez: ¿el dueño también atiende clientes o solo administra?
+  const preguntar = isOwner() && !A.me.isSuper && ownStaff && A.settings?.ownerAttends === undefined;
   el.innerHTML = `
+    ${preguntar ? `<section class="mb-4 rounded-xl border-2 border-pole-blue/40 bg-pole-blue/5 p-4">
+      <p class="font-narrow text-xl font-bold">👤 ¿Tú también atiendes clientes?</p>
+      <p class="mb-3 text-sm text-ink/70">Así sabemos si tus clientes pueden agendar contigo o solo con tu equipo.</p>
+      <div class="flex flex-wrap gap-2"><button class="btn-primary" data-sact="atiendo" data-id="${esc(ownId)}">✂️ Sí, también atiendo</button>
+      <button class="btn-light" data-sact="administro" data-id="${esc(ownId)}">💼 No, solo administro</button></div>
+    </section>` : ""}
     ${isOwner() ? `<div class="mb-4 flex flex-wrap items-center justify-between gap-2">
       <p class="text-sm text-ink/70">${ownerTg ? "Tu Telegram de dueño está conectado." : "Conecta tu Telegram de dueño en Configuración para recibir todos los avisos."}</p>
       ${lockedNow("team") ? `<button class="btn-light" data-goplan="${PLANS().basic.maxStaff > (planInfo().maxStaff || 0) || !PLANS().basic.maxStaff ? "basic" : "gold"}">🔒 Agregar al equipo (sube de plan)</button>` : `<button class="btn-primary" data-sact="new">+ Agregar al equipo</button>`}</div>` : ""}
@@ -623,21 +633,26 @@ function renderStaffTab() {
       const busy = isBusy(s);
       const canBreak = isOwner() || s.id === A.me.staffId;
       const tgOn = A.tg?.staff?.[s.id];
-      return `<article class="rounded-xl border border-line bg-white p-4 ${s.active === false ? "opacity-60" : ""}">
+      const esDueno = isOwner() && !!ownId && s.id === ownId;
+      const soloAdmin = esDueno && s.active === false;
+      return `<article class="rounded-xl border border-line bg-white p-4 ${s.active === false && !esDueno ? "opacity-60" : ""}">
         <div class="flex items-center justify-between gap-2">
-          <p class="font-narrow text-2xl font-bold">${esc(s.name)}</p>
+          <p class="font-narrow text-2xl font-bold">${esc(s.name)}${esDueno ? ` <span class="ml-1 align-middle rounded-full bg-amber-100 px-2 py-0.5 font-sans text-xs font-semibold text-amber-800">👑 Tú · dueño</span>` : ""}</p>
           <span class="flex items-center gap-2 text-sm font-semibold"><i class="dot ${busy ? "bg-pole-red" : "bg-emerald-500"}"></i>${busy ? "Ocupado hasta " + timeOf(s.busyUntil) : "Disponible"}</span>
         </div>
         ${busy && s.busyReason ? `<p class="text-sm text-ink/70">${esc(s.busyReason)}</p>` : ""}
-        ${s.active === false ? `<p class="text-sm text-ink/70">Inactivo: no aparece en la página.</p>` : ""}
+        ${soloAdmin ? `<p class="text-sm text-ink/70">💼 Solo administras · no recibes citas.</p>`
+          : s.active === false ? `<p class="text-sm text-ink/70">Inactivo: no aparece en la página.</p>` : ""}
         <div class="mt-3 flex flex-wrap gap-2">
           ${canBreak ? (busy ? `<button class="btn-primary !bg-emerald-700" data-sact="end" data-id="${s.id}">Ya estoy disponible</button>`
                               : `<button class="btn-dark" data-sact="break" data-id="${s.id}">Tomar descanso</button>`) : ""}
           ${!isOwner() && s.id === A.me.staffId ? `<button class="btn-sm" data-sact="mysvc" data-id="${s.id}">Mis servicios</button>` : ""}
+          ${soloAdmin ? `<button class="btn-sm" data-sact="atiendo" data-id="${s.id}">✂️ Empezar a atender</button>` : ""}
           ${isOwner() ? `<button class="btn-sm" data-sact="edit" data-id="${s.id}">Editar</button>
-            <button class="btn-sm" data-sact="tg" data-id="${s.id}">${tgOn ? "Telegram conectado ✓ (reconectar)" : "Conectar Telegram"}</button>` : ""}
+            ${esDueno ? "" : `<button class="btn-sm" data-sact="tg" data-id="${s.id}">${tgOn ? "Telegram conectado ✓ (reconectar)" : "📲 Conectar su Telegram"}</button>`}` : ""}
         </div>
-        <p class="mt-2 text-xs text-ink/50">ID: ${esc(s.id)}</p>
+        ${esDueno ? `<p class="mt-2 text-xs text-ink/60">${ownerTg ? "🔔 Tus avisos ya llegan a tu Telegram de dueño." : "🔔 Conecta tu Telegram de dueño en Configuración para recibir tus avisos."}</p>`
+          : isOwner() && !tgOn ? `<p class="mt-2 text-xs text-ink/60">Para que le lleguen sus citas: toca «Conectar su Telegram» y envíale el enlace por WhatsApp.</p>` : ""}
       </article>`;
     }).join("")}
     </div>`;
@@ -655,7 +670,17 @@ $("tab-staff").addEventListener("click", async (e) => {
   if (act === "edit" || act === "new") openStaffEdit(s);
   if (act === "mysvc") openMyServices(s);
   if (act === "hours") openStaffHours(s);
-  if (act === "tg") tgLink(s.id);
+  if (act === "tg") tgLink(s.id, s.name);
+  if (act === "atiendo" || act === "administro") {
+    const si = act === "atiendo";
+    setBusy(b, true, "Guardando…");
+    try {
+      await updateDoc(doc(db, bpath("staff", s.id)), { active: si });
+      await setDoc(doc(db, bpath("settings", "general")), { ownerAttends: si }, { merge: true });
+      toast(si ? "¡Listo! Tus clientes ya pueden agendar contigo." : "Listo: solo administras. Ahora agrega a tu primer trabajador.");
+      if (!si && !A.staff.some((x) => x.id !== s.id) && !lockedNow("team")) openStaffEdit();
+    } catch (err) { toast("No se pudo guardar: " + err.message, "error"); setBusy(b, false); }
+  }
 });
 
 function openBreak(staff) {
@@ -784,7 +809,7 @@ async function openStaffEdit(s) {
   };
 }
 
-async function tgLink(target) {
+async function tgLink(target, nombre) {
   let bot = "";
   try { bot = ((await getDoc(doc(db, "platform", "public"))).data()?.telegramBot || "").replace(/^@/, "").trim(); } catch { /* sin bot */ }
   if (!bot) return toast("El bot de Telegram de la plataforma aún no está configurado. Avísale a soporte.", "error");
@@ -796,7 +821,9 @@ async function tgLink(target) {
     <p class="mb-3">Abre este enlace en el celular ${target === "owner" ? "donde quieres recibir los avisos" : "de esa persona"} y toca <b>Iniciar</b> en Telegram. Llegará un mensaje confirmando la conexión.</p>
     <p class="mb-4 break-all rounded-lg bg-paper p-3 text-sm">${link}</p>
     <div class="flex flex-wrap gap-2"><a class="btn-primary" href="${link}" target="_blank" rel="noopener">Abrir Telegram</a>
-    <button class="btn-light" data-copy="${link}">Copiar enlace</button></div>`);
+    <button class="btn-light" data-copy="${link}">Copiar enlace</button>
+    ${target !== "owner" ? `<a class="btn-light" href="https://wa.me/?text=${encodeURIComponent(`Hola ${nombre || ""} 👋 Toca este enlace para que te lleguen tus citas a Telegram: ${link}`)}" target="_blank" rel="noopener">📲 Enviar por WhatsApp</a>` : ""}</div>
+    ${target !== "owner" ? `<p class="mt-3 text-xs text-ink/60">Envíaselo por WhatsApp: cuando lo abra y toque <b>Iniciar</b>, le llegarán sus citas a su Telegram.</p>` : ""}`);
 }
 
 // ================= Clientes =================

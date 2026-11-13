@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.41** · Página **2026-11-13d** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.41** · Página **2026-11-13e** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -132,6 +132,17 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-13 · página 2026-11-13e · 👑 el dueño en «Equipo»: ¿también atiendes?, sin ID y enlace de Telegram por WhatsApp
+- **Pregunta de una sola vez** en «Equipo»: «👤 ¿Tú también atiendes clientes?» → «✂️ Sí, también atiendo» / «💼 No, solo administro».
+  Se guarda en `settings.ownerAttends` y prende o apaga al trabajador del dueño (`A.me.staffId`, normalmente `barbero1`).
+  Si solo administra y no hay más gente, se abre «Agregar al equipo». No se le pregunta al súper.
+- **Tarjeta del dueño:** «👑 Tú · dueño». Ya no tiene «Conectar Telegram» (sus avisos llegan al Telegram de dueño); dice si está conectado o que lo conecte en Configuración.
+  Si solo administra: «💼 Solo administras · no recibes citas» + botón «✂️ Empezar a atender».
+- **Se quitaron los «ID: …»** de las tarjetas (confundían).
+- **Telegram de cada trabajador:** el botón dice «📲 Conectar su Telegram»; la ventana trae «📲 Enviar por WhatsApp» con el mensaje listo
+  («Hola <nombre> 👋 Toca este enlace para que te lleguen tus citas a Telegram: …») y una pista en la tarjeta.
+- Banco de la página: 0 fallas. Zip: `agendador-web-2026-11-13e.zip` (solo página; Mary sigue en 3.41).
 
 ### 2026-11-13 · agendador-ia-3.41 · página 2026-11-13d · 💳 pago automático de la suscripción por Bre-B o por el link de Nequi Negocios
 - Con el código que mandó /servidor se vio que el servidor YA tiene el cobro automático copiado de Epic:
