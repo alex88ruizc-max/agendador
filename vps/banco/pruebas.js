@@ -502,3 +502,14 @@ test('3.47 · 🔔 Servidor: los avisos (los mismos de Telegram) quedan en la co
   st.maryBot.avisos.numero = '573110000000'; F.tgNotify([], 'x'); assert.equal(cola.cola.length, 0, 'el número del negocio no sirve');
   st.maryBot.avisos.numero = '3009998877'; OFF = ['avisosWa']; F.tgNotify([], 'x'); assert.equal(cola.cola.length, 0, 'apagado por el superusuario');
 });
+
+test('3.51 · 🖼️ Servidor: el estado del bot queda en los estados de la página (un documento por tipo: el nuevo reemplaza al viejo); apagado por el dueño o imagen rara, no', { skip: !require('fs').existsSync(GS_MARY) && 'dentro de la imagen no está gs/' }, () => {
+  const src = require('fs').readFileSync(GS_MARY, 'utf8');
+  let st = {}, escrito = null;
+  const G = { ACTIONS: {}, PUBLIC_ACTIONS: {}, console, bp: (x) => x, loadSettings: () => st, wSet: (p, v) => ({ p, v }), commit: (w) => { escrito = w; } };
+  const F = new Function(...Object.keys(G), src + '\nreturn { maryHistoria_, maryContactos_: typeof maryContactos_ };')(...Object.values(G));
+  assert.deepEqual(F.maryHistoria_({ id: 'hoy', label: 'Cupos de hoy', horas: 9, img: 'data:image/png;base64,AAAA' }), { ok: true });
+  assert.equal(escrito[0].p, 'stories/bot-hoy'); assert.equal(escrito[0].v.bot, true); assert.ok(escrito[0].v.expiresAt > new Date());
+  assert.equal(F.maryHistoria_({ id: 'hoy', img: '<script>' }).ok, false);
+  st = { maryBot: { estados: { pagina: false } } }; assert.equal(F.maryHistoria_({ id: 'hoy', img: 'data:image/png;base64,AAAA' }).ok, false);
+});

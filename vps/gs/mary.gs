@@ -14,7 +14,7 @@
  * Instalación: pega este archivo, ejecuta activarMary() una vez, copia la clave que sale en el registro
  * y ponla en el mary.env del VPS (MARY_KEY). Vuelve a implementar la aplicación web (Implementar > Administrar > editar > Nueva versión).
  */
-const MARY_VERSION = 'agendador-ia-3.50';
+const MARY_VERSION = 'agendador-ia-3.51';
 
 // Se registra como acción pública del servidor (sin sesión: entra con la clave de Mary).
 // ⚠️ Este archivo debe quedar DEBAJO del archivo principal en la lista de archivos de Apps Script (los nuevos quedan al final: así está bien).
@@ -58,6 +58,7 @@ function maryAgenda(b) {
     case 'dobleAvisado': return maryDobleAvisado_(b);
     case 'volver': return maryVolver_(st, b);           // 3.32 · recordatorio de servicio
     case 'volverAvisado': return maryVolverAvisado_(b);
+    case 'historia': return maryHistoria_(b);           // 3.51 · el estado que publicó el bot también va a los estados de la página
     case 'avisos': return maryAvisos_();                // 3.47 · avisos al dueño por WhatsApp (el VPS los recoge solo cuando hay)
     case 'revisarPago': return maryRevisarPago_(b);     // 3.47 · el dueño respondió 1 (aprobar) o 2 (rechazar) por WhatsApp
     case 'estadisticas': return maryEstadisticas_(b);   // 3.37 · reporte del bot (el VPS lo manda una vez por hora)
@@ -112,7 +113,7 @@ function maryBotCfg_(st) {
     saludoDiario: d(b.saludoDiario, true) !== false, pedirNombre: d(b.pedirNombre, true) !== false, pedirCorreo: d(b.pedirCorreo, true) !== false,
     loDeSiempre: d(b.loDeSiempre, true) !== false, recordatorioMin: Math.max(0, Number(d(b.recordatorioMin, d(st.maryReminderMinutes, 120)))),
     recordatorioConfirmar: d(b.recordatorioConfirmar, true) !== false, cambios: d(b.cambios, true) !== false, pausaMin: Math.max(5, Number(d(b.pausaMin, 30))),
-    estados: { activo: d(e.activo, true) !== false, horas: horas, manana: d(e.manana, true) !== false, semanal: d(e.semanal, false) === true },
+    estados: { activo: d(e.activo, true) !== false, horas: horas, manana: d(e.manana, true) !== false, semanal: d(e.semanal, false) === true, todos: d(e.todos, true) !== false, pagina: d(e.pagina, true) !== false },
     volver: { activo: (b.volver || {}).activo === true, dias: Math.max(0, Math.min(60, Number((b.volver || {}).dias || 0))) },   // 3.32: lo elige el dueño (0 = no elegido: no sale)
     guia: { activo: (b.guia || {}).activo !== false, hora: /^\d{2}:\d{2}$/.test(String((b.guia || {}).hora || '')) ? b.guia.hora : '08:00', cadaDias: Math.max(1, Math.min(30, Number((b.guia || {}).cadaDias || 3))) }   // 3.43: estado «Cómo agendar»
   };
@@ -229,8 +230,9 @@ function maryReagendar_(st, b) {
 // números de los clientes del negocio: para que los estados les lleguen a ELLOS (WAHA solo conoce a quien escribió hace poco)
 function maryContactos_() {
   const L = {};
-  fsListAll(bp('customers')).forEach(function (c) { const n = String(c.whatsapp || '').replace(/\D/g, ''); if (n.length >= 10 && !c.blocked) L[n.length === 10 ? '57' + n : n] = true; });
-  return { numeros: Object.keys(L).slice(0, 3000) };
+  const B = {};   // 3.51: los bloqueados también se le dicen al VPS, para sacarlos de las otras fuentes (chats y libreta)
+  fsListAll(bp('customers')).forEach(function (c) { const n = String(c.whatsapp || '').replace(/\D/g, ''); if (n.length < 10) return; const t = n.length === 10 ? '57' + n : n; if (c.blocked) B[t] = true; else L[t] = true; });
+  return { numeros: Object.keys(L).slice(0, 3000), bloqueados: Object.keys(B).slice(0, 1000) };
 }
 // Nombres de las categorías (o de los servicios principales si no hay categorías) para los estados
 function maryCategorias_() {
@@ -961,4 +963,16 @@ function maryRevisarPago_(b) {
   if (!cfg.activo || String(b.de || '').replace(/\D/g, '') !== cfg.numero) return { ok: false, motivo: 'Ese número no es el del dueño.' };
   try { doReview(String(b.code || ''), b.aprobar === true, b.aprobar === true ? '' : 'No encontramos la transferencia', 'whatsapp del dueño'); return { ok: true, aprobado: b.aprobar === true }; }
   catch (e) { return { ok: false, motivo: String(e.message || e) }; }
+}
+
+// ---------- 🖼️ 3.51 · LOS ESTADOS DEL BOT TAMBIÉN EN LA PÁGINA (el círculo del logo) ----------
+// Cada tipo (cupos de hoy, semana, cómo agendar 1 y 2) usa SIEMPRE el mismo documento: el nuevo reemplaza al anterior, así no se acumulan
+// ni gastan el cupo de estados que el dueño sube a mano. Duran lo que diga el VPS (cupos: hasta el final del día; cómo agendar: 24 horas).
+function maryHistoria_(b) {
+  const id = String(b.id || '').replace(/[^a-z0-9-]/g, '').slice(0, 20), img = String(b.img || '');
+  if (!id || !/^data:image\/(png|jpeg);base64,[A-Za-z0-9+\/=]+$/.test(img) || img.length > 900000) return { ok: false, motivo: 'imagen no válida' };
+  if (maryBotCfg_(loadSettings()).estados.pagina === false) return { ok: false, motivo: 'el dueño lo apagó' };
+  const horas = Math.max(1, Math.min(48, Number(b.horas || 24)));
+  commit([wSet(bp('stories/bot-' + id), { img: img, bg: '#FFFFFF', text: '', label: String(b.label || 'Estado').slice(0, 30), bot: true, createdAt: new Date(), expiresAt: new Date(Date.now() + horas * 3600000) })]);
+  return { ok: true };
 }

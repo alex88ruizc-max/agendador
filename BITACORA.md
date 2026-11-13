@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.50** · Página **2026-11-13p** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.51** · Página **2026-11-13q** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -133,6 +133,18 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-13 · agendador-ia-3.51 · página 2026-11-13q · 📣 estados a todos los contactos y también en la página
+- **Alex:** «¿por qué solo llega a ese público tan pequeño?». El bot es un dispositivo vinculado: tiene que decirle a WhatsApp a quién mandar el estado, y solo usaba los Clientes del panel.
+- **Tres fuentes** (`audienciaDe` en principal.js, se guarda 6 h): 1) clientes del panel · 2) quienes le han escrito (memoria del bot + `GET /api/<sesión>/chats`) · 3) la libreta del WhatsApp (`GET /api/contacts/all`).
+  Sin bloqueados (el servidor ahora los manda aparte), sin el propio número, sin grupos ni números ocultos, sin repetir, y con tope `ESTADOS_TOPE` (1500). Los números de prueba de Alex van siempre.
+  El registro dice el desglose: «a 312 contactos (40 clientes, 85 que le han escrito, 187 de su libreta)».
+- **También en la página:** cada estado del bot (cupos de hoy, semana, cómo agendar 1 y 2) queda en los estados de la página (`stories/bot-<tipo>`, op `historia` en gs/mary.gs).
+  Un documento por tipo: el nuevo reemplaza al viejo y no gasta el cupo de estados del dueño. Cuesta 1 llamada a Google por imagen publicada.
+- **Panel (WhatsApp Bot › Estados):** «📣 Mandarlos a todos mis contactos» y «🖼️ Mostrarlos también en mi página» (los dos prendidos por defecto).
+- Sin verificar en el servidor real: si la versión de WAHA instalada entrega los chats y la libreta. Si no, quedan los clientes y la memoria del bot; el registro lo deja ver.
+- Reseña de Gold y página de venta: «Estados automáticos en WhatsApp y en tu página».
+- Banco: 172 pasan aquí; como el VPS: 149 pasan, 17 saltadas, 0 fallas. Página: 0 fallas.
 
 ### 2026-11-13 · agendador-ia-3.50 · 🔎 estados: saber a quién se mandaron
 - **Alex:** «los estados de El Barba no me llegaron a mí, y yo puedo ver sus estados». El registro decía «publicado», pero eso solo prueba que se le entregó a WhatsApp.

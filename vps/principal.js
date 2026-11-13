@@ -6,7 +6,7 @@
 const http = require('http'), fs = require('fs'), path = require('path');
 const T = require('./textos'), C = require('./correo'), E = require('./estado'), A = require('./asistente');
 
-const VERSION = 'agendador-ia-3.50';
+const VERSION = 'agendador-ia-3.51';
 const env = (k, d) => (process.env[k] === undefined || process.env[k] === '' ? d : process.env[k]);
 const CFG = {
   puerto: parseInt(env('PUERTO', '3060'), 10),
@@ -18,6 +18,7 @@ const CFG = {
   prueba: String(env('MARY_PRUEBA', '')).split(/[,\s]+/).map((x) => x.replace(/\D/g, '')).filter((x) => x.length >= 10),
   leerDirecto: env('LEER_DIRECTO', 'si') !== 'no',
   volverEspacioMs: parseInt(env('VOLVER_ESPACIO_MS', String(3 * 60000)), 10),   // 3.32: minutos entre un recordatorio de servicio y el siguiente   // 3.30: días/horas/cupos calculados en el VPS (LEER_DIRECTO=no → todo por Google como antes)
+  estadosTope: parseInt(env('ESTADOS_TOPE', '1500'), 10),   // 3.51: máximo de contactos a los que se manda un estado
   guiaEspacioMs: parseInt(env('GUIA_ESPACIO_MS', '20000'), 10),   // 3.43: segundos entre las 2 imágenes de «Cómo agendar» (para que lleguen en orden)
   silencioMin: parseInt(env('SILENCIO_MIN', '15'), 10),     // no repite lo mismo en un chat antes de esto (salvo que el cliente diga algo de la lista)
   humanoMin: parseFloat(env('HUMANO_MIN', '30')),           // 3.1: si el dueño escribe a mano en un chat, se calla ahí 30 min (o lo que diga su panel)
@@ -199,7 +200,7 @@ async function gas(neg, op, datos) {
 }
 // ---------- 3.1 · configuración del panel «WhatsApp Bot» (por negocio) ----------
 const BOT = new Map();
-const BOT_DEF = { audios: true, activo: true, agendar: true, cupos: true, saludoDiario: true, pedirNombre: true, pedirCorreo: true, loDeSiempre: true, recordatorioMin: 120, recordatorioConfirmar: true, cambios: true, pausaMin: 30, estados: { activo: true, horas: ['11:00'], manana: true, semanal: false }, guia: { activo: true, hora: '08:00', cadaDias: 3 } };
+const BOT_DEF = { audios: true, activo: true, agendar: true, cupos: true, saludoDiario: true, pedirNombre: true, pedirCorreo: true, loDeSiempre: true, recordatorioMin: 120, recordatorioConfirmar: true, cambios: true, pausaMin: 30, estados: { activo: true, horas: ['11:00'], manana: true, semanal: false, todos: true, pagina: true }, guia: { activo: true, hora: '08:00', cadaDias: 3 } };
 function botDe(neg) { const x = BOT.get(neg.bid); const c = Object.assign({}, BOT_DEF, x ? x.cfg : {}); c.estados = Object.assign({}, BOT_DEF.estados, (x && x.cfg.estados) || {}); c.guia = Object.assign({}, BOT_DEF.guia, (x && x.cfg.guia) || {}); if (!x) c.pausaMin = CFG.humanoMin; return apagarGlobal(c, BOT_OFF.L); }
 // 🤖 3.45 · lo que el superusuario APAGÓ para todas las tiendas (platform/public.botOff) manda sobre lo de cada tienda
 const BOT_OFF = { L: [], t: 0 };
@@ -237,7 +238,7 @@ function botNormal(b, recordatorioViejo) {   // mismos valores por defecto que e
   let horas = (Array.isArray(e.horas) ? e.horas : ['11:00']).filter((h) => /^\d{2}:\d{2}$/.test(String(h))).slice(0, 2); if (!horas.length) horas = ['11:00'];
   const c = {}; ['audios', 'activo', 'agendar', 'cupos', 'saludoDiario', 'pedirNombre', 'pedirCorreo', 'loDeSiempre', 'recordatorioConfirmar', 'cambios'].forEach((k) => { c[k] = d(b[k], true) !== false; });
   c.recordatorioMin = Math.max(0, Number(d(b.recordatorioMin, d(recordatorioViejo, 120)))); c.pausaMin = Math.max(5, Number(d(b.pausaMin, 30)));
-  c.estados = { activo: d(e.activo, true) !== false, horas, manana: d(e.manana, true) !== false, semanal: d(e.semanal, false) === true };
+  c.estados = { activo: d(e.activo, true) !== false, horas, manana: d(e.manana, true) !== false, semanal: d(e.semanal, false) === true, todos: d(e.todos, true) !== false, pagina: d(e.pagina, true) !== false };   // 3.51: a todos mis contactos · también en la página
   const v = b.volver || {}; c.volver = { activo: v.activo === true, dias: Math.max(0, Math.min(60, Number(v.dias || 0))) };   // 3.32: recordatorio de servicio (lo elige el dueño)
   const av = b.avisos || {}; let avn = String(av.numero || '').replace(/\D/g, ''); if (avn.length === 10) avn = '57' + avn; c.avisos = { activo: av.activo === true && avn.length >= 11, numero: avn };   // 3.47: avisos al WhatsApp personal del dueño
   const g = b.guia || {}; c.guia = { activo: g.activo !== false, hora: /^\d{2}:\d{2}$/.test(String(g.hora || '')) ? g.hora : '08:00', cadaDias: Math.max(1, Math.min(30, Number(g.cadaDias || 3))) };   // 3.43: estado «Cómo agendar»
@@ -595,6 +596,9 @@ async function publicarEstado(neg, tipo) {
   const caption = cap0 + (conPie ? E.PIE_PRUEBA : '');
   if (tipo === 'hoy' && !png) return { ok: false, motivo: 'no hay cupos hoy ni mañana: no publiqué' };
   await enviarEstado(neg, quien, png, caption);
+  // 3.51: el mismo estado queda en la página de la tienda (hasta la medianoche si es de cupos de hoy; la semana, 24 h)
+  const a0 = ahoraLocal(), [h0, m0] = a0.hm.split(':').map(Number);
+  await aLaPagina(neg, tipo === 'semana' ? 'semana' : 'hoy', png, tipo === 'semana' ? 'Cupos de la semana' : 'Cupos de hoy', tipo === 'semana' ? 24 : Math.max(1, 24 - h0 - m0 / 60));
   if (conPie) { MEM.piePrueba[neg.bid] = ahoraLocal().fecha; memGuardar(); }
   est.estados++; anotar({ bid: neg.bid, que: 'estado ' + tipo + ' publicado' + (dia && dia !== d.dias[0] ? ' (cupos de mañana)' : '') + aQuienes() });
   return { ok: true };
@@ -604,16 +608,22 @@ async function enviarEstado(neg, quien, png, caption) {
   try {
     // 3.1: WAHA solo conoce a quien escribió hace poco → el estado va a TODOS los clientes del negocio (sus números)
     let para = quien.allContacts ? null : quien.statusJidList.map((j) => j.replace('@s.whatsapp.net', '@c.us'));
-    if (!para && esWaha(neg)) { const r = await contactosDe(neg); if (r.length) para = [...new Set(r.concat(CFG.prueba.map(numeroWa)))].filter((n) => n.length >= 11).map((n) => n + '@c.us'); }   // 3.50: + los números de prueba de Alex (así puede revisar los estados de cualquier tienda)
+    if (!para && esWaha(neg)) { const A = await audienciaDe(neg); if (A.L.length) para = A.L.map((n) => n + '@c.us'); ENVIO_ESTADO.de = A.de; }   // 3.51: clientes + quienes le han escrito + su libreta
     ENVIO_ESTADO.n = para ? para.length : 0; ENVIO_ESTADO.fallo = '';
     if (esWaha(neg)) await waha('post', '/api/' + encodeURIComponent(sesionDe(neg)) + '/status/image', Object.assign({ file: { mimetype: 'image/png', url }, caption }, para ? { contacts: para } : {}), 120000);
     else await evo('post', '/message/sendStatus/' + encodeURIComponent(neg.instancia), Object.assign({ type: 'image', content: url, caption }, quien), 120000);
   }
   catch (e) { if (!/timeout|aborted|524|504/i.test(e.message)) throw e; ENVIO_ESTADO.fallo = 'WhatsApp tardó en confirmar'; }   // ⏳ publicar a muchos contactos tarda: Evolution lo sigue haciendo solo
 }
+// 🖼️ 3.51 · el estado del bot también va a los estados de la página (una llamada a Google por imagen; si falla, el de WhatsApp ya salió igual)
+async function aLaPagina(neg, id, png, label, horas) {
+  if (CFG.modo !== 'todos' || botDe(neg).estados.pagina === false) return;
+  try { const r = await gas(neg, 'historia', { id, label, horas, img: 'data:image/png;base64,' + Buffer.from(png).toString('base64') }); if (r && r.ok === false) anotar({ bid: neg.bid, que: 'estado en la página: ' + r.motivo }); }
+  catch (e) { anotar({ bid: neg.bid, que: 'estado en la página falló: ' + String(e.message).slice(0, 80) }); }
+}
 // 3.50 · para el registro: a cuántos contactos se mandó el último estado y si WhatsApp confirmó (antes solo decía «publicado»)
-const ENVIO_ESTADO = { n: 0, fallo: '' };
-const aQuienes = () => (ENVIO_ESTADO.n ? ' · a ' + ENVIO_ESTADO.n + ' contacto' + (ENVIO_ESTADO.n === 1 ? '' : 's') : ' · a todos los contactos') + (ENVIO_ESTADO.fallo ? ' · ⚠️ ' + ENVIO_ESTADO.fallo : '');
+const ENVIO_ESTADO = { n: 0, fallo: '', de: '' };
+const aQuienes = () => (ENVIO_ESTADO.n ? ' · a ' + ENVIO_ESTADO.n + ' contacto' + (ENVIO_ESTADO.n === 1 ? '' : 's') + (ENVIO_ESTADO.de ? ' (' + ENVIO_ESTADO.de + ')' : '') : ' · a todos los contactos') + (ENVIO_ESTADO.fallo ? ' · ⚠️ ' + ENVIO_ESTADO.fallo : '');
 // 📲 3.43 · ESTADO «CÓMO AGENDAR»: 2 imágenes seguidas (pasos 1-2 y 3-4) con el nombre, servicios, equipo y horas reales.
 //    Los datos salen de la base (cuposLocal.guia): no gasta llamadas de Google. Sale en todos los planes (prueba incluida).
 const GUIA = require('./guia');
@@ -625,7 +635,9 @@ async function publicarGuia(neg) {
   if (D.biz && D.biz.status && D.biz.status !== 'active') return { ok: false, motivo: 'la agenda del negocio no está activa' };
   const info = GUIA.datosGuia(Object.assign({}, D, { link: 'https://tuagenda.vip/index.html?b=' + encodeURIComponent(neg.bid) }));
   for (let p = 1; p <= GUIA.PARTES; p++) {   // en orden: primero los pasos 1-2, después 3-4
-    await enviarEstado(neg, quien, E.png(GUIA.svgGuia(info, p, E.marcaAgua)), GUIA.textoGuia(info, p));
+    const pngG = E.png(GUIA.svgGuia(info, p, E.marcaAgua));
+    await enviarEstado(neg, quien, pngG, GUIA.textoGuia(info, p));
+    await aLaPagina(neg, 'guia' + p, pngG, 'Cómo agendar ' + p + '/' + GUIA.PARTES, 24);
     if (p < GUIA.PARTES) await esperar(CFG.guiaEspacioMs);
   }
   est.estados++; anotar({ bid: neg.bid, que: 'estado «cómo agendar» publicado (' + GUIA.PARTES + ' imágenes)' + aQuienes() });
@@ -635,8 +647,34 @@ const esperar = (ms) => new Promise((ok) => setTimeout(ok, ms));
 const CONTACTOS = new Map();   // bid → { L, t } (6 h)
 async function contactosDe(neg) {
   const x = CONTACTOS.get(neg.bid); if (x && Date.now() - x.t < 6 * 3600000) return x.L;
-  let L = []; try { L = ((await gas(neg, 'contactos')) || {}).numeros || []; } catch (e) { L = (x && x.L) || []; }
-  CONTACTOS.set(neg.bid, { L, t: Date.now() }); return L;
+  let L = [], B = []; try { const r = (await gas(neg, 'contactos')) || {}; L = r.numeros || []; B = r.bloqueados || []; } catch (e) { L = (x && x.L) || []; B = (x && x.B) || []; }
+  CONTACTOS.set(neg.bid, { L, B, t: Date.now() }); return L;
+}
+// 📣 3.51 · A QUIÉN LE LLEGAN LOS ESTADOS DEL BOT. Antes solo a los Clientes del panel (un público pequeño). Ahora se juntan TRES fuentes,
+//    para llegar casi al mismo público que cuando el dueño sube un estado a mano:
+//      1) los clientes del panel   2) quienes le han escrito al negocio (memoria del bot + chats de WhatsApp)   3) la libreta de contactos del WhatsApp
+//    Sin bloqueados, sin el propio número y con tope (ESTADOS_TOPE, 1500). Si el dueño apaga «a todos mis contactos», vuelve a ser solo la fuente 1.
+//    Los números de prueba de Alex van siempre (para poder revisar cualquier tienda). Se guarda 6 h.
+const AUDIENCIA = new Map();
+const telDe = (id) => { const m = String(id || '').match(/^(\d{10,15})(?::\d+)?@(c\.us|s\.whatsapp\.net)$/); return m ? m[1] : ''; };
+async function audienciaDe(neg) {
+  const amplio = botDe(neg).estados.todos !== false;
+  const x = AUDIENCIA.get(neg.bid); if (x && x.amplio === amplio && Date.now() - x.t < 6 * 3600000) return x.v;
+  const clientes = (await contactosDe(neg)).map(numeroWa), bloq = new Set(((CONTACTOS.get(neg.bid) || {}).B || []).map(numeroWa));
+  let chats = [], libreta = [], mio = '';
+  if (amplio) {
+    chats = Object.keys(MEM.clientes || {}).filter((k) => k.startsWith(neg.bid + ':')).map((k) => numeroWa(k.slice(neg.bid.length + 1)));
+    const s = encodeURIComponent(sesionDe(neg));
+    try { const me = await waha('get', '/api/sessions/' + s, null, 8000); mio = telDe((me && me.me && me.me.id) || ''); } catch (e) { /* no importa */ }
+    try { const r = await waha('get', '/api/' + s + '/chats?limit=1500&sortBy=conversationTimestamp&sortOrder=desc', null, 20000); chats = chats.concat((Array.isArray(r) ? r : []).map((c) => telDe(c && (c.id && c.id._serialized || c.id)))); } catch (e) { /* esa versión no lo trae: quedan los de la memoria */ }
+    try { const r = await waha('get', '/api/contacts/all?session=' + s + '&limit=5000', null, 20000); libreta = (Array.isArray(r) ? r : []).filter((c) => c && c.isMyContact !== false && !c.isGroup).map((c) => telDe(c.id && c.id._serialized || c.id)); } catch (e) { /* sin libreta: quedan las otras dos fuentes */ }
+  }
+  const vistos = new Set(), L = [], cuenta = { clientes: 0, chats: 0, libreta: 0 };
+  const meter = (lista, de) => lista.forEach((n) => { if (n && n.length >= 11 && n !== mio && !bloq.has(n) && !vistos.has(n) && L.length < CFG.estadosTope) { vistos.add(n); L.push(n); cuenta[de]++; } });
+  meter(clientes, 'clientes'); meter(chats, 'chats'); meter(libreta, 'libreta');
+  CFG.prueba.map(numeroWa).forEach((n) => { if (n.length >= 11 && !vistos.has(n)) { vistos.add(n); L.push(n); } });
+  const de = amplio ? cuenta.clientes + ' clientes, ' + cuenta.chats + ' que le han escrito, ' + cuenta.libreta + ' de su libreta' : 'solo clientes del panel';
+  const v = { L, de, cuenta }; AUDIENCIA.set(neg.bid, { v, amplio, t: Date.now() }); return v;
 }
 // 3.1 · qué estados tocan ahora (función pura, con pruebas): máximo 2 al día a las horas del panel, cada uno una sola vez
 function estadosQueTocan(cfg, a, hechos, bid) {
@@ -1006,5 +1044,5 @@ if (require.main === module) {
   servidor.listen(CFG.puerto, () => { log('👩‍💼 ' + VERSION + ' escuchando en ' + CFG.puerto + ' · modo ' + CFG.modo); negocios(); arrancarRelojes(); });
 }
 // 🧪 solo para el banco de escenarios (banco/escenarios.js): deja a Mary como recién encendida
-const _banco = { ASIS, BOT, yaLoDije, memDicho: () => (MEM.dicho = MEM.dicho || {}), memHumano: () => MEM.humano, memRobot: () => (MEM.robot = MEM.robot || {}), memConv: () => (MEM.conv = MEM.conv || {}), tickRecordatorios, tickVolver, tickRetomar, tickEstadisticas, tickEstados, publicarGuia, memLids: () => (MEM.lids = MEM.lids || {}), entregarAvisos, tickPedidosWa, memAvisoPago: () => (MEM.avisoPago = MEM.avisoPago || {}), avisados, botOff: BOT_OFF, apagarGlobal, botAlDia, botDe, memGuia: () => (MEM.guia = MEM.guia || {}), memStats: () => (MEM.stats = MEM.stats || {}), publicarEstado, alMensaje, alEventoConexion, ultimos, reiniciar() { CL = null; MEM.volver = {}; MEM.stats = {}; MEM.piePrueba = {}; MEM.lids = {}; MEM.lidAviso = {}; LID_NO.clear(); MEM.guia = {}; MEM.avisoPago = {}; avisados.clear(); leer.avisado = false; BOT_LEIDO.clear(); MEM.sinbot = {}; MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; MEM.conv = {}; MEM.clientes = {}; MEM.conectados = {}; MEM.pendientesWa = {}; MEM.codigos = {}; MEM.robot = {}; MEM.dicho = {}; AGRUPA.clear(); ASIS._cat.clear(); BOT.clear(); CONTACTOS.clear(); vinculando.clear(); delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
+const _banco = { ASIS, BOT, yaLoDije, memDicho: () => (MEM.dicho = MEM.dicho || {}), memHumano: () => MEM.humano, memRobot: () => (MEM.robot = MEM.robot || {}), memConv: () => (MEM.conv = MEM.conv || {}), tickRecordatorios, tickVolver, tickRetomar, tickEstadisticas, tickEstados, publicarGuia, audienciaDe, AUDIENCIA, memLids: () => (MEM.lids = MEM.lids || {}), entregarAvisos, tickPedidosWa, memAvisoPago: () => (MEM.avisoPago = MEM.avisoPago || {}), avisados, botOff: BOT_OFF, apagarGlobal, botAlDia, botDe, memGuia: () => (MEM.guia = MEM.guia || {}), memStats: () => (MEM.stats = MEM.stats || {}), publicarEstado, alMensaje, alEventoConexion, ultimos, reiniciar() { CL = null; MEM.volver = {}; MEM.stats = {}; MEM.piePrueba = {}; MEM.lids = {}; MEM.lidAviso = {}; LID_NO.clear(); MEM.guia = {}; MEM.avisoPago = {}; avisados.clear(); leer.avisado = false; BOT_LEIDO.clear(); MEM.sinbot = {}; MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; MEM.conv = {}; MEM.clientes = {}; MEM.conectados = {}; MEM.pendientesWa = {}; MEM.codigos = {}; MEM.robot = {}; MEM.dicho = {}; AGRUPA.clear(); ASIS._cat.clear(); BOT.clear(); CONTACTOS.clear(); AUDIENCIA.clear(); vinculando.clear(); delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
 module.exports = { _banco, botNormal, frenoRobot, estadosQueTocan, atenderPedidoWa, sincronizarConectados, renovarQr, telEnAviso, deWaha, esWaha, debeResponder, alEventoConexion, tickPedidosWa, limpiarSinVincular, leerMensaje, atiende, PREGUNTA, numeroWa, ahoraLocal, enFila, yaVisto, quienVeEstados, CFG };

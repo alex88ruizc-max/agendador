@@ -9,9 +9,9 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, ventanaReserva, OFERTA_TXT, nombreCompleto, planEjemplos, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-11-13p";
-import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-13p";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-13p";
+} from "./common.js?v=2026-11-13q";
+import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-13q";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-13q";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -130,7 +130,7 @@ function start() {
     // recién creada desde "Probar gratis": abre la guía de primeros pasos
     // asistente de inicio: la primera vez (o al llegar desde "Probar gratis")
     if (!A.wizAuto && isOwner() && !A.me?.isSuper && !document.body.classList.contains("plan-gate") && !A.bill?.planWanted && (!A.settings.setupDone || !A.settings.tutorial2 || new URLSearchParams(location.search).get("guia") === "1")) {
-      // 2026-11-13p · los primeros pasos (nuevos, 4 pasos) se muestran UNA vez más a todas las tiendas, también a las que ya los habían hecho (tutorial2)
+      // 2026-11-13q · los primeros pasos (nuevos, 4 pasos) se muestran UNA vez más a todas las tiendas, también a las que ya los habían hecho (tutorial2)
       const otraVez = !!A.settings.setupDone && !A.settings.tutorial2;
       A.wizAuto = true; A.geoAsked = true;
       if (!A.settings.tutorial2) updateDoc(doc(db, bpath("settings", "general")), { tutorial2: true }).catch(() => {});
@@ -2775,7 +2775,7 @@ function marcaAgua(cv, abajo) {
 { const _st = drawStory; drawStory = async (cv, S2) => { const r = await _st(cv, S2); marcaAgua(cv, S2 && S2.mode === "own" && S2.ownLogo !== false); return r; }; }
 { const _im = drawImage; drawImage = async (...a) => { const r = await _im(...a); marcaAgua($("imgCanvas")); return r; }; }
 const storyLimit = () => Math.max(1, Number(A.plat?.storyLimit || 10));
-const activeStories = () => H.stories.filter((x) => toMillis(x.expiresAt) > Date.now()).length;
+const activeStories = () => H.stories.filter((x) => !x.bot && toMillis(x.expiresAt) > Date.now()).length;   // los que publica el bot no gastan tu cupo
 function newStory(preset = {}) {
   if (lockedNow("marketing")) return switchTab("marketing");
   if (activeStories() >= storyLimit()) return toast(`Ya tienes ${storyLimit()} estados activos, el máximo para no saturar a tus clientes. Toca uno y “Quitar ahora”, o espera a que se venza alguno.`, "error");
@@ -2991,7 +2991,7 @@ async function loadLost() {
 const guideDone = () => A.settings?.guideDone || [];
 // lo que ya se hizo en el asistente de inicio cuenta como hecho en la guía
 const WIZ_ORDER = ["hi", "biz", "social", "team", "hours", "services", "deposit", "geo", "telegram", "done"];
-// 2026-11-13p · el asistente de inicio ahora son 4 pasos (negocio, horario, servicios y listo). Lo demás queda en la guía.
+// 2026-11-13q · el asistente de inicio ahora son 4 pasos (negocio, horario, servicios y listo). Lo demás queda en la guía.
 //   Quien terminó el asistente viejo (10 pasos) ya pasó por todo; quien termina el nuevo (setupVer 2) solo pasó por esos 4.
 const WIZ_NUEVO = ["biz", "hours", "services", "done"];
 const wizPassed = (id) => {
@@ -4169,7 +4169,7 @@ document.addEventListener("click", async (e) => {
 });
 
 // Opciones del asistente (settings.maryBot). Los valores por defecto son los mismos del servidor (maryBotCfg_).
-const BOT_DEF = { audios: true, activo: true, agendar: true, cupos: true, saludoDiario: true, pedirNombre: true, pedirCorreo: true, loDeSiempre: true, recordatorioMin: 120, recordatorioConfirmar: true, cambios: true, pausaMin: 30, estados: { activo: true, horas: ["11:00"], manana: true, semanal: false }, volver: { activo: false, dias: 0 }, guia: { activo: true, hora: "08:00", cadaDias: 3 }, avisos: { activo: false, numero: "" } };
+const BOT_DEF = { audios: true, activo: true, agendar: true, cupos: true, saludoDiario: true, pedirNombre: true, pedirCorreo: true, loDeSiempre: true, recordatorioMin: 120, recordatorioConfirmar: true, cambios: true, pausaMin: 30, estados: { activo: true, horas: ["11:00"], manana: true, semanal: false, todos: true, pagina: true }, volver: { activo: false, dias: 0 }, guia: { activo: true, hora: "08:00", cadaDias: 3 }, avisos: { activo: false, numero: "" } };
 function botCfg() {
   const s = A.settings || {}, b = s.maryBot || {};
   const c = { ...BOT_DEF, ...b, estados: { ...BOT_DEF.estados, ...(b.estados || {}) }, volver: { ...BOT_DEF.volver, ...(b.volver || {}) }, guia: { ...BOT_DEF.guia, ...(b.guia || {}) }, avisos: { ...BOT_DEF.avisos, ...(b.avisos || {}) } };
@@ -4237,7 +4237,9 @@ function renderWaBot() {
       ${e.activo ? `<div class="flex items-center gap-3 p-3.5"><span class="text-xl">1️⃣</span><span class="flex-1"><b class="block text-[14.5px]">Primer estado</b></span>${sel("estados.h0", e.horas[0], HORAS_ESTADO.map((h) => [h, hora12(h)]))}</div>
       <div class="flex items-center gap-3 p-3.5"><span class="text-xl">2️⃣</span><span class="flex-1"><b class="block text-[14.5px]">Segundo estado</b><span class="block text-xs text-ink/65">Opcional</span></span>${sel("estados.h1", e.horas[1] || "", [["", "No publicar"]].concat(HORAS_ESTADO.filter((h) => h !== e.horas[0]).map((h) => [h, hora12(h)])))}</div>
       ${fila("estados.manana", "➡️", "Si hoy no hay cupos, publicar los de mañana", "Apagado, ese día no publica.", e.manana)}
-      ${fila("estados.semanal", "🗓️", "Estado de la semana los lunes", "Además, los lunes a las 7:00 a. m. un resumen de la semana.", e.semanal)}` : ""}
+      ${fila("estados.semanal", "🗓️", "Estado de la semana los lunes", "Además, los lunes a las 7:00 a. m. un resumen de la semana.", e.semanal)}
+      ${fila("estados.todos", "📣", "Mandarlos a todos mis contactos", "Les llega a tus clientes, a quienes te han escrito y a los contactos guardados en tu WhatsApp. Apagado: solo a los clientes de tu panel.", e.todos !== false)}
+      ${fila("estados.pagina", "🖼️", "Mostrarlos también en mi página", "El mismo estado sale en el círculo de tu logo, en tu página de citas.", e.pagina !== false)}` : ""}
     </div>` : ""}
     ${hay("guia") ? `<div class="sp-h mt-5"><h2>📲 Estado «Cómo agendar»</h2><span>2 imágenes, paso a paso</span></div>
     <div class="sp-card !p-0 divide-y divide-line">
@@ -4245,7 +4247,7 @@ function renderWaBot() {
       ${c.guia.activo ? `<div class="flex items-center gap-3 p-3.5"><span class="text-xl">⏰</span><span class="flex-1"><b class="block text-[14.5px]">Hora</b></span>${sel("guia.hora", c.guia.hora, HORAS_ESTADO.map((h) => [h, hora12(h)]))}</div>
       <div class="flex items-center gap-3 p-3.5"><span class="text-xl">📆</span><span class="flex-1"><b class="block text-[14.5px]">Cada cuántos días</b></span>${sel("guia.cadaDias", c.guia.cadaDias, [[1, "Todos los días"], [2, "Cada 2 días"], [3, "Cada 3 días"], [5, "Cada 5 días"], [7, "Cada semana"], [15, "Cada 15 días"]])}</div>` : ""}
     </div>` : ""}
-    <p class="soft mt-3 text-xs">Los estados los ven los clientes que tienen guardado el número de tu negocio (así funciona WhatsApp).</p>
+    <p class="soft mt-3 text-xs">En WhatsApp, un estado solo lo ve quien tiene guardado el número de tu negocio. Pídeles a tus clientes que te guarden.</p>
     ${hay("volver") ? `<div class="sp-h mt-5"><h2>🔁 Recordatorio de servicio</h2><span>para que vuelvan</span></div>
     <div class="sp-card !p-0 divide-y divide-line">
       ${fila("volver.activo", "🔁", "Escribirle al cliente para que vuelva", "«Ya van 3 semanas desde tu último Corte con Gabriel. ¿Te agendo de nuevo?» Si dice «Sí, lo mismo», solo elige día y hora y queda confirmada.", c.volver.activo)}

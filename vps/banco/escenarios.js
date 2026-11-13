@@ -48,7 +48,8 @@ global.fetch = async (url, o) => {
     if (b.op === 'proximas') return resp({ ok: true, data: { citas: W.proximas, dobles: W.dobles || [], info: Object.assign({ bot: BOTX, recordatorioMin: BOTX.recordatorioMin }, NEGOCIO) } });
     if (b.op === 'asistencia' || b.op === 'cancelar') return resp({ ok: true, data: { ok: true, link: NEGOCIO.link, cita: (W.proximas[0] || {}) } });
     if (b.op === 'reagendar') { const d = W.cupos.find((x) => x.date === b.date); return resp({ ok: true, data: { ok: true, cita: Object.assign({}, W.proximas[0] || {}, { dia: d.dia, hora: d.horas[d.libres.indexOf(b.time)], link: NEGOCIO.link + '&cita=R-VIEJA1' }) } }); }
-    if (b.op === 'contactos') return resp({ ok: true, data: { numeros: W.contactos } });
+    if (b.op === 'contactos') return resp({ ok: true, data: { numeros: W.contactos, bloqueados: W.bloqueados || [] } });
+    if (b.op === 'historia') { (W.historias = W.historias || []).push({ id: b.id, label: b.label, horas: b.horas, img: String(b.img).slice(0, 22) }); return resp({ ok: true, data: { ok: true } }); }   // 3.51
     if (b.op === 'avisos') { const A = W.avisos || []; W.avisos = []; return resp({ ok: true, data: { avisos: A, numero: W.avisosNum || '' } }); }   // 3.47
     if (b.op === 'revisarPago') { W.revisado = { code: b.code, aprobar: b.aprobar, de: b.de }; return resp({ ok: true, data: { ok: true, aprobado: b.aprobar } }); }
     if (b.op === 'waPedido') { const p = W.pedido; W.pedido = null; return resp({ ok: true, data: { pedido: p } }); }
@@ -74,6 +75,8 @@ global.fetch = async (url, o) => {
     }
     return ok({});
   }
+  if (/\/api\/contacts\/all/.test(u)) return W.wahaLibreta ? resp(W.wahaLibreta) : resp({ error: 'no' }, 404);   // 3.51: la libreta del WhatsApp
+  if (/\/api\/[^/]+\/chats\?/.test(u)) return W.wahaChats ? resp(W.wahaChats) : resp({ error: 'no' }, 404);        // 3.51: quienes le han escrito
   const lidM = u.match(/\/api\/[^/]+\/lids\/([^/?]+)$/);   // 3.49: WAHA dice (o no) el número real de un código …@lid
   if (lidM) { const pn = (W.lids || {})[decodeURIComponent(lidM[1])]; return pn ? resp({ lid: decodeURIComponent(lidM[1]), pn }) : resp({ error: 'no lo sé' }, 404); }
   if (/\/api\/sendText$/.test(u)) { const id = 'W' + W.enviados.length; W.enviados.push({ id, motor: 'waha', a: b.chatId.split('@')[0], chatId: b.chatId, texto: b.text, sesion: b.session }); return resp({ id }); }
@@ -472,7 +475,7 @@ test('3.1 · Estados: 1 al día a las 11:00 a. m. (máximo 2), una sola vez cada
 });
 test('3.1 · Estado: con cupos hoy → hoy; sin cupos hoy → los de mañana; sin cupos → no publica · va a los clientes del negocio', async () => {
   let r = await B.publicarEstado({ bid: 'lina-spa', instancia: 'lina-spa', motor: 'waha', sesion: 'default' }, 'hoy');
-  assert.equal(r.ok, true); assert.deepEqual(W.estados[0].contacts, ['573001112233@c.us', '573004445566@c.us', '573187920386@c.us'], 'los clientes del negocio + el número de prueba de Alex (3.50)'); assert.match(ultimoRegistro(), /estado hoy publicado · a 3 contactos$/);
+  assert.equal(r.ok, true); assert.deepEqual(W.estados[0].contacts, ['573001112233@c.us', '573004445566@c.us', '573187920386@c.us'], 'los clientes del negocio + el número de prueba de Alex (3.50)'); assert.match(ultimoRegistro(), /estado hoy publicado · a 3 contactos \(2 clientes, 0 que le han escrito, 0 de su libreta\)$/);
   W.cupos[0].libres = []; W.cupos[0].horas = [];
   r = await B.publicarEstado({ bid: 'lina-spa', instancia: 'lina-spa', motor: 'waha', sesion: 'default' }, 'hoy');
   assert.equal(r.ok, true); assert.match(ultimoRegistro(), /cupos de mañana/);
@@ -1222,7 +1225,8 @@ test('3.43 · 📲 Estado «Cómo agendar»: 2 imágenes EN ORDEN (pasos 1-2 y 3
   assert.equal(W.estados.length, 2, 'dos estados');
   assert.match(W.estados[0].caption, /Así agendas tu cita en Uñas Valen.*\(1 de 2\)/);
   assert.match(W.estados[1].caption, /Agenda aquí: https:\/\/tuagenda\.vip\/index\.html\?b=lina-spa/);
-  assert.ok(!W.gas.slice(gasAntes).some((op) => op !== 'contactos'), 'no le pide nada a Google (solo la lista de contactos, que ya se guarda 6 h)');
+  assert.ok(!W.gas.slice(gasAntes).some((op) => op !== 'contactos' && op !== 'historia'), 'los datos NO se le piden a Google (solo la lista de contactos, que se guarda 6 h, y dejar la imagen en la página)');
+  assert.deepEqual((W.historias || []).map((h) => h.id), ['guia1', 'guia2'], '3.51: las 2 imágenes quedan también en los estados de la página');
   assert.match(ultimoRegistro(), /cómo agendar.*publicado/);
 });
 test('3.43 · 📲 «Cómo agendar» usa lo real del negocio: tipo «Uñas», sus servicios y precios; sin servicios, los de ejemplo de su tipo; sin marca con el adicional', () => {
@@ -1297,4 +1301,22 @@ test('3.49 · 🕵️ Número oculto (…@lid): si WAHA sabe el número real, se
   assert.equal(ultimo().a, '573005550101', 'le responde a su número real'); assert.doesNotMatch(ultimo().texto, /Para agendar tu cita entra aquí 👉/, 'ya no es el mensaje de emergencia');
   assert.equal(B.memLids()['lina-spa:999888777666555@lid'], '573005550101', 'queda guardado para la próxima');
   W.lids = {};
+});
+
+test('3.51 · 📣 Los estados del bot llegan a TRES fuentes (clientes + quienes le han escrito + la libreta del WhatsApp), sin bloqueados ni repetidos, con tope; apagado → solo clientes', async () => {
+  const neg = { bid: 'lina-spa', instancia: 'lina-spa', motor: 'waha', sesion: 'default' };
+  W.bloqueados = ['573009990000'];
+  W.wahaChats = [{ id: '573001112233@c.us' }, { id: '573015550001@c.us' }, { id: '120363@g.us' }, { id: '777@lid' }, { id: '573009990000@c.us' }];
+  W.wahaLibreta = [{ id: '573025550002@c.us', isMyContact: true }, { id: '573035550003@c.us', isMyContact: false }, { id: '573015550001@c.us', isMyContact: true }];
+  B.memConv(); P._banco.ASIS.cliente('lina-spa:573045550004').nombre = 'Ana';   // alguien que le escribió al bot
+  await B.publicarEstado(neg, 'hoy');
+  const C = W.estados[0].contacts.map((x) => x.split('@')[0]);
+  assert.deepEqual(C, ['573001112233', '573004445566', '573045550004', '573015550001', '573025550002', '573187920386'], 'clientes, luego chats, luego libreta, y el número de prueba; sin grupos, sin ocultos, sin bloqueados, sin repetir');
+  assert.match(ultimoRegistro(), /a 6 contactos \(2 clientes, 2 que le han escrito, 1 de su libreta\)/);
+  assert.equal(W.historias[0].id, 'hoy', 'y queda en los estados de la página'); assert.match(W.historias[0].img, /^data:image\/png;base64,/);
+  // el dueño lo apaga → solo los clientes del panel, y no va a la página
+  W.fsBot = { estados: { todos: false, pagina: false } }; await B.botAlDia(neg); B.AUDIENCIA.clear(); W.estados = []; W.historias = [];
+  await B.publicarEstado(neg, 'hoy');
+  assert.deepEqual(W.estados[0].contacts.map((x) => x.split('@')[0]), ['573001112233', '573004445566', '573187920386']); assert.equal(W.historias.length, 0);
+  W.fsBot = null; W.wahaChats = null; W.wahaLibreta = null; W.bloqueados = null;
 });
