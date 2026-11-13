@@ -4117,9 +4117,9 @@ function renderWaBot() {
       ${fila("estados.manana", "➡️", "Si hoy no hay cupos, publicar los de mañana", "Apagado, ese día no publica.", e.manana)}
       ${fila("estados.semanal", "🗓️", "Estado de la semana los lunes", "Además, los lunes a las 7:00 a. m. un resumen de la semana.", e.semanal)}` : ""}
     </div>
-    <div class="sp-h mt-5"><h2>📲 Estado «Cómo agendar»</h2><span>3 imágenes, paso a paso</span></div>
+    <div class="sp-h mt-5"><h2>📲 Estado «Cómo agendar»</h2><span>2 imágenes, paso a paso</span></div>
     <div class="sp-card !p-0 divide-y divide-line">
-      ${fila("guia.activo", "📲", "Enseñar a agendar con tu link", "3 estados seguidos (pasos 1-2, 3-4 y 5-6) con tu nombre, tus servicios, tu equipo y tus horas libres de verdad.", c.guia.activo)}
+      ${fila("guia.activo", "📲", "Enseñar a agendar con tu link", "2 estados seguidos (pasos 1-2 y 3-4) con tu nombre, tus servicios, tu equipo y tus horas libres de verdad.", c.guia.activo)}
       ${c.guia.activo ? `<div class="flex items-center gap-3 p-3.5"><span class="text-xl">⏰</span><span class="flex-1"><b class="block text-[14.5px]">Hora</b></span>${sel("guia.hora", c.guia.hora, HORAS_ESTADO.map((h) => [h, hora12(h)]))}</div>
       <div class="flex items-center gap-3 p-3.5"><span class="text-xl">📆</span><span class="flex-1"><b class="block text-[14.5px]">Cada cuántos días</b></span>${sel("guia.cadaDias", c.guia.cadaDias, [[1, "Todos los días"], [2, "Cada 2 días"], [3, "Cada 3 días"], [5, "Cada 5 días"], [7, "Cada semana"], [15, "Cada 15 días"]])}</div>` : ""}
     </div>

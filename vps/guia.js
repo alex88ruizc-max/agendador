@@ -1,4 +1,4 @@
-// 📲 3.43 · ESTADO «CÓMO AGENDAR» (3 imágenes 1080×1920, 2 pasos cada una), con el nombre, los servicios, el equipo y las
+// 📲 3.43 · ESTADO «CÓMO AGENDAR» (2 imágenes 1080×1920, 2 pasos cada una: 1-2 y 3-4), con el nombre, los servicios, el equipo y las
 //    horas REALES del negocio. Todo sale de la base (Firestore) igual que los cupos: NO gasta llamadas de Google.
 //    Diseño propio de Tu Agenda (fondo blanco · tinta, azul y rojo del poste). Nada del diseño de Epic.
 //    Se dibuja en SVG y se pasa a PNG con resvg (como estado.js). Sin emojis dentro de la imagen (resvg no los dibuja).
@@ -90,28 +90,26 @@ const PASOS = [
       ['Nombre', 'WhatsApp', 'Correo'].map((k, i) => t(x, y + 252 + i * 112, k, { w: 700, z: 20, c: C.mut }) + r(x, y + 266 + i * 112, w, 64, { s: C.line, rx: 16 }) +
         t(x + 20, y + 307 + i * 112, ['Tu nombre', '+57 300 123 4567', 'tucorreo@gmail.com'][i], { z: 22, c: '#9AA3AB' })).join('') +
       btn(x, y + 610, w, 'Crear cuenta y ver la agenda', C.red) },
-  { titulo: 'Elige el día', texto: 'En el calendario toca el día que quieres. Si prefieres, elige también con quién.',
+  { titulo: 'Elige día y hora', texto: 'Toca el día y una hora libre. Si quieres, elige también con quién.',
     cuerpo: (info) => (x, y, w) => {
-      let s = r(x, y, w, 66, { f: C.blue, rx: 18 }) + t(x + w / 2, y + 43, 'ELIGE DÍA Y HORA', { w: 800, z: 24, c: '#FFFFFF', a: 'middle', ls: 1 });
-      let cx = x; ['Cualquiera'].concat(info.gente).slice(0, 3).forEach((n, i) => { const nn = corto(n, 10), cw = 30 + nn.length * 12; s += r(cx, y + 90, cw, 48, { f: i ? '#FFFFFF' : C.ink, s: i ? C.line : C.ink, rx: 24 }) + t(cx + cw / 2, y + 122, nn, { w: 700, z: 19, c: i ? C.ink : '#FFFFFF', a: 'middle' }); cx += cw + 10; });
+      let s = '';
+      let cx = x; ['Cualquiera'].concat(info.gente).slice(0, 3).forEach((n, i) => { const nn = corto(n, 10), cw = 30 + nn.length * 12; s += r(cx, y, cw, 48, { f: i ? '#FFFFFF' : C.ink, s: i ? C.line : C.ink, rx: 24 }) + t(cx + cw / 2, y + 32, nn, { w: 700, z: 19, c: i ? C.ink : '#FFFFFF', a: 'middle' }); cx += cw + 10; });
       const [yy, mm] = info.fecha.split('-').map(Number);
-      s += t(x, y + 186, MESES[mm - 1].charAt(0).toUpperCase() + MESES[mm - 1].slice(1) + ' ' + yy, { w: 700, z: 24 });
-      const cw = w / 7, ini = sumarDias(info.hoy, -dow(info.hoy));
-      ['D', 'L', 'M', 'M', 'J', 'V', 'S'].forEach((d, i) => { s += t(x + cw * i + cw / 2, y + 228, d, { w: 700, z: 17, c: C.mut, a: 'middle' }); });
-      for (let k = 0; k < 21; k++) {
-        const f = sumarDias(ini, k), cxx = x + cw * (k % 7), cyy = y + 248 + Math.floor(k / 7) * 64, sel = f === info.fecha;
+      s += t(x, y + 96, MESES[mm - 1].charAt(0).toUpperCase() + MESES[mm - 1].slice(1) + ' ' + yy, { w: 700, z: 24 });
+      const cw = w / 7, ini0 = sumarDias(info.hoy, -dow(info.hoy)), ini = info.fecha >= sumarDias(ini0, 14) ? sumarDias(info.fecha, -dow(info.fecha)) : ini0;
+      ['D', 'L', 'M', 'M', 'J', 'V', 'S'].forEach((d, i) => { s += t(x + cw * i + cw / 2, y + 136, d, { w: 700, z: 17, c: C.mut, a: 'middle' }); });
+      const filas = 2;   // 2 semanas: deja espacio para las horas
+      for (let k = 0; k < 7 * filas; k++) {
+        const f = sumarDias(ini, k), cxx = x + cw * (k % 7), cyy = y + 154 + Math.floor(k / 7) * 62, sel = f === info.fecha;
         const gris = f < info.hoy || info.cerrados.includes(f);
-        if (sel) s += r(cxx + 4, cyy, cw - 8, 54, { f: C.blue, rx: 14 });
-        s += t(cxx + cw / 2, cyy + 36, String(Number(f.slice(8))), { w: sel ? 800 : 600, z: 21, c: sel ? '#FFFFFF' : gris ? '#C3C9CE' : C.ink, a: 'middle' });
+        if (sel) s += r(cxx + 4, cyy, cw - 8, 52, { f: C.blue, rx: 14 });
+        s += t(cxx + cw / 2, cyy + 35, String(Number(f.slice(8))), { w: sel ? 800 : 600, z: 21, c: sel ? '#FFFFFF' : gris ? '#C3C9CE' : C.ink, a: 'middle' });
       }
-      return s + t(x, y + 470, 'Los días en gris no tienen cupos.', { z: 19, c: C.mut });
-    } },
-  { titulo: 'Elige la hora', texto: 'Solo ves las horas libres. Toca la que te sirva.',
-    cuerpo: (info) => (x, y, w) => {
-      let s = t(x, y + 28, info.diaTxt + ' ' + Number(info.fecha.slice(8)) + ' de ' + MESES[Number(info.fecha.slice(5, 7)) - 1], { w: 700, z: 26 }) + t(x, y + 62, 'Toca una hora para apartarla.', { z: 19, c: C.mut });
-      const cw = (w - 20) / 3;
-      info.horas.forEach((h, i) => { const cx = x + (i % 3) * (cw + 10), cy = y + 88 + Math.floor(i / 3) * 74, on = h === info.elegida;
-        s += r(cx, cy, cw, 62, { f: on ? C.blue : '#FFFFFF', s: on ? C.blue : C.line, rx: 14 }) + t(cx + cw / 2, cy + 40, h.replace(' a. m.', ' am').replace(' p. m.', ' pm'), { w: 700, z: 21, c: on ? '#FFFFFF' : C.ink, a: 'middle' }); });
+      s += `<rect x="${x}" y="${y + 296}" width="${w}" height="2" fill="${C.line}"/>`;
+      s += t(x, y + 346, 'Horas libres · ' + info.diaTxt + ' ' + Number(info.fecha.slice(8)), { w: 700, z: 23 });
+      const hw = (w - 20) / 3;
+      info.horas.slice(0, 9).forEach((h, i) => { const hx = x + (i % 3) * (hw + 10), hy = y + 372 + Math.floor(i / 3) * 74, on = h === info.elegida;
+        s += r(hx, hy, hw, 62, { f: on ? C.blue : '#FFFFFF', s: on ? C.blue : C.line, rx: 14 }) + t(hx + hw / 2, hy + 40, h.replace(' a. m.', ' am').replace(' p. m.', ' pm'), { w: 700, z: 21, c: on ? '#FFFFFF' : C.ink, a: 'middle' }); });
       return s;
     } },
   { titulo: '¿Qué te vas a hacer?', texto: 'Marca el servicio. Si le sumas algo, el precio y el tiempo se suman solos.',
@@ -127,70 +125,58 @@ const PASOS = [
           t(x + 66, cy + 90, corto(info.extra.nombre, 17), { w: 600, z: 22 }) + t(x + w - 18, cy + 90, '+' + cop(info.extra.precio), { w: 800, z: 22, c: C.blue, a: 'end' }); }
       return s;
     } },
-  { titulo: 'Revisa y aparta', texto: 'Mira el resumen y toca «Apartar cupo».',
+  { titulo: 'Aparta y ¡listo!', texto: (info) => info.abono > 0 ? 'Toca «Apartar cupo», sube la captura del abono y ¡listo!' : 'Toca «Apartar cupo» y te sale tu número de reserva. ¡Listo!',
     cuerpo: (info) => (x, y, w) => {
-      const sv = info.servicios[Math.min(1, info.servicios.length - 1)];
-      let s = r(x, y, w, 330, { s: C.line, rx: 22 });
-      [['Día', info.diaTxt + ' ' + Number(info.fecha.slice(8))], ['Hora', info.elegida], ['Con', info.conQuien || 'Quien esté libre'], ['Servicio', sv.nombre], ['Total', cop(sv.precio)]]
-        .forEach(([k, v], i) => { s += fila(x + 22, y + 52 + i * 60, w - 44, k, v); });
-      s += btn(x, y + 356, w, 'Apartar cupo', C.red);
-      if (info.abono > 0) s += r(x, y + 450, w, 220, { f: C.paper, rx: 22 }) + t(x + 22, y + 492, 'PARA CONFIRMAR, UN ABONO DE', { w: 700, z: 17, c: C.mut }) +
-        t(x + 22, y + 546, cop(info.abono), { w: 800, z: 42 }) + r(x + 22, y + 574, w - 44, 70, { f: '#FFFFFF', s: '#B9C3CC', da: '10 8', rx: 16 }) + t(x + w / 2, y + 617, 'Sube la captura del pago', { w: 600, z: 20, c: C.mut, a: 'middle' });
-      else s += r(x, y + 450, w, 120, { f: '#F1FBF6', s: '#B9E4CF', rx: 22 }) + t(x + 22, y + 500, 'Sin abono:', { w: 800, z: 23, c: '#0F7A4D' }) + t(x + 22, y + 538, 'tu cupo queda apartado al instante.', { z: 21 });
-      return s;
-    } },
-  { titulo: '¡Cita confirmada!', texto: 'Te sale tu número de reserva y te llega por WhatsApp y al correo.',
-    cuerpo: (info) => (x, y, w) => {
-      const sv = info.servicios[Math.min(1, info.servicios.length - 1)];
-      let s = `<rect x="${x}" y="${y}" width="${w}" height="490" rx="22" fill="#FFFFFF" stroke="${C.line}" stroke-width="2"/>` +
-        `<path d="M${x} ${y + 22}a22 22 0 0 1 22 -22h${w - 44}a22 22 0 0 1 22 22v186h-${w}z" fill="${C.ink}"/>` +
-        `<circle cx="${x + w / 2}" cy="${y + 52}" r="28" fill="#10B981"/><path d="M${x + w / 2 - 13} ${y + 52}l9 9l17 -18" stroke="#FFFFFF" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>` +
-        t(x + w / 2, y + 122, 'CITA CONFIRMADA', { w: 800, z: 23, c: '#FFFFFF', a: 'middle', ls: 2 }) + t(x + w / 2, y + 180, 'K7P2Q', { w: 800, z: 46, c: '#FFFFFF', a: 'middle', ls: 6 });
-      for (let k = 0; k * 28 + 14 <= w; k++) s += `<rect x="${x + k * 28}" y="${y + 202}" width="14" height="6" fill="${k % 2 ? C.blue : C.red}"/>`;
+      const sv = info.servicios[Math.min(1, info.servicios.length - 1)], y0 = y + 92;
+      let s = btn(x, y, w, 'Apartar cupo · ' + cop(sv.precio), C.red);
+      s += `<rect x="${x}" y="${y0}" width="${w}" height="490" rx="22" fill="#FFFFFF" stroke="${C.line}" stroke-width="2"/>` +
+        `<path d="M${x} ${y0 + 22}a22 22 0 0 1 22 -22h${w - 44}a22 22 0 0 1 22 22v186h-${w}z" fill="${C.ink}"/>` +
+        `<circle cx="${x + w / 2}" cy="${y0 + 52}" r="28" fill="#10B981"/><path d="M${x + w / 2 - 13} ${y0 + 52}l9 9l17 -18" stroke="#FFFFFF" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>` +
+        t(x + w / 2, y0 + 122, 'CITA CONFIRMADA', { w: 800, z: 23, c: '#FFFFFF', a: 'middle', ls: 2 }) + t(x + w / 2, y0 + 180, 'K7P2Q', { w: 800, z: 46, c: '#FFFFFF', a: 'middle', ls: 6 });
+      for (let k = 0; k * 28 + 14 <= w; k++) s += `<rect x="${x + k * 28}" y="${y0 + 202}" width="14" height="6" fill="${k % 2 ? C.blue : C.red}"/>`;
       [['Fecha', info.diaTxt + ' ' + Number(info.fecha.slice(8))], ['Hora', info.elegida], ['Con', info.conQuien || 'Quien esté libre'], ['Servicio', sv.nombre]]
-        .forEach(([k, v], i) => { s += fila(x + 22, y + 262 + i * 58, w - 44, k, v); });
-      const half = (w - 12) / 2;
-      if (info.mapa) s += btn(x, y + 512, half, 'Ir con Waze', '#33CCFF', '#0B2540') + r(x + half + 12, y + 512, half, 70, { s: C.line, rx: 18 }) + t(x + half + 12 + half / 2, y + 557, 'Google Maps', { w: 800, z: 23, a: 'middle' });
-      s += r(x, y + (info.mapa ? 596 : 512), w, 70, { s: C.line, rx: 18 }) + t(x + w / 2, y + (info.mapa ? 641 : 557), 'Enviar a WhatsApp', { w: 800, z: 23, a: 'middle' });
+        .forEach(([k, v], i) => { s += fila(x + 22, y0 + 262 + i * 58, w - 44, k, v); });
+      const half = (w - 12) / 2, yb = y0 + 510;
+      if (info.mapa) s += btn(x, yb, half, 'Ir con Waze', '#33CCFF', '#0B2540') + r(x + half + 12, yb, half, 70, { s: C.line, rx: 18 }) + t(x + half + 12 + half / 2, yb + 45, 'Google Maps', { w: 800, z: 23, a: 'middle' });
+      else s += r(x, yb, w, 70, { s: C.line, rx: 18 }) + t(x + w / 2, yb + 45, 'Enviar a WhatsApp', { w: 800, z: 23, a: 'middle' });
       return s;
     } }
 ];
-const TITULOS = ['Cómo agendar tu cita', 'Elige hora y servicio', 'Aparta y ¡listo!'];
+const TITULOS = ['Cómo agendar tu cita', 'Elige y ¡listo!'];
 const PIES = [
-  ['Sigue en el siguiente estado', 'Ya casi: falta la hora y el servicio.'],
-  ['Último paso en el siguiente estado', 'Revisas, apartas y ¡listo!'],
+  ['Sigue en el siguiente estado', 'Ya casi: eliges el servicio y apartas.'],
   ['Agenda tu cita aquí', '']
 ];
+const PARTES = 2;
 
-// parte = 1, 2 o 3 (pasos 1-2, 3-4, 5-6)
+// parte = 1 o 2 (pasos 1-2 y 3-4)
 function svgGuia(info, parte, marcaAgua) {
-  const p = Math.max(1, Math.min(3, Number(parte) || 1)), a = PASOS[(p - 1) * 2], b = PASOS[(p - 1) * 2 + 1];
+  const p = Math.max(1, Math.min(PARTES, Number(parte) || 1)), a = PASOS[(p - 1) * 2], b = PASOS[(p - 1) * 2 + 1];
   const col = (paso, n, x) => {
-    const L = renglones(paso.texto, 29).slice(0, 3);
+    const L = renglones(typeof paso.texto === 'function' ? paso.texto(info) : paso.texto, 29).slice(0, 3);
     return `<circle cx="${x + 34}" cy="${520}" r="34" fill="${C.ink}"/>` + t(x + 34, 532, String(n), { w: 800, z: 34, c: '#FFFFFF', a: 'middle' }) +
       t(x + 84, 534, corto(paso.titulo, 20), { w: 800, z: 38 }) + L.map((l, i) => t(x, 600 + i * 40, l, { z: 27, c: C.mut })).join('') +
       celular(info, x, 720, paso.cuerpo(info));
   };
-  const barras = [0, 1, 2].map((i) => `<rect x="${56 + i * 86}" y="426" width="72" height="12" rx="6" fill="${i === p - 1 ? C.blue : C.line}"/>`).join('');
+  const barras = Array.from({ length: PARTES }, (_, i) => `<rect x="${56 + i * 86}" y="426" width="72" height="12" rx="6" fill="${i === p - 1 ? C.blue : C.line}"/>`).join('');
   const pie = PIES[p - 1];
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1920" viewBox="0 0 1080 1920">
 <rect width="1080" height="1920" fill="#FFFFFF"/>
-${r(56, 96, 430, 64, { f: C.paper, rx: 32 })}${t(86, 138, 'Cómo agendar · ' + p + ' de 3', { w: 700, z: 26, c: C.blue })}
+${r(56, 96, 430, 64, { f: C.paper, rx: 32 })}${t(86, 138, 'Cómo agendar · ' + p + ' de ' + PARTES, { w: 700, z: 26, c: C.blue })}
 ${t(56, 250, corto(info.negocio, 22), { w: 700, z: 40, c: C.mut })}
 ${t(52, 380, TITULOS[p - 1], { w: 800, z: 86, ls: -2 })}
 ${barras}
 ${col(a, (p - 1) * 2 + 1, 56)}${col(b, (p - 1) * 2 + 2, 554)}
 ${r(56, 1660, 968, 140, { f: C.paper, rx: 32 })}
-${t(92, 1716, pie[0], { w: 800, z: 34 })}${t(92, 1764, p === 3 && info.link ? String(info.link).replace(/^https?:\/\//, '').replace('/index.html?b=', '/?b=') : pie[1], { z: 28, c: C.mut })}
+${t(92, 1716, pie[0], { w: 800, z: 34 })}${t(92, 1764, p === PARTES && info.link ? String(info.link).replace(/^https?:\/\//, '').replace('/index.html?b=', '/?b=') : pie[1], { z: 28, c: C.mut })}
 ${info.marca ? t(540, 1866, 'Hecho con tuagenda.vip', { w: 600, z: 26, c: C.mut, a: 'middle' }) : ''}
 ${marcaAgua ? marcaAgua(info, false) : ''}
 </svg>`;
 }
 const textoGuia = (info, parte) => [
-  `📲 Así agendas tu cita en ${info.negocio}, en 1 minuto (1 de 3)`,
-  `🕐 Eliges la hora y lo que te vas a hacer (2 de 3)`,
-  `✅ ¡Y listo! Agenda aquí: ${info.link}`
-][Math.max(1, Math.min(3, Number(parte) || 1)) - 1];
+  `📲 Así agendas tu cita en ${info.negocio}, en 1 minuto (1 de 2)`,
+  `✅ Eliges el servicio, apartas ¡y listo! Agenda aquí: ${info.link}`
+][Math.max(1, Math.min(PARTES, Number(parte) || 1)) - 1];
 
 // ---------- 3 · ¿toca hoy? (función pura): a la hora elegida, cada N días, una sola vez ----------
 function guiaToca(cfg, a, ultima) {
@@ -204,4 +190,4 @@ function guiaToca(cfg, a, ultima) {
   return dias >= cada;
 }
 
-module.exports = { TIPOS, datosGuia, svgGuia, textoGuia, guiaToca };
+module.exports = { PARTES, TIPOS, datosGuia, svgGuia, textoGuia, guiaToca };

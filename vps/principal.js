@@ -18,7 +18,7 @@ const CFG = {
   prueba: String(env('MARY_PRUEBA', '')).split(/[,\s]+/).map((x) => x.replace(/\D/g, '')).filter((x) => x.length >= 10),
   leerDirecto: env('LEER_DIRECTO', 'si') !== 'no',
   volverEspacioMs: parseInt(env('VOLVER_ESPACIO_MS', String(3 * 60000)), 10),   // 3.32: minutos entre un recordatorio de servicio y el siguiente   // 3.30: días/horas/cupos calculados en el VPS (LEER_DIRECTO=no → todo por Google como antes)
-  guiaEspacioMs: parseInt(env('GUIA_ESPACIO_MS', '20000'), 10),   // 3.43: segundos entre las 3 imágenes de «Cómo agendar» (para que lleguen en orden)
+  guiaEspacioMs: parseInt(env('GUIA_ESPACIO_MS', '20000'), 10),   // 3.43: segundos entre las 2 imágenes de «Cómo agendar» (para que lleguen en orden)
   silencioMin: parseInt(env('SILENCIO_MIN', '15'), 10),     // no repite lo mismo en un chat antes de esto (salvo que el cliente diga algo de la lista)
   humanoMin: parseFloat(env('HUMANO_MIN', '30')),           // 3.1: si el dueño escribe a mano en un chat, se calla ahí 30 min (o lo que diga su panel)
   agruparMs: parseInt(env('AGRUPAR_MS', '7000'), 10),
@@ -554,7 +554,7 @@ async function enviarEstado(neg, quien, png, caption) {
   }
   catch (e) { if (!/timeout|aborted|524|504/i.test(e.message)) throw e; }   // ⏳ publicar a muchos contactos tarda: Evolution lo sigue haciendo solo
 }
-// 📲 3.43 · ESTADO «CÓMO AGENDAR»: 3 imágenes seguidas (1-2, 3-4, 5-6) con el nombre, servicios, equipo y horas reales.
+// 📲 3.43 · ESTADO «CÓMO AGENDAR»: 2 imágenes seguidas (pasos 1-2 y 3-4) con el nombre, servicios, equipo y horas reales.
 //    Los datos salen de la base (cuposLocal.guia): no gasta llamadas de Google. Sale en todos los planes (prueba incluida).
 const GUIA = require('./guia');
 async function publicarGuia(neg) {
@@ -564,11 +564,11 @@ async function publicarGuia(neg) {
   const D = await CL.guia(neg.bid);
   if (D.biz && D.biz.status && D.biz.status !== 'active') return { ok: false, motivo: 'la agenda del negocio no está activa' };
   const info = GUIA.datosGuia(Object.assign({}, D, { link: 'https://tuagenda.vip/index.html?b=' + encodeURIComponent(neg.bid) }));
-  for (const p of [1, 2, 3]) {   // en orden: primero 1-2, luego 3-4, al final 5-6
+  for (let p = 1; p <= GUIA.PARTES; p++) {   // en orden: primero los pasos 1-2, después 3-4
     await enviarEstado(neg, quien, E.png(GUIA.svgGuia(info, p, E.marcaAgua)), GUIA.textoGuia(info, p));
-    if (p < 3) await esperar(CFG.guiaEspacioMs);
+    if (p < GUIA.PARTES) await esperar(CFG.guiaEspacioMs);
   }
-  est.estados++; anotar({ bid: neg.bid, que: 'estado «cómo agendar» publicado (3 imágenes)' });
+  est.estados++; anotar({ bid: neg.bid, que: 'estado «cómo agendar» publicado (' + GUIA.PARTES + ' imágenes)' });
   return { ok: true };
 }
 const esperar = (ms) => new Promise((ok) => setTimeout(ok, ms));
