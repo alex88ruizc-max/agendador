@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.48** · Página **2026-11-13n** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.48** · Página **2026-11-13o** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -133,6 +133,14 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-13 · página 2026-11-13o · 👀 «Mira cómo funciona» en los planes y beneficios de conectar Telegram
+- **«👀 Mira cómo funciona»** debajo de la tabla de planes del panel (`planEjemplos()` en common.js): la misma lista de beneficios con un ejemplo de cómo se ve cada cosa
+  (página de citas, chat del bot, aviso con Aprobar/Rechazar, recordatorio, «que vuelvan», estados y reporte). Sale según lo que trae el plan elegido y con el servicio y el profesional reales del negocio.
+- **Beneficios de conectar Telegram** (guía y Configuración): foto del comprobante con botones, cada reserva al instante, cada profesional recibe sus citas, aviso antes de la cita, sirve con un solo número, gratis.
+- **WhatsApp Bot › Avisos:** tarjeta «¿WhatsApp o Telegram? Puedes usar los dos» con la diferencia entre ambos y el botón «Conectar mi Telegram».
+- Tabla de planes: «Avisos en Telegram» ya no dice «8»; dice «Todos» (o «N tipos»).
+- Banco de la página: 0 fallas. Mary no cambia (sigue 3.48).
 
 ### 2026-11-13 · agendador-ia-3.48 · la 3.47 no se instaló: el banco fallaba SOLO en el VPS
 - **Qué pasó:** el cartero respondió «La versión nueva NO pasó el banco de pruebas» con la 3.47. El bot estaba bien; la que fallaba era una prueba (la de «días para reservar», de la 3.44)
