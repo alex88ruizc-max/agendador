@@ -1,6 +1,6 @@
 // Página pública: ver cupos, registrarse, apartar, pagar con screenshot, mis cupos
-import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro, ventanaReserva } from "./common.js?v=2026-11-13i";
-import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-13i";
+import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro, ventanaReserva, OFERTA_TXT } from "./common.js?v=2026-11-13j";
+import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-13j";
 import {
   onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, sendPasswordResetEmail,
   GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult
@@ -12,7 +12,7 @@ import {
   startUpdateWatcher, applyBrandColors, warmServer, uiConfirm, setDialogBrand, viewImage, pushOverlay, dropOverlay, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, dow, hora12, fechaLarga, fechaCorta, toMillis, cop, esc,
   normalizePhone, waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, computeSlots, dayCapacityUnits, staffHours, mapLinks, headerBgCss,
   toast, openModal, closeModal, setBusy, copyText, tmin, mstr, UNIT
-} from "./common.js?v=2026-11-13i";
+} from "./common.js?v=2026-11-13j";
 
 const $ = (id) => document.getElementById(id);
 const S = {
@@ -49,7 +49,7 @@ if (!/^[a-z0-9][a-z0-9-]{1,29}$/.test(BIZ_ID)) {
     const b = e.target.closest("[data-lp]"); if (!b) return;
     if (b.dataset.lp === "trial") $("btnTrial").click(); else openAuth("login");
   });
-  // 🚀 2026-11-13i · viene de la invitación de una página de negocio: se abre «Probar gratis» de una vez
+  // 🚀 2026-11-13j · viene de la invitación de una página de negocio: se abre «Probar gratis» de una vez
   if (new URLSearchParams(location.search).has("probar")) setTimeout(() => $("btnTrial").click(), 400);
 } else {
   setBusiness(BIZ_ID);
@@ -1174,7 +1174,7 @@ getDoc(doc(db, "platform", "public")).then((d) => {
   if (S.settings) renderAll();
   const on = PLAT.trialEnabled !== false;
   $("trialCta").classList.toggle("hidden", !on);
-  // 2026-11-13i · en la página de un negocio NO hay «Probar gratis» mientras el cliente agenda (no se pierde la cita):
+  // 2026-11-13j · en la página de un negocio NO hay «Probar gratis» mientras el cliente agenda (no se pierde la cita):
   //   solo el sello chiquito abajo; la invitación sale DESPUÉS (cita confirmada y «Mis citas"), en otra pestaña.
   $("trialTop").classList.add("hidden"); $("trialTop").classList.remove("inline-flex");
   $("trialCta").classList.add("hidden");
@@ -1195,7 +1195,7 @@ function renderTrialPlans() {
     <div class="grid grid-cols-3 gap-2">${PLAN_KEYS.map((k) => `<button type="button" class="relative rounded-2xl px-1.5 py-3 text-center" style="background:${PSTYLE[k][0]};color:${PSTYLE[k][1]};outline:3px solid ${k === T_PLAN ? "#17222E" : "transparent"};outline-offset:2px" data-tplan="${k}" aria-pressed="${k === T_PLAN}">
       ${k === rec ? `<span class="absolute -top-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-pole-red px-1.5 text-[8.5px] font-extrabold text-white">RECOMENDADO</span>` : ""}
       ${k === T_PLAN ? `<span class="absolute -right-1.5 -top-2 grid h-5 w-5 place-items-center rounded-full bg-ink text-[11px] font-extrabold text-white">✓</span>` : ""}
-      <b class="block text-[14px]">${PSTYLE[k][2]} ${esc(P[k].name)}</b><span class="block text-[11px] opacity-90">${k === "free" ? P.free.days + " días" : cop(P[k].priceCOP) + "/mes"}</span></button>`).join("")}</div>
+      <b class="block text-[14px]">${PSTYLE[k][2]} ${esc(P[k].name)}</b><span class="block text-[11px] opacity-90">${k === "free" ? P.free.days + " días" : cop(P[k].priceCOP) + "/mes"}</span>${k !== "free" && P[k].oferta ? `<span class="mx-auto mt-1 block w-fit rounded-full bg-white px-1.5 py-0.5 text-[9px] font-extrabold leading-tight" style="color:#B3202A">${OFERTA_TXT}</span>` : ""}</button>`).join("")}</div>
     <div class="mt-3 rounded-2xl p-3" style="background:${T_PLAN === "gold" ? "linear-gradient(160deg,#fff6db,#fff)" : "#F2F5F8"};${T_PLAN === "gold" ? "border:1px solid #f5c542" : ""}">
       <p class="mb-1 text-sm font-extrabold">${PSTYLE[T_PLAN][2]} Con ${esc(P[T_PLAN].name)}${P[T_PLAN].tagline ? `: <span class="font-semibold text-ink/70">${esc(P[T_PLAN].tagline)}</span>` : ""}</p>
       ${planBenefitsIntro(P, T_PLAN) ? `<p class="mb-1 text-[12px] font-bold text-ink/60">${esc(planBenefitsIntro(P, T_PLAN))}</p>` : ""}

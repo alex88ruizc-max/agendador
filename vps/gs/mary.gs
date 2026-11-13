@@ -14,7 +14,7 @@
  * Instalación: pega este archivo, ejecuta activarMary() una vez, copia la clave que sale en el registro
  * y ponla en el mary.env del VPS (MARY_KEY). Vuelve a implementar la aplicación web (Implementar > Administrar > editar > Nueva versión).
  */
-const MARY_VERSION = 'agendador-ia-3.44';
+const MARY_VERSION = 'agendador-ia-3.45';
 
 // Se registra como acción pública del servidor (sin sesión: entra con la clave de Mary).
 // ⚠️ Este archivo debe quedar DEBAJO del archivo principal en la lista de archivos de Apps Script (los nuevos quedan al final: así está bien).
@@ -105,7 +105,7 @@ function maryBotCfg_(st) {
   const d = function (v, x) { return v === undefined || v === null || v === '' ? x : v; };
   let horas = (Array.isArray(e.horas) ? e.horas : ['11:00']).filter(function (h) { return /^\d{2}:\d{2}$/.test(String(h)); }).slice(0, 2);   // máximo 2 estados al día
   if (!horas.length) horas = ['11:00'];
-  return {
+  const c = {
     activo: d(b.activo, true) !== false, agendar: d(b.agendar, true) !== false, cupos: d(b.cupos, true) !== false, audios: d(b.audios, true) !== false,
     saludoDiario: d(b.saludoDiario, true) !== false, pedirNombre: d(b.pedirNombre, true) !== false, pedirCorreo: d(b.pedirCorreo, true) !== false,
     loDeSiempre: d(b.loDeSiempre, true) !== false, recordatorioMin: Math.max(0, Number(d(b.recordatorioMin, d(st.maryReminderMinutes, 120)))),
@@ -114,6 +114,16 @@ function maryBotCfg_(st) {
     volver: { activo: (b.volver || {}).activo === true, dias: Math.max(0, Math.min(60, Number((b.volver || {}).dias || 0))) },   // 3.32: lo elige el dueño (0 = no elegido: no sale)
     guia: { activo: (b.guia || {}).activo !== false, hora: /^\d{2}:\d{2}$/.test(String((b.guia || {}).hora || '')) ? b.guia.hora : '08:00', cadaDias: Math.max(1, Math.min(30, Number((b.guia || {}).cadaDias || 3))) }   // 3.43: estado «Cómo agendar»
   };
+  // 🤖 3.45 · lo que el superusuario apagó para TODAS las tiendas manda (platform/public.botOff)
+  let off = []; try { off = (typeof platformPublic === 'function' ? platformPublic().botOff : null) || []; } catch (e) { off = []; }
+  off.forEach(function (k) {
+    if (k === 'recordatorio') c.recordatorioMin = 0;
+    else if (k === 'estados') c.estados.activo = false;
+    else if (k === 'guia') c.guia.activo = false;
+    else if (k === 'volver') c.volver.activo = false;
+    else if (typeof c[k] === 'boolean') c[k] = false;
+  });
+  return c;
 }
 // 3.1 · el cliente queda en los CLIENTES del negocio (panel › Clientes) con su nombre, WhatsApp y correo
 function maryGuardarCliente_(nombre, phone, email) {

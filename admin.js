@@ -7,11 +7,11 @@ import {
   startUpdateWatcher, applyBrandColors, uiConfirm, uiPrompt, setDialogBrand, viewImage, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, hora12, tmin, fechaLarga, fechaCorta, toMillis, cop, esc, normalizePhone,
   waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, DEFAULT_WA_RESCHEDULE, computeSlots, staffHours, mapLinks, headerBgCss, onColor, darken,
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
-  PLAN_KEYS, plansOf, planOfBiz, planPriceOf, ventanaReserva, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
+  PLAN_KEYS, plansOf, planOfBiz, planPriceOf, ventanaReserva, OFERTA_TXT, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-11-13i";
-import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-13i";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-13i";
+} from "./common.js?v=2026-11-13j";
+import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-13j";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-13j";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -2063,6 +2063,7 @@ function renderPlan() {
         ${k === sel ? `<span class="absolute -right-1.5 -top-2 grid h-5 w-5 place-items-center rounded-full text-[11px] font-extrabold text-white" style="background:var(--sink)">✓</span>` : ""}
         <b class="block text-[14px]">${PLAN_STYLE[k][2]} ${esc(P[k].name)}</b>
         <span class="block text-[11px] opacity-90">${k === "free" ? `${P.free.days} días` : cop(P[k].priceCOP) + "/mes"}</span>
+        ${k !== "free" && P[k].oferta ? `<span class="mx-auto mt-1 block w-fit rounded-full bg-white px-1.5 py-0.5 text-[9px] font-extrabold leading-tight" style="color:#B3202A">${OFERTA_TXT}</span>` : ""}
         ${k === cur && !gate ? `<span class="mt-1 inline-block rounded-full bg-white/25 px-1.5 text-[9.5px] font-bold">Tu plan</span>` : ""}
       </button>`).join("")}</div>
     <div class="mt-3 rounded-2xl p-3" style="background:${sel === "gold" ? "linear-gradient(160deg,#fff6db,#fff)" : "var(--canvas)"};${sel === "gold" ? "border:1px solid #f5c542" : ""}">
@@ -2209,7 +2210,7 @@ function startHome() {
     renderTabs(); syncPlanGate(); if (A.tab === "plan") renderPlan();
   }, () => {}));
   if (isOwner()) H.unsubs.push(onSnapshot(doc(db, bpath("private", "billing")), (d) => { A.bill = d.data() || {}; syncPlanGate(); if (A.tab === "plan") renderPlan(); }, () => {}));
-  H.unsubs.push(onSnapshot(doc(db, "platform", "public"), (d) => { A.plat = d.data() || {}; renderTabs(); if (A.tab === "home") renderHome(); if (A.tab === "linkcli") renderLinkCli(); }, () => {}));
+  H.unsubs.push(onSnapshot(doc(db, "platform", "public"), (d) => { A.plat = d.data() || {}; renderTabs(); if (A.tab === "home") renderHome(); if (A.tab === "linkcli") renderLinkCli(); if (A.tab === "wabot") renderWaBot(); }, () => {}));
   H.today = bogNow().date;
   H.unsubs.push(onSnapshot(query(collection(db, bpath("appointments")), where("date", "==", H.today)), (q) => { H.apts = q.docs.map((d) => d.data()); renderHome(); }, onErr));
   H.unsubs.push(onSnapshot(query(collection(db, bpath("slotLocks")), where("date", "==", H.today)), (q) => { H.locks = q.docs.map((d) => d.data()); renderHome(); }, onErr));
@@ -4000,7 +4001,29 @@ function maryWaCard() {
         <label class="field"><span>Número de WhatsApp del negocio</span><input id="mwNum" type="tel" inputmode="numeric" placeholder="57 300 123 4567" value="${esc(num.length === 10 ? "57" + num : num)}"></label>
         <button type="button" id="mwOn" class="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-[15px] font-extrabold text-white" style="background:#25D366"><i class="fa-brands fa-whatsapp text-xl"></i> Vincular mi WhatsApp</button>
         <div id="mwBox" class="mt-3 hidden"></div>
+        ${mwGuia()}
       </div></div>`;
+}
+// 📖 guía paso a paso para vincular (se ve ANTES de tocar «Vincular»: así el dueño sabe qué va a pasar)
+function mwGuia() {
+  const paso = (n, t, d) => `<li class="flex gap-3"><span class="grid h-7 w-7 shrink-0 place-items-center rounded-full text-[13px] font-extrabold text-white" style="background:#128C7E">${n}</span><span class="min-w-0"><b class="block text-[14px]">${t}</b><span class="block text-[12.5px] text-ink/70">${d}</span></span></li>`;
+  return `<details class="mt-4 rounded-2xl border border-line" open>
+    <summary class="cursor-pointer px-3.5 py-3 text-[14.5px] font-extrabold">📖 Así se vincula, paso a paso <span class="font-semibold text-ink/55">(2 minutos)</span></summary>
+    <ol class="space-y-3 px-3.5 pb-3.5">
+      ${paso(1, "Ten a la mano el celular del negocio", "El que tiene el WhatsApp que vas a vincular. Puede ser WhatsApp normal o Business, en iPhone o Android.")}
+      ${paso(2, "Escribe el número y toca «Vincular mi WhatsApp»", "Con el 57 adelante, ej. 57 300 123 4567. Debe ser el MISMO número del celular del negocio.")}
+      ${paso(3, "Aquí te sale un código de 8 letras", "Ejemplo: ABCD-1234. Tienes <b>3 minutos</b> para usarlo. Déjalo a la vista.")}
+      ${paso(4, "En el celular del negocio abre WhatsApp", "<b>Android:</b> toca los <b>⋮</b> de arriba a la derecha. <b>iPhone:</b> toca <b>Configuración</b> abajo a la derecha.")}
+      ${paso(5, "Entra a «Dispositivos vinculados» › «Vincular un dispositivo»", "Si te pide tu huella o tu clave del celular, pónla.")}
+      ${paso(6, "Toca «Vincular con el número de teléfono»", "Está abajo, en letra pequeña, debajo de la cámara para el QR. Escribe ahí el código de 8 letras.")}
+      ${paso(7, "¡Listo!", "Aquí cambia a «✓ WhatsApp vinculado» y te llega un aviso a Telegram. Sigues usando tu WhatsApp igual que siempre.")}
+    </ol>
+    <div class="mx-3.5 mb-3.5 rounded-xl p-3 text-[12.5px]" style="background:var(--canvas)">
+      <b>💡 Si algo no sale:</b><br>
+      • ¿Se acabaron los 3 minutos? Toca «Vincular mi WhatsApp» otra vez y sale un código nuevo.<br>
+      • ¿Dice que el código es incorrecto? Revisa que el número de arriba sea el del celular donde lo estás escribiendo.<br>
+      • ¿Prefieres QR? Cuando salga el código, toca «Prefiero escanear un QR» y escanéalo desde «Vincular un dispositivo».
+    </div></details>`;
 }
 function mwPintar(r) {
   const box = $("mwBox"); if (!box) return;
@@ -4096,6 +4119,8 @@ function renderWaBot() {
   const el = $("tab-wabot"); if (!el) return;
   if (lockedNow("whatsapp")) { const need = planFor("whatsapp"); el.innerHTML = `<div class="sp-card text-sm">🔒 El asistente de WhatsApp viene en el plan <b>${esc(PLANS()[need].name)}</b>. <a href="#" class="font-bold underline" data-goplan="${need}">Ver planes</a></div>`; return; }
   const c = botCfg(), e = c.estados;
+  const OFF = new Set((A.plat && A.plat.botOff) || []), hay = (k) => !OFF.has(k);   // 🤖 lo que el superusuario apagó para todas las tiendas no sale
+  if (!hay("activo")) { el.innerHTML = `<div class="sp-h"><h2>💬 WhatsApp Bot</h2></div><div class="sp-card text-sm">El asistente de WhatsApp no está disponible por ahora.</div>`; return; }
   const sw = (on) => `<span class="relative inline-block h-7 w-12 shrink-0 rounded-full transition" style="background:${on ? "var(--mint)" : "#cfd6df"}"><i class="absolute top-[3px] h-[22px] w-[22px] rounded-full bg-white shadow transition-all" style="left:${on ? "23px" : "3px"}"></i></span>`;
   const fila = (k, ic, t, d, on) => `<button type="button" class="flex w-full items-start gap-3 p-3.5 text-left" data-bot="${k}" aria-pressed="${on}"><span class="text-xl leading-none">${ic}</span><span class="min-w-0 flex-1"><b class="block text-[14.5px]">${t}</b><span class="block text-xs text-ink/65">${d}</span></span>${sw(on)}</button>`;
   const sel = (k, val, ops) => `<select data-botsel="${k}" class="rounded-xl border border-line bg-white px-2 py-1.5 text-sm font-bold">${ops.map(([v, t]) => `<option value="${v}" ${String(val) === String(v) ? "selected" : ""}>${t}</option>`).join("")}</select>`;
@@ -4106,34 +4131,34 @@ function renderWaBot() {
     ${reporteHtml()}
     <div class="sp-h mt-5"><h2>⚙️ Cómo atiende</h2><span>se aplica al instante</span></div>
     <div class="sp-card !p-0 divide-y divide-line">
-      ${BOT_OPTS.map(([k, ic, t, d]) => fila(k, ic, t, d, !!c[k])).join("")}
-      <div class="flex items-center gap-3 p-3.5"><span class="text-xl">⏰</span><span class="min-w-0 flex-1"><b class="block text-[14.5px]">Recordatorio al cliente</b><span class="block text-xs text-ink/65">«Hola 👋 Recuerda que tu cita es en 1 hora». También queda como aviso en su calendario.</span></span>
-        ${sel("recordatorioMin", c.recordatorioMin, [[0, "Sin recordatorio"], [30, "30 min antes"], [60, "1 hora antes"], [120, "2 horas antes"], [180, "3 horas antes"], [1440, "1 día antes"]])}</div>
+      ${BOT_OPTS.filter(([k]) => hay(k)).map(([k, ic, t, d]) => fila(k, ic, t, d, !!c[k])).join("")}
+      ${hay("recordatorio") ? `<div class="flex items-center gap-3 p-3.5"><span class="text-xl">⏰</span><span class="min-w-0 flex-1"><b class="block text-[14.5px]">Recordatorio al cliente</b><span class="block text-xs text-ink/65">«Hola 👋 Recuerda que tu cita es en 1 hora». También queda como aviso en su calendario.</span></span>
+        ${sel("recordatorioMin", c.recordatorioMin, [[0, "Sin recordatorio"], [30, "30 min antes"], [60, "1 hora antes"], [120, "2 horas antes"], [180, "3 horas antes"], [1440, "1 día antes"]])}</div>` : ""}
       <div class="flex items-center gap-3 p-3.5"><span class="text-xl">🙊</span><span class="min-w-0 flex-1"><b class="block text-[14.5px]">Si escribes tú en un chat, se calla</b><span class="block text-xs text-ink/65">El asistente se hace a un lado en ese chat para que hables tú.</span></span>
         ${sel("pausaMin", c.pausaMin, [[15, "15 min"], [30, "30 min"], [60, "1 hora"], [120, "2 horas"]])}</div>
     </div>
-    <div class="sp-h mt-5"><h2>📸 Estados con tus cupos</h2><span>máximo 2 al día</span></div>
+    ${hay("estados") ? `<div class="sp-h mt-5"><h2>📸 Estados con tus cupos</h2><span>máximo 2 al día</span></div>
     <div class="sp-card !p-0 divide-y divide-line">
       ${fila("estados.activo", "📸", "Publicar estados con los cupos del día", "Una imagen con tus horas libres. Si hoy ya no hay cupos, publica los de mañana. Si tampoco hay, no publica.", e.activo)}
       ${e.activo ? `<div class="flex items-center gap-3 p-3.5"><span class="text-xl">1️⃣</span><span class="flex-1"><b class="block text-[14.5px]">Primer estado</b></span>${sel("estados.h0", e.horas[0], HORAS_ESTADO.map((h) => [h, hora12(h)]))}</div>
       <div class="flex items-center gap-3 p-3.5"><span class="text-xl">2️⃣</span><span class="flex-1"><b class="block text-[14.5px]">Segundo estado</b><span class="block text-xs text-ink/65">Opcional</span></span>${sel("estados.h1", e.horas[1] || "", [["", "No publicar"]].concat(HORAS_ESTADO.filter((h) => h !== e.horas[0]).map((h) => [h, hora12(h)])))}</div>
       ${fila("estados.manana", "➡️", "Si hoy no hay cupos, publicar los de mañana", "Apagado, ese día no publica.", e.manana)}
       ${fila("estados.semanal", "🗓️", "Estado de la semana los lunes", "Además, los lunes a las 7:00 a. m. un resumen de la semana.", e.semanal)}` : ""}
-    </div>
-    <div class="sp-h mt-5"><h2>📲 Estado «Cómo agendar»</h2><span>2 imágenes, paso a paso</span></div>
+    </div>` : ""}
+    ${hay("guia") ? `<div class="sp-h mt-5"><h2>📲 Estado «Cómo agendar»</h2><span>2 imágenes, paso a paso</span></div>
     <div class="sp-card !p-0 divide-y divide-line">
       ${fila("guia.activo", "📲", "Enseñar a agendar con tu link", "2 estados seguidos (pasos 1-2 y 3-4) con tu nombre, tus servicios, tu equipo y tus horas libres de verdad.", c.guia.activo)}
       ${c.guia.activo ? `<div class="flex items-center gap-3 p-3.5"><span class="text-xl">⏰</span><span class="flex-1"><b class="block text-[14.5px]">Hora</b></span>${sel("guia.hora", c.guia.hora, HORAS_ESTADO.map((h) => [h, hora12(h)]))}</div>
       <div class="flex items-center gap-3 p-3.5"><span class="text-xl">📆</span><span class="flex-1"><b class="block text-[14.5px]">Cada cuántos días</b></span>${sel("guia.cadaDias", c.guia.cadaDias, [[1, "Todos los días"], [2, "Cada 2 días"], [3, "Cada 3 días"], [5, "Cada 5 días"], [7, "Cada semana"], [15, "Cada 15 días"]])}</div>` : ""}
-    </div>
+    </div>` : ""}
     <p class="soft mt-3 text-xs">Los estados los ven los clientes que tienen guardado el número de tu negocio (así funciona WhatsApp).</p>
-    <div class="sp-h mt-5"><h2>🔁 Recordatorio de servicio</h2><span>para que vuelvan</span></div>
+    ${hay("volver") ? `<div class="sp-h mt-5"><h2>🔁 Recordatorio de servicio</h2><span>para que vuelvan</span></div>
     <div class="sp-card !p-0 divide-y divide-line">
       ${fila("volver.activo", "🔁", "Escribirle al cliente para que vuelva", "«Ya van 3 semanas desde tu último Corte con Gabriel. ¿Te agendo de nuevo?» Si dice «Sí, lo mismo», solo elige día y hora y queda confirmada.", c.volver.activo)}
       ${c.volver.activo ? `<div class="flex items-center gap-3 p-3.5"><span class="text-xl">📆</span><span class="min-w-0 flex-1"><b class="block text-[14.5px]">¿Cuántos días después de su última cita?</b>${c.volver.dias ? `<span class="block text-xs text-ink/65">Sale a partir de las 10:00 a. m., máximo 20 clientes al día, con unos minutos entre uno y otro.</span>` : `<span class="block text-xs font-bold" style="color:#B45309">⚠️ Elige los días: mientras no los elijas, no se le escribe a nadie.</span>`}</span>
         ${sel("volver.dias", c.volver.dias || "", [["", "Elige…"], [7, "7 días"], [15, "15 días"], [21, "21 días"], [30, "30 días"], [45, "45 días"], [60, "60 días"]])}</div>` : ""}
     </div>
-    <p class="soft mt-3 text-xs">Solo a clientes que ya vinieron y no tienen otra cita. Una sola vez por visita: si no responde o dice «no, gracias», no se insiste.</p>`;
+    <p class="soft mt-3 text-xs">Solo a clientes que ya vinieron y no tienen otra cita. Una sola vez por visita: si no responde o dice «no, gracias», no se insiste.</p>` : ""}`;
   if (MW.res && $("mwBox") && ["pidiendo", "codigo", "desconectando"].includes(MW.res.estado) && Date.now() < MW.hasta) mwPintar(MW.res);
   pintarReporte();
 }

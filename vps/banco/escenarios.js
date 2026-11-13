@@ -94,6 +94,7 @@ global.fetch = async (url, o) => {
     return resp(Object.assign({ name: n }, W.sesiones[n])); }
   const ac = u.match(/\/api\/([^/]+)\/auth\/(request-code|qr)/);
   if (ac) { W.wahaLlamadas.push(ac[2] + ' ' + decodeURIComponent(ac[1])); return ac[2] === 'qr' ? resp({ mimetype: 'image/png', data: 'UVI=' }) : resp({ code: 'ABCD1234' }); }
+  if (/\/documents\/platform\/public/.test(u) && W.botOff) return resp({ fields: { botOff: { arrayValue: { values: W.botOff.map((x) => ({ stringValue: x })) } } } });   // 3.45: lo que el superusuario apagó
   if (W.fsDirecto && /firestore|\/documents\/businesses\//.test(u)) {   // 3.30: la base de datos que el VPS lee directo (configuración, equipo, servicios, cupos ocupados)
     const D = W.fsDirecto, aFs2 = (v) => typeof v === 'boolean' ? { booleanValue: v } : typeof v === 'number' ? { integerValue: String(v) } : typeof v === 'string' ? { stringValue: v } : Array.isArray(v) ? { arrayValue: { values: v.map(aFs2) } } : { mapValue: { fields: Object.fromEntries(Object.entries(v).map(([k, x]) => [k, aFs2(x)])) } };
     const docu = (n, o) => ({ name: n, fields: aFs2(o).mapValue.fields });
@@ -1239,4 +1240,17 @@ test('3.43 · 📲 «Cómo agendar» sale a las 8:00 cada 3 días (lo cambia el 
   assert.equal(G.guiaToca({ cadaDias: 1, hora: '10:00' }, a('2026-11-14', '09:30'), '2026-11-13'), false, 'su hora');
   assert.equal(G.guiaToca({ cadaDias: 1, hora: '10:00' }, a('2026-11-14', '10:00'), '2026-11-13'), true);
   assert.equal(G.guiaToca({ activo: false }, a('2026-11-20', '08:00'), null), false, 'apagado');
+});
+
+test('3.45 · 🤖 Lo que el superusuario APAGA en su panel (para todas las tiendas) manda sobre lo que tenga cada tienda; al prenderlo vuelve como estaba', async () => {
+  const neg = { bid: 'lina-spa', instancia: 'lina-spa', motor: 'waha', sesion: 'default' };
+  W.fsBot = { cupos: true, volver: { activo: true, dias: 21 }, guia: { activo: true }, recordatorioMin: 60 };
+  W.botOff = ['cupos', 'volver', 'guia', 'recordatorio']; B.botOff.t = 0; B.botOff.L = [];
+  let c = await B.botAlDia(neg);
+  assert.equal(c.cupos, false, 'cupos apagado por el superusuario'); assert.equal(c.volver.activo, false); assert.equal(c.guia.activo, false); assert.equal(c.recordatorioMin, 0);
+  assert.equal(c.agendar, true, 'lo demás sigue igual');
+  W.botOff = []; B.botOff.t = 0;
+  c = await B.botAlDia(neg);
+  assert.equal(c.cupos, true, 'lo prende otra vez: vuelve como lo tenía la tienda'); assert.equal(c.volver.dias, 21); assert.equal(c.recordatorioMin, 60);
+  W.botOff = null; W.fsBot = null; B.botOff.L = []; B.botOff.t = 0;
 });

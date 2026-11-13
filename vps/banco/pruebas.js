@@ -451,3 +451,13 @@ test('3.44 · 📅 Días para reservar: MANDA EL SÚPER PANEL (el 5 guardado al 
   assert.match(gs, /loadSettings = function \(\)[\s\S]*bookingWindowOwner === true/, 'el servidor de Google usa la misma regla');
   assert.doesNotMatch(gs.match(/function maryVentana_[^\n]*/)[0], /, 21\)/, 'sin tope escondido de 21 días');
 });
+
+test('3.45 · 🤖 Servidor de Google: maryBotCfg_ también respeta lo que el superusuario apagó para todas las tiendas', { skip: !require('fs').existsSync(GS_MARY) && 'dentro de la imagen no está gs/' }, () => {
+  const src = require('fs').readFileSync(GS_MARY, 'utf8');
+  let OFF = ['cambios', 'estados'];
+  const G = { ACTIONS: {}, PUBLIC_ACTIONS: {}, console, platformPublic: () => ({ botOff: OFF }) };
+  const F = new Function(...Object.keys(G), src + '\nreturn { maryBotCfg_ };')(...Object.values(G));
+  let c = F.maryBotCfg_({ maryBot: { cambios: true } });
+  assert.equal(c.cambios, false); assert.equal(c.estados.activo, false); assert.equal(c.agendar, true);
+  OFF = []; c = F.maryBotCfg_({ maryBot: { cambios: true } }); assert.equal(c.cambios, true);
+});

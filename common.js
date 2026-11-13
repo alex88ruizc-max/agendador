@@ -2,7 +2,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js?v=2026-11-13i";
+import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js?v=2026-11-13j";
 
 export const app = initializeApp(firebaseConfig);
 // Caché en el dispositivo: muestra al instante lo último que se vio y luego actualiza en vivo
@@ -21,7 +21,7 @@ export function businessFromUrl() {
 export const bpath = (...parts) => ["businesses", BID, ...parts].join("/");
 
 // Versión de la página: cámbiala en cada actualización para comprobar que se publicó
-export const APP_VERSION = '2026-11-13i';
+export const APP_VERSION = '2026-11-13j';
 // Versiones que esta página espera del servidor y de las reglas de Firebase
 export const SERVER_VERSION = '2026-10-10n';
 export const RULES_VERSION = '2026-10-10l';
@@ -438,8 +438,8 @@ export const PLAN_FEATURES = [
 ];
 export const DEFAULT_PLANS = {
   free: { name: "Prueba gratis", priceCOP: 0, days: 15, daysAhead: 5, maxStaff: 1, features: [], tagline: "Para empezar a recibir citas", tgEvents: [], tgChoose: false },
-  basic: { name: "Básico", priceCOP: 30000, daysAhead: 30, maxStaff: 3, features: ["telegram", "appearance", "clients", "images"], tagline: "Tu marca y tus clientes", tgEvents: ["newBooking"], tgChoose: false },
-  gold: { name: "Gold", priceCOP: 40000, daysAhead: 90, maxStaff: 0, features: ["telegram", "appearance", "clients", "images", "marketing", "activity", "whatsapp"], tagline: "Todo para llenar tu agenda", tgEvents: ["newBooking", "proof", "cancel", "reschedule", "reminder", "panelApt", "breaks", "noShow"], tgChoose: true }
+  basic: { name: "Básico", oferta: true, priceCOP: 30000, daysAhead: 30, maxStaff: 3, features: ["telegram", "appearance", "clients", "images"], tagline: "Tu marca y tus clientes", tgEvents: ["newBooking"], tgChoose: false },
+  gold: { name: "Gold", oferta: true, priceCOP: 40000, daysAhead: 90, maxStaff: 0, features: ["telegram", "appearance", "clients", "images", "marketing", "activity", "whatsapp"], tagline: "Todo para llenar tu agenda", tgEvents: ["newBooking", "proof", "cancel", "reschedule", "reminder", "panelApt", "breaks", "noShow"], tgChoose: true }
 };
 export function plansOf(plat = {}) {
   const out = {};
@@ -493,6 +493,17 @@ export function planPriceOf(plat, plan, months) {
   if (!off && plat.planBundles?.[months] && plat.planPriceCOP) off = Math.max(0, Math.round((1 - plat.planBundles[months] / (plat.planPriceCOP * months)) * 100));
   return months === 1 || !off ? base : Math.round((base * (1 - off / 100)) / 100) * 100;
 }
+// 🔥 etiqueta de oferta en la tarjeta del plan (el superusuario la pone o la quita en Planes)
+export const OFERTA_TXT = "🔥 Súper oferta de lanzamiento";
+// 🤖 opciones del bot que el superusuario puede apagar PARA TODAS LAS TIENDAS (platform/public.botOff):
+//    apagada = desaparece del panel de cada tienda y el bot deja de hacerla. «Si escribes tú, se calla» no se apaga (protege tus chats).
+export const BOT_GLOBAL = [
+  ["activo", "🤖", "Asistente de WhatsApp (todo el bot)"], ["agendar", "📋", "Agendar por WhatsApp con listas"], ["cupos", "🕐", "Responder «¿hay cupos?»"],
+  ["audios", "🎤", "Escuchar notas de voz"], ["saludoDiario", "👋", "Saludar una vez al día"], ["pedirNombre", "🙋", "Preguntar el nombre"],
+  ["pedirCorreo", "📧", "Pedir el correo para su calendario"], ["loDeSiempre", "⭐", "Ofrecer «¿Lo de siempre?»"], ["recordatorio", "⏰", "Recordatorio antes de la cita"],
+  ["recordatorioConfirmar", "✅", "Pedir confirmación en el recordatorio"], ["cambios", "🔄", "Cancelar o modificar por WhatsApp"],
+  ["estados", "📸", "Estados con los cupos"], ["guia", "📲", "Estado «Cómo agendar»"], ["volver", "🔁", "Recordatorio de servicio (que vuelvan)"]
+];
 export const DEFAULT_PAY_WARNING = "Ni un peso más ni uno menos. Así tu pago se reconoce solo y tu plan se activa de inmediato. Si envías otro valor, tendremos que revisarlo a mano y puede tardar.";
 
 // Categorías de avisos de Telegram (qué trae cada plan lo decide el superusuario)

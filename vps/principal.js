@@ -6,7 +6,7 @@
 const http = require('http'), fs = require('fs'), path = require('path');
 const T = require('./textos'), C = require('./correo'), E = require('./estado'), A = require('./asistente');
 
-const VERSION = 'agendador-ia-3.44';
+const VERSION = 'agendador-ia-3.45';
 const env = (k, d) => (process.env[k] === undefined || process.env[k] === '' ? d : process.env[k]);
 const CFG = {
   puerto: parseInt(env('PUERTO', '3060'), 10),
@@ -200,7 +200,27 @@ async function gas(neg, op, datos) {
 // ---------- 3.1 · configuración del panel «WhatsApp Bot» (por negocio) ----------
 const BOT = new Map();
 const BOT_DEF = { audios: true, activo: true, agendar: true, cupos: true, saludoDiario: true, pedirNombre: true, pedirCorreo: true, loDeSiempre: true, recordatorioMin: 120, recordatorioConfirmar: true, cambios: true, pausaMin: 30, estados: { activo: true, horas: ['11:00'], manana: true, semanal: false }, guia: { activo: true, hora: '08:00', cadaDias: 3 } };
-function botDe(neg) { const x = BOT.get(neg.bid); const c = Object.assign({}, BOT_DEF, x ? x.cfg : {}); c.estados = Object.assign({}, BOT_DEF.estados, (x && x.cfg.estados) || {}); c.guia = Object.assign({}, BOT_DEF.guia, (x && x.cfg.guia) || {}); if (!x) c.pausaMin = CFG.humanoMin; return c; }
+function botDe(neg) { const x = BOT.get(neg.bid); const c = Object.assign({}, BOT_DEF, x ? x.cfg : {}); c.estados = Object.assign({}, BOT_DEF.estados, (x && x.cfg.estados) || {}); c.guia = Object.assign({}, BOT_DEF.guia, (x && x.cfg.guia) || {}); if (!x) c.pausaMin = CFG.humanoMin; return apagarGlobal(c, BOT_OFF.L); }
+// 🤖 3.45 · lo que el superusuario APAGÓ para todas las tiendas (platform/public.botOff) manda sobre lo de cada tienda
+const BOT_OFF = { L: [], t: 0 };
+function apagarGlobal(c, off) {
+  (off || []).forEach((k) => {
+    if (k === 'recordatorio') c.recordatorioMin = 0;
+    else if (k === 'estados') c.estados = Object.assign({}, c.estados, { activo: false });
+    else if (k === 'guia') c.guia = Object.assign({}, c.guia, { activo: false });
+    else if (k === 'volver') c.volver = Object.assign({}, c.volver || {}, { activo: false });
+    else if (k in BOT_DEF && typeof BOT_DEF[k] === 'boolean') c[k] = false;
+  });
+  return c;
+}
+async function botOffAlDia() {
+  if (Date.now() - BOT_OFF.t < 60000) return;
+  BOT_OFF.t = Date.now();
+  try {
+    const r = await fetch(FS.url + '/v1/projects/' + FS.proyecto + '/databases/(default)/documents/platform/public?key=' + FS.llave + '&mask.fieldPaths=botOff', { signal: AbortSignal.timeout(5000) });
+    if (r.ok) { const f = ((await r.json()) || {}).fields || {}; BOT_OFF.L = (deFs(f.botOff) || []).map(String); }
+  } catch (e) { /* queda lo último leído */ }
+}
 // 3.23 · lo que el dueño elige en el panel se lee DIRECTO de la base (cada minuto como mucho), sin pasar por Google:
 //        si apaga el asistente, en menos de 1 minuto deja de responder aunque el servidor de Google esté caído
 function deFs(v) {
@@ -231,7 +251,7 @@ async function botDesdeBase(neg) {
     return true;
   } catch (e) { return false; }
 }
-async function botAlDia(neg) { if (Date.now() - (BOT_LEIDO.get(neg.bid) || 0) > 60000) await botDesdeBase(neg); return botDe(neg); }
+async function botAlDia(neg) { await botOffAlDia(); if (Date.now() - (BOT_LEIDO.get(neg.bid) || 0) > 60000) await botDesdeBase(neg); return botDe(neg); }
 async function botFresco(neg, maxMs) { const x = BOT.get(neg.bid); if (!x || Date.now() - x.t > maxMs) await gas(neg, 'info').catch(() => {}); return botDe(neg); }
 
 // ---------- 🛑 3.5 · FRENO ANTI-BOTS (función pura, con pruebas) ----------
@@ -917,5 +937,5 @@ if (require.main === module) {
   servidor.listen(CFG.puerto, () => { log('👩‍💼 ' + VERSION + ' escuchando en ' + CFG.puerto + ' · modo ' + CFG.modo); negocios(); arrancarRelojes(); });
 }
 // 🧪 solo para el banco de escenarios (banco/escenarios.js): deja a Mary como recién encendida
-const _banco = { ASIS, BOT, yaLoDije, memDicho: () => (MEM.dicho = MEM.dicho || {}), memHumano: () => MEM.humano, memRobot: () => (MEM.robot = MEM.robot || {}), memConv: () => (MEM.conv = MEM.conv || {}), tickRecordatorios, tickVolver, tickRetomar, tickEstadisticas, tickEstados, publicarGuia, memGuia: () => (MEM.guia = MEM.guia || {}), memStats: () => (MEM.stats = MEM.stats || {}), publicarEstado, alMensaje, alEventoConexion, ultimos, reiniciar() { CL = null; MEM.volver = {}; MEM.stats = {}; MEM.piePrueba = {}; MEM.guia = {}; leer.avisado = false; BOT_LEIDO.clear(); MEM.sinbot = {}; MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; MEM.conv = {}; MEM.clientes = {}; MEM.conectados = {}; MEM.pendientesWa = {}; MEM.codigos = {}; MEM.robot = {}; MEM.dicho = {}; AGRUPA.clear(); ASIS._cat.clear(); BOT.clear(); CONTACTOS.clear(); vinculando.clear(); delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
+const _banco = { ASIS, BOT, yaLoDije, memDicho: () => (MEM.dicho = MEM.dicho || {}), memHumano: () => MEM.humano, memRobot: () => (MEM.robot = MEM.robot || {}), memConv: () => (MEM.conv = MEM.conv || {}), tickRecordatorios, tickVolver, tickRetomar, tickEstadisticas, tickEstados, publicarGuia, botOff: BOT_OFF, apagarGlobal, botAlDia, botDe, memGuia: () => (MEM.guia = MEM.guia || {}), memStats: () => (MEM.stats = MEM.stats || {}), publicarEstado, alMensaje, alEventoConexion, ultimos, reiniciar() { CL = null; MEM.volver = {}; MEM.stats = {}; MEM.piePrueba = {}; MEM.guia = {}; leer.avisado = false; BOT_LEIDO.clear(); MEM.sinbot = {}; MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; MEM.conv = {}; MEM.clientes = {}; MEM.conectados = {}; MEM.pendientesWa = {}; MEM.codigos = {}; MEM.robot = {}; MEM.dicho = {}; AGRUPA.clear(); ASIS._cat.clear(); BOT.clear(); CONTACTOS.clear(); vinculando.clear(); delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
 module.exports = { _banco, botNormal, frenoRobot, estadosQueTocan, atenderPedidoWa, sincronizarConectados, renovarQr, telEnAviso, deWaha, esWaha, debeResponder, alEventoConexion, tickPedidosWa, limpiarSinVincular, leerMensaje, atiende, PREGUNTA, numeroWa, ahoraLocal, enFila, yaVisto, quienVeEstados, CFG };

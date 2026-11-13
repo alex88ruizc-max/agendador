@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.44** · Página **2026-11-13i** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.45** · Página **2026-11-13j** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -115,6 +115,7 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## ⏳ Pendientes
+0. Planes parte 2: con los interruptores del bot ya se puede apagar en general; falta por PLAN (Básico con candado «Desbloquéalo con Gold») y el panel de ingresos bloqueado en prueba y Básico. Segundo WhatsApp +$20.000 (Gold).
 1. Instalar 3.1 + página 2026-11-12b y probar el agendamiento por listas con El Barba (tu 318) desde el número aparte. Luego `MARY_MODO=todos`.
    Verificar en un celular real: que la lista llegue por WAHA (si no, sale el texto con números) y que la invitación entre al calendario.
    El panel guarda `maryReminderMinutes` en settings: confirmar que las reglas de Firestore lo dejan guardar.
@@ -132,6 +133,15 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-13 · agendador-ia-3.45 · página 2026-11-13j · 🤖 bot general en el súper panel · 🔥 súper oferta · 📖 guía para vincular WhatsApp
+- **Súper panel › Planes › «🤖 Opciones del bot de WhatsApp (todas las tiendas)»:** un interruptor por opción
+  (asistente, listas, cupos, audios, saludo, nombre, correo, «lo de siempre», recordatorio, confirmación, cambios, estados, «Cómo agendar», «que vuelvan»).
+  Apagada = desaparece del panel de cada tienda y el bot no la hace (VPS `apagarGlobal`/`botOffAlDia` y servidor `maryBotCfg_`). Se guarda en `platform/public.botOff`.
+  Al prenderla, cada tienda queda como la tenía. «Si escribes tú, se calla» no se apaga (protege los chats).
+- **«🔥 Súper oferta de lanzamiento»** en las tarjetas de Básico y Gold (registro y «Mi plan»). En el súper panel, cada plan tiene la casilla para ponerla o quitarla (`plans.<plan>.oferta`). Sin precio tachado (Alex).
+- **Guía paso a paso para vincular WhatsApp** en «WhatsApp Bot», visible ANTES de tocar «Vincular»: 7 pasos (Android e iPhone, «Vincular con el número de teléfono», los 3 minutos) y qué hacer si algo no sale.
+- Banco: 165 pasan (2 pruebas nuevas). Página: 0 fallas.
 
 ### 2026-11-13 · agendador-ia-3.44 · página 2026-11-13i · 📅 los días para reservar los manda el súper panel
 - **Problema (Alex):** en el súper panel puso más días, pero las tiendas de prueba seguían dejando agendar solo 5 días.
