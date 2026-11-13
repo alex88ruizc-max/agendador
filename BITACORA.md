@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.46** · Página **2026-11-13l** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.47** · Página **2026-11-13m** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -133,6 +133,22 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-13 · agendador-ia-3.47 · página 2026-11-13m · 🚀 activar el negocio más fácil y la página más rápida (auditoría aprobada por Alex: «hazlo todo»)
+1. **Asistente de inicio en 4 pasos** (antes 10): negocio → horario → servicios → «¡listo, este es tu link!». Redes, equipo, abono, ubicación y Telegram quedan en la guía.
+   `setupVer: 2` distingue a quien hizo el asistente nuevo (para no dar por hechos los pasos que ya no pregunta).
+2. **«Deja tu agenda lista» con el WhatsApp de PRIMERO:** «🤖 Vincula tu WhatsApp (2 min)» (antes no salía en ningún lado del camino de activación).
+3. **«Probar gratis» entra directo** a una sola pantalla (sin elegir plan). Los planes quedan en «Ver planes».
+4. **🔔 Avisos al dueño por WhatsApp** (WhatsApp Bot › «Avisos a tu WhatsApp»): pone su número PERSONAL (distinto al del negocio) y el asistente le escribe cada aviso
+   que hoy va a Telegram. Un comprobante se aprueba respondiendo **1** (2 = rechazar). Servidor: `tgNotify`/`tgPhoto` envueltos → cola `private/maryAvisos` + bandera pública
+   `platform/public.maryAvisoPend` (el VPS llama a Google SOLO cuando hay avisos). Siguen las reglas de avisos del plan. El superusuario puede apagarlo para todos («avisosWa»).
+   Límite conocido: la captura del pago no se manda por WhatsApp (se ve en el panel). Con un solo número, se sigue usando Telegram.
+5. **Telegram bien explicado** (guía, Configuración): para qué sirve, ejemplo del aviso con Aprobar/Rechazar, por qué Telegram y la alternativa por WhatsApp.
+6. **Textos según el negocio:** «Hoy en la silla» → «Hoy en tu agenda»; «Reglas de la silla» → «Reglas de las citas»; «barbero» → la palabra de cada negocio.
+7. **Velocidad:** los estilos van ARMADOS en `tailwind.css` (26 KB) en vez de calcularse en el celular con cdn.tailwindcss.com; y solo 2 letras (Inter y Sora) en vez de 6
+   (Archivo, Archivo Narrow, Bricolage y Figtree se cargaban pero el diseño premium las tapaba). El banco de la página revisa que ninguna página vuelva al CDN y que no falten clases.
+- Reseña de planes y página de venta al día: «🔔 Avisos de cada reserva a tu WhatsApp o Telegram».
+- Banco: 168 pasan (2 pruebas nuevas). Página: 0 fallas. NO se pudo abrir la página real desde aquí (sin acceso a Firebase): Alex la revisa al instalar.
 
 ### 2026-11-13 · página 2026-11-13l · 🏷️ el nombre del negocio se ve completo
 - Alex: «ESTÉTICA MAR…» se cortaba arriba en la página de reservas y en el panel. Ahora el nombre sale completo: si es largo, baja de tamaño y pasa a 2 renglones (`nombreCompleto()` en common.js, clase `.nombre-completo` en styles.css). Nunca «…».

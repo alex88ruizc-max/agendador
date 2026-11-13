@@ -1,4 +1,4 @@
-🗓️ AGENDADOR IA · agendador-ia-3.46   (por dentro atiende «Mary», la recepcionista)
+🗓️ AGENDADOR IA · agendador-ia-3.47   (por dentro atiende «Mary», la recepcionista)
 =====================================================================================================
 🚫 REGLA UNIVERSAL N.º 1 — EPIC NO SE TOCA (manda sobre todo lo demás, para Alex, para Claude y para cada script de este paquete)
    Epic (Mary de Epic, Luisa, la tienda, epic-waha, epic-tiendas, Epic Channels…) y CUALQUIER otro proyecto:
@@ -63,6 +63,7 @@ AJUSTES POR NEGOCIO (negocios.json)
   "recordatorioMin": 120     ·   "estados": { "activo": true, "hoy": "07:30", "semana": "07:00", "semanaDia": 1 }
   En Firestore (settings/general del negocio) maryAutoCaptura: true → la captura confirma al instante y el dueño revisa después.
 
+NOVEDADES 3.47 · 🔔 Avisos al dueño por WhatsApp (a su número personal; aprueba pagos respondiendo 1). Banco de la página: revisa los estilos armados (tailwind.css). Después manda agendador-web-2026-11-13m.zip.
 NOVEDADES 3.46 · 🔄 «Reactivar» una cita cuyo abono no llegó a tiempo (si la hora sigue libre). Después manda agendador-web-2026-11-13k.zip.
 NOVEDADES 3.45 · 🤖 Las opciones del bot que el superusuario apaga en su panel se apagan en TODAS las tiendas (el bot y el servidor las respetan). Después manda agendador-web-2026-11-13j.zip.
 NOVEDADES 3.44 · 📅 Los días para reservar los manda el súper panel (el 5 que se guardaba al crear la tienda ya no limita; sin tope escondido de 21 días en el bot). Después manda agendador-web-2026-11-13i.zip.

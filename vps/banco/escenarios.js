@@ -49,6 +49,8 @@ global.fetch = async (url, o) => {
     if (b.op === 'asistencia' || b.op === 'cancelar') return resp({ ok: true, data: { ok: true, link: NEGOCIO.link, cita: (W.proximas[0] || {}) } });
     if (b.op === 'reagendar') { const d = W.cupos.find((x) => x.date === b.date); return resp({ ok: true, data: { ok: true, cita: Object.assign({}, W.proximas[0] || {}, { dia: d.dia, hora: d.horas[d.libres.indexOf(b.time)], link: NEGOCIO.link + '&cita=R-VIEJA1' }) } }); }
     if (b.op === 'contactos') return resp({ ok: true, data: { numeros: W.contactos } });
+    if (b.op === 'avisos') { const A = W.avisos || []; W.avisos = []; return resp({ ok: true, data: { avisos: A, numero: W.avisosNum || '' } }); }   // 3.47
+    if (b.op === 'revisarPago') { W.revisado = { code: b.code, aprobar: b.aprobar, de: b.de }; return resp({ ok: true, data: { ok: true, aprobado: b.aprobar } }); }
     if (b.op === 'waPedido') { const p = W.pedido; W.pedido = null; return resp({ ok: true, data: { pedido: p } }); }
     if (b.op === 'waResultado') { W.resultados.push(b); return resp({ ok: true, data: { ok: true } }); }
     if (W.gasFalla && b.op === 'chat') return resp({ ok: false, error: 'Servicio invocado demasiadas veces' });
@@ -94,6 +96,7 @@ global.fetch = async (url, o) => {
     return resp(Object.assign({ name: n }, W.sesiones[n])); }
   const ac = u.match(/\/api\/([^/]+)\/auth\/(request-code|qr)/);
   if (ac) { W.wahaLlamadas.push(ac[2] + ' ' + decodeURIComponent(ac[1])); return ac[2] === 'qr' ? resp({ mimetype: 'image/png', data: 'UVI=' }) : resp({ code: 'ABCD1234' }); }
+  if (/\/documents\/platform\/public/.test(u) && W.avisoPend) return resp({ fields: { maryAvisoPend: { mapValue: { fields: { 'lina-spa': { integerValue: String(W.avisoPend) } } } } } });   // 3.47: bandera de avisos
   if (/\/documents\/platform\/public/.test(u) && W.botOff) return resp({ fields: { botOff: { arrayValue: { values: W.botOff.map((x) => ({ stringValue: x })) } } } });   // 3.45: lo que el superusuario apagó
   if (W.fsDirecto && /firestore|\/documents\/businesses\//.test(u)) {   // 3.30: la base de datos que el VPS lee directo (configuración, equipo, servicios, cupos ocupados)
     const D = W.fsDirecto, aFs2 = (v) => typeof v === 'boolean' ? { booleanValue: v } : typeof v === 'number' ? { integerValue: String(v) } : typeof v === 'string' ? { stringValue: v } : Array.isArray(v) ? { arrayValue: { values: v.map(aFs2) } } : { mapValue: { fields: Object.fromEntries(Object.entries(v).map(([k, x]) => [k, aFs2(x)])) } };
@@ -1253,4 +1256,23 @@ test('3.45 · 🤖 Lo que el superusuario APAGA en su panel (para todas las tien
   c = await B.botAlDia(neg);
   assert.equal(c.cupos, true, 'lo prende otra vez: vuelve como lo tenía la tienda'); assert.equal(c.volver.dias, 21); assert.equal(c.recordatorioMin, 60);
   W.botOff = null; W.fsBot = null; B.botOff.L = []; B.botOff.t = 0;
+});
+
+test('3.47 · 🔔 Avisos al dueño por WhatsApp: le llegan a su número personal; un comprobante se aprueba respondiendo 1 (o 2 = rechazar); Google solo se llama cuando hay avisos', async () => {
+  const DUENO = '573009998877';
+  W.avisosNum = DUENO; W.avisos = [{ t: Date.now(), texto: 'NUEVA RESERVA\nJuan Pérez · R-AAAA1', code: '' }, { t: Date.now(), texto: 'COMPROBANTE POR REVISAR\nJuan Pérez · R-AAAA1', code: 'R-AAAA1' }];
+  let antes = W.gas.length;
+  await B.tickPedidosWa();
+  assert.ok(!W.gas.slice(antes).includes('avisos'), 'sin bandera no se le pregunta nada a Google');
+  W.avisoPend = Date.now(); await B.tickPedidosWa();
+  const alDueno = W.enviados.filter((x) => x.a === DUENO);
+  assert.equal(alDueno.length, 2); assert.match(alDueno[0].texto, /^🔔 NUEVA RESERVA/); assert.match(alDueno[1].texto, /Responde \*1\* para APROBAR/);
+  antes = W.gas.length; await B.tickPedidosWa();
+  assert.ok(!W.gas.slice(antes).includes('avisos'), 'la misma bandera no se atiende dos veces');
+  // un cliente cualquiera que escribe «1» NO aprueba nada
+  await llega(wahaMsg(CLIENTE, '1')); assert.equal(W.revisado, undefined);
+  await llega(wahaMsg(DUENO, '1'));
+  assert.deepEqual(W.revisado, { code: 'R-AAAA1', aprobar: true, de: DUENO }); assert.match(ultimo().texto, /Pago aprobado.*R-AAAA1/);
+  W.revisado = undefined; await llega(wahaMsg(DUENO, '1')); assert.equal(W.revisado, undefined, 'ya no hay nada pendiente: el 1 no vuelve a aprobar');
+  W.avisoPend = 0; W.avisos = []; W.avisosNum = '';
 });

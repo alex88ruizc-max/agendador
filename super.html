@@ -7,33 +7,30 @@
   <title>Superusuario · Agendador</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Archivo+Narrow:wght@500;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&&family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
-  <link rel="preconnect" href="https://cdn.tailwindcss.com">
   <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
   <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
   <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js">
   <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js">
   <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js">
-  <link rel="modulepreload" href="common.js?v=2026-11-13l">
-  <link rel="modulepreload" href="super.js?v=2026-11-13l">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="theme.js?v=2026-11-13l"></script>
+  <link rel="modulepreload" href="common.js?v=2026-11-13m">
+  <link rel="modulepreload" href="super.js?v=2026-11-13m">
   <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
-  <link rel="stylesheet" href="styles.css?v=2026-11-13l">
+  <link rel="stylesheet" href="styles.css?v=2026-11-13m">
   <style>
     /* ===== Panel del superusuario: claro, frío, con un solo elemento protagonista (el carril de cobros) ===== */
     .sp { --canvas:#F2F5F8; --paperw:#FFFFFF; --sink:#14213D; --soft:#5B6782; --hair:#DDE3EA; --sblue:#2B59C3; --sred:#D7263D; --mint:#1E9E63; --sky:#3F8FD6; --amber:#C77700;
-      background:var(--canvas); color:var(--sink); font-family:Figtree, system-ui, sans-serif; }
-    .sp .disp { font-family:"Bricolage Grotesque", system-ui, sans-serif; letter-spacing:-.01em; }
+      background:var(--canvas); color:var(--sink); font-family:Inter, system-ui, sans-serif; }
+    .sp .disp { font-family:Sora, Inter, system-ui, sans-serif; letter-spacing:-.01em; }
     .sp .soft { color:var(--soft); }
     .sp .btn-primary { background:var(--sink); color:#fff; }
     .sp .btn-primary:hover { background:#0e1830; }
     .sp .field span { color:var(--soft); }
     .sp .sp-card { background:var(--paperw); border-radius:22px; padding:16px; }
     .sp .sp-h { display:flex; justify-content:space-between; align-items:baseline; gap:.5rem; margin:22px 2px 8px; }
-    .sp .sp-h h2 { font-family:"Bricolage Grotesque", system-ui, sans-serif; font-size:18px; font-weight:700; }
+    .sp .sp-h h2 { font-family:Sora, Inter, system-ui, sans-serif; font-size:18px; font-weight:700; }
     .sp .sp-h span { font-size:12.5px; color:var(--soft); }
 
     /* Navegación: barra inferior en el celular, columna lateral en el computador */
@@ -100,7 +97,9 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Tu Agenda">
-  <link rel="stylesheet" href="panel-premium.css?v=2026-11-13l">
+  <link rel="stylesheet" href="panel-premium.css?v=2026-11-13m">
+  <!-- estilos ya armados (antes los calculaba el celular con cdn.tailwindcss.com): va de ÚLTIMO, igual que antes -->
+  <link rel="stylesheet" href="tailwind.css?v=2026-11-13m">
 </head>
 <body class="sp pp antialiased">
 
@@ -298,6 +297,6 @@
     </div>
   </div>
 
-  <script type="module" src="super.js?v=2026-11-13l"></script>
+  <script type="module" src="super.js?v=2026-11-13m"></script>
 </body>
 </html>

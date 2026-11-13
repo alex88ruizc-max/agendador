@@ -34,6 +34,7 @@
 - **Cada mejora que vean las tiendas se agrega a la reseña de los planes** (`DEFAULT_BENEFITS` en `common.js`, la lista vieja a `BENEFITS_VIEJOS`) y a la página de venta (`index.html`), en el mismo cambio. Solo lo que ya está hecho; nunca precios ni funciones que no existen (orden de Alex, 2026-11-13).
 - Antes de entregar un zip de Mary: `cd vps && node --test banco/pruebas.js banco/escenarios.js banco/reglas.js` (0 fallas). Un arreglo de Mary trae su escenario nuevo en `vps/banco/escenarios.js`.
 - Antes de entregar un zip de la página: `node vps/banco/web.js <carpeta>` (0 fallas). Todas las `?v=` iguales a `APP_VERSION`.
+- **Estilos armados:** la página ya no usa `cdn.tailwindcss.com`. Si se agregan clases de Tailwind en los `.html` o `.js` de la página, se rearma `tailwind.css` (`npx tailwindcss@3.4.17 -c tailwind.config.js -i tailwind.entrada.css -o tailwind.css --minify`) y va en el zip de la página. Va enlazado de ÚLTIMO en el `<head>`.
 - Después: `graphify update .` para que el mapa del código quede al día (si falta: `pip install graphifyy`).
 - El código del VPS vive en `vps/` (fuente de verdad). Los zips se arman desde ahí, sin `node_modules`, `datos` ni `gs/mary-clave.gs`.
 

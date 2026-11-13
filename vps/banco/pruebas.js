@@ -481,3 +481,23 @@ test('3.46 · 🔄 Reactivar un apartado vencido: «ya pagó» → confirmada; �
   tomada = false; apt.date = '2020-01-01'; assert.throws(() => F.ACTIONS.maryReactivar({ code: 'R-1' }, { uid: 'u' }), /ya pasó/);
   apt.date = manana; apt.status = 'confirmed'; assert.throws(() => F.ACTIONS.maryReactivar({ code: 'R-1' }, { uid: 'u' }), /no está vencida/);
 });
+
+test('3.47 · 🔔 Servidor: los avisos (los mismos de Telegram) quedan en la cola del WhatsApp del dueño; sin número, con el número del negocio o apagado por el superusuario, no', { skip: !require('fs').existsSync(GS_MARY) && 'dentro de la imagen no está gs/' }, () => {
+  const src = require('fs').readFileSync(GS_MARY, 'utf8');
+  let st, OFF = [], escrito = [], cola = {}, tgLlamado = 0, revisado = null;
+  const G = { ACTIONS: {}, PUBLIC_ACTIONS: {}, console, BID: 'barba', bp: (x) => x, fp: (x) => x.join('.'), docName: (x) => x, encFields: (x) => x, platformPublic: () => ({ botOff: OFF }),
+    loadSettings: () => st, planHas: () => true, fsGet: (p) => (p === 'private/maryAvisos' ? cola : null), wPatch: (p, v) => ({ p, v }), commit: (w) => { escrito = w; if (w[0].p === 'private/maryAvisos') cola = w[0].v; },
+    tgNotify: () => { tgLlamado++; }, tgPhoto: () => { tgLlamado++; }, doReview: (code, ap, motivo, por) => { revisado = { code, ap, por }; } };
+  const F = new Function(...Object.keys(G), src + '\nreturn { tgNotify, tgPhoto, maryAvisos_, maryRevisarPago_, maryBotCfg_ };')(...Object.values(G));
+  st = { maryWa: { conectado: true, numero: '573110000000' }, maryBot: { avisos: { activo: true, numero: '300 999 8877' } } };
+  F.tgNotify(['s1'], '✅ <b>NUEVA RESERVA</b>\nJuan &amp; Ana · R-1');
+  assert.equal(tgLlamado, 1, 'Telegram sigue igual'); assert.equal(cola.cola.length, 1); assert.equal(cola.cola[0].texto, '✅ NUEVA RESERVA\nJuan & Ana · R-1');
+  F.tgPhoto(['s1'], null, '🧾 <b>COMPROBANTE POR REVISAR</b>', [[{ text: 'Aprobar', callback_data: 'ap|barba|R-1' }]]);
+  assert.equal(cola.cola[1].code, 'R-1');
+  F.tgNotify(['s1'], 'recordatorio solo para el profesional', true); assert.equal(cola.cola.length, 2, 'lo que es solo del profesional no va al dueño');
+  let r = F.maryAvisos_(); assert.equal(r.numero, '573009998877'); assert.equal(r.avisos.length, 2); assert.equal(cola.cola.length, 0, 'la cola se vacía');
+  assert.deepEqual(F.maryRevisarPago_({ code: 'R-1', aprobar: true, de: '573009998877' }), { ok: true, aprobado: true }); assert.equal(revisado.code, 'R-1');
+  assert.equal(F.maryRevisarPago_({ code: 'R-1', aprobar: true, de: '573001112233' }).ok, false, 'otro número no puede aprobar');
+  st.maryBot.avisos.numero = '573110000000'; F.tgNotify([], 'x'); assert.equal(cola.cola.length, 0, 'el número del negocio no sirve');
+  st.maryBot.avisos.numero = '3009998877'; OFF = ['avisosWa']; F.tgNotify([], 'x'); assert.equal(cola.cola.length, 0, 'apagado por el superusuario');
+});

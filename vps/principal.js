@@ -6,7 +6,7 @@
 const http = require('http'), fs = require('fs'), path = require('path');
 const T = require('./textos'), C = require('./correo'), E = require('./estado'), A = require('./asistente');
 
-const VERSION = 'agendador-ia-3.46';
+const VERSION = 'agendador-ia-3.47';
 const env = (k, d) => (process.env[k] === undefined || process.env[k] === '' ? d : process.env[k]);
 const CFG = {
   puerto: parseInt(env('PUERTO', '3060'), 10),
@@ -209,6 +209,7 @@ function apagarGlobal(c, off) {
     else if (k === 'estados') c.estados = Object.assign({}, c.estados, { activo: false });
     else if (k === 'guia') c.guia = Object.assign({}, c.guia, { activo: false });
     else if (k === 'volver') c.volver = Object.assign({}, c.volver || {}, { activo: false });
+    else if (k === 'avisosWa') c.avisos = Object.assign({}, c.avisos || {}, { activo: false });
     else if (k in BOT_DEF && typeof BOT_DEF[k] === 'boolean') c[k] = false;
   });
   return c;
@@ -238,6 +239,7 @@ function botNormal(b, recordatorioViejo) {   // mismos valores por defecto que e
   c.recordatorioMin = Math.max(0, Number(d(b.recordatorioMin, d(recordatorioViejo, 120)))); c.pausaMin = Math.max(5, Number(d(b.pausaMin, 30)));
   c.estados = { activo: d(e.activo, true) !== false, horas, manana: d(e.manana, true) !== false, semanal: d(e.semanal, false) === true };
   const v = b.volver || {}; c.volver = { activo: v.activo === true, dias: Math.max(0, Math.min(60, Number(v.dias || 0))) };   // 3.32: recordatorio de servicio (lo elige el dueño)
+  const av = b.avisos || {}; let avn = String(av.numero || '').replace(/\D/g, ''); if (avn.length === 10) avn = '57' + avn; c.avisos = { activo: av.activo === true && avn.length >= 11, numero: avn };   // 3.47: avisos al WhatsApp personal del dueño
   const g = b.guia || {}; c.guia = { activo: g.activo !== false, hora: /^\d{2}:\d{2}$/.test(String(g.hora || '')) ? g.hora : '08:00', cadaDias: Math.max(1, Math.min(30, Number(g.cadaDias || 3))) };   // 3.43: estado «Cómo agendar»
   return c;
 }
@@ -400,6 +402,7 @@ const esSinbot = (t) => /^\/\s*sin\s*bot\s*$/i.test(String(t || '').trim());
 const mudo = (k) => !!(MEM.sinbot && MEM.sinbot[k]);
 async function atenderMensaje(c, neg) {
   const k = neg.bid + ':' + (c.tel || c.jid);
+  if (await respuestaDelDueno(c, neg)) return;   // 🔔 3.47: el dueño aprobó o rechazó un pago respondiendo 1 o 2
   if (esSinbot(c.texto)) {
     MEM.sinbot = MEM.sinbot || {};
     if (mudo(k)) { delete MEM.sinbot[k]; memGuardar(); anotar({ bid: neg.bid, chat: (c.tel || '').slice(-4), que: '🔊 /sinbot: el asistente vuelve a atender este chat (' + (c.deMi ? 'el negocio' : 'el cliente') + ')' }); return; }
@@ -739,6 +742,33 @@ async function tickRevisadas() {
 const FS = { url: env('FS_URL', 'https://firestore.googleapis.com'), proyecto: env('FS_PROYECTO', 'agendador-alex'), llave: env('FS_LLAVE', 'AIzaSyC8J-JbGWo-eTx4p5M8PS8PRQIhH8HK0-A') };
 const EVENTOS = ['MESSAGES_UPSERT', 'CONNECTION_UPDATE', 'QRCODE_UPDATED'];
 const atendidos = new Map();   // bid → hora del último pedido atendido
+// 🔔 3.47 · AVISOS AL DUEÑO POR WHATSAPP: el servidor deja una cola y una bandera pública; aquí se recoge (una llamada a Google SOLO cuando hay avisos)
+//    y se le escribe a su número personal desde el WhatsApp del negocio. Un comprobante por revisar se aprueba respondiendo 1 (o 2 para rechazar).
+const avisados = new Map();
+async function entregarAvisos(bid, t) {
+  if (!/^[a-z0-9][a-z0-9-]{1,29}$/.test(bid) || !t || Date.now() - t > 6 * 3600000 || avisados.get(bid) === t) return;
+  avisados.set(bid, t);
+  const neg = negocios().find((n) => n.bid === bid); if (!neg || CFG.modo === 'apagado') return;
+  const r = await gas(neg, 'avisos');
+  const num = String(r.numero || '').replace(/\D/g, ''); if (!num || !(r.avisos || []).length) return;
+  for (const a of r.avisos) {
+    const cola = a.code ? '\n\n👉 Responde *1* para APROBAR el pago o *2* para rechazarlo.\n(La captura la ves en tu panel, en Agenda.)' : '';
+    await escribir(neg, num, '🔔 ' + a.texto + cola);
+    if (a.code) { MEM.avisoPago = MEM.avisoPago || {}; MEM.avisoPago[bid] = { code: a.code, numero: num, t: Date.now() }; memGuardar(); }
+    est.avisosWa = (est.avisosWa || 0) + 1;
+  }
+  anotar({ bid, que: '🔔 ' + r.avisos.length + ' aviso(s) al WhatsApp del dueño' });
+}
+// el dueño responde 1 o 2 al último comprobante que se le avisó (vale 24 horas)
+async function respuestaDelDueno(c, neg) {
+  const p = (MEM.avisoPago || {})[neg.bid], t = String(c.texto || '').trim();
+  if (!p || c.deMi || String(c.tel || '') !== p.numero || !/^[12]$/.test(t) || Date.now() - p.t > 24 * 3600000) return false;
+  delete MEM.avisoPago[neg.bid]; memGuardar();
+  const r = await gas(neg, 'revisarPago', { code: p.code, aprobar: t === '1', de: p.numero }).catch((e) => ({ ok: false, motivo: e.message }));
+  await escribir(neg, p.numero, r.ok ? (t === '1' ? '✅ Pago aprobado. La cita ' + p.code + ' quedó confirmada.' : '❌ Pago rechazado. El cupo de la cita ' + p.code + ' quedó libre.') : '⚠️ No pude hacerlo: ' + (r.motivo || 'intenta desde tu panel') + '.');
+  anotar({ bid: neg.bid, que: '🔔 el dueño ' + (t === '1' ? 'aprobó' : 'rechazó') + ' ' + p.code + ' por WhatsApp' + (r.ok ? '' : ' (falló: ' + r.motivo + ')') });
+  return true;
+}
 const vinculando = new Map();  // bid → hasta cuándo se reenvían los QR nuevos al panel
 const VENCE_MIN = Math.max(2, parseInt(env('VINCULAR_MIN', '3'), 10));   // 3.27: si no vincula en 3 min, se borra la conexión vacía (el panel muestra la cuenta regresiva)
 function guardarNegocio(bid, extra) {
@@ -860,9 +890,11 @@ async function tickPedidosWa() {
   if (Date.now() - SINC.t > 30 * 60000) { SINC.t = Date.now(); await sincronizarConectados().catch((e) => log('sincronizar', e.message)); }
   let pend = {};
   try {
-    const r = await fetch(FS.url + '/v1/projects/' + FS.proyecto + '/databases/(default)/documents/platform/public?key=' + FS.llave + '&mask.fieldPaths=maryWaPend', { signal: AbortSignal.timeout(15000) });
+    const r = await fetch(FS.url + '/v1/projects/' + FS.proyecto + '/databases/(default)/documents/platform/public?key=' + FS.llave + '&mask.fieldPaths=maryWaPend&mask.fieldPaths=maryAvisoPend', { signal: AbortSignal.timeout(15000) });
     const j = await r.json(); const f = (((j.fields || {}).maryWaPend || {}).mapValue || {}).fields || {};
     for (const k of Object.keys(f)) pend[k] = Number(f[k].integerValue || f[k].doubleValue || 0);
+    const fa = (((j.fields || {}).maryAvisoPend || {}).mapValue || {}).fields || {};   // 🔔 3.47: hay avisos para el dueño (en la misma lectura: no gasta nada extra)
+    for (const k of Object.keys(fa)) await entregarAvisos(k, Number(fa[k].integerValue || fa[k].doubleValue || 0)).catch((e) => log('avisos', k, e.message));
   } catch (e) { return; }
   for (const [bid, t] of Object.entries(pend)) {
     if (!/^[a-z0-9][a-z0-9-]{1,29}$/.test(bid) || Date.now() - t > 15 * 60000 || atendidos.get(bid) === t) continue;
@@ -937,5 +969,5 @@ if (require.main === module) {
   servidor.listen(CFG.puerto, () => { log('👩‍💼 ' + VERSION + ' escuchando en ' + CFG.puerto + ' · modo ' + CFG.modo); negocios(); arrancarRelojes(); });
 }
 // 🧪 solo para el banco de escenarios (banco/escenarios.js): deja a Mary como recién encendida
-const _banco = { ASIS, BOT, yaLoDije, memDicho: () => (MEM.dicho = MEM.dicho || {}), memHumano: () => MEM.humano, memRobot: () => (MEM.robot = MEM.robot || {}), memConv: () => (MEM.conv = MEM.conv || {}), tickRecordatorios, tickVolver, tickRetomar, tickEstadisticas, tickEstados, publicarGuia, botOff: BOT_OFF, apagarGlobal, botAlDia, botDe, memGuia: () => (MEM.guia = MEM.guia || {}), memStats: () => (MEM.stats = MEM.stats || {}), publicarEstado, alMensaje, alEventoConexion, ultimos, reiniciar() { CL = null; MEM.volver = {}; MEM.stats = {}; MEM.piePrueba = {}; MEM.guia = {}; leer.avisado = false; BOT_LEIDO.clear(); MEM.sinbot = {}; MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; MEM.conv = {}; MEM.clientes = {}; MEM.conectados = {}; MEM.pendientesWa = {}; MEM.codigos = {}; MEM.robot = {}; MEM.dicho = {}; AGRUPA.clear(); ASIS._cat.clear(); BOT.clear(); CONTACTOS.clear(); vinculando.clear(); delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
+const _banco = { ASIS, BOT, yaLoDije, memDicho: () => (MEM.dicho = MEM.dicho || {}), memHumano: () => MEM.humano, memRobot: () => (MEM.robot = MEM.robot || {}), memConv: () => (MEM.conv = MEM.conv || {}), tickRecordatorios, tickVolver, tickRetomar, tickEstadisticas, tickEstados, publicarGuia, entregarAvisos, tickPedidosWa, memAvisoPago: () => (MEM.avisoPago = MEM.avisoPago || {}), avisados, botOff: BOT_OFF, apagarGlobal, botAlDia, botDe, memGuia: () => (MEM.guia = MEM.guia || {}), memStats: () => (MEM.stats = MEM.stats || {}), publicarEstado, alMensaje, alEventoConexion, ultimos, reiniciar() { CL = null; MEM.volver = {}; MEM.stats = {}; MEM.piePrueba = {}; MEM.guia = {}; MEM.avisoPago = {}; avisados.clear(); leer.avisado = false; BOT_LEIDO.clear(); MEM.sinbot = {}; MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; MEM.conv = {}; MEM.clientes = {}; MEM.conectados = {}; MEM.pendientesWa = {}; MEM.codigos = {}; MEM.robot = {}; MEM.dicho = {}; AGRUPA.clear(); ASIS._cat.clear(); BOT.clear(); CONTACTOS.clear(); vinculando.clear(); delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
 module.exports = { _banco, botNormal, frenoRobot, estadosQueTocan, atenderPedidoWa, sincronizarConectados, renovarQr, telEnAviso, deWaha, esWaha, debeResponder, alEventoConexion, tickPedidosWa, limpiarSinVincular, leerMensaje, atiende, PREGUNTA, numeroWa, ahoraLocal, enFila, yaVisto, quienVeEstados, CFG };

@@ -8,7 +8,7 @@ const DIR = process.argv[2];
 if (!DIR || !fs.existsSync(DIR)) { console.log('Uso: node banco/web.js <carpeta>'); process.exit(2); }
 // archivos que ya viven en tuagenda.vip (un zip puede traer solo una parte)
 const DEL_SITIO = ['index.html', 'admin.html', 'super.html', 'privacidad.html', '404.html', 'app.js', 'admin.js', 'super.js', 'common.js',
-  'config.js', 'theme.js', 'styles.css', 'premium.css', 'panel-premium.css', 'sw.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png',
+  'config.js', 'theme.js', 'styles.css', 'tailwind.css', 'premium.css', 'panel-premium.css', 'sw.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png',
   'icon-maskable-512.png', 'apple-touch-icon.png', 'tu-agenda.apk', 'CNAME'];
 const fallas = [], avisos = [];
 const archivos = fs.readdirSync(DIR).filter((f) => fs.statSync(path.join(DIR, f)).isFile());
@@ -40,6 +40,22 @@ if (archivos.includes('config.js')) { const t = leer('config.js'); if (!/export 
 // 5) páginas completas
 for (const f of archivos.filter((x) => /\.html$/.test(x))) { const t = leer(f); if (!/<\/html>\s*$/i.test(t.trim() + '\n') && !/<\/html>/i.test(t)) fallas.push(f + ': la página está cortada (no termina en </html>)'); }
 
+// 6) estilos ya armados (2026-11-13m): ninguna página vuelve a calcularlos en el celular, y a tailwind.css no le falta ninguna clase «con valor propio»
+for (const f of archivos.filter((x) => /\.html$/.test(x))) if (/<script[^>]*cdn\.tailwindcss\.com/.test(leer(f))) fallas.push(f + ': vuelve a cargar cdn.tailwindcss.com (los estilos van armados en tailwind.css)');
+if (archivos.includes('tailwind.css')) {
+  const css = leer('tailwind.css'), faltan = new Set();
+  if (css.length < 8000) fallas.push('tailwind.css: está vacío o cortado');
+  for (const f of archivos.filter((x) => /\.(html|js)$/.test(x) && !['config.js', 'theme.js', 'sw.js'].includes(x))) {
+    for (const m of leer(f).matchAll(/class(?:Name)?\s*=\s*"([^"]*)"/g)) {
+      for (const t of m[1].replace(/\$\{[^}]*\}/g, ' ').split(/\s+/)) {
+        if (!/^[!\w\-:\[\]./%#(),]+$/.test(t) || !/[\[:\/]/.test(t) || /^https?:|\]\.|^\d/.test(t)) continue;   // solo las de Tailwind con valor propio, variante u opacidad
+        if (/,/.test(t)) continue;   // con comas Tailwind las escribe de otra forma (\\2c): no se revisan
+        if (!css.includes('.' + t.replace(/([^\w-])/g, '\\$1'))) faltan.add(t);
+      }
+    }
+  }
+  if (faltan.size) fallas.push('tailwind.css no trae: ' + [...faltan].slice(0, 8).join(' ') + ' → vuelve a armarlo (npx tailwindcss@3.4.17 -c tailwind.config.js -i tailwind.entrada.css -o tailwind.css --minify)');
+} else if (archivos.some((x) => /^(index|admin|super)\.html$/.test(x) || /^(app|admin|super|common)\.js$/.test(x))) avisos.push('el zip no trae tailwind.css: si agregaste clases nuevas, ármalo y mételo');
 console.log('🧪 Banco de la página: ' + archivos.length + ' archivos' + (VER ? ' · versión ' + VER : ''));
 avisos.slice(0, 5).forEach((a) => console.log('   ⚠️ ' + a));
 if (fallas.length) { fallas.forEach((x) => console.log('   ❌ ' + x)); console.log('# fail ' + fallas.length); process.exit(1); }

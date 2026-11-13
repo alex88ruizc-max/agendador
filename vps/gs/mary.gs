@@ -14,7 +14,7 @@
  * Instalación: pega este archivo, ejecuta activarMary() una vez, copia la clave que sale en el registro
  * y ponla en el mary.env del VPS (MARY_KEY). Vuelve a implementar la aplicación web (Implementar > Administrar > editar > Nueva versión).
  */
-const MARY_VERSION = 'agendador-ia-3.46';
+const MARY_VERSION = 'agendador-ia-3.47';
 
 // Se registra como acción pública del servidor (sin sesión: entra con la clave de Mary).
 // ⚠️ Este archivo debe quedar DEBAJO del archivo principal en la lista de archivos de Apps Script (los nuevos quedan al final: así está bien).
@@ -58,6 +58,8 @@ function maryAgenda(b) {
     case 'dobleAvisado': return maryDobleAvisado_(b);
     case 'volver': return maryVolver_(st, b);           // 3.32 · recordatorio de servicio
     case 'volverAvisado': return maryVolverAvisado_(b);
+    case 'avisos': return maryAvisos_();                // 3.47 · avisos al dueño por WhatsApp (el VPS los recoge solo cuando hay)
+    case 'revisarPago': return maryRevisarPago_(b);     // 3.47 · el dueño respondió 1 (aprobar) o 2 (rechazar) por WhatsApp
     case 'estadisticas': return maryEstadisticas_(b);   // 3.37 · reporte del bot (el VPS lo manda una vez por hora)
   }
   fail('Operación no válida.');
@@ -114,6 +116,7 @@ function maryBotCfg_(st) {
     volver: { activo: (b.volver || {}).activo === true, dias: Math.max(0, Math.min(60, Number((b.volver || {}).dias || 0))) },   // 3.32: lo elige el dueño (0 = no elegido: no sale)
     guia: { activo: (b.guia || {}).activo !== false, hora: /^\d{2}:\d{2}$/.test(String((b.guia || {}).hora || '')) ? b.guia.hora : '08:00', cadaDias: Math.max(1, Math.min(30, Number((b.guia || {}).cadaDias || 3))) }   // 3.43: estado «Cómo agendar»
   };
+  c.avisos = maryAvisosCfg_(st);   // 3.47: avisos al WhatsApp personal del dueño
   // 🤖 3.45 · lo que el superusuario apagó para TODAS las tiendas manda (platform/public.botOff)
   let off = []; try { off = (typeof platformPublic === 'function' ? platformPublic().botOff : null) || []; } catch (e) { off = []; }
   off.forEach(function (k) {
@@ -121,6 +124,7 @@ function maryBotCfg_(st) {
     else if (k === 'estados') c.estados.activo = false;
     else if (k === 'guia') c.guia.activo = false;
     else if (k === 'volver') c.volver.activo = false;
+    else if (k === 'avisosWa') c.avisos.activo = false;
     else if (typeof c[k] === 'boolean') c[k] = false;
   });
   return c;
@@ -911,3 +915,50 @@ ACTIONS.maryReactivar = function (b, auth) {
     return { ok: true, status: patch.status, code: a.code };
   });
 };
+
+// ---------- 🔔 3.47 · AVISOS AL DUEÑO POR WHATSAPP (para no obligar a instalar Telegram) ----------
+// El dueño pone SU número personal en el panel (WhatsApp Bot › Avisos a tu WhatsApp). Cada aviso que hoy va a Telegram (reserva nueva,
+// comprobante, cancelación…) queda en una cola; el VPS la recoge SOLO cuando hay algo (bandera pública platform/public.maryAvisoPend,
+// la misma idea de maryWaPend: no gasta llamadas de Google cuando no hay nada) y se lo escribe desde el WhatsApp del negocio.
+// Si el aviso es un comprobante por revisar, el dueño responde 1 (aprobar) o 2 (rechazar). Siguen las reglas de avisos del plan (las mismas de Telegram).
+function maryAvisosCfg_(st) {
+  const a = ((st.maryBot || {}).avisos) || {}; let n = String(a.numero || '').replace(/\D/g, ''); if (n.length === 10) n = '57' + n;
+  const negocio = String(((st.maryWa || {}).numero) || '').replace(/\D/g, '');
+  return { activo: a.activo === true && n.length >= 11 && n !== negocio, numero: n };
+}
+function maryAvisoWa_(texto, code) {
+  try {
+    const st = loadSettings(), cfg = maryBotCfg_(st).avisos;
+    if (!cfg.activo || !planHas('whatsapp') || !((st.maryWa || {}).conectado)) return;
+    const limpio = String(texto || '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').trim().slice(0, 900);
+    if (!limpio) return;
+    const ruta = bp('private/maryAvisos'), ya = fsGet(ruta) || {}, ahora = Date.now();
+    const cola = (ya.cola || []).filter(function (x) { return ahora - Number(x.t || 0) < 6 * 3600000; }).slice(-19);
+    cola.push({ t: ahora, texto: limpio, code: String(code || '') });
+    commit([wPatch(ruta, { cola: cola }),
+      { update: { name: docName('platform/public'), fields: encFields({ maryAvisoPend: (function () { const o = {}; o[BID] = ahora; return o; })() }) }, updateMask: { fieldPaths: [fp(['maryAvisoPend', BID])] } }]);
+  } catch (e) { console.error('Aviso por WhatsApp: ' + e); }
+}
+try {
+  const _tgNotify = tgNotify, _tgPhoto = tgPhoto;
+  tgNotify = function (staffIds, text, onlyStaff, system) { const r = _tgNotify.apply(this, arguments); if (!onlyStaff) maryAvisoWa_(text, ''); return r; };
+  tgPhoto = function (staffIds, blob, caption, buttons) {
+    const r = _tgPhoto.apply(this, arguments);
+    let code = ''; try { code = String((((buttons || [])[0] || [])[0] || {}).callback_data || '').split('|')[2] || ''; } catch (e) { code = ''; }
+    maryAvisoWa_(caption, code); return r;
+  };
+} catch (e) { console.error('Avisos por WhatsApp: ' + e); }
+// el VPS recoge la cola (y se vacía)
+function maryAvisos_() {
+  const ruta = bp('private/maryAvisos'), ya = fsGet(ruta) || {}, cfg = maryBotCfg_(loadSettings()).avisos;
+  const cola = (ya.cola || []).filter(function (x) { return Date.now() - Number(x.t || 0) < 6 * 3600000; });
+  commit([wPatch(ruta, { cola: [] }), { update: { name: docName('platform/public'), fields: {} }, updateMask: { fieldPaths: [fp(['maryAvisoPend', BID])] } }]);
+  return { avisos: cfg.activo ? cola : [], numero: cfg.numero };
+}
+// el dueño respondió por WhatsApp: 1 = aprobar el pago, 2 = rechazarlo (la misma revisión del panel)
+function maryRevisarPago_(b) {
+  const cfg = maryBotCfg_(loadSettings()).avisos;
+  if (!cfg.activo || String(b.de || '').replace(/\D/g, '') !== cfg.numero) return { ok: false, motivo: 'Ese número no es el del dueño.' };
+  try { doReview(String(b.code || ''), b.aprobar === true, b.aprobar === true ? '' : 'No encontramos la transferencia', 'whatsapp del dueño'); return { ok: true, aprobado: b.aprobar === true }; }
+  catch (e) { return { ok: false, motivo: String(e.message || e) }; }
+}
