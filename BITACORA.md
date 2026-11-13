@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.56** · Página **2026-11-13u** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.56** · Página **2026-11-13v** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -136,6 +136,18 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-13 · página 2026-11-13v · 🏠 Inicio reorganizado · pantalla fija sin zoom
+- **Inicio (Alex: «que sea un inicio real, y que el administrador ponga los accesos directos que quiera»). Todo lo que había se queda, en otro orden:**
+  1. **Accesos directos** que cada persona elige («✏️ Cambiar mis accesos» → lista con chulitos, máximo 8; vienen Agenda, Bot, Clientes y Mi enlace). Se guardan en su cuenta (`settings.homeAccesos.<uid>`) y en el celular.
+  2. **Enlace de citas** en una sola fila (antes una tarjeta grande).
+  3. **Hoy en tu agenda** ordenada sola: 🔴 le toca ya (aunque se le haya pasado la hora, con «✓ Llegó / No asistió / WhatsApp») → ⏭️ siguen («en 40 min») → ✅ ya atendidos. «‹ Ayer · Mañana ›» y «Ver otra fecha» abren la Agenda en ese día. La línea de tiempo queda plegada debajo.
+  4. Equipo, en vivo, «Para hoy», recomendación, referidos, estados y huecos: siguen ahí, más abajo.
+- **Configuración pendiente → botón flotante** «⚙️ Te faltan N pasos» (solo en Inicio). La ✕ lo esconde 24 horas; a la tercera vez no vuelve a salir solo (la guía sigue en el menú de la inicial).
+  La guía ahora muestra primero lo que FALTA, numerado 1, 2, 3; abajo «✓ Ya hechos». Paso nuevo: «Activa las notificaciones».
+- **Pantalla fija como una app (Alex: «que no se haga zoom y se ajuste a todos los dispositivos»):** sin zoom por pellizco ni doble toque (`viewport` + `touch-action`), y nada se sale hacia los lados
+  (una tarjeta con un correo largo ensanchaba toda la página en Clientes). Aplica a la página, el panel y el súper panel.
+- Banco de la página: 0 fallas. Mary no cambia (3.56). No se pudo ver en un celular real desde aquí.
 
 ### 2026-11-13 · agendador-ia-3.56 · página 2026-11-13u · 📋 servicios «por categoría» o «una sola lista»
 - **Alex:** en Servicios, elegir cómo se ven; y que el WhatsApp dispare la lista igual. Confirmó: la opción va en Servicios y manda para los dos lados.

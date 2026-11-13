@@ -9,9 +9,9 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, ventanaReserva, OFERTA_TXT, nombreCompleto, planEjemplos, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-11-13u";
-import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-13u";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-13u";
+} from "./common.js?v=2026-11-13v";
+import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-13v";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-13v";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -130,7 +130,7 @@ function start() {
     // recién creada desde "Probar gratis": abre la guía de primeros pasos
     // asistente de inicio: la primera vez (o al llegar desde "Probar gratis")
     if (!A.wizAuto && isOwner() && !A.me?.isSuper && !document.body.classList.contains("plan-gate") && !A.bill?.planWanted && (!A.settings.setupDone || !A.settings.tutorial2 || new URLSearchParams(location.search).get("guia") === "1")) {
-      // 2026-11-13u · los primeros pasos (nuevos, 4 pasos) se muestran UNA vez más a todas las tiendas, también a las que ya los habían hecho (tutorial2)
+      // 2026-11-13v · los primeros pasos (nuevos, 4 pasos) se muestran UNA vez más a todas las tiendas, también a las que ya los habían hecho (tutorial2)
       const otraVez = !!A.settings.setupDone && !A.settings.tutorial2;
       A.wizAuto = true; A.geoAsked = true;
       if (!A.settings.tutorial2) updateDoc(doc(db, bpath("settings", "general")), { tutorial2: true }).catch(() => {});
@@ -274,6 +274,7 @@ function switchTab(id, opts = {}) {
   if (A.tab !== "home") $("hdrSub").textContent = TABS[A.tab][0];
   window.scrollTo({ top: 0, behavior: "smooth" });
   if (A.tab === "home") renderHome();
+  guiaFab();   // el botón flotante de «te faltan pasos» solo vive en Inicio
   if (lockedNow(A.tab)) return lockCard(A.tab);
   if (A.tab === "clients") loadUsers();
   if (A.tab === "settings") renderSettings();
@@ -2289,6 +2290,99 @@ function freeTimes(date, locks, minutes) {
 }
 const firstName = (a) => (a.customer?.firstName || "Cliente").split(/\s+/)[0];
 
+// ================= 🏠 INICIO (2026-11-13v): accesos directos que cada quien elige · agenda de hoy ordenada · configuración en un botón flotante =================
+const ACC_DEF = ["agenda", "wabot", "clients", "linkcli"];
+const ACC_CORTO = { agenda: "Agenda", wabot: "Bot", clients: "Clientes", linkcli: "Mi enlace", staff: "Equipo", services: "Servicios", marketing: "Marketing", settings: "Ajustes", plan: "Mi plan", cupos: "Cupos", activity: "Actividad", referrals: "Referidos", appearance: "Apariencia", images: "Imágenes" };
+const accPermitidos = () => ["agenda", "cupos", "staff"].concat(isOwner() ? ["wabot", "clients", "linkcli", "services", "marketing", "settings", "plan", "activity", "referrals", "appearance", "images"] : []);
+function accesosDe() {
+  const uid = A.me?.uid || ""; let L = (A.settings?.homeAccesos || {})[uid];
+  if (!Array.isArray(L)) { try { L = JSON.parse(localStorage.getItem("acc:" + uid) || "null"); } catch { L = null; } }
+  const ok = accPermitidos();
+  return (Array.isArray(L) ? L : ACC_DEF).filter((id) => TABS[id] && ok.includes(id)).slice(0, 8);
+}
+function accesosHtml() {
+  const L = accesosDe();
+  const tile = (id) => `<button type="button" class="rounded-2xl border border-line bg-white px-1 py-2.5 text-center" data-hgo="${id}"><i class="fa-solid ${TABS[id][1]} text-[19px]" style="color:${TABS[id][2]}"></i><span class="mt-1 block truncate text-[11.5px] font-bold">${ACC_CORTO[id] || TABS[id][0]}</span></button>`;
+  return `<div class="grid grid-cols-4 gap-2">${L.map(tile).join("")}</div>
+    <div class="mb-3 mt-1 text-right"><button type="button" class="soft text-[11.5px] font-bold underline" data-hacc="edit">✏️ ${L.length ? "Cambiar mis accesos" : "Elegir mis accesos directos"}</button></div>`;
+}
+function openAccesos() {
+  const sel = accesosDe(), ok = accPermitidos();
+  openM("✏️ Tus accesos directos", `
+    <p class="soft -mt-2 mb-3 text-sm">Marca lo que más usas. Aparece arriba en tu Inicio. Máximo 8.</p>
+    <div id="accList" class="space-y-1.5">${ok.map((id) => `<label class="flex items-center gap-3 rounded-xl p-2.5" style="background:var(--canvas)"><input type="checkbox" class="h-5 w-5" value="${id}" ${sel.includes(id) ? "checked" : ""}><i class="fa-solid ${TABS[id][1]} w-5 text-center" style="color:${TABS[id][2]}"></i><b class="text-[14px]">${TABS[id][0]}</b></label>`).join("")}</div>
+    <button id="accOk" class="btn-primary mt-4 w-full py-3">Listo</button>`);
+  $("accList").onchange = (e) => { const m = [...$("accList").querySelectorAll("input:checked")]; if (m.length > 8) { e.target.checked = false; toast("Máximo 8 accesos.", "error"); } };
+  $("accOk").onclick = async () => {
+    const marcados = [...$("accList").querySelectorAll("input:checked")].map((i) => i.value);
+    const L = sel.filter((id) => marcados.includes(id)).concat(marcados.filter((id) => !sel.includes(id))).slice(0, 8);   // los que ya tenía conservan su orden; los nuevos van al final
+    const uid = A.me?.uid || "";
+    try { localStorage.setItem("acc:" + uid, JSON.stringify(L)); } catch { /* nada */ }
+    A.settings.homeAccesos = { ...(A.settings.homeAccesos || {}), [uid]: L };
+    closeM(); renderHome();
+    if (!A.me?.isSuper) { try { await setDoc(doc(db, bpath("settings", "general")), { homeAccesos: { [uid]: L } }, { merge: true }); } catch { /* quedó guardado en este celular */ } }
+    toast("✓ Accesos guardados.");
+  };
+}
+// Agenda de hoy ordenada: 🔴 le toca ya (aunque se le haya pasado la hora) → ⏭️ siguen → ✅ ya atendidos
+function hoyListaHtml(visible, nowMin, varios) {
+  const min = (t) => { const [h, m] = String(t).split(":").map(Number); return h * 60 + m; };
+  const dur = (m) => (m < 60 ? m + " min" : Math.floor(m / 60) + " h" + (m % 60 ? " " + (m % 60) : ""));
+  const L = visible.slice().sort((a, b) => min(a.startTime) - min(b.startTime));
+  L.forEach((a) => { A.index[a.code] = a; });
+  const ya = L.filter((a) => a.status === "confirmed" && min(a.startTime) <= nowMin);
+  const hechos = L.filter((a) => a.status === "attended");
+  const sig = L.filter((a) => !ya.includes(a) && !hechos.includes(a));
+  const serv = (a) => (a.items || []).map((i) => esc(i.name)).join(" + ") + (varios ? ` · con ${esc(a.staffName)}` : "");
+  const fila = (a, tipo) => {
+    const m = min(a.startTime), etq = tipo === "ya" ? `hace ${dur(nowMin - m)}` : tipo === "ok" ? "Atendido" : a.status === "pending_payment" ? "Falta abono" : a.status === "pending_verification" ? "Abono por revisar" : `en ${dur(m - nowMin)}`;
+    return `<div class="mb-1.5 rounded-2xl border p-2.5 ${tipo === "ok" ? "opacity-60" : ""}" style="${tipo === "ya" ? "border:2px solid var(--sred);background:#fff5f5" : "border-color:var(--line,#e7e5e0);background:#fff"}">
+      <button type="button" class="flex w-full items-center gap-2.5 text-left" data-hcode="${a.code}">
+        <span class="disp w-[78px] shrink-0 whitespace-nowrap text-[13.5px] font-extrabold leading-tight">${hora12(a.startTime).replace(" a. m.", " am").replace(" p. m.", " pm")}</span>
+        <span class="min-w-0 flex-1"><b class="block truncate text-[13.5px]">${esc(custName(a))}</b><span class="soft block truncate text-[11.5px]">${serv(a)}</span></span>
+        <span class="shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-extrabold ${tipo === "ya" ? "text-white" : tipo === "ok" ? "t-ok" : "t-trial"}" style="${tipo === "ya" ? "background:var(--sred)" : ""}">${etq}</span></button>
+      ${tipo === "ya" ? `<div class="mt-2 grid gap-1.5" style="grid-template-columns:1fr 1fr ${a.customer?.whatsapp ? "44px" : ""}">
+        <button class="rounded-xl py-2 text-[12.5px] font-extrabold text-white" style="background:var(--sink)" data-act="attended" data-code="${a.code}">✓ Llegó</button>
+        <button class="rounded-xl border border-line bg-white py-2 text-[12.5px] font-bold" data-act="noshow" data-code="${a.code}">No asistió</button>
+        ${a.customer?.whatsapp ? `<a class="grid place-items-center rounded-xl border border-line bg-white" target="_blank" rel="noopener" aria-label="Escribirle por WhatsApp" href="${waLink(a.customer.whatsapp, `Hola ${firstName(a)}, te estamos esperando para tu cita de las ${hora12(a.startTime)}.`)}"><i class="fa-brands fa-whatsapp" style="color:#128C7E"></i></a>` : ""}</div>` : ""}
+    </div>`;
+  };
+  const sec = (t, n) => `<p class="mb-1 mt-3 text-[10.5px] font-extrabold tracking-wider text-ink/50">${t}${n ? ` (${n})` : ""}</p>`;
+  return `<div class="mt-2 flex items-center justify-between gap-2 text-[12px]">
+      <button class="rounded-full border border-line bg-white px-2.5 py-1 font-bold" data-hdia="-1">‹ Ayer</button>
+      <span class="soft min-w-0 truncate text-center capitalize">${fechaLarga(H.today)}</span>
+      <button class="rounded-full border border-line bg-white px-2.5 py-1 font-bold" data-hdia="1">Mañana ›</button></div>
+    ${L.length ? "" : `<p class="soft mt-3 text-sm">Hoy no tienes citas todavía. Comparte tu enlace o usa <b>Cita rápida</b>.</p>`}
+    ${ya.length ? sec("🔴 LE TOCA YA") + ya.map((a) => fila(a, "ya")).join("") : ""}
+    ${sig.length ? sec("⏭️ SIGUEN") + sig.map((a) => fila(a, "sig")).join("") : ""}
+    ${hechos.length ? sec("✅ YA ATENDIDOS", hechos.length) + hechos.map((a) => fila(a, "ok")).join("") : ""}
+    <button class="mt-2 w-full rounded-xl py-2 text-[12.5px] font-bold" style="background:var(--canvas)" data-hdia="0">📅 Ver otra fecha en la Agenda</button>`;
+}
+// ⚙️ Botón flotante «Te faltan N pasos» (reemplaza la tarjeta grande). La ✕ lo esconde 24 horas; a la tercera vez ya no vuelve a salir solo.
+//    La guía completa sigue siempre en el menú de la inicial.
+const fabClave = () => "guiaFab:" + (bpath().split("/")[1] || "") + ":" + (A.me?.uid || "");
+const fabEstado = () => { try { return JSON.parse(localStorage.getItem(fabClave()) || "null") || { n: 0, t: 0 }; } catch { return { n: 0, t: 0 }; } };
+function guiaFab() {
+  const viejo = $("guiaFab");
+  let falta = 0; try { if (isOwner()) { const g = guideProgress(); falta = g.total - g.done; } } catch { falta = 0; }
+  const st = fabEstado();
+  const ver = A.tab === "home" && falta > 0 && st.n < 3 && Date.now() - st.t > 24 * 3600000 && !document.body.classList.contains("wiz-on");
+  if (!ver) { if (viejo) viejo.remove(); return; }
+  const el = viejo || document.createElement("div");
+  el.id = "guiaFab";
+  el.style.cssText = "position:fixed;right:14px;bottom:calc(98px + env(safe-area-inset-bottom));z-index:35;display:flex;align-items:center;gap:2px;background:#5b3fe0;color:#fff;border-radius:999px;padding:4px 4px 4px 14px;box-shadow:0 10px 22px -8px rgba(91,63,224,.7);font-weight:800;font-size:13px";
+  el.innerHTML = `<button type="button" data-fab="abrir" style="display:flex;align-items:center;gap:8px;padding:7px 4px">⚙️ Te falta${falta === 1 ? "" : "n"} <span style="background:#fff;color:#5b3fe0;border-radius:999px;min-width:22px;height:22px;display:grid;place-items:center;font-size:12px">${falta}</span> paso${falta === 1 ? "" : "s"}</button>
+    <button type="button" data-fab="x" aria-label="Recordármelo mañana" style="width:30px;height:30px;border-radius:999px;font-size:14px;opacity:.85">✕</button>`;
+  if (!viejo) {
+    document.body.appendChild(el);
+    el.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-fab]"); if (!b) return;
+      if (b.dataset.fab === "abrir") return openGuide();
+      const s = fabEstado(); try { localStorage.setItem(fabClave(), JSON.stringify({ n: s.n + 1, t: Date.now() })); } catch { /* nada */ }
+      el.remove(); toast(s.n + 1 >= 3 ? "Listo, no te lo recordamos más. La guía sigue en el menú de tu inicial." : "Te lo recordamos mañana. 👍");
+    });
+  }
+}
 function renderHome() {
   if (!A.me || !$("tab-home")) return;
   const el = $("tab-home");
@@ -2380,27 +2474,37 @@ function renderHome() {
       <span class="min-w-0 flex-1 text-[13.5px] leading-snug"><b>Invita y paga menos</b><br><span class="opacity-80">Gana ${refLevels()[0]}% de descuento cada mes que paguen tus invitados.</span></span>
       <span class="rounded-full px-2 py-0.5 text-[10px] font-extrabold" style="background:var(--sred)">Nuevo</span></button>` : "";
   const bookUrl = $("linkUrl").textContent || "";
-  const linkHtml = bookUrl ? `<div class="sp-card mb-3" style="background:linear-gradient(135deg,#14213D,#2B59C3);color:#fff">
-      <div class="flex items-center gap-2"><span class="text-lg">📅</span><div class="min-w-0"><p class="text-[15px] font-extrabold leading-tight">Tu enlace de citas</p><p class="text-[11.5px] opacity-80">Para tus clientes: reservan solos con este enlace</p></div></div>
+  // 2026-11-13v · el enlace queda en una sola fila (antes era una tarjeta grande que ocupaba medio Inicio)
+  const linkHtml = bookUrl ? `<div class="sp-card mb-3 flex items-center gap-2 !py-2.5" style="background:linear-gradient(135deg,#14213D,#2B59C3);color:#fff">
+      <span class="min-w-0 flex-1"><span class="block text-[11px] font-bold opacity-80">🔗 Tu enlace de citas</span><span class="block truncate font-mono text-[12px]">${esc(bookUrl.replace(/^https?:\/\//, ""))}</span></span>
+      <button class="shrink-0 rounded-xl px-3 py-2 text-[13px] font-extrabold" style="background:#25D366;color:#0b3d1f" data-bl="wa" aria-label="Enviar por WhatsApp"><i class="fa-brands fa-whatsapp"></i> Enviar</button>
+      <button class="shrink-0 rounded-xl bg-white px-2.5 py-2 text-[13px]" style="color:var(--sink)" data-bl="copy" aria-label="Copiar enlace"><i class="fa-regular fa-copy"></i></button>
+      <button class="shrink-0 rounded-xl px-2.5 py-2 text-[13px]" style="background:rgba(255,255,255,.18)" data-bl="qr" aria-label="Ver QR del enlace"><i class="fa-solid fa-qrcode"></i></button></div>` : "";
+  const linkViejo = bookUrl ? `<div class="hidden"><div><div><p class="text-[15px] font-extrabold leading-tight">Tu enlace de citas</p><p class="text-[11.5px] opacity-80">Para tus clientes: reservan solos con este enlace</p></div></div>
       <p class="mt-2 truncate rounded-xl px-3 py-2 font-mono text-xs" style="background:rgba(255,255,255,.14)">${esc(bookUrl.replace(/^https?:\/\//, ""))}</p>
       <div class="mt-2.5 grid gap-2" style="grid-template-columns:1.3fr 1fr 52px">
         <button class="rounded-2xl py-2.5 text-[14px] font-extrabold" style="background:#25D366;color:#0b3d1f" data-bl="wa"><i class="fa-brands fa-whatsapp"></i> Enviar</button>
         <button class="rounded-2xl bg-white py-2.5 text-[14px] font-extrabold" style="color:var(--sink)" data-bl="copy"><i class="fa-regular fa-copy"></i> Copiar</button>
         <button class="rounded-2xl py-2.5 text-[16px]" style="background:rgba(255,255,255,.18)" data-bl="qr" aria-label="Ver QR del enlace"><i class="fa-solid fa-qrcode"></i></button>
       </div></div>` : "";
-  el.innerHTML = `${linkHtml}${pushCard("home")}${isOwner() ? guideCard() : ""}<div class="home-grid"><div class="home-col">${liveHtml}${teamHtml}
-    <div class="sp-card mt-3" id="chairCard"><div class="flex items-center justify-between gap-2"><h2 class="disp text-[18px] font-bold">Hoy en tu agenda</h2>
-      ${freeLater.length ? `<button class="rounded-full px-3 py-1.5 text-xs font-bold ${H.showFree ? "" : "t-late"}" style="${H.showFree ? "background:var(--sink);color:#fff" : ""}" data-hfree="1" aria-expanded="${!!H.showFree}">${freeLater.length} hueco${freeLater.length === 1 ? "" : "s"} libre${freeLater.length === 1 ? "" : "s"} ${H.showFree ? "▴" : "▾"}</button>` : `<span class="soft text-xs">Sin huecos libres</span>`}</div>${chair}
+  void linkViejo;
+  // 2026-11-13v · INICIO REORGANIZADO (todo se queda): accesos directos → agenda de hoy ordenada → pendientes → equipo → en vivo → lo demás.
+  //   La configuración pendiente ya no ocupa el Inicio: va en el botón flotante (guiaFab).
+  el.innerHTML = `${accesosHtml()}${linkHtml}${pushCard("home")}<div class="home-grid"><div class="home-col">
+    <div class="sp-card" id="chairCard"><div class="flex items-center justify-between gap-2"><h2 class="disp text-[18px] font-bold">Hoy en tu agenda</h2>
+      ${freeLater.length ? `<button class="rounded-full px-3 py-1.5 text-xs font-bold ${H.showFree ? "" : "t-late"}" style="${H.showFree ? "background:var(--sink);color:#fff" : ""}" data-hfree="1" aria-expanded="${!!H.showFree}">${freeLater.length} hueco${freeLater.length === 1 ? "" : "s"} libre${freeLater.length === 1 ? "" : "s"} ${H.showFree ? "▴" : "▾"}</button>` : `<span class="soft text-xs">Sin huecos libres</span>`}</div>${hoyListaHtml(visible, nowMin, staffList.length > 1)}
+      <details class="mt-3"><summary class="soft cursor-pointer text-xs font-bold">Ver el día en línea de tiempo</summary>${chair}</details>
       ${H.showFree && freeLater.length ? `<div class="q-pop mt-3 rounded-2xl p-3" style="background:var(--canvas)">
         <p class="mb-2 text-sm font-bold">Toca un hueco para agendar a alguien ahí</p>
         <div class="grid grid-cols-3 gap-2">${freeLater.map((f) => `<button class="q-slot" data-hfreeat="${f.time}">${hora12(f.time)}${myStaff().length > 1 ? `<span class="soft block text-[10px] font-semibold">${f.staffIds.length} libre${f.staffIds.length === 1 ? "" : "s"}</span>` : ""}</button>`).join("")}</div>
         ${isOwner() ? `<button class="mt-3 w-full rounded-xl py-2.5 text-sm font-bold t-late" data-hfill="story">${lockedNow("marketing") ? "🔒 " : ""}Publicar estos huecos como estado</button>` : ""}
       </div>` : ""}
       <div class="soft mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px]">${isOwner() ? `<button class="font-bold underline" style="color:var(--sblue)" data-gstep="slot">Turnos de ${Number(A.settings?.slotDurationMinutes || 30)} min, cambiar</button>` : ""}<span><span style="color:var(--mint)">●</span> confirmada</span><span><span style="color:var(--amber)">●</span> abono por revisar</span><span><span style="color:#8a94a8">●</span> esperando pago</span><span><span style="color:var(--sred)">|</span> ahora</span></div></div>
-    </div><div class="home-col">${recHtml}${refHtml}
+    ${teamHtml}${liveHtml}</div><div class="home-col">
     <div class="sp-h"><h2>Para hoy</h2><span>${todo.length ? todo.length + " pendiente" + (todo.length === 1 ? "" : "s") : ""}</span></div>
     ${todo.join("") || `<div class="todo"><span class="ic t-ok"><i class="fa-solid fa-check"></i></span><p class="flex-1 text-[13.5px]">Todo al día. Usa <b>Cita rápida</b> para agendar a quien llame o llegue.</p></div>`}
-    ${stories}${fill}</div></div>`;
+    ${recHtml}${refHtml}${stories}${fill}</div></div>`;
+  guiaFab();
 }
 function storyBg(x) { return x.img ? `background-image:url('${x.img}')` : `background:${x.bg || "#14213D"}`; }
 $("tab-home").addEventListener("click", async (e) => {
@@ -2413,6 +2517,9 @@ $("tab-home").addEventListener("click", async (e) => {
     return;
   }
   const go = e.target.closest("[data-hgo]"); if (go) return switchTab(go.dataset.hgo);
+  if (e.target.closest("[data-hacc]")) return openAccesos();
+  const ac = e.target.closest("[data-act]"); if (ac) return aptAction(ac);   // «Llegó» / «No asistió» desde el Inicio
+  const hd = e.target.closest("[data-hdia]"); if (hd) { setAgendaDate(addDays(H.today, Number(hd.dataset.hdia))); return switchTab("agenda"); }
   const fr = e.target.closest("[data-hfree]");
   if (fr) { H.showFree = fr.dataset.hfree === "open" ? true : !H.showFree; renderHome(); if (H.showFree) $("chairCard")?.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
   const fa = e.target.closest("[data-hfreeat]"); if (fa) return openQuick({ date: H.today, time: fa.dataset.hfreeat });
@@ -3011,7 +3118,7 @@ async function loadLost() {
 const guideDone = () => A.settings?.guideDone || [];
 // lo que ya se hizo en el asistente de inicio cuenta como hecho en la guía
 const WIZ_ORDER = ["hi", "biz", "social", "team", "hours", "services", "deposit", "geo", "telegram", "done"];
-// 2026-11-13u · el asistente de inicio ahora son 4 pasos (negocio, horario, servicios y listo). Lo demás queda en la guía.
+// 2026-11-13v · el asistente de inicio ahora son 4 pasos (negocio, horario, servicios y listo). Lo demás queda en la guía.
 //   Quien terminó el asistente viejo (10 pasos) ya pasó por todo; quien termina el nuevo (setupVer 2) solo pasó por esos 4.
 const WIZ_NUEVO = ["biz", "hours", "services", "done"];
 const wizPassed = (id) => {
@@ -3029,6 +3136,9 @@ function guideSteps() {
     { id: "wa", ic: "fa-comments", t: "Vincula tu WhatsApp (2 min)", d: "Tu asistente responde, agenda y recuerda las citas por ti, las 24 horas. Sigues usando tu WhatsApp igual.",
       ok: !!s.maryWa?.conectado || lockedNow("whatsapp") || !hayBot(), tab: "wabot",
       tip: "Escribe el número de tu negocio y toca «Vincular mi WhatsApp». Ahí mismo está la guía paso a paso." },
+    { id: "push", ic: "fa-bell", t: "Activa las notificaciones", d: "Que te suene el celular con cada reserva y cada cancelación, aunque tengas la app cerrada.",
+      ok: (() => { try { return pushOn() || !pushSoporta() || !!A.me?.isSuper; } catch { return true; } })(), tab: "wabot",
+      tip: "Toca «🔔 Activar» y, cuando el celular pregunte, elige Permitir." },
     { id: "biz", ic: "fa-store", t: "Datos de tu negocio", d: "Nombre, WhatsApp, dirección y ciudad. Así te encuentran y te escriben tus clientes.",
       ok: !!(s.businessName && s.whatsapp && s.address), tab: "settings", focus: "stName",
       tip: "Escribe el nombre, el WhatsApp y la dirección. Al final de la página toca Guardar." },
@@ -3126,12 +3236,15 @@ function guideCard() {
     <div class="mt-3 grid grid-cols-2 gap-2"><button class="btn-primary text-sm" data-gstep="${g.next.id}">Hacerlo ahora</button><button class="btn-light text-sm" data-gopen="1">Ver todos los pasos</button></div></div>`;
 }
 function openGuide() {
-  const steps = guideSteps(), g = guideProgress();
-  openM(g.done === 0 ? "Tus primeros pasos" : "Guía de configuración", `
-    <p class="soft -mt-2 mb-4 text-sm">${g.next ? `Llevas ${g.done} de ${g.total} pasos. Cada uno te lleva al lugar exacto y te dice qué hacer.` : "¡Tu agenda está lista! Puedes volver a cualquier paso cuando quieras."}</p>
-    <div class="space-y-2">${steps.map((x) => `
+  const todos = guideSteps(), g = guideProgress();
+  // 2026-11-13v: primero lo que FALTA, numerado (1, 2, 3…); abajo lo que ya está hecho
+  const faltan = todos.filter((x) => !x.ok && !x.optional), steps = faltan.concat(todos.filter((x) => !faltan.includes(x)));
+  openM(faltan.length ? `⚙️ Te falta${faltan.length === 1 ? "" : "n"} ${faltan.length} paso${faltan.length === 1 ? "" : "s"}` : "Guía de configuración", `
+    <p class="soft -mt-2 mb-4 text-sm">${g.next ? `Vas ${g.done} de ${g.total}. Cada paso te lleva al lugar exacto y te dice qué hacer.` : "¡Tu agenda está lista! Puedes volver a cualquier paso cuando quieras."}</p>
+    <div class="space-y-2">${steps.map((x, i) => `
+      ${i === faltan.length && faltan.length ? `<p class="pt-2 text-[11px] font-extrabold tracking-wider text-ink/50">✓ YA HECHOS</p>` : ""}
       <div class="flex items-start gap-3 rounded-2xl p-3" style="background:${x.ok ? "#f1faf5" : "var(--canvas)"}">
-        <span class="grid h-9 w-9 shrink-0 place-items-center rounded-xl ${x.ok ? "t-ok" : "t-trial"}"><i class="fa-solid ${x.ok ? "fa-check" : x.ic}"></i></span>
+        <span class="grid h-9 w-9 shrink-0 place-items-center rounded-xl ${x.ok ? "t-ok" : "t-trial"} font-extrabold">${i < faltan.length ? i + 1 : `<i class="fa-solid ${x.ok ? "fa-check" : x.ic}"></i>`}</span>
         <div class="min-w-0 flex-1"><p class="text-[14px] font-bold">${esc(x.t)}${x.optional ? ` <span class="soft text-xs font-semibold">opcional${lockedNow("appearance") && x.id === "brand" ? ", Pro" : ""}</span>` : ""}</p>
           <p class="soft text-xs leading-snug">${esc(x.d)}</p>
           <div class="mt-2 flex flex-wrap gap-2"><button class="btn-sm" data-gstep="${x.id}">${x.ok ? "Revisar" : "Hacerlo"}</button>
