@@ -9,9 +9,9 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-11-13a";
-import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-13a";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-13a";
+} from "./common.js?v=2026-11-13f";
+import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-13f";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-13f";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -603,7 +603,17 @@ function renderStaffTab() {
   const el = $("tab-staff");
   const list = isOwner() ? A.staff : A.staff.filter((s) => s.id === A.me.staffId);
   const ownerTg = A.tg?.owner;
+  const ownId = A.me.staffId || "";
+  const ownStaff = A.staff.find((x) => x.id === ownId);
+  // 👤 se pregunta UNA vez: ¿el dueño también atiende clientes o solo administra?
+  const preguntar = isOwner() && !A.me.isSuper && ownStaff && A.settings?.ownerAttends === undefined;
   el.innerHTML = `
+    ${preguntar ? `<section class="mb-4 rounded-xl border-2 border-pole-blue/40 bg-pole-blue/5 p-4">
+      <p class="font-narrow text-xl font-bold">👤 ¿Tú también atiendes clientes?</p>
+      <p class="mb-3 text-sm text-ink/70">Así sabemos si tus clientes pueden agendar contigo o solo con tu equipo.</p>
+      <div class="flex flex-wrap gap-2"><button class="btn-primary" data-sact="atiendo" data-id="${esc(ownId)}">✂️ Sí, también atiendo</button>
+      <button class="btn-light" data-sact="administro" data-id="${esc(ownId)}">💼 No, solo administro</button></div>
+    </section>` : ""}
     ${isOwner() ? `<div class="mb-4 flex flex-wrap items-center justify-between gap-2">
       <p class="text-sm text-ink/70">${ownerTg ? "Tu Telegram de dueño está conectado." : "Conecta tu Telegram de dueño en Configuración para recibir todos los avisos."}</p>
       ${lockedNow("team") ? `<button class="btn-light" data-goplan="${PLANS().basic.maxStaff > (planInfo().maxStaff || 0) || !PLANS().basic.maxStaff ? "basic" : "gold"}">🔒 Agregar al equipo (sube de plan)</button>` : `<button class="btn-primary" data-sact="new">+ Agregar al equipo</button>`}</div>` : ""}
@@ -623,21 +633,26 @@ function renderStaffTab() {
       const busy = isBusy(s);
       const canBreak = isOwner() || s.id === A.me.staffId;
       const tgOn = A.tg?.staff?.[s.id];
-      return `<article class="rounded-xl border border-line bg-white p-4 ${s.active === false ? "opacity-60" : ""}">
+      const esDueno = isOwner() && !!ownId && s.id === ownId;
+      const soloAdmin = esDueno && s.active === false;
+      return `<article class="rounded-xl border border-line bg-white p-4 ${s.active === false && !esDueno ? "opacity-60" : ""}">
         <div class="flex items-center justify-between gap-2">
-          <p class="font-narrow text-2xl font-bold">${esc(s.name)}</p>
+          <p class="font-narrow text-2xl font-bold">${esc(s.name)}${esDueno ? ` <span class="ml-1 align-middle rounded-full bg-amber-100 px-2 py-0.5 font-sans text-xs font-semibold text-amber-800">👑 Tú · dueño</span>` : ""}</p>
           <span class="flex items-center gap-2 text-sm font-semibold"><i class="dot ${busy ? "bg-pole-red" : "bg-emerald-500"}"></i>${busy ? "Ocupado hasta " + timeOf(s.busyUntil) : "Disponible"}</span>
         </div>
         ${busy && s.busyReason ? `<p class="text-sm text-ink/70">${esc(s.busyReason)}</p>` : ""}
-        ${s.active === false ? `<p class="text-sm text-ink/70">Inactivo: no aparece en la página.</p>` : ""}
+        ${soloAdmin ? `<p class="text-sm text-ink/70">💼 Solo administras · no recibes citas.</p>`
+          : s.active === false ? `<p class="text-sm text-ink/70">Inactivo: no aparece en la página.</p>` : ""}
         <div class="mt-3 flex flex-wrap gap-2">
           ${canBreak ? (busy ? `<button class="btn-primary !bg-emerald-700" data-sact="end" data-id="${s.id}">Ya estoy disponible</button>`
                               : `<button class="btn-dark" data-sact="break" data-id="${s.id}">Tomar descanso</button>`) : ""}
           ${!isOwner() && s.id === A.me.staffId ? `<button class="btn-sm" data-sact="mysvc" data-id="${s.id}">Mis servicios</button>` : ""}
+          ${soloAdmin ? `<button class="btn-sm" data-sact="atiendo" data-id="${s.id}">✂️ Empezar a atender</button>` : ""}
           ${isOwner() ? `<button class="btn-sm" data-sact="edit" data-id="${s.id}">Editar</button>
-            <button class="btn-sm" data-sact="tg" data-id="${s.id}">${tgOn ? "Telegram conectado ✓ (reconectar)" : "Conectar Telegram"}</button>` : ""}
+            ${esDueno ? "" : `<button class="btn-sm" data-sact="tg" data-id="${s.id}">${tgOn ? "Telegram conectado ✓ (reconectar)" : "📲 Conectar su Telegram"}</button>`}` : ""}
         </div>
-        <p class="mt-2 text-xs text-ink/50">ID: ${esc(s.id)}</p>
+        ${esDueno ? `<p class="mt-2 text-xs text-ink/60">${ownerTg ? "🔔 Tus avisos ya llegan a tu Telegram de dueño." : "🔔 Conecta tu Telegram de dueño en Configuración para recibir tus avisos."}</p>`
+          : isOwner() && !tgOn ? `<p class="mt-2 text-xs text-ink/60">Para que le lleguen sus citas: toca «Conectar su Telegram» y envíale el enlace por WhatsApp.</p>` : ""}
       </article>`;
     }).join("")}
     </div>`;
@@ -655,7 +670,17 @@ $("tab-staff").addEventListener("click", async (e) => {
   if (act === "edit" || act === "new") openStaffEdit(s);
   if (act === "mysvc") openMyServices(s);
   if (act === "hours") openStaffHours(s);
-  if (act === "tg") tgLink(s.id);
+  if (act === "tg") tgLink(s.id, s.name);
+  if (act === "atiendo" || act === "administro") {
+    const si = act === "atiendo";
+    setBusy(b, true, "Guardando…");
+    try {
+      await updateDoc(doc(db, bpath("staff", s.id)), { active: si });
+      await setDoc(doc(db, bpath("settings", "general")), { ownerAttends: si }, { merge: true });
+      toast(si ? "¡Listo! Tus clientes ya pueden agendar contigo." : "Listo: solo administras. Ahora agrega a tu primer trabajador.");
+      if (!si && !A.staff.some((x) => x.id !== s.id) && !lockedNow("team")) openStaffEdit();
+    } catch (err) { toast("No se pudo guardar: " + err.message, "error"); setBusy(b, false); }
+  }
 });
 
 function openBreak(staff) {
@@ -784,7 +809,7 @@ async function openStaffEdit(s) {
   };
 }
 
-async function tgLink(target) {
+async function tgLink(target, nombre) {
   let bot = "";
   try { bot = ((await getDoc(doc(db, "platform", "public"))).data()?.telegramBot || "").replace(/^@/, "").trim(); } catch { /* sin bot */ }
   if (!bot) return toast("El bot de Telegram de la plataforma aún no está configurado. Avísale a soporte.", "error");
@@ -796,7 +821,9 @@ async function tgLink(target) {
     <p class="mb-3">Abre este enlace en el celular ${target === "owner" ? "donde quieres recibir los avisos" : "de esa persona"} y toca <b>Iniciar</b> en Telegram. Llegará un mensaje confirmando la conexión.</p>
     <p class="mb-4 break-all rounded-lg bg-paper p-3 text-sm">${link}</p>
     <div class="flex flex-wrap gap-2"><a class="btn-primary" href="${link}" target="_blank" rel="noopener">Abrir Telegram</a>
-    <button class="btn-light" data-copy="${link}">Copiar enlace</button></div>`);
+    <button class="btn-light" data-copy="${link}">Copiar enlace</button>
+    ${target !== "owner" ? `<a class="btn-light" href="https://wa.me/?text=${encodeURIComponent(`Hola ${nombre || ""} 👋 Toca este enlace para que te lleguen tus citas a Telegram: ${link}`)}" target="_blank" rel="noopener">📲 Enviar por WhatsApp</a>` : ""}</div>
+    ${target !== "owner" ? `<p class="mt-3 text-xs text-ink/60">Envíaselo por WhatsApp: cuando lo abra y toque <b>Iniciar</b>, le llegarán sus citas a su Telegram.</p>` : ""}`);
 }
 
 // ================= Clientes =================
@@ -2062,11 +2089,32 @@ function renderPlan() {
     }).join("");
     const tot = planPrice(sel, months), save = price * months - tot, net = Math.max(0, tot - credit);
     const pp = A.plat || {}, o = bl.pendingOrder && bl.pendingOrder.status === "pending" && toMillis(bl.pendingOrder.expiresAt) > Date.now() ? bl.pendingOrder : null;
-    const orderOk = o && o.plan === sel && o.months === months;
+    // 3.41 · formas de pago de la suscripción: Bre-B (sin comisión) y, si hay link de Nequi Negocios, link desde Nequi/Bancolombia u otros bancos
+    const COM = { breb: 0, nequi: 0.015 * 1.19, banco: 0.0269 * 1.19 }, conCom = (v, m) => COM[m] ? Math.ceil(v / (1 - COM[m]) / 10) * 10 : v;
+    const conLink = !!(pp.brebEnabled && pp.brebKey && pp.nequiLink);
+    const metodo = conLink && COM[A.planMetodo] !== undefined ? A.planMetodo : "breb";
+    const orderOk = o && o.plan === sel && o.months === months && (o.metodo || "breb") === metodo;
+    const esLink = orderOk && metodo !== "breb";
+    const METODOS = [["breb", "⭐ Llave Bre-B", "Sin comisión · al instante"], ["nequi", "💜 Link · Nequi o Bancolombia", "+ comisión Wompi 1,5 % + IVA"], ["banco", "🏦 Link · otro banco", "+ comisión Wompi 2,69 % + IVA"]];
+    const selMetodo = conLink && net > 0 ? `<p class="mt-4 text-[12px] font-extrabold uppercase tracking-wider text-ink/60">¿Cómo quieres pagar?</p>
+      <div class="mt-2 grid gap-2">${METODOS.map(([k, t, d]) => `<button type="button" data-pmet="${k}" class="flex items-center justify-between gap-2 rounded-2xl border px-3 py-2.5 text-left ${metodo === k ? "text-white" : "bg-white"}" style="${metodo === k ? "background:var(--sink);border-color:var(--sink)" : "border-color:var(--hair)"}">
+        <span><b class="block text-sm">${t}</b><span class="block text-xs ${metodo === k ? "text-white/75" : "soft"}">${d}</span></span><b class="text-[15px]">${cop(conCom(net, k))}</b></button>`).join("")}</div>
+      ${metodo !== "breb" ? `<p class="mt-2 rounded-xl px-3 py-2 text-[12.5px]" style="background:#f3f0ff;color:#4c3a99">💳 Wompi (el sistema de pagos de Nequi) cobra una comisión por cada pago con link: ${metodo === "nequi" ? "1,5 %" : "2,69 %"} + IVA. Esa comisión se suma a tu pago. <b>Por la llave Bre-B no pagas ninguna comisión.</b></p>` : ""}` : "";
     action = `<div class="mt-4 grid grid-cols-4 gap-2">${chips}</div>
       ${save > 0 ? `<p class="mt-2 rounded-xl px-3 py-2 text-sm font-semibold" style="background:#e9f7f0;color:#16774b">🎉 Ahorras ${cop(save)}: te sale a ${cop(Math.round(tot / months / 100) * 100)} al mes.</p>` : ""}
       ${credit ? `<p class="mt-2 rounded-xl px-3 py-2 text-sm font-semibold" style="background:#fff7e0;color:#8a5a00">🎁 Descuento por referidos: −${cop(Math.min(credit, tot))}${net === 0 ? ". ¡Este pago te sale gratis!" : ""}</p>` : ""}
-      ${pp.brebEnabled && pp.brebKey ? (orderOk ? `
+      ${selMetodo}
+      ${pp.brebEnabled && pp.brebKey ? (esLink ? `
+        <div class="sp-card mt-3" style="border:2px solid #7c3aed">
+          <div class="flex items-center justify-between"><p class="text-[11px] font-extrabold uppercase tracking-wider text-ink/60">1️⃣ Copia este valor exacto</p><span class="rounded-full px-2.5 py-0.5 text-xs font-semibold t-ok">⏱ <span id="brebLeft">--:--</span></span></div>
+          <div class="flex items-center justify-between gap-2"><p class="disp text-[34px] font-extrabold leading-none">${cop(o.amountCOP)}</p><button class="pay-ibtn main" data-copy="${o.amountCOP}" aria-label="Copiar monto"><i class="fa-regular fa-copy"></i></button></div>
+          <p class="soft mt-1 text-xs">Plan ${cop(o.baseCOP)} + comisión de Wompi ${cop(o.comisionCOP || 0)}</p>
+          <a href="${esc(pp.nequiLink)}" target="_blank" rel="noopener" class="btn-primary mt-3 flex w-full items-center justify-center gap-2 py-3 text-base" style="background:#7c3aed">2️⃣ Abrir el link de pago y pegar el valor <i class="fa-solid fa-arrow-up-right-from-square"></i></a>
+          <div class="mt-3 flex gap-2.5 rounded-2xl p-3" style="border:2px solid #f59e0b;background:#fff7e6" role="alert"><span class="text-xl leading-none">⚠️</span>
+            <p class="text-[12.5px] leading-snug" style="color:#7a4b00"><b style="color:#5c3700">Escribe exactamente ${cop(o.amountCOP)}.</b> Con ese valor sabemos que eres tú. Si pones otro, tu plan no se activa solo.</p></div>
+          <p class="mt-2 flex items-center gap-2 rounded-xl px-3 py-2 text-[12.5px] font-bold" style="background:#e9f7f0;color:#16774b"><span class="live-dot"></span>3️⃣ Cuando pagues, tu plan se activa solo en 1 a 2 minutos</p>
+          <button id="brebCancel" class="mt-2 w-full py-1 text-center text-xs text-ink/50 underline">Cancelar este pago</button>
+        </div>` : orderOk ? `
         <div class="sp-card mt-3" style="border:2px solid var(--mint)">
           <div class="flex items-center justify-between"><p class="text-[11px] font-extrabold uppercase tracking-wider text-ink/60">Envía exactamente</p><span class="rounded-full px-2.5 py-0.5 text-xs font-semibold t-ok">⏱ <span id="brebLeft">--:--</span></span></div>
           <div class="flex items-center justify-between gap-2"><p class="disp text-[34px] font-extrabold leading-none">${cop(o.amountCOP)}</p><button class="pay-ibtn" data-copy="${o.amountCOP}" aria-label="Copiar monto"><i class="fa-regular fa-copy"></i></button></div>
@@ -2080,7 +2128,7 @@ function renderPlan() {
             <label class="pay-drop mt-2" for="pOtherFile"><span class="pay-drop-ico"><i class="fa-solid fa-camera"></i></span><span id="pOtherLbl" class="min-w-0 flex-1 text-sm"><b>Adjunta la captura</b></span></label>
             <input id="pOtherFile" type="file" accept="image/*" class="hidden"><button id="pOtherSend" class="btn-primary mt-2 w-full">Enviar captura</button></details>
           <button id="brebCancel" class="mt-2 w-full py-1 text-center text-xs text-ink/50 underline">Cancelar este pago</button>
-        </div>` : `<button id="pPay" class="btn-primary mt-3 w-full py-3.5 text-base" style="${sel === "gold" ? "background:linear-gradient(140deg,#d4a017,#b8860b);color:#1a1200" : ""}">${net === 0 ? "🎁 Activar gratis con mis referidos" : `Pagar ${cop(net)} con Bre-B y activar ${esc(P[sel].name)}`}</button>`)
+        </div>` : `<button id="pPay" class="btn-primary mt-3 w-full py-3.5 text-base" style="${sel === "gold" ? "background:linear-gradient(140deg,#d4a017,#b8860b);color:#1a1200" : ""}">${net === 0 ? "🎁 Activar gratis con mis referidos" : metodo === "breb" ? `Pagar ${cop(net)} con Bre-B y activar ${esc(P[sel].name)}` : `Pagar ${cop(conCom(net, metodo))} con el link y activar ${esc(P[sel].name)}`}</button>`)
       : `<p class="soft mt-3 rounded-xl p-3 text-sm" style="background:var(--canvas)">El pago automático no está disponible. Sube el comprobante abajo.</p>`}
       ${bl.pendingProof ? `<p class="mt-3 rounded-xl p-3 text-sm" style="background:#e3f0fc;color:#1f6fb3"><b>Comprobante en revisión.</b> Te avisamos cuando lo aprobemos.</p>` : ""}
       ${!orderOk ? `<details class="mt-3"><summary class="cursor-pointer text-sm font-semibold soft">¿Pagaste por otro medio? Sube el comprobante</summary>
@@ -2092,12 +2140,13 @@ function renderPlan() {
   // ---- acciones
   el.querySelectorAll("[data-psel]").forEach((b) => b.onclick = () => { A.planPick = b.dataset.psel; renderPlan(); });
   el.querySelectorAll("[data-pm]").forEach((b) => b.onclick = () => { A.planMonths = Number(b.dataset.pm); renderPlan(); });
+  el.querySelectorAll("[data-pmet]").forEach((b) => b.onclick = () => { A.planMetodo = b.dataset.pmet; renderPlan(); });
   const free = async () => { try { await api("chooseFreePlan", {}); toast("Listo: empiezas con la prueba gratis."); } catch (err) { toast(err.message, "error"); } };
   if ($("pFree")) $("pFree").onclick = free;
   if ($("pFree2")) $("pFree2").onclick = free;
   if ($("pPay")) $("pPay").onclick = async () => {
     const btn = $("pPay"); setBusy(btn, true, "Generando tu pago…");
-    try { const r = await api("createPlanOrder", { months, plan: sel }); if (r?.free) toast("🎉 ¡Plan activado con tus referidos!"); } catch (err) { toast(err.message, "error"); setBusy(btn, false); }
+    try { const r = await api("createPlanOrder", { months, plan: sel, metodo: A.planMetodo || "breb" }); if (r?.free) toast("🎉 ¡Plan activado con tus referidos!"); } catch (err) { toast(err.message, "error"); setBusy(btn, false); }
   };
   if ($("brebQr")) $("brebQr").onclick = () => viewImage(A.plat.brebQr, `Bre-B: ${A.plat.brebKey}`);
   if ($("brebCancel")) $("brebCancel").onclick = async () => {
@@ -2673,6 +2722,24 @@ async function drawStory(cv, S2) {
     x.fillStyle = SUB; x.font = `600 28px ${F}`; x.fillText(S2.qr ? "Escanea o toca el botón de la página" : "Toca “Agendar mi cita” aquí abajo", W / 2, by + h + 52);
   }
 }
+// 🏷️ 3.38 · MARCA DE AGUA de la página en TODA imagen de estado que sale del agendador (salvo el adicional «sin marca de agua»)
+function marcaAgua(cv, abajo) {
+  if (!cv || A.biz?.addons?.sinMarca) return;
+  // 3.39: ARRIBA a la derecha, grande y con fondo sólido (pedido de Alex: «que se vea»)
+  const x = cv.getContext("2d"), W = cv.width, H = cv.height, s = W / 1080, w = 380 * s, h = 72 * s, px = W - 56 * s - w, py = (abajo ? 200 : 150) * s;
+  let claro = false;
+  try { const d = x.getImageData(Math.round(px), Math.round(py), Math.round(w), Math.round(h)).data; let l = 0; for (let i = 0; i < d.length; i += 16) l += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]; claro = l / (d.length / 16) > 150; } catch { /* nada */ }
+  const fg = claro ? "#FFFFFF" : "#121216";
+  x.save(); x.shadowColor = "rgba(0,0,0,.35)"; x.shadowBlur = 18 * s;
+  roundRect(x, px, py, w, h, h / 2); x.fillStyle = claro ? "rgba(18,18,22,.94)" : "rgba(255,255,255,.94)"; x.fill(); x.shadowBlur = 0;
+  x.strokeStyle = fg; x.lineWidth = 3.6 * s; x.lineCap = "round";
+  roundRect(x, px + 26 * s, py + 20 * s, 34 * s, 32 * s, 7 * s); x.stroke();
+  x.beginPath(); x.moveTo(px + 26 * s, py + 30 * s); x.lineTo(px + 60 * s, py + 30 * s); x.moveTo(px + 35 * s, py + 14 * s); x.lineTo(px + 35 * s, py + 22 * s); x.moveTo(px + 51 * s, py + 14 * s); x.lineTo(px + 51 * s, py + 22 * s); x.stroke();
+  x.fillStyle = fg; x.font = `800 ${36 * s}px 'Segoe UI', Roboto, Arial, sans-serif`; x.textAlign = "left"; x.textBaseline = "middle"; x.fillText("tuagenda.vip", px + 76 * s, py + h / 2 + 1 * s);
+  x.restore();
+}
+{ const _st = drawStory; drawStory = async (cv, S2) => { const r = await _st(cv, S2); marcaAgua(cv, S2 && S2.mode === "own" && S2.ownLogo !== false); return r; }; }
+{ const _im = drawImage; drawImage = async (...a) => { const r = await _im(...a); marcaAgua($("imgCanvas")); return r; }; }
 const storyLimit = () => Math.max(1, Number(A.plat?.storyLimit || 10));
 const activeStories = () => H.stories.filter((x) => toMillis(x.expiresAt) > Date.now()).length;
 function newStory(preset = {}) {

@@ -1,6 +1,6 @@
 // Página pública: ver cupos, registrarse, apartar, pagar con screenshot, mis cupos
-import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro } from "./common.js?v=2026-11-13a";
-import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-13a";
+import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro } from "./common.js?v=2026-11-13f";
+import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-13f";
 import {
   onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, sendPasswordResetEmail,
   GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult
@@ -12,7 +12,7 @@ import {
   startUpdateWatcher, applyBrandColors, warmServer, uiConfirm, setDialogBrand, viewImage, pushOverlay, dropOverlay, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, dow, hora12, fechaLarga, fechaCorta, toMillis, cop, esc,
   normalizePhone, waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, computeSlots, dayCapacityUnits, staffHours, mapLinks, headerBgCss,
   toast, openModal, closeModal, setBusy, copyText, tmin, mstr, UNIT
-} from "./common.js?v=2026-11-13a";
+} from "./common.js?v=2026-11-13f";
 
 const $ = (id) => document.getElementById(id);
 const S = {
@@ -49,6 +49,8 @@ if (!/^[a-z0-9][a-z0-9-]{1,29}$/.test(BIZ_ID)) {
     const b = e.target.closest("[data-lp]"); if (!b) return;
     if (b.dataset.lp === "trial") $("btnTrial").click(); else openAuth("login");
   });
+  // 🚀 2026-11-13f · viene de la invitación de una página de negocio: se abre «Probar gratis» de una vez
+  if (new URLSearchParams(location.search).has("probar")) setTimeout(() => $("btnTrial").click(), 400);
 } else {
   setBusiness(BIZ_ID);
   try { localStorage.setItem("ultimoNegocio", BIZ_ID); } catch { /* nada */ }
@@ -59,6 +61,7 @@ function boot() {
 onSnapshot(doc(db, "businesses", BIZ_ID), (s) => {
   if (!s.exists()) { showUnavailable("No encontramos este negocio", "Revisa que el enlace esté completo."); return; }
   S.biz = s.data();
+  pintarSello();   // el sello sale o no según el adicional «sin marca»
   const off = S.biz.status !== "active";
   $("closedBanner").classList.toggle("hidden", !off);
   $("btnBook").classList.toggle("hidden", off);
@@ -915,6 +918,35 @@ function watchTicket(code) {
     showTicket(a);
   }, () => {});
 }
+// ================= 🚀 Invitación a crear su propia agenda (solo después de agendar) =================
+//   No sale con el adicional «sin marca» ni si la plataforma apagó la prueba gratis. Abre en otra pestaña.
+const PROBAR_URL = "index.html?probar=1";
+function promoOn() {
+  return !!BIZ_ID && !document.body.classList.contains("is-landing") && PLAT.trialEnabled !== false && !(S.biz?.addons || {}).sinMarca;
+}
+function promoDias() { return Number(plansOf(PLAT).free.days || 15); }
+function promoGrande() {
+  if (!promoOn()) return "";
+  return `<a href="${PROBAR_URL}" target="_blank" rel="noopener" class="ta-promo mt-3 block rounded-2xl border p-4 text-ink no-underline" style="background:#F4F7FB;border-color:#d6e0ee">
+    <p class="font-narrow text-lg font-bold leading-tight">✨ ¿Te gustó lo fácil que fue?</p>
+    <p class="mt-0.5 text-sm text-ink/70">Ten esto mismo en tu negocio: tu página, bot de WhatsApp y recordatorios.</p>
+    <span class="mt-3 grid grid-cols-4 gap-1.5 text-center text-lg">${["💈", "💅", "🦷", "🐾"].map((x) => `<span class="rounded-lg border border-line bg-white py-1">${x}</span>`).join("")}</span>
+    <span class="mt-3 block rounded-xl py-2.5 text-center font-bold text-white" style="background:#24508A">Probar gratis ${promoDias()} días →</span></a>`;
+}
+function promoChica() {
+  if (!promoOn()) return "";
+  return `<a href="${PROBAR_URL}" target="_blank" rel="noopener" class="ta-promo mt-4 flex items-center gap-3 rounded-2xl border p-3 text-ink no-underline" style="background:#F4F7FB;border-color:#d6e0ee">
+    <span class="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-lg" style="background:#24508A">💼</span>
+    <span class="min-w-0 flex-1"><b class="block font-narrow text-base leading-tight">¿Tienes un negocio?</b><span class="text-xs text-ink/60">Crea tu agenda gratis · ${promoDias()} días</span></span>
+    <span class="text-lg font-extrabold" style="color:#24508A">→</span></a>`;
+}
+function pintarSello() {
+  let el = document.getElementById("taSello");
+  if (!promoOn()) { if (el) el.remove(); return; }
+  if (!el) { el = document.createElement("p"); el.id = "taSello"; el.className = "mx-auto mt-8 mb-6 text-center text-[11.5px] text-ink/55"; $("trialCta").after(el); }
+  el.innerHTML = `<a href="${PROBAR_URL}" target="_blank" rel="noopener" class="no-underline">⚡ Hecho con <b class="text-ink">tuagenda</b><b style="color:#A9844E">.vip</b></a>`;
+}
+
 function showTicket(apt) {
   presence("done");
   const st = S.settings || {};
@@ -949,7 +981,8 @@ function showTicket(apt) {
           <a class="btn-light text-center text-sm" style="background:#33ccff;border-color:#33ccff;color:#0b2540" href="${mapLinks(st).waze}" target="_blank" rel="noopener"><i class="fa-brands fa-waze"></i> Ir con Waze</a>
           <a class="btn-light text-center text-sm" href="${mapLinks(st).gmaps}" target="_blank" rel="noopener"><i class="fa-solid fa-map-location-dot"></i> Google Maps</a></div>` : ""}
       </div>
-    </article>`;
+    </article>
+    ${apt.status === "confirmed" ? promoGrande() : ""}`;
   $("tkCopy").onclick = () => copyText(apt.code);
   const wa = $("tkWa");
   if (st.whatsapp) { wa.href = waLink(st.whatsapp, fillTemplate(st.waConfirmTemplate || DEFAULT_WA_CONFIRM, apt, st)); wa.classList.remove("hidden"); }
@@ -999,7 +1032,8 @@ function renderMine() {
     <p class="text-xs font-bold uppercase tracking-wider text-ink/60">Próximas (${next.length})</p>
     ${next.map(apptCard).join("") || `<p class="text-sm text-ink/60">No tienes citas próximas.</p>`}
     <p class="pt-2 text-xs font-bold uppercase tracking-wider text-ink/60">Historial (${past.length})</p>
-    ${past.length ? `<p class="text-xs text-ink/60">${done.length} visita(s) · ${cop(done.reduce((t, a) => t + Number(a.totalCOP || 0), 0))} en servicios</p>` + past.map(apptCard).join("") : `<p class="text-sm text-ink/60">Aquí verás tus citas pasadas.</p>`}`;
+    ${past.length ? `<p class="text-xs text-ink/60">${done.length} visita(s) · ${cop(done.reduce((t, a) => t + Number(a.totalCOP || 0), 0))} en servicios</p>` + past.map(apptCard).join("") : `<p class="text-sm text-ink/60">Aquí verás tus citas pasadas.</p>`}
+    ${promoChica()}`;
 }
 function openAccount(tab) {
   const p = S.profile || {};
@@ -1139,7 +1173,11 @@ getDoc(doc(db, "platform", "public")).then((d) => {
   if (S.settings) renderAll();
   const on = PLAT.trialEnabled !== false;
   $("trialCta").classList.toggle("hidden", !on);
-  $("trialTop").classList.toggle("hidden", !on); $("trialTop").classList.toggle("inline-flex", on);   // 3.30: «Probar gratis» también arriba
+  // 2026-11-13f · en la página de un negocio NO hay «Probar gratis» mientras el cliente agenda (no se pierde la cita):
+  //   solo el sello chiquito abajo; la invitación sale DESPUÉS (cita confirmada y «Mis citas"), en otra pestaña.
+  $("trialTop").classList.add("hidden"); $("trialTop").classList.remove("inline-flex");
+  $("trialCta").classList.add("hidden");
+  pintarSello();
   $("trialDaysTxt").textContent = `${Number(plansOf(PLAT).free.days || 30)} días gratis`;
   document.querySelectorAll(".lp-dias").forEach((x) => { x.textContent = String(Number(plansOf(PLAT).free.days || 15)); });
   if (document.body.classList.contains("is-landing")) { $("trialCta").classList.add("hidden"); $("trialTop").classList.add("hidden"); }
@@ -1412,7 +1450,8 @@ if (new URLSearchParams(location.search).get("desde") === "panel" && BIZ_ID) {
       box().innerHTML = `<p class="text-5xl text-center">${a.status === "cancelled" || a.status === "expired" ? "⌛" : "✅"}</p>
         <p class="mt-2 text-center font-narrow text-2xl font-bold">${a.status === "confirmed" ? "¡Tu cita está confirmada!" : a.status === "pending_verification" ? "Recibimos tu comprobante" : "Esta cita ya no está esperando pago"}</p>
         <p class="mt-1 text-center text-sm text-ink/70">Cita <b>${esc(a.code || code)}</b>${a.date ? ` · ${esc(fechaLarga(a.date))} a las ${hora12(a.startTime)}` : ""}</p>
-        <button class="btn-primary mt-5 w-full py-3" id="waClose">Listo</button>`;
+        <button class="btn-primary mt-5 w-full py-3" id="waClose">Listo</button>
+        ${a.status === "confirmed" ? promoGrande() : ""}`;
       document.getElementById("waClose").onclick = close; return;
     }
     box().innerHTML = `
