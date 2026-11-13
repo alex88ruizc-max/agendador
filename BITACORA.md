@@ -148,6 +148,7 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 - **Panel › Mi plan:** «¿Cómo quieres pagar?» con las 3 formas y su precio, y la explicación de la comisión. Con link: «1️⃣ copia el valor exacto · 2️⃣ abre el link y pégalo · 3️⃣ se activa solo».
 - **Super panel › Pago automático:** campo «Link de pago de Nequi Negocios» (solo acepta links de wompi.co / nequi.com.co).
 - **Correo:** el lector solo ve el Gmail de **tuagenda.servidor**. Alex pone en su Gmail un filtro que solo REENVÍA una copia de notificaciones@nequi.com.co (sin archivar ni marcar como leído), así Epic sigue igual. Los pagos de Epic que lleguen se ignoran: solo cuenta el monto exacto de un pedido pendiente (probado).
+- Correo de la llave Bre-B (otro formato, enviado por Alex): «Detalle de tu venta por Bre-B · Venta exitosa por $ 35.000 · Pagador…». Probado: se reconoce. ⚠️ El filtro de Gmail debe ser SOLO por remitente (notificaciones@nequi.com.co), no por asunto, porque los asuntos del link y de Bre-B son distintos.
 - Banco: 158 pruebas, 0 fallas.
 
 ### 2026-11-13 · agendador-ia-3.40 · /servidor (código del servidor de Google sin claves) · plan de pagos de suscripción por Nequi Negocios

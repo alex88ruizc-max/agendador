@@ -405,6 +405,9 @@ test('3.41 · 💳 Pago del plan: Bre-B al precio exacto; link Nequi/Bancolombia
   assert.ok(F.PAGO_SI.test(correo) && !F.PAGO_NO.test(correo)); assert.ok(F.montosPago_(correo).includes(35640));
   assert.ok(F.PAGO_NO.test('Transacción RECHAZADA por $35,640'), 'un pago rechazado nunca activa');
   assert.ok(F.montosPago_('Recibiste $35.000 de Laura por Bre-B').includes(35000), 'Bre-B sigue igual');
+  // el correo REAL de una venta por la llave Bre-B de Nequi Negocios (otro formato: «$ 2.000» con espacio y punto)
+  const breb = 'Detalle de tu venta por Bre-B Venta exitosa por $ 35.000 Detalle de la venta Monto: $ 35.000 Estado: Aprobada Fecha: 12/11/2026 10:19:36 Pagador: LEONARDO FAJARDO Banco: Nequi Referencia: M05565670 Método de pago: QR Negocios Bre-B';
+  assert.ok(F.PAGO_SI.test(breb) && !F.PAGO_NO.test(breb), 'el correo de la llave Bre-B se reconoce'); assert.deepEqual(F.montosPago_(breb), [35000, 35000]);
 });
 test('3.41 · 💳 El lector del Gmail del servidor activa SOLO el pedido con el monto exacto (los pagos de Epic y los rechazados se ignoran)', { skip: !require('fs').existsSync(GS_MARY) && 'dentro de la imagen no está gs/' }, () => {
   const src = require('fs').readFileSync(GS_MARY, 'utf8'), ahora = Date.now();
