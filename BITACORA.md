@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.48** · Página **2026-11-13o** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.48** · Página **2026-11-13p** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -133,6 +133,13 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-13 · página 2026-11-13p · 🧸 explicaciones «para cualquiera» (Telegram y avisos)
+- Alex: «la explicación debe ser full intuitiva, para dummies». Regla de estilo desde ahora: frases cortas, palabras de todos los días, un ejemplo, y preguntas con respuesta de una línea.
+- **Telegram** (guía y Configuración): «¿Qué es esto? · Mira un ejemplo · ¿Qué te avisa? · Preguntas (¿Y mi WhatsApp? ¿Cuesta plata? ¿Es difícil?)».
+- **Avisos por WhatsApp:** «Pon aquí TU número. El tuyo, no el del negocio» con ejemplo, y «¿Cómo apruebo un pago?» en 3 pasos (respondes 1).
+- **«¿Cuál uso: WhatsApp o Telegram?»** según el caso del dueño: tengo 2 números → WhatsApp; tengo 1 → Telegram; quiero ver la foto del pago → Telegram.
+- Banco de la página: 0 fallas. Mary no cambia (3.48).
 
 ### 2026-11-13 · página 2026-11-13o · 👀 «Mira cómo funciona» en los planes y beneficios de conectar Telegram
 - **«👀 Mira cómo funciona»** debajo de la tabla de planes del panel (`planEjemplos()` en common.js): la misma lista de beneficios con un ejemplo de cómo se ve cada cosa
