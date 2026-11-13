@@ -9,9 +9,9 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, ventanaReserva, OFERTA_TXT, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-11-13j";
-import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-13j";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-13j";
+} from "./common.js?v=2026-11-13k";
+import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-13k";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-13k";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -299,6 +299,7 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("moda
 function custName(a) { return `${a.customer?.firstName || ""} ${a.customer?.lastName || ""}`.trim() || "Cliente"; }
 function payLine(a) {
   const p = a.payment || {};
+  if (a.status === "expired") return "⌛ No subió el comprobante del abono a tiempo: el apartado se venció y el cupo quedó libre para otros";
   if (p.mode === "preferential") return "⭐ Cliente preferencial, paga en el local";
   if (p.status === "submitted") return a.status === "confirmed" ? "Comprobante recibido, confirmada automáticamente: revisa que el dinero llegó" : "Comprobante por revisar";
   if (p.status === "approved") return p.mode === "manual" ? `Abono recibido (${p.method})` : "Abono verificado";
@@ -324,7 +325,15 @@ function aptCard(a) {
     acts.push(`<button class="btn-sm" data-act="resched" data-code="${a.code}">Reagendar</button>`);
     acts.push(`<button class="btn-sm" data-act="cancel" data-code="${a.code}">Cancelar</button>`);
   }
-  if (a.customer?.whatsapp) {
+  // ⌛ apartado vencido (no pagó el abono a tiempo): reactivar si la hora sigue libre, o preguntarle si aún la quiere
+  const futura = Date.parse(a.date + "T" + a.startTime + ":00-05:00") > Date.now();
+  if (a.status === "expired" && futura) acts.push(`<button class="btn-sm !border-emerald-600 text-emerald-800" data-act="revive" data-code="${a.code}">🔄 Reactivar</button>`);
+  if (a.customer?.whatsapp && a.status === "expired") {
+    const link = `https://tuagenda.vip/index.html?b=${encodeURIComponent(bpath().split("/")[1])}`;
+    const nom = String(a.customer?.firstName || "").split(" ")[0];
+    const msg = `Hola${nom ? " " + nom : ""} 👋 Tu cita del ${fechaLarga(a.date)} a las ${hora12(a.startTime)} en ${A.settings.businessName || "el negocio"} no quedó confirmada porque no nos llegó el comprobante del abono a tiempo. ¿Aún quieres la cita? Si ya pagaste, envíanos la captura por aquí y te la confirmo. O apártala de nuevo aquí: ${link}`;
+    acts.push(`<a class="btn-sm" target="_blank" rel="noopener" href="${waLink(a.customer.whatsapp, msg)}">WhatsApp: ¿aún quieres la cita?</a>`);
+  } else if (a.customer?.whatsapp) {
     acts.push(`<a class="btn-sm" target="_blank" rel="noopener" href="${waLink(a.customer.whatsapp, fillTemplate(A.settings.waConfirmTemplate || DEFAULT_WA_CONFIRM, a, A.settings))}">WhatsApp: confirmar</a>`);
     if (ACTIVE.includes(a.status)) acts.push(`<a class="btn-sm" target="_blank" rel="noopener" href="${waLink(a.customer.whatsapp, fillTemplate(A.settings.waRescheduleTemplate || DEFAULT_WA_RESCHEDULE, a, A.settings))}">WhatsApp: reagendar</a>`);
   }
@@ -453,11 +462,28 @@ $("modalBody").addEventListener("click", (e) => {
   if (b && ["approve", "reject", "attended", "noshow", "resched", "cancel"].includes(b.dataset.act)) aptAction(b);
 });
 
+// 🔄 reactivar un apartado vencido: si ya pagó → confirmada; si no → otro rato para pagar. Solo si la hora sigue libre.
+function openRevive(a) {
+  const min = Math.max(5, Number(A.settings.holdMinutes || 30));
+  openM("🔄 Reactivar la cita", `
+    <p class="mb-3 text-sm">${esc(custName(a))} · ${fechaLarga(a.date)} a las ${hora12(a.startTime)} · ${(a.items || []).map((i) => esc(i.name)).join(" + ")}, con ${esc(a.staffName)}</p>
+    <p class="mb-4 text-xs text-ink/65">Solo se puede si esa hora sigue libre. Si alguien ya la tomó, te avisamos.</p>
+    <div class="grid gap-2">
+      <button class="btn-primary" data-rv="pagada">✅ Ya pagó: confirmar la cita</button>
+      <button class="btn-light" data-rv="tiempo">⏳ Darle ${min} minutos más para pagar</button>
+    </div>`);
+  document.querySelectorAll("[data-rv]").forEach((x) => x.onclick = async () => {
+    setBusy(x, true, "Reactivando…");
+    try { const r = await api("maryReactivar", { code: a.code, modo: x.dataset.rv }); closeM(); toast(r.status === "confirmed" ? "✓ Cita reactivada y confirmada." : `✓ Cita reactivada: tiene ${min} minutos para subir el comprobante.`); }
+    catch (err) { toast(err.message, "error"); setBusy(x, false); }
+  });
+}
 async function aptAction(b) {
   const a = A.index[b.dataset.code]; if (!a) return;
   const act = b.dataset.act;
   try {
     if (act === "resched") return openAptModal("resched", a);
+    if (act === "revive") return openRevive(a);
     if (act === "approve") { setBusy(b, true, "Aprobando…"); await api("reviewPayment", { code: a.code, approve: true }); toast("Pago aprobado."); }
     if (act === "reject") {
       const reason = await uiPrompt("Rechazar pago", `¿Por qué rechazas el pago de ${custName(a)}? Se lo enviamos por correo y Telegram.`, "No encontramos la transferencia", { okText: "Rechazar", danger: true });
