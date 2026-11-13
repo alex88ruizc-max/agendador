@@ -18,6 +18,7 @@ const CFG = {
   prueba: String(env('MARY_PRUEBA', '')).split(/[,\s]+/).map((x) => x.replace(/\D/g, '')).filter((x) => x.length >= 10),
   leerDirecto: env('LEER_DIRECTO', 'si') !== 'no',
   volverEspacioMs: parseInt(env('VOLVER_ESPACIO_MS', String(3 * 60000)), 10),   // 3.32: minutos entre un recordatorio de servicio y el siguiente   // 3.30: días/horas/cupos calculados en el VPS (LEER_DIRECTO=no → todo por Google como antes)
+  guiaEspacioMs: parseInt(env('GUIA_ESPACIO_MS', '20000'), 10),   // 3.43: segundos entre las 3 imágenes de «Cómo agendar» (para que lleguen en orden)
   silencioMin: parseInt(env('SILENCIO_MIN', '15'), 10),     // no repite lo mismo en un chat antes de esto (salvo que el cliente diga algo de la lista)
   humanoMin: parseFloat(env('HUMANO_MIN', '30')),           // 3.1: si el dueño escribe a mano en un chat, se calla ahí 30 min (o lo que diga su panel)
   agruparMs: parseInt(env('AGRUPAR_MS', '7000'), 10),
@@ -198,8 +199,8 @@ async function gas(neg, op, datos) {
 }
 // ---------- 3.1 · configuración del panel «WhatsApp Bot» (por negocio) ----------
 const BOT = new Map();
-const BOT_DEF = { audios: true, activo: true, agendar: true, cupos: true, saludoDiario: true, pedirNombre: true, pedirCorreo: true, loDeSiempre: true, recordatorioMin: 120, recordatorioConfirmar: true, cambios: true, pausaMin: 30, estados: { activo: true, horas: ['11:00'], manana: true, semanal: false } };
-function botDe(neg) { const x = BOT.get(neg.bid); const c = Object.assign({}, BOT_DEF, x ? x.cfg : {}); c.estados = Object.assign({}, BOT_DEF.estados, (x && x.cfg.estados) || {}); if (!x) c.pausaMin = CFG.humanoMin; return c; }
+const BOT_DEF = { audios: true, activo: true, agendar: true, cupos: true, saludoDiario: true, pedirNombre: true, pedirCorreo: true, loDeSiempre: true, recordatorioMin: 120, recordatorioConfirmar: true, cambios: true, pausaMin: 30, estados: { activo: true, horas: ['11:00'], manana: true, semanal: false }, guia: { activo: true, hora: '08:00', cadaDias: 3 } };
+function botDe(neg) { const x = BOT.get(neg.bid); const c = Object.assign({}, BOT_DEF, x ? x.cfg : {}); c.estados = Object.assign({}, BOT_DEF.estados, (x && x.cfg.estados) || {}); c.guia = Object.assign({}, BOT_DEF.guia, (x && x.cfg.guia) || {}); if (!x) c.pausaMin = CFG.humanoMin; return c; }
 // 3.23 · lo que el dueño elige en el panel se lee DIRECTO de la base (cada minuto como mucho), sin pasar por Google:
 //        si apaga el asistente, en menos de 1 minuto deja de responder aunque el servidor de Google esté caído
 function deFs(v) {
@@ -217,6 +218,7 @@ function botNormal(b, recordatorioViejo) {   // mismos valores por defecto que e
   c.recordatorioMin = Math.max(0, Number(d(b.recordatorioMin, d(recordatorioViejo, 120)))); c.pausaMin = Math.max(5, Number(d(b.pausaMin, 30)));
   c.estados = { activo: d(e.activo, true) !== false, horas, manana: d(e.manana, true) !== false, semanal: d(e.semanal, false) === true };
   const v = b.volver || {}; c.volver = { activo: v.activo === true, dias: Math.max(0, Math.min(60, Number(v.dias || 0))) };   // 3.32: recordatorio de servicio (lo elige el dueño)
+  const g = b.guia || {}; c.guia = { activo: g.activo !== false, hora: /^\d{2}:\d{2}$/.test(String(g.hora || '')) ? g.hora : '08:00', cadaDias: Math.max(1, Math.min(30, Number(g.cadaDias || 3))) };   // 3.43: estado «Cómo agendar»
   return c;
 }
 const BOT_LEIDO = new Map();   // bid → cuándo se leyó de la base
@@ -284,11 +286,12 @@ async function tickEstadisticas() {
 }
 // 💰 3.30 · ahorro de Google: días, horas y cupos se calculan en el VPS leyendo la base directo (como la página). Si falla → Google.
 let CL = null;
+function crearCL() { return require('./cuposLocal').crear({ fetch: (...x) => fetch(...x), url: FS.url, proyecto: FS.proyecto, llave: FS.llave, ahora: () => { const a = ahoraLocal(); const [h, m] = a.hm.split(':').map(Number); return { fecha: a.fecha, min: h * 60 + m }; } }); }
 const DIRECTO = new Set(['horas', 'dias', 'cupos']);
 async function leer(neg, op, d) {
   if (!DIRECTO.has(op) || CFG.leerDirecto === false) return gas(neg, op, d);
   try {
-    CL = CL || require('./cuposLocal').crear({ fetch: (...x) => fetch(...x), url: FS.url, proyecto: FS.proyecto, llave: FS.llave, ahora: () => { const a = ahoraLocal(); const [h, m] = a.hm.split(':').map(Number); return { fecha: a.fecha, min: h * 60 + m }; } });
+    CL = CL || crearCL();
     const cat = (ASIS._cat.get(neg.bid) || {}).d;
     if (op === 'cupos' && !cat) throw new Error('sin catálogo en memoria');   // el nombre y el link vienen del catálogo
     const r = await CL[op](neg.bid, d || {});
@@ -535,6 +538,12 @@ async function publicarEstado(neg, tipo) {
   const conPie = !!d.prueba && MEM.piePrueba[neg.bid] !== ahoraLocal().fecha;   // 🚀 3.38: prueba gratis → la invitación en UN estado al día
   const caption = cap0 + (conPie ? E.PIE_PRUEBA : '');
   if (tipo === 'hoy' && !png) return { ok: false, motivo: 'no hay cupos hoy ni mañana: no publiqué' };
+  await enviarEstado(neg, quien, png, caption);
+  if (conPie) { MEM.piePrueba[neg.bid] = ahoraLocal().fecha; memGuardar(); }
+  est.estados++; anotar({ bid: neg.bid, que: 'estado ' + tipo + ' publicado' + (dia && dia !== d.dias[0] ? ' (cupos de mañana)' : '') });
+  return { ok: true };
+}
+async function enviarEstado(neg, quien, png, caption) {
   const url = guardarImg(png);
   try {
     // 3.1: WAHA solo conoce a quien escribió hace poco → el estado va a TODOS los clientes del negocio (sus números)
@@ -544,10 +553,25 @@ async function publicarEstado(neg, tipo) {
     else await evo('post', '/message/sendStatus/' + encodeURIComponent(neg.instancia), Object.assign({ type: 'image', content: url, caption }, quien), 120000);
   }
   catch (e) { if (!/timeout|aborted|524|504/i.test(e.message)) throw e; }   // ⏳ publicar a muchos contactos tarda: Evolution lo sigue haciendo solo
-  if (conPie) { MEM.piePrueba[neg.bid] = ahoraLocal().fecha; memGuardar(); }
-  est.estados++; anotar({ bid: neg.bid, que: 'estado ' + tipo + ' publicado' + (dia && dia !== d.dias[0] ? ' (cupos de mañana)' : '') });
+}
+// 📲 3.43 · ESTADO «CÓMO AGENDAR»: 3 imágenes seguidas (1-2, 3-4, 5-6) con el nombre, servicios, equipo y horas reales.
+//    Los datos salen de la base (cuposLocal.guia): no gasta llamadas de Google. Sale en todos los planes (prueba incluida).
+const GUIA = require('./guia');
+async function publicarGuia(neg) {
+  const quien = quienVeEstados(CFG.modo, CFG.prueba);
+  if (!quien) return { ok: false, motivo: 'Mary está apagada' };
+  CL = CL || crearCL();
+  const D = await CL.guia(neg.bid);
+  if (D.biz && D.biz.status && D.biz.status !== 'active') return { ok: false, motivo: 'la agenda del negocio no está activa' };
+  const info = GUIA.datosGuia(Object.assign({}, D, { link: 'https://tuagenda.vip/index.html?b=' + encodeURIComponent(neg.bid) }));
+  for (const p of [1, 2, 3]) {   // en orden: primero 1-2, luego 3-4, al final 5-6
+    await enviarEstado(neg, quien, E.png(GUIA.svgGuia(info, p, E.marcaAgua)), GUIA.textoGuia(info, p));
+    if (p < 3) await esperar(CFG.guiaEspacioMs);
+  }
+  est.estados++; anotar({ bid: neg.bid, que: 'estado «cómo agendar» publicado (3 imágenes)' });
   return { ok: true };
 }
+const esperar = (ms) => new Promise((ok) => setTimeout(ok, ms));
 const CONTACTOS = new Map();   // bid → { L, t } (6 h)
 async function contactosDe(neg) {
   const x = CONTACTOS.get(neg.bid); if (x && Date.now() - x.t < 6 * 3600000) return x.L;
@@ -582,6 +606,14 @@ async function tickEstados() {
       try { const r = await publicarEstado(neg, t.tipo); if (!r.ok) anotar({ bid: neg.bid, que: 'estado ' + t.tipo + ': ' + r.motivo }); }
       catch (e) { est.errores++; log('❌ estado', neg.bid, t.tipo, e.message); anotar({ bid: neg.bid, que: 'estado ' + t.tipo + ' falló: ' + e.message.slice(0, 120) }); }
       if (n < tareas.length - 1) await new Promise((ok) => setTimeout(ok, 60000));
+    }
+    // 📲 3.43 · «Cómo agendar»: a la hora elegida, cada N días; si ya salió el de cupos en este minuto, va después
+    MEM.guia = MEM.guia || {};
+    if (GUIA.guiaToca(bot.guia, a, MEM.guia[neg.bid])) {
+      MEM.guia[neg.bid] = a.fecha; memGuardar();   // una vez aunque falle (no reintenta en bucle)
+      if (tareas.length) await esperar(60000);
+      try { const r = await publicarGuia(neg); if (!r.ok) anotar({ bid: neg.bid, que: 'estado «cómo agendar»: ' + r.motivo }); }
+      catch (e) { est.errores++; log('❌ estado guía', neg.bid, e.message); anotar({ bid: neg.bid, que: 'estado «cómo agendar» falló: ' + e.message.slice(0, 120) }); }
     }
   }
 }
@@ -874,7 +906,7 @@ const servidor = http.createServer(async (req, res) => {
     if (req.method === 'GET' && url.pathname === '/registro') return json(res, 200, ultimos.slice(-Math.min(100, parseInt(url.searchParams.get('n') || '20', 10))));
     // 🧪 vista previa del estado (no publica): curl -s "127.0.0.1:3060/vista?bid=mi-negocio&tipo=hoy" -o hoy.png
     if (req.method === 'GET' && url.pathname === '/vista') { const neg = negocios().find((n) => n.bid === url.searchParams.get('bid')); if (!neg) return json(res, 404, { ok: false, error: 'negocio no está en negocios.json' }); const { png } = await armarEstado(neg, url.searchParams.get('tipo') === 'semana' ? 'semana' : 'hoy'); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(png); }
-    if (req.method === 'POST' && url.pathname === '/publicar') { const neg = negocios().find((n) => n.bid === url.searchParams.get('bid')); if (!neg) return json(res, 404, { ok: false, error: 'negocio no está en negocios.json' }); return json(res, 200, await publicarEstado(neg, url.searchParams.get('tipo') === 'semana' ? 'semana' : 'hoy')); }
+    if (req.method === 'POST' && url.pathname === '/publicar') { const neg = negocios().find((n) => n.bid === url.searchParams.get('bid')); if (!neg) return json(res, 404, { ok: false, error: 'negocio no está en negocios.json' }); const tp = url.searchParams.get('tipo'); return json(res, 200, tp === 'guia' ? await publicarGuia(neg) : await publicarEstado(neg, tp === 'semana' ? 'semana' : 'hoy')); }
     if (req.method === 'POST' && url.pathname === '/correo-ya') { await revisarCorreos(); return json(res, 200, { ok: true, est }); }
     json(res, 404, { ok: false });
   } catch (e) { est.errores++; json(res, 500, { ok: false, error: e.message }); }
@@ -885,5 +917,5 @@ if (require.main === module) {
   servidor.listen(CFG.puerto, () => { log('👩‍💼 ' + VERSION + ' escuchando en ' + CFG.puerto + ' · modo ' + CFG.modo); negocios(); arrancarRelojes(); });
 }
 // 🧪 solo para el banco de escenarios (banco/escenarios.js): deja a Mary como recién encendida
-const _banco = { ASIS, BOT, yaLoDije, memDicho: () => (MEM.dicho = MEM.dicho || {}), memHumano: () => MEM.humano, memRobot: () => (MEM.robot = MEM.robot || {}), memConv: () => (MEM.conv = MEM.conv || {}), tickRecordatorios, tickVolver, tickRetomar, tickEstadisticas, memStats: () => (MEM.stats = MEM.stats || {}), publicarEstado, alMensaje, alEventoConexion, ultimos, reiniciar() { CL = null; MEM.volver = {}; MEM.stats = {}; MEM.piePrueba = {}; leer.avisado = false; BOT_LEIDO.clear(); MEM.sinbot = {}; MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; MEM.conv = {}; MEM.clientes = {}; MEM.conectados = {}; MEM.pendientesWa = {}; MEM.codigos = {}; MEM.robot = {}; MEM.dicho = {}; AGRUPA.clear(); ASIS._cat.clear(); BOT.clear(); CONTACTOS.clear(); vinculando.clear(); delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
+const _banco = { ASIS, BOT, yaLoDije, memDicho: () => (MEM.dicho = MEM.dicho || {}), memHumano: () => MEM.humano, memRobot: () => (MEM.robot = MEM.robot || {}), memConv: () => (MEM.conv = MEM.conv || {}), tickRecordatorios, tickVolver, tickRetomar, tickEstadisticas, tickEstados, publicarGuia, memGuia: () => (MEM.guia = MEM.guia || {}), memStats: () => (MEM.stats = MEM.stats || {}), publicarEstado, alMensaje, alEventoConexion, ultimos, reiniciar() { CL = null; MEM.volver = {}; MEM.stats = {}; MEM.piePrueba = {}; MEM.guia = {}; leer.avisado = false; BOT_LEIDO.clear(); MEM.sinbot = {}; MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; MEM.conv = {}; MEM.clientes = {}; MEM.conectados = {}; MEM.pendientesWa = {}; MEM.codigos = {}; MEM.robot = {}; MEM.dicho = {}; AGRUPA.clear(); ASIS._cat.clear(); BOT.clear(); CONTACTOS.clear(); vinculando.clear(); delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
 module.exports = { _banco, botNormal, frenoRobot, estadosQueTocan, atenderPedidoWa, sincronizarConectados, renovarQr, telEnAviso, deWaha, esWaha, debeResponder, alEventoConexion, tickPedidosWa, limpiarSinVincular, leerMensaje, atiende, PREGUNTA, numeroWa, ahoraLocal, enFila, yaVisto, quienVeEstados, CFG };

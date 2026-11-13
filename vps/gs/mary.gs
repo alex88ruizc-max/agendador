@@ -111,7 +111,8 @@ function maryBotCfg_(st) {
     loDeSiempre: d(b.loDeSiempre, true) !== false, recordatorioMin: Math.max(0, Number(d(b.recordatorioMin, d(st.maryReminderMinutes, 120)))),
     recordatorioConfirmar: d(b.recordatorioConfirmar, true) !== false, cambios: d(b.cambios, true) !== false, pausaMin: Math.max(5, Number(d(b.pausaMin, 30))),
     estados: { activo: d(e.activo, true) !== false, horas: horas, manana: d(e.manana, true) !== false, semanal: d(e.semanal, false) === true },
-    volver: { activo: (b.volver || {}).activo === true, dias: Math.max(0, Math.min(60, Number((b.volver || {}).dias || 0))) }   // 3.32: lo elige el dueño (0 = no elegido: no sale)
+    volver: { activo: (b.volver || {}).activo === true, dias: Math.max(0, Math.min(60, Number((b.volver || {}).dias || 0))) },   // 3.32: lo elige el dueño (0 = no elegido: no sale)
+    guia: { activo: (b.guia || {}).activo !== false, hora: /^\d{2}:\d{2}$/.test(String((b.guia || {}).hora || '')) ? b.guia.hora : '08:00', cadaDias: Math.max(1, Math.min(30, Number((b.guia || {}).cadaDias || 3))) }   // 3.43: estado «Cómo agendar»
   };
 }
 // 3.1 · el cliente queda en los CLIENTES del negocio (panel › Clientes) con su nombre, WhatsApp y correo

@@ -4067,10 +4067,10 @@ document.addEventListener("click", async (e) => {
 });
 
 // Opciones del asistente (settings.maryBot). Los valores por defecto son los mismos del servidor (maryBotCfg_).
-const BOT_DEF = { audios: true, activo: true, agendar: true, cupos: true, saludoDiario: true, pedirNombre: true, pedirCorreo: true, loDeSiempre: true, recordatorioMin: 120, recordatorioConfirmar: true, cambios: true, pausaMin: 30, estados: { activo: true, horas: ["11:00"], manana: true, semanal: false }, volver: { activo: false, dias: 0 } };
+const BOT_DEF = { audios: true, activo: true, agendar: true, cupos: true, saludoDiario: true, pedirNombre: true, pedirCorreo: true, loDeSiempre: true, recordatorioMin: 120, recordatorioConfirmar: true, cambios: true, pausaMin: 30, estados: { activo: true, horas: ["11:00"], manana: true, semanal: false }, volver: { activo: false, dias: 0 }, guia: { activo: true, hora: "08:00", cadaDias: 3 } };
 function botCfg() {
   const s = A.settings || {}, b = s.maryBot || {};
-  const c = { ...BOT_DEF, ...b, estados: { ...BOT_DEF.estados, ...(b.estados || {}) }, volver: { ...BOT_DEF.volver, ...(b.volver || {}) } };
+  const c = { ...BOT_DEF, ...b, estados: { ...BOT_DEF.estados, ...(b.estados || {}) }, volver: { ...BOT_DEF.volver, ...(b.volver || {}) }, guia: { ...BOT_DEF.guia, ...(b.guia || {}) } };
   if (b.recordatorioMin === undefined && s.maryReminderMinutes !== undefined) c.recordatorioMin = Number(s.maryReminderMinutes);
   c.estados.horas = (c.estados.horas || []).filter((h) => /^\d{2}:\d{2}$/.test(h)).slice(0, 2);
   if (!c.estados.horas.length) c.estados.horas = ["11:00"];
@@ -4116,6 +4116,12 @@ function renderWaBot() {
       <div class="flex items-center gap-3 p-3.5"><span class="text-xl">2️⃣</span><span class="flex-1"><b class="block text-[14.5px]">Segundo estado</b><span class="block text-xs text-ink/65">Opcional</span></span>${sel("estados.h1", e.horas[1] || "", [["", "No publicar"]].concat(HORAS_ESTADO.filter((h) => h !== e.horas[0]).map((h) => [h, hora12(h)])))}</div>
       ${fila("estados.manana", "➡️", "Si hoy no hay cupos, publicar los de mañana", "Apagado, ese día no publica.", e.manana)}
       ${fila("estados.semanal", "🗓️", "Estado de la semana los lunes", "Además, los lunes a las 7:00 a. m. un resumen de la semana.", e.semanal)}` : ""}
+    </div>
+    <div class="sp-h mt-5"><h2>📲 Estado «Cómo agendar»</h2><span>3 imágenes, paso a paso</span></div>
+    <div class="sp-card !p-0 divide-y divide-line">
+      ${fila("guia.activo", "📲", "Enseñar a agendar con tu link", "3 estados seguidos (pasos 1-2, 3-4 y 5-6) con tu nombre, tus servicios, tu equipo y tus horas libres de verdad.", c.guia.activo)}
+      ${c.guia.activo ? `<div class="flex items-center gap-3 p-3.5"><span class="text-xl">⏰</span><span class="flex-1"><b class="block text-[14.5px]">Hora</b></span>${sel("guia.hora", c.guia.hora, HORAS_ESTADO.map((h) => [h, hora12(h)]))}</div>
+      <div class="flex items-center gap-3 p-3.5"><span class="text-xl">📆</span><span class="flex-1"><b class="block text-[14.5px]">Cada cuántos días</b></span>${sel("guia.cadaDias", c.guia.cadaDias, [[1, "Todos los días"], [2, "Cada 2 días"], [3, "Cada 3 días"], [5, "Cada 5 días"], [7, "Cada semana"], [15, "Cada 15 días"]])}</div>` : ""}
     </div>
     <p class="soft mt-3 text-xs">Los estados los ven los clientes que tienen guardado el número de tu negocio (así funciona WhatsApp).</p>
     <div class="sp-h mt-5"><h2>🔁 Recordatorio de servicio</h2><span>para que vuelvan</span></div>
@@ -4204,7 +4210,7 @@ function pintarReporte() {
 document.addEventListener("click", (e) => { const b = e.target.closest("#tab-wabot [data-rep]"); if (!b) return; REP.modo = b.dataset.rep; REP.clave = ""; renderWaBot(); });
 document.addEventListener("change", (e) => { if (e.target.id === "repDesde" || e.target.id === "repHasta") { REP.desde = $("repDesde").value; REP.hasta = $("repHasta").value; REP.clave = ""; pintarReporte(); } });
 async function botGuardar(patch) {
-  const c = botCfg(), n = { ...c, ...patch, estados: { ...c.estados, ...(patch.estados || {}) }, volver: { ...c.volver, ...(patch.volver || {}) } };
+  const c = botCfg(), n = { ...c, ...patch, estados: { ...c.estados, ...(patch.estados || {}) }, volver: { ...c.volver, ...(patch.volver || {}) }, guia: { ...c.guia, ...(patch.guia || {}) } };
   A.settings.maryBot = n; renderWaBot();
   try { await setDoc(doc(db, bpath("settings", "general")), { maryBot: n }, { merge: true }); toast("✓ Guardado."); }
   catch (err) { toast("No se pudo guardar: " + err.message, "error"); }
@@ -4214,6 +4220,7 @@ document.addEventListener("click", (e) => {
   const k = b.dataset.bot, c = botCfg();
   if (k.startsWith("estados.")) { const kk = k.slice(8); botGuardar({ estados: { [kk]: !c.estados[kk] } }); }
   else if (k === "volver.activo") botGuardar({ volver: { activo: !c.volver.activo } });
+  else if (k === "guia.activo") botGuardar({ guia: { activo: !c.guia.activo } });
   else botGuardar({ [k]: !c[k] });
 });
 document.addEventListener("change", (e) => {
@@ -4223,6 +4230,8 @@ document.addEventListener("change", (e) => {
     const h = [...c.estados.horas]; h[k === "estados.h0" ? 0 : 1] = s.value;
     botGuardar({ estados: { horas: [...new Set(h.filter(Boolean))].sort().slice(0, 2) } });
   } else if (k === "volver.dias") botGuardar({ volver: { dias: Number(s.value) || 0 } });
+  else if (k === "guia.hora") botGuardar({ guia: { hora: s.value } });
+  else if (k === "guia.cadaDias") botGuardar({ guia: { cadaDias: Number(s.value) || 3 } });
   else botGuardar({ [k]: Number(s.value) });
 });
 

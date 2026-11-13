@@ -15,7 +15,7 @@ fs.writeFileSync(NEG_F, JSON.stringify([
 Object.assign(process.env, {
   DATOS: DIR, NEGOCIOS: NEG_F, GAS_URL: 'https://gas.prueba/exec', MARY_KEY: 'clave-prueba', EVO_KEY: 'evo-prueba',
   WAHA_URL: 'http://waha-agendador:3000', WAHA_KEY: 'waha-prueba', MARY_MODO: 'todos', MARY_PRUEBA: '573187920386',
-  SILENCIO_MIN: '15', HUMANO_MIN: '15', TZ: 'America/Bogota', ESPERA_MS: '5', AGRUPAR_MS: '0'
+  SILENCIO_MIN: '15', HUMANO_MIN: '15', TZ: 'America/Bogota', ESPERA_MS: '5', AGRUPAR_MS: '0', GUIA_ESPACIO_MS: '5'
 });
 const P = require('../principal');
 const B = P._banco;
@@ -102,6 +102,7 @@ global.fetch = async (url, o) => {
     if (/\/staff\?/.test(u)) return resp({ documents: D.staff.map((x) => docu('x/staff/' + x.id, x)) });
     if (/\/services\?/.test(u)) return resp({ documents: D.servicios.map((x) => docu('x/services/' + x.id, x)) });
     if (/:runQuery/.test(u)) return resp([]);
+    if (/\/documents\/businesses\/[^/?]+\?/.test(u)) return resp(docu('businesses/x', D.biz || { status: 'active' }));   // 3.43: el negocio (plan, adicional sin marca)
   }
   if (/\/documents\/businesses\/[^/]+\/settings\/general/.test(u)) {   // 3.23: el panel guarda «maryBot» en la base y el VPS lo lee directo
     if (!W.fsBot) return resp({ error: { code: 404 } }, 404);
@@ -1197,4 +1198,46 @@ test('3.38 · 🚀 Prueba gratis: UN estado al día lleva «Regístrate gratis y
   W.prueba = false; P._banco.reiniciar(); W.estados = [];
   await B.publicarEstado({ bid: 'lina-spa', instancia: 'lina-spa', motor: 'waha', sesion: 'default' }, 'hoy');
   assert.doesNotMatch(W.estados[0].caption, /Regístrate gratis/, 'plan de pago: sin invitación');
+});
+
+test('3.43 · 📲 Estado «Cómo agendar»: 3 imágenes EN ORDEN (1-2, 3-4, 5-6) con nombre, tipo, servicios y equipo reales · sin gastar Google', async () => {
+  const todos = { open: '08:00', close: '18:00' };
+  W.fsDirecto = { st: { businessName: 'Uñas Valen', businessType: 'unas', slotDurationMinutes: 30, minAdvanceMinutes: 0, bookingWindowDays: 30, businessHours: Object.fromEntries([0, 1, 2, 3, 4, 5, 6].map((d) => [String(d), [todos]])) },
+    staff: [{ id: 's1', name: 'Valen', active: true }],
+    servicios: [{ id: 'm1', name: 'Manicure', minutes: 45, priceCOP: 25000, type: 'base', active: true }, { id: 'p1', name: 'Semipermanente', minutes: 60, priceCOP: 40000, type: 'base', active: true }],
+    biz: { status: 'active', addons: {} } };
+  const gasAntes = W.gas.length;
+  const r = await B.publicarGuia({ bid: 'lina-spa', instancia: 'lina-spa', motor: 'waha', sesion: 'default' });
+  assert.equal(r.ok, true);
+  assert.equal(W.estados.length, 3, 'tres estados');
+  assert.match(W.estados[0].caption, /Así agendas tu cita en Uñas Valen.*\(1 de 3\)/);
+  assert.match(W.estados[1].caption, /\(2 de 3\)/);
+  assert.match(W.estados[2].caption, /Agenda aquí: https:\/\/tuagenda\.vip\/index\.html\?b=lina-spa/);
+  assert.ok(!W.gas.slice(gasAntes).some((op) => op !== 'contactos'), 'no le pide nada a Google (solo la lista de contactos, que ya se guarda 6 h)');
+  assert.match(ultimoRegistro(), /cómo agendar.*publicado/);
+});
+test('3.43 · 📲 «Cómo agendar» usa lo real del negocio: tipo «Uñas», sus servicios y precios; sin servicios, los de ejemplo de su tipo; sin marca con el adicional', () => {
+  const G = require('../guia');
+  const base = { hoy: '2026-11-13', link: 'https://tuagenda.vip/index.html?b=x', staff: [{ name: 'Valen' }], cupos: { dias: [] }, biz: {} };
+  let i = G.datosGuia(Object.assign({}, base, { st: { businessName: 'Uñas Valen', businessType: 'unas' }, servicios: [{ name: 'Manicure', minutes: 45, priceCOP: 25000, type: 'base' }] }));
+  assert.equal(i.tipo, 'Uñas'); assert.deepEqual(i.servicios.map((s) => s.nombre), ['Manicure']); assert.equal(i.ejemplo, false);
+  const svg = G.svgGuia(i, 2); assert.match(svg, /Manicure/); assert.match(svg, /\$25\.000/); assert.match(svg, /Uñas Valen/);
+  i = G.datosGuia(Object.assign({}, base, { st: { businessName: 'Pelos', businessType: 'mascotas' }, servicios: [] }));
+  assert.equal(i.ejemplo, true); assert.match(i.servicios[0].nombre, /Baño/);
+  i = G.datosGuia(Object.assign({}, base, { st: { businessType: 'otro', businessTypeLabel: 'Bronceado' }, servicios: [] }));
+  assert.equal(i.tipo, 'Bronceado');
+  i = G.datosGuia(Object.assign({}, base, { st: { businessName: 'X' }, servicios: [], biz: { addons: { sinMarca: true } } }));
+  assert.equal(i.marca, false); assert.doesNotMatch(G.svgGuia(i, 1), /Hecho con tuagenda/);
+  for (const p of [1, 2, 3]) assert.match(G.svgGuia(i, p), new RegExp(p + ' de 3'));
+});
+test('3.43 · 📲 «Cómo agendar» sale a las 8:00 cada 3 días (lo cambia el dueño en el panel) y una sola vez', () => {
+  const G = require('../guia'), a = (fecha, hm) => ({ fecha, hm });
+  assert.equal(G.guiaToca({}, a('2026-11-13', '07:59'), null), false, 'antes de las 8 no');
+  assert.equal(G.guiaToca({}, a('2026-11-13', '08:00'), null), true, 'la primera vez sí');
+  assert.equal(G.guiaToca({}, a('2026-11-13', '09:00'), '2026-11-13'), false, 'una vez al día');
+  assert.equal(G.guiaToca({}, a('2026-11-15', '08:00'), '2026-11-13'), false, 'a los 2 días todavía no');
+  assert.equal(G.guiaToca({}, a('2026-11-16', '08:00'), '2026-11-13'), true, 'a los 3 días sí');
+  assert.equal(G.guiaToca({ cadaDias: 1, hora: '10:00' }, a('2026-11-14', '09:30'), '2026-11-13'), false, 'su hora');
+  assert.equal(G.guiaToca({ cadaDias: 1, hora: '10:00' }, a('2026-11-14', '10:00'), '2026-11-13'), true);
+  assert.equal(G.guiaToca({ activo: false }, a('2026-11-20', '08:00'), null), false, 'apagado');
 });

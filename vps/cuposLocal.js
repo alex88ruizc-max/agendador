@@ -113,7 +113,13 @@ function crear({ fetch: f, url, proyecto, llave, ahora, cacheMs = 60000, locksMs
     }
     return { dias: out };
   }
-  return { horas, dias, cupos, olvidar: (bid, date) => { C.delete('lk:' + bid + ':' + date); } };
+  // 📲 3.43 · lo que necesita el estado «Cómo agendar» (todo de la base, sin Google)
+  const negocio = (bid) => guardado('bz:' + bid, cacheMs, async () => doc(await pedir(base(bid) + '?key=' + llave)));
+  async function guia(bid) {
+    const [st, staff, servicios, biz, c] = await Promise.all([ajustes(bid), lista(bid, 'staff'), lista(bid, 'services'), negocio(bid), cupos(bid, { dias: 14 })]);
+    return { st, staff, servicios, biz, cupos: c, hoy: ahora().fecha };
+  }
+  return { horas, dias, cupos, guia, olvidar: (bid, date) => { C.delete('lk:' + bid + ':' + date); } };
 }
 
 module.exports = { crear, libres, horario, diaTxt, hora12, ocupa };
