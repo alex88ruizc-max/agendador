@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.39** · Página **2026-11-13c** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.40** · Página **2026-11-13c** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -132,6 +132,20 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-13 · agendador-ia-3.40 · /servidor (código del servidor de Google sin claves) · plan de pagos de suscripción por Nequi Negocios
+- **Pagos de la suscripción de las tiendas (acordado con Alex, en construcción).** Solo para que las tiendas le paguen su plan a Alex; nada de los cobros de cada tienda a sus clientes.
+  - Un solo link de Nequi Negocios (valor abierto) + su llave de negocios (Bre-B). Tarifas confirmadas con sus pantallas y una prueba real de $1.500 desde Nequi → $1.473:
+    - llave / QR: gratis, al instante;
+    - link desde Nequi o Bancolombia: 1,5 % + IVA;
+    - link desde otros bancos: 2,69 % + IVA;
+    - tarjetas: 1,99 % + IVA + retención → no se usan.
+  - Gold $35.000: llave $35.000 · link Nequi/Bancolombia $35.640 · link otros bancos $36.160, + unos pesos únicos por pedido para saber qué tienda pagó.
+  - Cada pago manda el correo «Transacción APROBADA» (de notificaciones@nequi.com.co) a alex88ruizc@gmail.com.
+  - ⚠️ A ese MISMO Nequi y Gmail llegan los pagos de **Epic**. Regla N.º 1: el agendador NUNCA entra a ese Gmail (Epic puede depender de él). Alex hará un filtro que solo REENVÍA una copia a tuagenda.servidor@gmail.com, y el agendador lee solo ese.
+  - Activa un plan únicamente si el monto coincide exacto con un pedido pendiente (48 h, referencia usada una sola vez). Los pagos de Epic se ignoran.
+- **/servidor** (cartero): manda por Telegram la copia del código del servidor de Google que el VPS baja en cada actualización (~/agendador/google). Quita llaves privadas, tokens, llaves de Wompi, contraseñas y la clave de Mary. Sirve para conectar la activación automática con la MISMA función con la que hoy se aprueban los planes (no está en el repositorio). Probado con un servidor falso lleno de secretos de ejemplo (`reglas.js`).
+- Banco: 156 pruebas, 0 fallas.
 
 ### 2026-11-13 · agendador-ia-3.39 · página 2026-11-13c · la marca de agua ARRIBA y bien visible
 - Alex: «arriba debe salir tuagenda.vip, que se vea; abajo queda escondida».

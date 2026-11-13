@@ -148,6 +148,33 @@ def tg_doc(nombre, datos, texto=''):
     cuerpo.write(datos); cuerpo.write(('\r\n--' + b + '--\r\n').encode())
     req = urllib.request.Request(API + '/sendDocument', data=cuerpo.getvalue(), headers={'Content-Type': 'multipart/form-data; boundary=' + b})
     with urllib.request.urlopen(req, timeout=120) as r: return json.load(r)
+# 🗂️ 3.40 · /servidor → te manda por Telegram el código del servidor de Google del AGENDADOR (la copia que el VPS bajó en la
+#    última actualización, en ~/agendador/google), SIN claves: se quitan llaves privadas, tokens, contraseñas y la clave de Mary.
+#    Solo lee la carpeta del agendador (regla N.º 1). Sirve para que Claude vea cómo funcionan los planes sin adivinar.
+SECRETOS = [
+    (re.compile(r'-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----', re.S), '«LLAVE PRIVADA QUITADA»'),
+    (re.compile(r'(["\']?(?:private_key|private_key_id|client_secret|refresh_token|access_token|password|passwd|clave|secret|secreto|token|apikey|api_key|integrity)[\w-]*["\']?\s*[:=]\s*)(["\'])[^"\'\n]{6,}\2', re.I), r'\1\2«QUITADO»\2'),
+    (re.compile(r'\b\d{8,10}:[A-Za-z0-9_-]{30,}\b'), '«TOKEN DE TELEGRAM QUITADO»'),
+    (re.compile(r'\b(?:prv|pub|prod|test)_(?:prod|test)_[A-Za-z0-9]{10,}\b'), '«LLAVE DE WOMPI QUITADA»'),
+    (re.compile(r'\b(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{10,}\b'), '«LLAVE QUITADA»'),
+]
+def limpiar_secretos(txt):
+    n = 0
+    for rx, rep in SECRETOS:
+        txt, k = rx.subn(rep, txt); n += k
+    return txt, n
+def servidor():
+    carpeta = os.path.join(AQUI, 'google')
+    if not os.path.isdir(carpeta): return None, '❌ No encontré ~/agendador/google (Google no está conectado todavía).'
+    buf, quitados, n = io.BytesIO(), 0, 0
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as z:
+        for f in sorted(os.listdir(carpeta)):
+            if f.startswith('mary-clave') or f.startswith('.') or f.endswith('.env') or not f.endswith(('.gs', '.js', '.json', '.html')): continue
+            txt = open(os.path.join(carpeta, f), encoding='utf-8', errors='replace').read()
+            txt, k = limpiar_secretos(txt); quitados += k; n += 1
+            z.writestr(f, txt)
+    if not n: return None, '❌ La carpeta del servidor de Google está vacía.'
+    return buf.getvalue(), '🗂️ Código del servidor de Google (' + str(n) + ' archivos, copia de la última actualización). Quité ' + str(quitados) + ' clave(s) o token(s). Pásaselo a Claude.'
 def hacer_apk():
     os.makedirs(APK_DIR, exist_ok=True)
     est_f = os.path.join(APK_DIR, 'estado.json')
@@ -228,9 +255,15 @@ def atender(m):
     elif texto.startswith('/registro'): decir(curl('/registro?n=12'))
     elif texto.startswith('/auditoria') or texto.startswith('/auditoría'): decir(auditoria())
     elif texto.startswith('/limpiar'): decir(limpiar())
+    elif texto.startswith('/servidor'):
+        datos, msj = servidor()
+        if not datos: decir(msj)
+        else:
+            try: tg_doc('servidor-google-' + time.strftime('%Y%m%d-%H%M') + '.zip', datos, msj)
+            except Exception as e: decir('❌ No pude mandarte el archivo: ' + str(e)[:200])
     elif texto.startswith('/modo'): decir(cmd_modo(texto))
     elif texto.startswith('/prueba'): decir(cmd_prueba(texto))
-    elif texto: decir('Hola 👋 Soy el cartero del Agendador IA.\nMándame:\n• agendador-ia-….zip → actualizo el VPS (Mary) y el Apps Script de Google\n• agendador-web-….zip → subo la página tuagenda.vip\n/apk → genero la app de Android\n/estado · /registro\n/auditoria → reviso que el agendador no toque a Epic ni a nadie (solo lee)\n/limpiar → quito contenedores sueltos del agendador (solo los nuestros)\n/modo → ver o cambiar el modo (prueba, todos, apagado)\n/prueba <números> → tus números de prueba')
+    elif texto: decir('Hola 👋 Soy el cartero del Agendador IA.\nMándame:\n• agendador-ia-….zip → actualizo el VPS (Mary) y el Apps Script de Google\n• agendador-web-….zip → subo la página tuagenda.vip\n/apk → genero la app de Android\n/estado · /registro\n/auditoria → reviso que el agendador no toque a Epic ni a nadie (solo lee)\n/limpiar → quito contenedores sueltos del agendador (solo los nuestros)\n/servidor → te mando el código del servidor de Google (sin claves) para Claude\n/modo → ver o cambiar el modo (prueba, todos, apagado)\n/prueba <números> → tus números de prueba')
 
 # ---------- 🧪 3.1 · modo del asistente por Telegram: /modo · /modo prueba|todos|apagado · /prueba <números> ----------
 ENV_IA = os.path.join(AQUI, 'agendador-ia.env')

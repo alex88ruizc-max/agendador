@@ -56,6 +56,17 @@ test('3.33 · El cartero solo BORRA contenedores en /limpiar, y solo los probado
   const borra = src.split('\n').filter((l) => /dk\(\s*'(rm|stop|kill|restart)'/.test(l) && !/^\s*#/.test(l));
   assert.equal(borra.length, 1, 'un solo sitio que borra: ' + borra.join(' | '));
   assert.match(borra[0], /x\['id'\]/); assert.match(src, /def limpiar\(\):\n    L = sueltos\(\)/);
-  const s = src.slice(src.indexOf('def sueltos'), src.indexOf('def limpiar'));
+  const s = src.slice(src.indexOf('def sueltos'), src.indexOf('def limpiar():'));
   assert.match(s, /in NUESTROS or 'epic' in nombre\.lower\(\): continue/); assert.match(s, /com\.docker\.compose\.project/); assert.match(s, /m == AQUI or m\.startswith\(AQUI \+ '\/'\)/);
+});
+test('3.40 · /servidor manda el código del servidor de Google SIN claves (llaves privadas, tokens, Wompi, contraseñas, clave de Mary)', { skip: (!fs.existsSync(path.join(RAIZ, 'cartero.py')) || require('child_process').spawnSync('python3', ['--version']).status !== 0) && 'sin cartero o sin python aquí' }, () => {
+  const os = require('os'), d = fs.mkdtempSync(path.join(os.tmpdir(), 'srv-'));
+  fs.copyFileSync(path.join(RAIZ, 'cartero.py'), path.join(d, 'cartero.py')); fs.writeFileSync(path.join(d, 'cartero.env'), ''); fs.mkdirSync(path.join(d, 'google'));
+  fs.writeFileSync(path.join(d, 'google', 'Codigo.gs'), 'const SA = { "private_key": "-----BEGIN PRIVATE KEY-----\\nMIIEsecreto\\n-----END PRIVATE KEY-----\\n" };\nconst T = \'8454986905:AAHk-abcdefghijklmnopqrstuvwxyz1234\';\nconst W = \'prv_prod_ABCDEFGHIJ1234567890\';\nvar password = "superclave123";\nfunction superApproveOrder(b, auth) {}\n');
+  fs.writeFileSync(path.join(d, 'google', 'mary-clave.gs'), 'const MARY_CLAVE = "no-debe-salir";');
+  const py = 'import importlib.util,sys,zipfile,io\ns=importlib.util.spec_from_file_location("c",sys.argv[1]);c=importlib.util.module_from_spec(s);s.loader.exec_module(c)\nd,m=c.servidor();z=zipfile.ZipFile(io.BytesIO(d))\nprint("\\n".join(z.read(n).decode() for n in z.namelist()))';
+  const r = require('child_process').spawnSync('python3', ['-c', py, path.join(d, 'cartero.py')], { encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr);
+  for (const malo of ['MIIEsecreto', 'AAHk-abc', 'prv_prod_ABC', 'superclave123', 'no-debe-salir']) assert.ok(!r.stdout.includes(malo), 'se coló: ' + malo);
+  assert.match(r.stdout, /function superApproveOrder/, 'el código sí va');
 });
