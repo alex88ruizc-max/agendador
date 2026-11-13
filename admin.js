@@ -9,9 +9,9 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, ventanaReserva, OFERTA_TXT, nombreCompleto, planEjemplos, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-11-13q";
-import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-13q";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-13q";
+} from "./common.js?v=2026-11-13r";
+import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-13r";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-13r";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -130,7 +130,7 @@ function start() {
     // recién creada desde "Probar gratis": abre la guía de primeros pasos
     // asistente de inicio: la primera vez (o al llegar desde "Probar gratis")
     if (!A.wizAuto && isOwner() && !A.me?.isSuper && !document.body.classList.contains("plan-gate") && !A.bill?.planWanted && (!A.settings.setupDone || !A.settings.tutorial2 || new URLSearchParams(location.search).get("guia") === "1")) {
-      // 2026-11-13q · los primeros pasos (nuevos, 4 pasos) se muestran UNA vez más a todas las tiendas, también a las que ya los habían hecho (tutorial2)
+      // 2026-11-13r · los primeros pasos (nuevos, 4 pasos) se muestran UNA vez más a todas las tiendas, también a las que ya los habían hecho (tutorial2)
       const otraVez = !!A.settings.setupDone && !A.settings.tutorial2;
       A.wizAuto = true; A.geoAsked = true;
       if (!A.settings.tutorial2) updateDoc(doc(db, bpath("settings", "general")), { tutorial2: true }).catch(() => {});
@@ -917,7 +917,8 @@ const CLIENT_FILTERS = {
   all: ["Todos", () => true],
   pref: ["⭐ Preferenciales", (u) => u.paymentMode === "preferential"],
   blocked: ["Bloqueados", (u) => !!u.blocked],
-  noshow: ["Con faltas", (u) => Number(u.noShowCount || 0) > 0]
+  noshow: ["Con faltas", (u) => Number(u.noShowCount || 0) > 0],
+  prosp: ["💬 Solo escribieron", (u) => !!u.prospecto && !u.totalAppointments]
 };
 function renderClients() {
   const f = A.clientF || "all";
@@ -929,7 +930,7 @@ function renderClients() {
     <article class="rounded-xl border border-line bg-white p-3">
       <div class="flex items-start justify-between gap-2">
         <div class="min-w-0">
-          <p class="truncate font-semibold">${esc(u.firstName)} ${esc(u.lastName)}${u.paymentMode === "preferential" ? " ⭐" : ""}${u.blocked ? ` <span class="ml-1 rounded bg-rose-100 px-1.5 text-xs text-rose-900">Bloqueado</span>` : ""}</p>
+          <p class="truncate font-semibold">${esc(u.firstName)} ${esc(u.lastName)}${u.paymentMode === "preferential" ? " ⭐" : ""}${u.prospecto && !u.totalAppointments ? ` <span class="ml-1 rounded bg-sky-100 px-1.5 text-xs text-sky-900">💬 Escribió, aún no agenda</span>` : ""}${u.blocked ? ` <span class="ml-1 rounded bg-rose-100 px-1.5 text-xs text-rose-900">Bloqueado</span>` : ""}</p>
           <p class="truncate text-sm text-ink/70">${esc(u.whatsapp)} · ${esc(u.email)}</p>
           <p class="text-xs text-ink/60">${u.totalAppointments || 0} visita(s) · ${u.noShowCount || 0} falta(s) · ${MODE_LABEL[u.paymentMode] || MODE_LABEL.deposit}</p>
           ${citasHtml(u)}
@@ -2991,7 +2992,7 @@ async function loadLost() {
 const guideDone = () => A.settings?.guideDone || [];
 // lo que ya se hizo en el asistente de inicio cuenta como hecho en la guía
 const WIZ_ORDER = ["hi", "biz", "social", "team", "hours", "services", "deposit", "geo", "telegram", "done"];
-// 2026-11-13q · el asistente de inicio ahora son 4 pasos (negocio, horario, servicios y listo). Lo demás queda en la guía.
+// 2026-11-13r · el asistente de inicio ahora son 4 pasos (negocio, horario, servicios y listo). Lo demás queda en la guía.
 //   Quien terminó el asistente viejo (10 pasos) ya pasó por todo; quien termina el nuevo (setupVer 2) solo pasó por esos 4.
 const WIZ_NUEVO = ["biz", "hours", "services", "done"];
 const wizPassed = (id) => {
@@ -4169,7 +4170,7 @@ document.addEventListener("click", async (e) => {
 });
 
 // Opciones del asistente (settings.maryBot). Los valores por defecto son los mismos del servidor (maryBotCfg_).
-const BOT_DEF = { audios: true, activo: true, agendar: true, cupos: true, saludoDiario: true, pedirNombre: true, pedirCorreo: true, loDeSiempre: true, recordatorioMin: 120, recordatorioConfirmar: true, cambios: true, pausaMin: 30, estados: { activo: true, horas: ["11:00"], manana: true, semanal: false, todos: true, pagina: true }, volver: { activo: false, dias: 0 }, guia: { activo: true, hora: "08:00", cadaDias: 3 }, avisos: { activo: false, numero: "" } };
+const BOT_DEF = { guardado: false, audios: true, activo: true, agendar: true, cupos: true, saludoDiario: true, pedirNombre: true, pedirCorreo: true, loDeSiempre: true, recordatorioMin: 120, recordatorioConfirmar: true, cambios: true, pausaMin: 30, estados: { activo: true, horas: ["11:00"], manana: true, semanal: false, todos: true, pagina: true }, volver: { activo: false, dias: 0 }, guia: { activo: true, hora: "08:00", cadaDias: 3 }, avisos: { activo: false, numero: "" } };
 function botCfg() {
   const s = A.settings || {}, b = s.maryBot || {};
   const c = { ...BOT_DEF, ...b, estados: { ...BOT_DEF.estados, ...(b.estados || {}) }, volver: { ...BOT_DEF.volver, ...(b.volver || {}) }, guia: { ...BOT_DEF.guia, ...(b.guia || {}) }, avisos: { ...BOT_DEF.avisos, ...(b.avisos || {}) } };
@@ -4188,7 +4189,8 @@ const BOT_OPTS = [
   ["pedirCorreo", "📧", "Pedir el correo para su calendario", "Con el correo, la cita le queda en su calendario y se mueve o se borra sola si cambia."],
   ["loDeSiempre", "⭐", "Ofrecer «¿Lo de siempre?»", "Aprende lo que pide cada cliente y se lo ofrece la próxima vez."],
   ["recordatorioConfirmar", "✅", "Pedir confirmación en el recordatorio", "«¿Puedes continuar con tu cita? Responde sí». Si confirma, te llega a Telegram con sus datos."],
-  ["cambios", "🔄", "Dejar cancelar o modificar por WhatsApp", "Respeta tus horas mínimas y el máximo de cambios de Configuración."]
+  ["cambios", "🔄", "Dejar cancelar o modificar por WhatsApp", "Respeta tus horas mínimas y el máximo de cambios de Configuración."],
+  ["guardado", "🧠", "Guardado inteligente de contactos 🆕", "Todo el que te escriba queda guardado en «Clientes» con su número y su nombre de WhatsApp, aunque no agende. Así no pierdes a nadie."]
 ];
 const HORAS_ESTADO = ["07:00", "08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00"];
 function renderWaBot() {
@@ -4205,6 +4207,13 @@ function renderWaBot() {
     <div class="sp-h"><h2>💬 WhatsApp Bot</h2><span>tu asistente 24/7</span></div>
     ${maryWaCard()}
     ${reporteHtml()}
+    ${hay("guardado") && !c.guardado && !A.settings?.novGuardadoVista ? `<div class="sp-card mt-4" style="border:2px solid #7c3aed;background:#f5f3ff">
+      <p class="text-[11px] font-extrabold tracking-wider" style="color:#7c3aed">🆕 NOVEDAD</p>
+      <p class="mt-0.5 text-[16px] font-extrabold">🧠 Guardado inteligente de contactos</p>
+      <p class="mt-1 text-[13.5px]">¿Alguien te escribió y no agendó? <b>Ya no lo pierdes.</b> Tu asistente lo guarda solo en «Clientes», con su número y su nombre de WhatsApp.</p>
+      <p class="mt-1 text-[13px] text-ink/70">Ejemplo: Juan pregunta el precio y se va. Mañana lo ves en tus Clientes como «💬 Escribió, aún no agenda» y le puedes escribir.</p>
+      <div class="mt-3 flex flex-wrap gap-2"><button type="button" class="btn-primary" data-nov="si">Activarlo</button><button type="button" class="btn-light" data-nov="no">Ahora no</button></div>
+    </div>` : ""}
     <div class="sp-h mt-5"><h2>⚙️ Cómo atiende</h2><span>se aplica al instante</span></div>
     <div class="sp-card !p-0 divide-y divide-line">
       ${BOT_OPTS.filter(([k]) => hay(k)).map(([k, ic, t, d]) => fila(k, ic, t, d, !!c[k])).join("")}
@@ -4349,6 +4358,12 @@ document.addEventListener("click", (e) => {
   else botGuardar({ [k]: !c[k] });
 });
 document.addEventListener("click", (e) => { if (e.target.closest("#avTg")) openTelegramGuide(); });
+document.addEventListener("click", async (e) => {   // 🆕 novedad «Guardado inteligente»: el dueño decide si lo activa
+  const b = e.target.closest("#tab-wabot [data-nov]"); if (!b) return;
+  A.settings.novGuardadoVista = true;
+  try { await setDoc(doc(db, bpath("settings", "general")), { novGuardadoVista: true }, { merge: true }); } catch { /* no es grave */ }
+  if (b.dataset.nov === "si") { await botGuardar({ guardado: true }); toast("🧠 Guardado inteligente activado."); } else renderWaBot();
+});
 document.addEventListener("click", (e) => {
   if (!e.target.closest("#avSave")) return;
   let n = String($("avNum").value || "").replace(/\D/g, ""); if (n.length === 10) n = "57" + n;

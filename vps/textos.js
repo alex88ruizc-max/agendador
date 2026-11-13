@@ -85,4 +85,11 @@ const audio = () => '🎤 En este momento no puedo escuchar audios 🙏 ¿Me lo 
 const demora = (link) => `😅 Se me demoró el sistema. Escríbeme *agendar* en un momento y seguimos, o aparta aquí en 1 minuto: ${link}`;
 // 🕵️ 3.49 · WhatsApp no mostró el número del cliente: no se puede agendar por chat, pero SÍ se le responde con el link
 const sinNumero = (negocio, link) => `¡Hola! 👋 Soy el asistente${negocio ? ' de *' + negocio + '*' : ''}.\n\nPara agendar tu cita entra aquí 👉 ${link}\n\nAhí ves las horas libres y apartas la tuya en 1 minuto. 🙌`;
-module.exports = { sinNumero, demora, asistio, cancelada, reagendada, parafrasisCambio, preguntaCancelar, saludo, enTiempo, duracion, listaHoras, cuposDia, cuposOtros, sinCupos, sinDias, sinServicios, pideCorreo, parafrasis, citaHecha, audio, cop, nombre1, sinCita, conCita, estadoTxt, pagoTxt, fotoRecibida, fotoSinCita, pagoConfirmado, recordatorio, decision, problema };
+// 📧 3.52 · el cliente dio su correo sin que se lo pidieran
+const teEncontre = (nombre, citas) => {
+  const c = (citas || [])[0];
+  return `✅ ¡Listo${nombre ? ', ' + nombre.split(' ')[0] : ''}! Ya te encontré y dejé tu WhatsApp al día. 🙌` + (c ? `\n\n📅 Tu cita: *${c.dia}* a las *${c.hora}*${c.servicio ? ' · ' + c.servicio : ''}.` : '');
+};
+const correoNoEsta = () => '🔎 No encontré ese correo en nuestros clientes. No pasa nada, te atiendo igual. 😊';
+const correoSigue = () => 'Escríbeme *agendar* para apartar una cita o *cupos* para ver las horas libres.';
+module.exports = { teEncontre, correoNoEsta, correoSigue, sinNumero, demora, asistio, cancelada, reagendada, parafrasisCambio, preguntaCancelar, saludo, enTiempo, duracion, listaHoras, cuposDia, cuposOtros, sinCupos, sinDias, sinServicios, pideCorreo, parafrasis, citaHecha, audio, cop, nombre1, sinCita, conCita, estadoTxt, pagoTxt, fotoRecibida, fotoSinCita, pagoConfirmado, recordatorio, decision, problema };

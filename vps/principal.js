@@ -6,7 +6,7 @@
 const http = require('http'), fs = require('fs'), path = require('path');
 const T = require('./textos'), C = require('./correo'), E = require('./estado'), A = require('./asistente');
 
-const VERSION = 'agendador-ia-3.51';
+const VERSION = 'agendador-ia-3.52';
 const env = (k, d) => (process.env[k] === undefined || process.env[k] === '' ? d : process.env[k]);
 const CFG = {
   puerto: parseInt(env('PUERTO', '3060'), 10),
@@ -200,7 +200,7 @@ async function gas(neg, op, datos) {
 }
 // ---------- 3.1 · configuración del panel «WhatsApp Bot» (por negocio) ----------
 const BOT = new Map();
-const BOT_DEF = { audios: true, activo: true, agendar: true, cupos: true, saludoDiario: true, pedirNombre: true, pedirCorreo: true, loDeSiempre: true, recordatorioMin: 120, recordatorioConfirmar: true, cambios: true, pausaMin: 30, estados: { activo: true, horas: ['11:00'], manana: true, semanal: false, todos: true, pagina: true }, guia: { activo: true, hora: '08:00', cadaDias: 3 } };
+const BOT_DEF = { guardado: false, audios: true, activo: true, agendar: true, cupos: true, saludoDiario: true, pedirNombre: true, pedirCorreo: true, loDeSiempre: true, recordatorioMin: 120, recordatorioConfirmar: true, cambios: true, pausaMin: 30, estados: { activo: true, horas: ['11:00'], manana: true, semanal: false, todos: true, pagina: true }, guia: { activo: true, hora: '08:00', cadaDias: 3 } };
 function botDe(neg) { const x = BOT.get(neg.bid); const c = Object.assign({}, BOT_DEF, x ? x.cfg : {}); c.estados = Object.assign({}, BOT_DEF.estados, (x && x.cfg.estados) || {}); c.guia = Object.assign({}, BOT_DEF.guia, (x && x.cfg.guia) || {}); if (!x) c.pausaMin = CFG.humanoMin; return apagarGlobal(c, BOT_OFF.L); }
 // 🤖 3.45 · lo que el superusuario APAGÓ para todas las tiendas (platform/public.botOff) manda sobre lo de cada tienda
 const BOT_OFF = { L: [], t: 0 };
@@ -240,6 +240,7 @@ function botNormal(b, recordatorioViejo) {   // mismos valores por defecto que e
   c.recordatorioMin = Math.max(0, Number(d(b.recordatorioMin, d(recordatorioViejo, 120)))); c.pausaMin = Math.max(5, Number(d(b.pausaMin, 30)));
   c.estados = { activo: d(e.activo, true) !== false, horas, manana: d(e.manana, true) !== false, semanal: d(e.semanal, false) === true, todos: d(e.todos, true) !== false, pagina: d(e.pagina, true) !== false };   // 3.51: a todos mis contactos · también en la página
   const v = b.volver || {}; c.volver = { activo: v.activo === true, dias: Math.max(0, Math.min(60, Number(v.dias || 0))) };   // 3.32: recordatorio de servicio (lo elige el dueño)
+  c.guardado = b.guardado === true;   // 3.52: guardado inteligente de contactos (apagado por defecto: lo activa el dueño)
   const av = b.avisos || {}; let avn = String(av.numero || '').replace(/\D/g, ''); if (avn.length === 10) avn = '57' + avn; c.avisos = { activo: av.activo === true && avn.length >= 11, numero: avn };   // 3.47: avisos al WhatsApp personal del dueño
   const g = b.guia || {}; c.guia = { activo: g.activo !== false, hora: /^\d{2}:\d{2}$/.test(String(g.hora || '')) ? g.hora : '08:00', cadaDias: Math.max(1, Math.min(30, Number(g.cadaDias || 3))) };   // 3.43: estado «Cómo agendar»
   return c;
@@ -401,6 +402,14 @@ function alMensaje(b) {
 //    ni preguntas), sin límite de tiempo. Otro «/sinbot» en ese chat (del dueño o del cliente) lo vuelve a activar. Nada lo salta.
 const esSinbot = (t) => /^\/\s*sin\s*bot\s*$/i.test(String(t || '').trim());
 const mudo = (k) => !!(MEM.sinbot && MEM.sinbot[k]);
+// 🧠 3.52 · GUARDADO INTELIGENTE: quien escribe queda en «Clientes» con su número y su nombre de WhatsApp (una vez por persona; si el dueño lo activó)
+function guardarContacto(neg, c, cl) {
+  if (!botDe(neg).guardado || !c.tel || cl.guardado) return;
+  cl.guardado = true; memGuardar();   // se marca antes: no se repite aunque Google tarde
+  gas(neg, 'guardarContacto', { phone: c.tel, nombre: c.nombre || '' })
+    .then((r) => { if (r && r.nuevo) anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: '🧠 contacto nuevo guardado en Clientes' }); if (r && r.ok === false) { cl.guardado = false; } })
+    .catch(() => { cl.guardado = false; });
+}
 // 🕵️ 3.49 · NÚMERO OCULTO (…@lid): WhatsApp a veces no manda el número del cliente, solo un código. Antes el bot se quedaba callado.
 //    1) Se le pregunta a WAHA el número real de ese código (se guarda: la próxima vez ni se pregunta).
 //    2) Si no lo consigue, igual responde EN ESE CHAT con el link de la agenda (una vez cada 12 h), para que el cliente no quede sin respuesta.
@@ -517,6 +526,7 @@ async function atenderMensaje(c, neg) {
   // 🤖 3.0: agendamiento en curso, «¿hay cupos?», «quiero una cita», opción de lista o audio → lo atiende el asistente
   if (c.texto || c.rowId || c.audio) {
     if (c.nombre && /^[\p{L}][\p{L} .'-]{1,40}$/u.test(String(c.nombre).trim())) { const cl = ASIS.cliente(k); if (cl.nombreWa !== c.nombre) { cl.nombreWa = String(c.nombre).trim(); memGuardar(); } }   // 3.33: el nombre de WhatsApp queda guardado (para el «¿Seguimos?» y el recordatorio)
+    guardarContacto(neg, c, ASIS.cliente(k));   // 3.52: guardado inteligente (si el dueño lo activó)
     const ca = { k, tel: c.tel, texto: c.texto, rowId: c.rowId, audio: c.audio, nombre: c.nombre };
     let r = null;
     try { r = await ASIS.manejar(neg, ca); }
@@ -536,8 +546,11 @@ async function atenderMensaje(c, neg) {
   const reciente = prev.t && Date.now() - prev.t < CFG.silencioMin * 60000;
   if (reciente && !PREGUNTA.test(c.texto)) { anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: 'callada (ya le respondí hace poco)' }); return; }   // atajo: ni se consulta a Google (no va a responder)
   let info;
-  const cl0 = ASIS.cliente(k), buscarNombre = !cl0.nombre && cl0.nombreBuscado !== ahoraLocal().fecha;   // una vez al día como mucho (no gasta Google de más)
-  if (buscarNombre) { cl0.nombreBuscado = ahoraLocal().fecha; memGuardar(); }
+  // 3.52: si no sabemos quién es, se busca en los Clientes del negocio CADA VEZ que escribe (con 10 min de respiro). Antes era una vez al día:
+  //       si el dueño corregía el número en el panel, el bot no se enteraba hasta el otro día.
+  const cl0 = ASIS.cliente(k), buscarNombre = !cl0.nombre && Date.now() - (cl0.nombreBuscadoT || 0) > 10 * 60000;
+  if (buscarNombre) { cl0.nombreBuscadoT = Date.now(); memGuardar(); }
+  guardarContacto(neg, c, cl0);
   try { info = await gas(neg, 'chat', Object.assign({ phone: c.tel }, buscarNombre ? { conNombre: 1 } : {})); }   // 3.30: si no sabemos su nombre, Google lo busca en los clientes del negocio
   catch (e) { est.errores++; log('❌ chat', neg.bid, e.message); if (!reciente) { try { const i2 = await gas(neg, 'info'); await escribir(neg, c.tel, T.problema(i2)); } catch (e2) { /* nada */ } } return; }
   if (!info.activo) { anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: 'agenda suspendida: no respondo' }); return; }   // agenda suspendida: el dueño atiende

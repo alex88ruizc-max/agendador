@@ -14,7 +14,7 @@
  * Instalación: pega este archivo, ejecuta activarMary() una vez, copia la clave que sale en el registro
  * y ponla en el mary.env del VPS (MARY_KEY). Vuelve a implementar la aplicación web (Implementar > Administrar > editar > Nueva versión).
  */
-const MARY_VERSION = 'agendador-ia-3.51';
+const MARY_VERSION = 'agendador-ia-3.52';
 
 // Se registra como acción pública del servidor (sin sesión: entra con la clave de Mary).
 // ⚠️ Este archivo debe quedar DEBAJO del archivo principal en la lista de archivos de Apps Script (los nuevos quedan al final: así está bien).
@@ -58,6 +58,8 @@ function maryAgenda(b) {
     case 'dobleAvisado': return maryDobleAvisado_(b);
     case 'volver': return maryVolver_(st, b);           // 3.32 · recordatorio de servicio
     case 'volverAvisado': return maryVolverAvisado_(b);
+    case 'reconocer': return maryReconocer_(b);         // 3.52 · el cliente dio su correo: ¿está en los clientes del negocio?
+    case 'guardarContacto': return maryGuardarContacto_(b);   // 3.52 · guardado inteligente (si el dueño lo activó)
     case 'historia': return maryHistoria_(b);           // 3.51 · el estado que publicó el bot también va a los estados de la página
     case 'avisos': return maryAvisos_();                // 3.47 · avisos al dueño por WhatsApp (el VPS los recoge solo cuando hay)
     case 'revisarPago': return maryRevisarPago_(b);     // 3.47 · el dueño respondió 1 (aprobar) o 2 (rechazar) por WhatsApp
@@ -86,8 +88,46 @@ function maryCitasDe_(phone) {
   const desde = Date.now() - 2 * 3600000;
   let all = [];
   ACTIVE.forEach(function (s) { all = all.concat(fsQuery('appointments', [['status', 'EQUAL', s]])); });
-  return all.filter(function (a) { return maryLast10_((a.customer || {}).whatsapp) === d10 && a.startAt && a.startAt.getTime() >= desde; })
+  // 3.52: también las citas del CLIENTE que hoy tiene ese número en «Clientes» (aunque la cita se haya creado con el número mal escrito)
+  const uids = {}; maryClientesPorNumero_(phone).forEach(function (c) { uids[c._id] = true; });
+  return all.filter(function (a) { return (maryLast10_((a.customer || {}).whatsapp) === d10 || (a.customerUid && uids[a.customerUid])) && a.startAt && a.startAt.getTime() >= desde; })
     .sort(function (x, y) { return x.startAt.getTime() - y.startAt.getTime(); });
+}
+// 3.52 · clientes del negocio que tienen ese WhatsApp (registrados en la página o guardados por el bot). Cada uno trae su id en _id.
+function maryClientesPorNumero_(phone) {
+  const d10 = maryLast10_(phone), out = [], vistos = {}; if (d10.length < 10) return out;
+  const meter = function (id, c) { if (c && !vistos[id]) { vistos[id] = true; out.push(Object.assign({ _id: id }, c)); } };
+  try {
+    meter('wa' + d10, fsGet(bp('customers/wa' + d10)));
+    fsQuery('customers', [['whatsapp', 'IN', ['+57' + d10, '57' + d10, d10]]]).forEach(function (c) { meter(String(c._id || ''), c); });   // una sola consulta para las 3 formas de escribirlo
+  } catch (e) { console.error('clientes por número: ' + e); }
+  return out.filter(function (c) { return c._id; });
+}
+// 3.52 · si una cita pendiente del cliente quedó con otro WhatsApp (se escribió mal al registrarse), se corrige: así el recordatorio le llega al número bueno
+function maryCorregirWa_(citas, phone) {
+  const d10 = maryLast10_(phone), tel = String(phone || '').replace(/\D/g, ''), w = [];
+  citas.forEach(function (a) { if (maryLast10_((a.customer || {}).whatsapp) !== d10) w.push(wPatch(bp('appointments/' + a.code), { customer: Object.assign({}, a.customer || {}, { whatsapp: '+' + (tel.length === 10 ? '57' + tel : tel) }), updatedAt: new Date() })); });
+  if (w.length) { try { commit(w); } catch (e) { console.error('corregir WhatsApp: ' + e); } }
+  return w.length;
+}
+// 3.52 · el cliente escribió su CORREO: se busca en los clientes del negocio. Si está, se le reconoce y su WhatsApp queda al día (en su ficha y en sus citas pendientes).
+function maryReconocer_(b) {
+  const email = String(b.email || '').trim().toLowerCase(), tel = String(b.phone || '').replace(/\D/g, '');
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(email) || maryLast10_(tel).length < 10) return { ok: false };
+  let L = []; try { L = fsQuery('customers', [['email', 'EQUAL', email]]); } catch (e) { L = []; }
+  const c = L.filter(function (x) { return !x.blocked; })[0]; if (!c) return { ok: false };
+  const id = String(c._id || c.id || c.uid || ''), wa = '+' + (tel.length === 10 ? '57' + tel : tel);
+  const w = [];
+  if (id && maryLast10_(c.whatsapp) !== maryLast10_(tel)) w.push(wPatch(bp('customers/' + id), { whatsapp: wa, updatedAt: new Date() }));
+  let citas = [];
+  try {
+    ACTIVE.forEach(function (s) { citas = citas.concat(fsQuery('appointments', [['status', 'EQUAL', s]])); });
+    citas = citas.filter(function (a) { return a.startAt && a.startAt.getTime() >= Date.now() - 2 * 3600000 && ((id && a.customerUid === id) || String((a.customer || {}).email || '').toLowerCase() === email); });
+  } catch (e) { citas = []; }
+  if (w.length) { try { commit(w); } catch (e) { console.error('reconocer: ' + e); } }
+  maryCorregirWa_(citas, tel);
+  const nombre = String(c.firstName || '').trim() !== 'Cliente' ? String((c.firstName || '') + ' ' + (c.lastName || '')).trim().split(/\s+/).slice(0, 2).join(' ') : '';
+  return { ok: true, nombre: nombre, citas: citas.sort(function (x, y) { return x.startAt.getTime() - y.startAt.getTime(); }).map(maryCitaOut_) };
 }
 function maryMedios_(st) {
   return (st.paymentMethods || []).map(function (m) { return { label: m.label || '', account: m.account || '', holder: m.holder || '' }; });
@@ -114,6 +154,7 @@ function maryBotCfg_(st) {
     loDeSiempre: d(b.loDeSiempre, true) !== false, recordatorioMin: Math.max(0, Number(d(b.recordatorioMin, d(st.maryReminderMinutes, 120)))),
     recordatorioConfirmar: d(b.recordatorioConfirmar, true) !== false, cambios: d(b.cambios, true) !== false, pausaMin: Math.max(5, Number(d(b.pausaMin, 30))),
     estados: { activo: d(e.activo, true) !== false, horas: horas, manana: d(e.manana, true) !== false, semanal: d(e.semanal, false) === true, todos: d(e.todos, true) !== false, pagina: d(e.pagina, true) !== false },
+    guardado: b.guardado === true,   // 3.52: guardado inteligente de contactos (lo activa el dueño; apagado por defecto)
     volver: { activo: (b.volver || {}).activo === true, dias: Math.max(0, Math.min(60, Number((b.volver || {}).dias || 0))) },   // 3.32: lo elige el dueño (0 = no elegido: no sale)
     guia: { activo: (b.guia || {}).activo !== false, hora: /^\d{2}:\d{2}$/.test(String((b.guia || {}).hora || '')) ? b.guia.hora : '08:00', cadaDias: Math.max(1, Math.min(30, Number((b.guia || {}).cadaDias || 3))) }   // 3.43: estado «Cómo agendar»
   };
@@ -136,7 +177,7 @@ function maryGuardarCliente_(nombre, phone, email) {
   try {
     const id = 'wa' + d10, path = bp('customers/' + id), ya = fsGet(path);
     const n = String(nombre || '').trim().split(/\s+/);
-    const datos = { whatsapp: String(phone || '').replace(/\D/g, ''), source: ya && ya.source ? ya.source : 'whatsapp', updatedAt: new Date() };
+    const datos = { whatsapp: String(phone || '').replace(/\D/g, ''), source: ya && ya.source ? ya.source : 'whatsapp', updatedAt: new Date(), prospecto: false };   // 3.52: ya agendó: deja de ser «solo escribió»
     if (n[0] && n[0] !== 'Cliente') { datos.firstName = n[0]; datos.lastName = n.slice(1).join(' '); }
     if (email) datos.email = String(email).toLowerCase();
     if (ya) commit([wPatch(path, datos)]);
@@ -243,7 +284,9 @@ function maryCategorias_() {
 
 // ---------- chat: ¿tiene cita? ----------
 function maryChat_(st, b) {
-  const citas = maryCitasDe_(b.phone).map(maryCitaOut_);
+  const crudas = maryCitasDe_(b.phone);
+  maryCorregirWa_(crudas, b.phone);   // 3.52: la cita con el número mal escrito se corrige sola
+  const citas = crudas.map(maryCitaOut_);
   const out = maryInfo_(st);
   out.citas = citas;
   if (!citas.length) { const c = maryCupos_(st, { dias: 1 }); out.cuposHoy = c.dias.length ? c.dias[0].libres.length : 0; }
@@ -975,4 +1018,17 @@ function maryHistoria_(b) {
   const horas = Math.max(1, Math.min(48, Number(b.horas || 24)));
   commit([wSet(bp('stories/bot-' + id), { img: img, bg: '#FFFFFF', text: '', label: String(b.label || 'Estado').slice(0, 30), bot: true, createdAt: new Date(), expiresAt: new Date(Date.now() + horas * 3600000) })]);
   return { ok: true };
+}
+
+// ---------- 🧠 3.52 · GUARDADO INTELIGENTE DE CONTACTOS (lo activa el dueño en WhatsApp Bot; viene apagado) ----------
+// Quien le escribe al negocio queda en «Clientes» con su número y el nombre que trae en WhatsApp, aunque no agende.
+// Queda marcado como prospecto («💬 Escribió, aún no agenda») hasta que agende. Si ya existe con ese número, no se toca.
+function maryGuardarContacto_(b) {
+  if (!maryBotCfg_(loadSettings()).guardado) return { ok: false, motivo: 'apagado' };
+  const tel = String(b.phone || '').replace(/\D/g, ''), d10 = maryLast10_(tel); if (d10.length < 10) return { ok: false, motivo: 'sin número' };
+  if (maryClientesPorNumero_(tel).length) return { ok: true, existia: true };
+  const limpio = String(b.nombre || '').replace(/[^\p{L}\p{N} .'-]/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 40), n = limpio.split(' ');
+  commit([wSet(bp('customers/wa' + d10), { firstName: n[0] || 'Cliente', lastName: n.slice(1).join(' '), email: '', whatsapp: tel.length === 10 ? '57' + tel : tel, source: 'whatsapp', prospecto: true,
+    paymentMode: 'deposit', blocked: false, noShowCount: 0, totalAppointments: 0, createdAt: new Date(), updatedAt: new Date() })]);
+  return { ok: true, nuevo: true };
 }

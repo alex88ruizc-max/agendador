@@ -49,6 +49,8 @@ global.fetch = async (url, o) => {
     if (b.op === 'asistencia' || b.op === 'cancelar') return resp({ ok: true, data: { ok: true, link: NEGOCIO.link, cita: (W.proximas[0] || {}) } });
     if (b.op === 'reagendar') { const d = W.cupos.find((x) => x.date === b.date); return resp({ ok: true, data: { ok: true, cita: Object.assign({}, W.proximas[0] || {}, { dia: d.dia, hora: d.horas[d.libres.indexOf(b.time)], link: NEGOCIO.link + '&cita=R-VIEJA1' }) } }); }
     if (b.op === 'contactos') return resp({ ok: true, data: { numeros: W.contactos, bloqueados: W.bloqueados || [] } });
+    if (b.op === 'reconocer') { W.reconocido = { phone: b.phone, email: b.email }; const c = (W.porCorreo || {})[b.email]; return resp({ ok: true, data: c ? { ok: true, nombre: c.nombre, citas: c.citas || [] } : { ok: false } }); }   // 3.52
+    if (b.op === 'guardarContacto') { (W.guardados = W.guardados || []).push({ phone: b.phone, nombre: b.nombre }); return resp({ ok: true, data: { ok: true, nuevo: true } }); }   // 3.52
     if (b.op === 'historia') { (W.historias = W.historias || []).push({ id: b.id, label: b.label, horas: b.horas, img: String(b.img).slice(0, 22) }); return resp({ ok: true, data: { ok: true } }); }   // 3.51
     if (b.op === 'avisos') { const A = W.avisos || []; W.avisos = []; return resp({ ok: true, data: { avisos: A, numero: W.avisosNum || '' } }); }   // 3.47
     if (b.op === 'revisarPago') { W.revisado = { code: b.code, aprobar: b.aprobar, de: b.de }; return resp({ ok: true, data: { ok: true, aprobado: b.aprobar } }); }
@@ -1319,4 +1321,29 @@ test('3.51 · 📣 Los estados del bot llegan a TRES fuentes (clientes + quienes
   await B.publicarEstado(neg, 'hoy');
   assert.deepEqual(W.estados[0].contacts.map((x) => x.split('@')[0]), ['573001112233', '573004445566', '573187920386']); assert.equal(W.historias.length, 0);
   W.fsBot = null; W.wahaChats = null; W.wahaLibreta = null; W.bloqueados = null;
+});
+
+test('3.52 · 📧 El cliente escribe su correo en medio de las listas: se busca en los clientes del negocio, se le reconoce y se sigue donde iba (antes: «No te entendí»)', async () => {
+  W.porCorreo = { 'alex@correo.com': { nombre: 'Alex Ruiz', citas: [{ code: 'R-1', status: 'confirmed', dia: 'Mañana', hora: '10:00 a. m.', servicio: 'Corte' }] } };
+  await llega(wahaMsg(CLIENTE, 'quiero agendar'));
+  const lista = ultimo().lista.button;
+  await llega(wahaMsg(CLIENTE, 'alex@correo.com'));
+  assert.deepEqual(W.reconocido, { phone: CLIENTE, email: 'alex@correo.com' }, 'se le pregunta al servidor por ese correo');
+  assert.match(ultimo().texto, /Ya te encontré y dejé tu WhatsApp al día/); assert.match(ultimo().texto, /Tu cita: \*Mañana\* a las \*10:00 a\. m\.\*/);
+  assert.doesNotMatch(ultimo().texto, /No te entendí/); assert.equal(ultimo().lista.button, lista, 'y vuelve a mostrar la misma lista');
+  assert.equal(B.ASIS.cliente('lina-spa:' + CLIENTE).nombre, 'Alex Ruiz');
+  // un correo que no está: no se enreda, sigue igual
+  await llega(wahaMsg(CLIENTE, 'otro@correo.com'));
+  assert.match(ultimo().texto, /No encontré ese correo/); assert.equal(ultimo().lista.button, lista);
+  W.porCorreo = null;
+});
+test('3.52 · 🧠 Guardado inteligente: apagado por defecto (no guarda a nadie); si el dueño lo activa, guarda a quien escribe con su nombre de WhatsApp, una sola vez', async () => {
+  await llega(wahaMsg(CLIENTE, 'hola, ¿cuánto vale el corte?'));
+  assert.ok(!W.gas.includes('guardarContacto'), 'apagado: no guarda');
+  P._banco.reiniciar(); W.fsBot = { guardado: true }; await B.botAlDia({ bid: 'lina-spa', instancia: 'lina-spa', motor: 'waha', sesion: 'default' });
+  await llega(wahaMsg(CLIENTE, 'hola, ¿cuánto vale el corte?')); await new Promise((ok) => setTimeout(ok, 20));
+  assert.deepEqual(W.guardados, [{ phone: CLIENTE, nombre: 'Camila' }]);
+  await llega(wahaMsg(CLIENTE, 'gracias')); await new Promise((ok) => setTimeout(ok, 20));
+  assert.equal(W.guardados.length, 1, 'una sola vez por persona');
+  W.fsBot = null; W.guardados = null;
 });

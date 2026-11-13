@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.51** · Página **2026-11-13q** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.52** · Página **2026-11-13r** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -115,6 +115,9 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## ⏳ Pendientes
+00. **💡 Idea de Alex (solo anotada, NO hecha): línea de ayuda para dueños.** Su WhatsApp 318 como «máster»: en el panel de cada dueño un botón «¿Necesitas ayuda?» que le escribe a ese número.
+    Un bot ahí responde SOLO a los dueños de tiendas (los reconoce por su número) con autoayuda de Tu Agenda, y Alex puede responder él mismo. A nadie más de su agenda le responde.
+    Antes de hacerlo: confirmar con Alex el número, vincularlo (regla del servidor: preguntar y esperar su confirmación) y definir de dónde salen las respuestas.
 0. Planes parte 2: con los interruptores del bot ya se puede apagar en general; falta por PLAN (Básico con candado «Desbloquéalo con Gold») y el panel de ingresos bloqueado en prueba y Básico. Segundo WhatsApp +$20.000 (Gold).
 1. Instalar 3.1 + página 2026-11-12b y probar el agendamiento por listas con El Barba (tu 318) desde el número aparte. Luego `MARY_MODO=todos`.
    Verificar en un celular real: que la lista llegue por WAHA (si no, sale el texto con números) y que la invitación entre al calendario.
@@ -133,6 +136,18 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-13 · agendador-ia-3.52 · página 2026-11-13r · 🔎 el bot reconoce al cliente · 🧠 guardado inteligente
+- **Caso de Alex:** un cliente apartó con el número mal escrito. Lo corrigieron en el panel y el bot seguía sin reconocerlo; tampoco al dar su correo (respondía «No te entendí»).
+- **Causas (confirmadas en el código):** 1) las citas se buscaban por el WhatsApp guardado EN LA CITA (el malo), no por el cliente; 2) el nombre se buscaba una sola vez al día; 3) el correo solo se entendía en el paso «¿tu correo?».
+- **Arreglo:**
+  - Servidor: `maryCitasDe_` también trae las citas del cliente que HOY tiene ese número en «Clientes» (`maryClientesPorNumero_`), y `maryCorregirWa_` deja la cita con el número bueno (así el recordatorio llega bien).
+  - Bot: si no sabe quién es, lo busca cada vez que escribe (con 10 min de respiro), no una vez al día.
+  - Correo en cualquier paso: op `reconocer` (`maryReconocer_`) lo busca en los clientes; si está, lo reconoce, actualiza su WhatsApp en la ficha y en sus citas, y sigue donde iba. Si no está: «No encontré ese correo… te atiendo igual».
+- **🧠 Guardado inteligente de contactos** (WhatsApp Bot; APAGADO por defecto, sale como 🆕 NOVEDAD con «Activarlo / Ahora no»): quien le escribe al negocio queda en «Clientes»
+  con su número y su nombre de WhatsApp aunque no agende, marcado «💬 Escribió, aún no agenda» (filtro nuevo «Solo escribieron»). Una llamada a Google por contacto nuevo. Con número oculto no se guarda hasta conocerlo.
+  El superusuario lo puede apagar para todos («guardado»).
+- Banco: 175 pasan aquí; como el VPS: 151 pasan, 18 saltadas, 0 fallas. Página: 0 fallas.
 
 ### 2026-11-13 · agendador-ia-3.51 · página 2026-11-13q · 📣 estados a todos los contactos y también en la página
 - **Alex:** «¿por qué solo llega a ese público tan pequeño?». El bot es un dispositivo vinculado: tiene que decirle a WhatsApp a quién mandar el estado, y solo usaba los Clientes del panel.

@@ -639,8 +639,8 @@ function crear(dep) {
   async function retomar(neg, tel, conv) {
     const k = neg.bid + ':' + tel, cl = cliente(k), cat = await catalogo(neg).catch(() => ({ negocio: '' }));
     const quedo = QUEDO[conv.paso];
-    if (!cl.nombre && !cl.nombreWa && cl.nombreBuscado !== hoy()) {   // 3.33: sin nombre → se busca en los clientes del negocio (una vez al día)
-      cl.nombreBuscado = hoy(); dep.guardar();
+    if (!cl.nombre && !cl.nombreWa && ahora() - (cl.nombreBuscadoT || 0) > 10 * 60000) {   // 3.33: sin nombre → se busca en los clientes del negocio (3.52: cada vez, con 10 min de respiro)
+      cl.nombreBuscadoT = ahora(); dep.guardar();
       try { const r = await dep.gas(neg, 'chat', { phone: tel, conNombre: 1 }); if (r && r.cliente && /^[\p{L}][\p{L} .'-]{1,40}$/u.test(r.cliente)) { cl.nombre = r.cliente; dep.guardar(); } } catch (e) { /* sin nombre */ }
     }
     const acabado = await diaAcabado(neg, conv);   // 3.36: si ya va a cerrar, NO se ofrece el mismo día: se le busca otro
@@ -678,6 +678,18 @@ function crear(dep) {
       const cat = await catalogo(neg).catch(() => ({ negocio: '' }));
       await dep.texto(neg, c.tel, saludo(c.k, cat.negocio, c.nombre) + T.audio());
       return 'audio';
+    }
+    // 📧 3.52 · escribió su CORREO sin que se lo pidieran (ej. «no me reconoces, mi correo es…»): se busca en los clientes del negocio.
+    //    Si está: se le reconoce, su WhatsApp queda al día y se sigue donde iba. Antes respondía «No te entendí».
+    const suelto = String(c.texto || '').trim().toLowerCase();
+    if (c.tel && CORREO.test(suelto) && !(vivo && vivo.paso === 'correo')) {
+      let r = null; try { r = await dep.gas(neg, 'reconocer', { phone: c.tel, email: suelto }); } catch (e) { r = null; }
+      const cl = cliente(c.k);
+      if (r && r.ok) { cl.correo = suelto; if (r.nombre) cl.nombre = r.nombre; dep.guardar(); }
+      const pre = r && r.ok ? T.teEncontre(r.nombre, r.citas) : T.correoNoEsta();
+      if (vivo) { await reenviar(neg, c, vivo, pre + '\n\n'); return 'flujo'; }
+      await dep.texto(neg, c.tel, pre + (r && r.ok && r.citas && r.citas.length ? '' : '\n\n' + T.correoSigue()));
+      return r && r.ok ? 'lo reconocí por su correo' : 'dio un correo que no está en los clientes';
     }
     // agenda suspendida por el dueño o la plataforma: no agenda ni muestra cupos (el catálogo queda en memoria 10 min: no gasta cupo)
     const cerrada = async () => { const cat = await catalogo(neg); if (cat.activo === false) { fin(c.k); return true; } return false; };

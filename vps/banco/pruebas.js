@@ -513,3 +513,29 @@ test('3.51 · 🖼️ Servidor: el estado del bot queda en los estados de la pá
   assert.equal(F.maryHistoria_({ id: 'hoy', img: '<script>' }).ok, false);
   st = { maryBot: { estados: { pagina: false } } }; assert.equal(F.maryHistoria_({ id: 'hoy', img: 'data:image/png;base64,AAAA' }).ok, false);
 });
+
+test('3.52 · Servidor: la cita con el número MAL escrito se encuentra por el cliente (y se corrige sola); por correo se reconoce y su WhatsApp queda al día; guardado inteligente solo si el dueño lo activó', { skip: !require('fs').existsSync(GS_MARY) && 'dentro de la imagen no está gs/' }, () => {
+  const src = require('fs').readFileSync(GS_MARY, 'utf8');
+  const manana = new Date(Date.now() + 86400000);
+  let st = {}, escrito = [];
+  const CL = [{ _id: 'uid7', firstName: 'Alex', lastName: 'Ruiz Castro', email: 'alex@correo.com', whatsapp: '+573187920386' }];
+  const CITAS = [{ code: 'R-9', status: 'confirmed', customerUid: 'uid7', customer: { whatsapp: '+573187920000', email: 'alex@correo.com' }, startAt: manana, date: '2030-01-01', startTime: '10:00', items: [{ id: 'c1', name: 'Corte' }] }];
+  const G = { ACTIONS: {}, PUBLIC_ACTIONS: {}, console, ACTIVE: ['confirmed'], bp: (x) => x, loadSettings: () => st, fsGet: () => null, wPatch: (p, v) => ({ p, v }), wSet: (p, v) => ({ p, v, nuevo: true }), commit: (w) => { escrito = escrito.concat(w); },
+    fsQuery: (col, f) => (col === 'appointments' ? CITAS : f[0][0] === 'whatsapp' ? CL.filter((c) => f[0][2].includes(c.whatsapp)) : f[0][0] === 'email' ? CL.filter((c) => c.email === f[0][2]) : []),
+    waDayLabel: () => 'Mañana', hora12: (t) => t, siteUrl: () => 'https://x', BID: 'barba' };
+  const F = new Function(...Object.keys(G), src + '\nreturn { maryCitasDe_, maryCorregirWa_, maryReconocer_, maryGuardarContacto_ };')(...Object.values(G));
+  // 1) escribe desde su número BUENO (ya corregido en Clientes): encuentra la cita que se creó con el número malo
+  const L = F.maryCitasDe_('573187920386'); assert.equal(L.length, 1, 'la encuentra por el cliente, no por el número de la cita');
+  assert.equal(F.maryCorregirWa_(L, '573187920386'), 1); assert.equal(escrito[0].p, 'appointments/R-9'); assert.equal(escrito[0].v.customer.whatsapp, '+573187920386', 'la cita queda con el número bueno');
+  // 2) escribe desde OTRO número y da su correo: se le reconoce y su ficha queda con este WhatsApp
+  escrito = []; const r = F.maryReconocer_({ phone: '3001112233', email: 'ALEX@correo.com' });
+  assert.equal(r.ok, true); assert.equal(r.nombre, 'Alex Ruiz'); assert.equal(r.citas.length, 1);
+  assert.ok(escrito.some((w) => w.p === 'customers/uid7' && w.v.whatsapp === '+573001112233'));
+  assert.equal(F.maryReconocer_({ phone: '3001112233', email: 'nadie@correo.com' }).ok, false);
+  // 3) guardado inteligente
+  escrito = []; assert.equal(F.maryGuardarContacto_({ phone: '573025550002', nombre: 'Juan 😎 Pérez' }).ok, false, 'apagado por defecto');
+  st = { maryBot: { guardado: true } };
+  assert.deepEqual(F.maryGuardarContacto_({ phone: '573025550002', nombre: 'Juan 😎 Pérez' }), { ok: true, nuevo: true });
+  assert.equal(escrito[0].p, 'customers/wa3025550002'); assert.equal(escrito[0].v.firstName, 'Juan'); assert.equal(escrito[0].v.lastName, 'Pérez'); assert.equal(escrito[0].v.prospecto, true);
+  assert.deepEqual(F.maryGuardarContacto_({ phone: '573187920386', nombre: 'Otro' }), { ok: true, existia: true }, 'si ya existe con ese número, no se toca');
+});

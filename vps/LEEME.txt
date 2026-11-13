@@ -1,4 +1,4 @@
-🗓️ AGENDADOR IA · agendador-ia-3.51   (por dentro atiende «Mary», la recepcionista)
+🗓️ AGENDADOR IA · agendador-ia-3.52   (por dentro atiende «Mary», la recepcionista)
 =====================================================================================================
 🚫 REGLA UNIVERSAL N.º 1 — EPIC NO SE TOCA (manda sobre todo lo demás, para Alex, para Claude y para cada script de este paquete)
    Epic (Mary de Epic, Luisa, la tienda, epic-waha, epic-tiendas, Epic Channels…) y CUALQUIER otro proyecto:
@@ -63,6 +63,7 @@ AJUSTES POR NEGOCIO (negocios.json)
   "recordatorioMin": 120     ·   "estados": { "activo": true, "hoy": "07:30", "semana": "07:00", "semanaDia": 1 }
   En Firestore (settings/general del negocio) maryAutoCaptura: true → la captura confirma al instante y el dueño revisa después.
 
+NOVEDADES 3.52 · El bot reconoce al cliente cada vez que escribe (por su número en Clientes o por su correo) y corrige solo el WhatsApp de la cita. 🧠 Guardado inteligente de contactos (apagado; lo activa el dueño). Después manda agendador-web-2026-11-13r.zip.
 NOVEDADES 3.51 · 📣 Los estados del bot llegan a clientes + quienes le han escrito + la libreta del WhatsApp (tope ESTADOS_TOPE=1500) y quedan también en los estados de la página. Después manda agendador-web-2026-11-13q.zip.
 NOVEDADES 3.50 · /registro dice a cuántos contactos se mandó cada estado; los números de prueba de Alex reciben los estados de todas las tiendas; comando /guia <tienda> en el cartero. Trae lo de la 3.49.
 NOVEDADES 3.49 · 🕵️ Clientes con número oculto (…@lid): el bot busca su número real en WAHA y, si no lo hay, igual les responde con el link de la agenda (antes se quedaba callado).
