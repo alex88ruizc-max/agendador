@@ -98,13 +98,30 @@ ${marcaAgua(info, false)}
 </svg>`;
 }
 
+// 🔤 3.57 · LA LETRA VA DENTRO DEL BOT (carpeta fuentes/). Antes dependía de la letra instalada en el servidor: si faltaba, el estado salía
+//    con las formas pero SIN NINGÚN TEXTO (le pasó a una tienda el 2026-11-13) y nadie se enteraba.
+const FUENTES = (() => { try { const d = require('path').join(__dirname, 'fuentes'); return require('fs').readdirSync(d).filter((f) => /\.(otf|ttf)$/i.test(f)).map((f) => require('path').join(d, f)); } catch (e) { return []; } })();
+const OPC_LETRA = { fontFiles: FUENTES, loadSystemFonts: true, defaultFontFamily: 'Inter' };
 function png(svg) {
   const { Resvg } = require('@resvg/resvg-js');
-  return new Resvg(svg, { fitTo: { mode: 'width', value: 1080 }, font: { loadSystemFonts: true, defaultFontFamily: 'Inter' } }).render().asPng();
+  return new Resvg(svg, { fitTo: { mode: 'width', value: 1080 }, font: OPC_LETRA }).render().asPng();
+}
+// ¿de verdad se dibujan las letras? Se dibuja el mismo recuadro con y sin texto: si pesan igual, no hay letra. Se revisa una vez.
+let _letras = null;
+function letras() {
+  if (_letras !== null) return _letras;
+  try {
+    const { Resvg } = require('@resvg/resvg-js');
+    const caja = (t) => `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="80"><rect width="300" height="80" fill="#fff"/>${t}</svg>`;
+    const con = new Resvg(caja(`<text x="10" y="55" font-family="${FONT}" font-weight="800" font-size="40" fill="#000">Hola 123</text>`), { font: OPC_LETRA }).render().asPng().length;
+    const sin = new Resvg(caja(''), { font: OPC_LETRA }).render().asPng().length;
+    _letras = con > sin + 200;
+  } catch (e) { _letras = false; }
+  return _letras;
 }
 const textoHoy = (info, dia) => dia.horas.length ? `Cupos de hoy en ${info.negocio}: ${dia.horas.slice(0, 6).join(', ')}${dia.horas.length > 6 ? '…' : ''}. Aparta aquí: ${info.link}` : `Hoy estamos llenos ✨ Aparta para los próximos días: ${info.link}`;
 const textoSemana = (info) => `Cupos de la semana en ${info.negocio}. Aparta aquí: ${info.link}`;
 
 // 🚀 3.38 · en la PRUEBA GRATIS, debajo de un estado al día: la invitación a crear su agenda (en el texto, donde el link sí se toca)
 const PIE_PRUEBA = '\n\n🚀 Regístrate gratis y crea tu agenda aquí: https://tuagenda.vip/';
-module.exports = { PIE_PRUEBA, marcaAgua, svgHoy, svgSemana, png, textoHoy, textoSemana, fechaLarga };
+module.exports = { PIE_PRUEBA, marcaAgua, svgHoy, svgSemana, png, letras, FUENTES, textoHoy, textoSemana, fechaLarga };

@@ -1,4 +1,4 @@
-🗓️ AGENDADOR IA · agendador-ia-3.56   (por dentro atiende «Mary», la recepcionista)
+🗓️ AGENDADOR IA · agendador-ia-3.57   (por dentro atiende «Mary», la recepcionista)
 =====================================================================================================
 🚫 REGLA UNIVERSAL N.º 1 — EPIC NO SE TOCA (manda sobre todo lo demás, para Alex, para Claude y para cada script de este paquete)
    Epic (Mary de Epic, Luisa, la tienda, epic-waha, epic-tiendas, Epic Channels…) y CUALQUIER otro proyecto:
@@ -63,6 +63,7 @@ AJUSTES POR NEGOCIO (negocios.json)
   "recordatorioMin": 120     ·   "estados": { "activo": true, "hoy": "07:30", "semana": "07:00", "semanaDia": 1 }
   En Firestore (settings/general del negocio) maryAutoCaptura: true → la captura confirma al instante y el dueño revisa después.
 
+NOVEDADES 3.57 · 🔤 La letra de los estados va dentro del bot (carpeta fuentes/): ya no salen en blanco. Si el servidor no puede dibujar letras, no publica y lo dice en /salud y en el registro. Trae lo de la 3.56. La página no cambia.
 NOVEDADES 3.56 · 📋 Servicios «por categoría» o «una sola lista» (se elige en el panel, en Servicios): manda en la página y en la lista del bot. Trae lo de la 3.55. Después manda agendador-web-2026-11-13u.zip.
 NOVEDADES 3.55 · 🔔 Notificaciones de la app (Web Push desde el VPS): cada reserva nueva y cada cancelación, en todos los planes. Las llaves se crean solas en datos/push-llaves.json. Después manda agendador-web-2026-11-13t.zip (trae sw.js).
 NOVEDADES 3.54 · Al pedir cancelar, el bot pregunta «¿Deseas cancelarla o reagendarla?» y, si elige reagendar, sigue el flujo de cambiar la cita. Trae lo de la 3.53.

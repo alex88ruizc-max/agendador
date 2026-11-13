@@ -17,7 +17,7 @@ if isinstance(L, list):
 EOL
 # 3.33 · 🧹 contenedores temporales del agendador que hayan quedado colgados (SOLO los nuestros: agendador-tmp-…; nunca otro proyecto)
 T=$(sudo docker ps -aq --filter name=^agendador-tmp- 2>/dev/null; sudo docker ps -aq --filter name=^agendador-tarea- 2>/dev/null); [ -n "$T" ] && sudo docker rm -f $T >/dev/null 2>&1 && echo "🧹 Quité contenedores temporales del agendador que habían quedado colgados."
-CODIGOS="principal.js textos.js correo.js estado.js asistente.js cuposLocal.js guia.js push.js package.json package-lock.json Dockerfile docker-compose.yml banco"
+CODIGOS="principal.js textos.js correo.js estado.js asistente.js cuposLocal.js guia.js push.js fuentes package.json package-lock.json Dockerfile docker-compose.yml banco"
 volver(){ for f in $CODIGOS; do [ -e "respaldo/$f" ] && cp -rf "respaldo/$f" .; done
   sudo docker image inspect $IMG:buena >/dev/null 2>&1 && sudo docker tag $IMG:buena $IMG:latest; }   # 1.1: la imagen vuelve a la buena (no queda la que falló)
 sudo docker image inspect $IMG:latest >/dev/null 2>&1 && sudo docker tag $IMG:latest $IMG:buena

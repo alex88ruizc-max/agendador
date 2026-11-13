@@ -1,0 +1,3 @@
+Letra «Inter» (Rasmus Andersson), licencia SIL Open Font License 1.1: se puede usar y distribuir libremente.
+Va DENTRO del bot para que los estados siempre salgan con texto, aunque el servidor no tenga la letra instalada.
+(El 2026-11-13 un estado «Cómo agendar» salió en blanco: las formas sí, las letras no.)

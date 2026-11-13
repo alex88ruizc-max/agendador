@@ -76,8 +76,9 @@ test('3.48 · 🧪 Ninguna prueba del banco lee gs/ sin revisar antes que exista
   for (const f of ['pruebas.js', 'escenarios.js']) {
     const src = fs.readFileSync(path.join(__dirname, f), 'utf8');
     src.split(/\n(?=test\()/).forEach((bloque) => {
-      if (!/^test\(/.test(bloque) || !/readFileSync\((GS_MARY|[^\n]*'gs')/.test(bloque)) return;
-      assert.ok(/existsSync/.test(bloque), f + ': la prueba «' + bloque.slice(6, 70) + '…» lee gs/ sin revisar que exista (ponle skip o un existsSync)');
+      // 3.57: tampoco el Dockerfile, los .sh ni el cartero (casi se entrega una prueba que leía el Dockerfile)
+      if (!/^test\(/.test(bloque) || !(/readFileSync\((GS_MARY|[^\n]*'gs')/.test(bloque) || /'(Dockerfile|[\w-]+\.sh|cartero\.py|docker-compose\.yml)'/.test(bloque))) return;
+      assert.ok(/existsSync/.test(bloque), f + ': la prueba «' + bloque.slice(6, 70) + '…» lee un archivo que no va en la imagen (gs/, Dockerfile, .sh, cartero) sin revisar que exista (ponle skip o un existsSync)');
     });
   }
 });

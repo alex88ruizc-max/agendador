@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.56** · Página **2026-11-13z** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.57** · Página **2026-11-13z** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -136,6 +136,14 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-13 · agendador-ia-3.57 · 🔤 estados sin texto (en blanco): la letra ahora va dentro del bot
+- **Qué pasó:** el estado «Cómo agendar» de una tienda (Antoluxury STUDIO) salió con los recuadros y botones, pero **sin ninguna letra**. El dibujante (resvg) no encontró la letra en el servidor y, cuando no la encuentra, no avisa: simplemente no escribe nada.
+- **Arreglo:** la letra Inter (4 grosores, licencia libre OFL) va en `vps/fuentes/` y `estado.js` la carga directo (`fontFiles`). Ya no depende de lo que tenga instalado el servidor. Va en el `COPY` del Dockerfile y en `CODIGOS` de `actualizar.sh`.
+- **Freno nuevo:** `E.letras()` revisa una vez si de verdad se dibujan letras. Si no, **no se publica ningún estado** (mejor nada que uno en blanco) y queda el motivo en el registro. `/salud` ahora dice `letras: ok` o el aviso.
+- **Prueba nueva** (pruebas.js): solo con la letra propia y sin letras del sistema, el texto sí se dibuja; y la carpeta viaja en el Dockerfile y el instalador. Banco: 186 pasan; como VPS también.
+- **Falta saber** (no se puede ver desde aquí): por qué en el servidor faltaba la letra si el Dockerfile instala `fonts-inter`. Con este cambio ya no importa. Alex prueba con `/guia <tienda>` después de instalar.
+- La página no cambia (2026-11-13z).
 
 ### 2026-11-13 · página 2026-11-13z · ➕ «Más tiempo…» en la duración de cada servicio (asistente de inicio)
 - Alex: en el paso de servicios la lista de duración llegaba hasta 2 horas. Debajo de «2 horas» ahora sale **«➕ Más tiempo…»**: se escribe el tiempo (2:30, 3, 150…) y queda guardado en ese servicio.

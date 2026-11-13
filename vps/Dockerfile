@@ -5,6 +5,7 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm install --omit=dev --no-audit --no-fund
 COPY principal.js textos.js correo.js estado.js asistente.js cuposLocal.js guia.js push.js ./
+COPY fuentes ./fuentes
 COPY banco ./banco
 ENV DATOS=/datos NEGOCIOS=/config/negocios.json TZ=America/Bogota
 EXPOSE 3060

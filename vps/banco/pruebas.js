@@ -615,3 +615,21 @@ test('3.56 · 📋 Servidor: con «una sola lista» el catálogo del bot trae un
   assert.equal(c.categorias.length, 1); assert.equal(c.categorias[0].nombre, 'Servicios'); assert.equal(c.categorias[0].desde, 12000);
   assert.deepEqual(c.categorias[0].servicios.map((x) => x.id), ['c1', 'k1', 'b1'], 'principales primero, el agregado al final'); assert.equal(c.vista, 'lista');
 });
+
+test('3.57 · 🔤 La letra va DENTRO del bot: el estado se dibuja con texto aunque el servidor no tenga ninguna letra instalada', () => {
+  const E2 = require('../estado'), fs2 = require('fs'), path2 = require('path'), { Resvg } = require('@resvg/resvg-js');
+  assert.ok(E2.FUENTES.length >= 4, 'la carpeta fuentes/ trae la letra (4 grosores)');
+  const svg = (t) => `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200"><rect width="400" height="200" fill="#fff"/>${t}</svg>`;
+  const pesa = (t, font) => new Resvg(svg(t), { font }).render().asPng().length;
+  const texto = [500, 600, 700, 800].map((w, i) => `<text x="10" y="${40 + i * 45}" font-family="Inter, sans-serif" font-weight="${w}" font-size="34">Agenda tu cita ${w}</text>`).join('');
+  const sinNada = { loadSystemFonts: false };
+  const propias = { fontFiles: E2.FUENTES, loadSystemFonts: false, defaultFontFamily: 'Inter' };
+  assert.ok(pesa(texto, sinNada) < pesa('', sinNada) + 50, 'sin letra, el texto no se dibuja (así salió en blanco)');
+  assert.ok(pesa(texto, propias) > pesa('', propias) + 1500, 'solo con la letra propia, el texto SÍ se dibuja');
+  assert.equal(E2.letras(), true, 'la revisión de letras dice que sí hay');
+  // y la carpeta viaja al servidor: está en el Dockerfile y en la lista de archivos del instalador
+  // (dentro de la imagen del VPS esos dos archivos no existen: ahí no se revisan)
+  const dk = path2.join(__dirname, '..', 'Dockerfile'), ac = path2.join(__dirname, '..', 'actualizar.sh');
+  if (fs2.existsSync(dk)) assert.match(fs2.readFileSync(dk, 'utf8'), /^COPY fuentes \.\/fuentes$/m);
+  if (fs2.existsSync(ac)) assert.match(fs2.readFileSync(ac, 'utf8'), /CODIGOS="[^"]*\bfuentes\b/);
+});

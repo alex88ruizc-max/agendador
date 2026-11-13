@@ -6,7 +6,7 @@
 const http = require('http'), fs = require('fs'), path = require('path');
 const T = require('./textos'), C = require('./correo'), E = require('./estado'), A = require('./asistente');
 
-const VERSION = 'agendador-ia-3.56';
+const VERSION = 'agendador-ia-3.57';
 const env = (k, d) => (process.env[k] === undefined || process.env[k] === '' ? d : process.env[k]);
 const CFG = {
   puerto: parseInt(env('PUERTO', '3060'), 10),
@@ -602,6 +602,7 @@ function quienVeEstados(modo, prueba) {
 async function publicarEstado(neg, tipo) {
   const quien = quienVeEstados(CFG.modo, CFG.prueba);
   if (!quien) return { ok: false, motivo: 'Mary está apagada' };
+  if (!E.letras()) return { ok: false, motivo: '⚠️ el servidor no puede dibujar letras: NO publiqué (saldría en blanco)' };   // 3.57
   const { d, png, caption: cap0, dia } = await armarEstado(neg, tipo);
   if (!d.activo) return { ok: false, motivo: 'la agenda del negocio no está activa' };
   MEM.piePrueba = MEM.piePrueba || {};
@@ -643,6 +644,7 @@ const GUIA = require('./guia');
 async function publicarGuia(neg) {
   const quien = quienVeEstados(CFG.modo, CFG.prueba);
   if (!quien) return { ok: false, motivo: 'Mary está apagada' };
+  if (!E.letras()) return { ok: false, motivo: '⚠️ el servidor no puede dibujar letras: NO publiqué (saldría en blanco)' };   // 3.57
   CL = CL || crearCL();
   const D = await CL.guia(neg.bid);
   if (D.biz && D.biz.status && D.biz.status !== 'active') return { ok: false, motivo: 'la agenda del negocio no está activa' };
@@ -1064,7 +1066,7 @@ const servidor = http.createServer(async (req, res) => {
     const mImg = url.pathname.match(/^\/img\/([a-z0-9]+)\.png$/);
     if (req.method === 'GET' && mImg) { const x = IMG.get(mImg[1]); if (!x) { res.writeHead(404); return res.end(); } res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'no-store' }); return res.end(x.png); }
     if (req.method === 'GET' && url.pathname === '/salud') { let oido = 'no instalado'; try { const r = await fetch(CFG.oido + '/salud', { signal: AbortSignal.timeout(2000) }); const j = await r.json(); oido = j.ok ? 'listo (' + j.modelo + ')' : 'cargando' + (j.error ? ': ' + j.error.slice(0, 60) : ''); } catch (e) { /* no está */ }
-      return json(res, 200, { ok: true, version: VERSION, oido, modo: CFG.modo, prueba: CFG.prueba.length, negocios: negocios().map((n) => n.bid), gas: !!(CFG.gas && CFG.maryKey), evo: !!CFG.evoKey, est }); }
+      return json(res, 200, { ok: true, version: VERSION, letras: E.letras() ? 'ok (' + E.FUENTES.length + ' propias)' : '⚠️ NO HAY LETRA: los estados no se publican', oido, modo: CFG.modo, prueba: CFG.prueba.length, negocios: negocios().map((n) => n.bid), gas: !!(CFG.gas && CFG.maryKey), evo: !!CFG.evoKey, est }); }
     if (req.method === 'GET' && url.pathname === '/registro') return json(res, 200, ultimos.slice(-Math.min(100, parseInt(url.searchParams.get('n') || '20', 10))));
     // 🧪 vista previa del estado (no publica): curl -s "127.0.0.1:3060/vista?bid=mi-negocio&tipo=hoy" -o hoy.png
     if (req.method === 'GET' && url.pathname === '/vista') { const neg = negocios().find((n) => n.bid === url.searchParams.get('bid')); if (!neg) return json(res, 404, { ok: false, error: 'negocio no está en negocios.json' }); const { png } = await armarEstado(neg, url.searchParams.get('tipo') === 'semana' ? 'semana' : 'hoy'); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(png); }
