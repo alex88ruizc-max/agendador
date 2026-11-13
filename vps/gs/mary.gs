@@ -14,7 +14,7 @@
  * Instalación: pega este archivo, ejecuta activarMary() una vez, copia la clave que sale en el registro
  * y ponla en el mary.env del VPS (MARY_KEY). Vuelve a implementar la aplicación web (Implementar > Administrar > editar > Nueva versión).
  */
-const MARY_VERSION = 'agendador-ia-3.32';
+const MARY_VERSION = 'agendador-ia-3.37';
 
 // Se registra como acción pública del servidor (sin sesión: entra con la clave de Mary).
 // ⚠️ Este archivo debe quedar DEBAJO del archivo principal en la lista de archivos de Apps Script (los nuevos quedan al final: así está bien).
@@ -58,6 +58,7 @@ function maryAgenda(b) {
     case 'dobleAvisado': return maryDobleAvisado_(b);
     case 'volver': return maryVolver_(st, b);           // 3.32 · recordatorio de servicio
     case 'volverAvisado': return maryVolverAvisado_(b);
+    case 'estadisticas': return maryEstadisticas_(b);   // 3.37 · reporte del bot (el VPS lo manda una vez por hora)
   }
   fail('Operación no válida.');
 }
@@ -426,6 +427,33 @@ function maryVolverAvisado_(b) {
   const L = (b.codes || []).slice(0, 20).map(function (c) { return wPatch(bp('appointments/' + String(c).toUpperCase()), { maryVolver: true }); });
   if (L.length) commit(L);
   return { ok: true };
+}
+// ---------- 3.37 · 📊 REPORTE DEL BOT ----------
+// El VPS manda el resumen del día (cuentas + huellas cortas de las personas, nunca el número) → businesses/<bid>/stats/<fecha>
+function maryEstadisticas_(b) {
+  const f = String(b.fecha || ''); if (!/^\d{4}-\d{2}-\d{2}$/.test(f)) fail('Fecha inválida.');
+  const n = {}; Object.keys(b.n || {}).forEach(function (k) { if (/^[a-zA-Z]{1,20}$/.test(k)) n[k] = Math.max(0, Math.floor(Number(b.n[k]) || 0)); });
+  const h = function (L) { return (Array.isArray(L) ? L : []).map(String).filter(function (x) { return /^[0-9a-f]{10}$/.test(x); }).slice(0, 3000); };
+  commit([wSet(bp('stats/' + f), { fecha: f, wa: n, personas: h(b.personas), listas: h(b.listas), at: new Date() })]);
+  return { ok: true };
+}
+// Panel (dueño): el reporte de un rango de fechas (máximo 400 días)
+try { ACTIONS.maryReporte = maryReportePanel_; } catch (e) { /* el principal aún no cargó */ }
+function maryReportePanel_(b, auth) {
+  const admin = getAdmin(auth); if (admin.role !== 'owner') fail('Solo el dueño puede ver el reporte.');
+  const desde = String(b.desde || ''), hasta = String(b.hasta || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(desde) || !/^\d{4}-\d{2}-\d{2}$/.test(hasta) || desde > hasta) fail('Revisa las fechas.');
+  const dias = []; let d = desde;
+  while (d <= hasta && dias.length < 400) { dias.push(d); d = toDateStr(new Date(Date.parse(d + 'T12:00:00Z') + 86400000)); }
+  const got = fsBatchGet(dias.map(function (x) { return bp('stats/' + x); }));
+  const tot = {}, personas = {}, listas = {}, serie = [];
+  dias.forEach(function (x) {
+    const s = got[bp('stats/' + x)]; if (!s) return;
+    Object.keys(s.wa || {}).forEach(function (k) { tot[k] = (tot[k] || 0) + Number(s.wa[k] || 0); });
+    (s.personas || []).forEach(function (p) { personas[p] = 1; }); (s.listas || []).forEach(function (p) { listas[p] = 1; });
+    serie.push({ fecha: x, mensajes: Number((s.wa || {}).mensajes || 0) });
+  });
+  return { tot: tot, personas: Object.keys(personas).length, listas: Object.keys(listas).length, dias: serie };
 }
 // 3.14 · citas que se cruzan del mismo WhatsApp (aún no se le preguntó): [{ whatsapp, nombre, citas: [...] }]
 function maryDobles_(L) {

@@ -250,6 +250,7 @@ function crear(dep) {
     if (!(conv.otraPersona && conv.nombreOtra && conv.nombreOtra !== cl.nombre)) aprender(cl, conv, r.cita);   // lo de otra persona no cuenta como «lo de siempre»
     dep.anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: (conv.volver ? '🔁 volvió a agendar (recordatorio de servicio) ' : 'agendó por WhatsApp ') + r.cita.code + ' (' + r.cita.status + ')' });
     const sel = elegidos(cat, conv.ids);
+    if (dep.contar) { if (conv.volver) dep.contar(neg.bid, 'volverOk'); if (conv.retomado) dep.contar(neg.bid, 'retomarOk'); }   // 📊 3.37
     return dep.texto(neg, c.tel, T.citaHecha(r.cita, { medios: r.medios, holdMinutes: r.holdMinutes, negocio: cat.negocio, comoSiempre: !!conv.comoSiempre, total: r.cita.total || total(sel), min: sel.reduce((a, x) => a + Number(x.min || 0), 0) }, conv.nombreOtra || cl.nombre, !!cl.correo && !(conv.otraPersona && conv.nombreOtra !== cl.nombre)));
   }
   // 🧠 aprende la combinación habitual (servicios + profesional) para ofrecer «¿Lo de siempre?»

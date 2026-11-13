@@ -1,0 +1,268 @@
+{
+  "admin.js": {
+    "mtime": 1794525588.0374975,
+    "seen": 1794525671.4786363,
+    "ast_hash": "4fc7632ccabf7ce3b82d2f8dfa0b8d86",
+    "semantic_hash": ""
+  },
+  "app.js": {
+    "mtime": 1794525588.0352178,
+    "seen": 1794525671.478647,
+    "ast_hash": "d7925ea6bd0df275ebde5520160019a6",
+    "semantic_hash": ""
+  },
+  "common.js": {
+    "mtime": 1794525588.0370436,
+    "seen": 1794525671.4786544,
+    "ast_hash": "8cec614f151d0b96755e5fe881d36aeb",
+    "semantic_hash": ""
+  },
+  "config.js": {
+    "mtime": 1794518786.3493803,
+    "seen": 1794518871.4593263,
+    "ast_hash": "fd0c796b0d73aa10715051bdf3f3040e",
+    "semantic_hash": ""
+  },
+  "super.js": {
+    "mtime": 1794525588.0361967,
+    "seen": 1794525671.4786687,
+    "ast_hash": "914401631fd2dbf29675c3f75bca07a7",
+    "semantic_hash": ""
+  },
+  "sw.js": {
+    "mtime": 1794094458.611829,
+    "seen": 1794504761.6860948,
+    "ast_hash": "f996112ef3a5ee91c50d9675ce156cf7",
+    "semantic_hash": "f996112ef3a5ee91c50d9675ce156cf7"
+  },
+  "theme.js": {
+    "mtime": 1794094458.612003,
+    "seen": 1794504761.6861005,
+    "ast_hash": "efbb6a0b796eec8acf38aef12285162d",
+    "semantic_hash": "efbb6a0b796eec8acf38aef12285162d"
+  },
+  "vps/actualizar-google.sh": {
+    "mtime": 1794527290.9176183,
+    "seen": 1794527501.179333,
+    "ast_hash": "8f6c02d3b3554077b69fbabb048a9a0f",
+    "semantic_hash": ""
+  },
+  "vps/actualizar.sh": {
+    "mtime": 1794527319.8429697,
+    "seen": 1794527501.1793425,
+    "ast_hash": "8fda4ea630955edf18778acb485a48d8",
+    "semantic_hash": ""
+  },
+  "vps/banco/escenarios.js": {
+    "mtime": 1794527715.5996852,
+    "seen": 1794527851.1356928,
+    "ast_hash": "40b92a70ed04ea121c7fc6d00c1563ca",
+    "semantic_hash": ""
+  },
+  "vps/banco/pruebas.js": {
+    "mtime": 1794525518.930406,
+    "seen": 1794525671.4787493,
+    "ast_hash": "96e6520c01d25b935302a1f44d62bf29",
+    "semantic_hash": ""
+  },
+  "vps/banco/web.js": {
+    "mtime": 1794504685.7498949,
+    "seen": 1794504761.6861289,
+    "ast_hash": "b3af3c94a56105757f5909562ace2d9b",
+    "semantic_hash": "b3af3c94a56105757f5909562ace2d9b"
+  },
+  "vps/cartero.py": {
+    "mtime": 1794527350.794071,
+    "seen": 1794527501.179393,
+    "ast_hash": "3b3a67e2945c09c4b0c032b552f538b1",
+    "semantic_hash": ""
+  },
+  "vps/conectar.sh": {
+    "mtime": 1794019876.0,
+    "seen": 1794504761.6861386,
+    "ast_hash": "f58978d86111e90ae35a452ed059347c",
+    "semantic_hash": "f58978d86111e90ae35a452ed059347c"
+  },
+  "vps/configurar-waha.sh": {
+    "mtime": 1794505972.6060913,
+    "seen": 1794506004.6480994,
+    "ast_hash": "1bc4361c05179d1b5b549baa80494f0f",
+    "semantic_hash": ""
+  },
+  "vps/correo.js": {
+    "mtime": 1794009656.0,
+    "seen": 1794504761.6861482,
+    "ast_hash": "17d71338323fbe874e7d322d42f8d9e6",
+    "semantic_hash": "17d71338323fbe874e7d322d42f8d9e6"
+  },
+  "vps/docker-compose.yml": {
+    "mtime": 1794527290.9164987,
+    "seen": 1794527501.1794336,
+    "ast_hash": "f75ca79a2d1c1c2a5f39fe9001184835",
+    "semantic_hash": ""
+  },
+  "vps/estado.js": {
+    "mtime": 1794009656.0,
+    "seen": 1794504761.6861575,
+    "ast_hash": "42b7ad5460eed9ec685a3eb6282e2f23",
+    "semantic_hash": "42b7ad5460eed9ec685a3eb6282e2f23"
+  },
+  "vps/gs/correo.gs": {
+    "mtime": 1794509929.0259376,
+    "seen": 1794510502.549788,
+    "ast_hash": "1c2f72dc0bcac33c634442a1c168d4ec",
+    "semantic_hash": "",
+    "language": "language=.js"
+  },
+  "vps/gs/mary.gs": {
+    "mtime": 1794525501.112344,
+    "seen": 1794525671.4788446,
+    "ast_hash": "a3c69e8f6a243eb5b226e74532a512fe",
+    "semantic_hash": "",
+    "language": "language=.js"
+  },
+  "vps/instalar-cartero.sh": {
+    "mtime": 1794009656.0,
+    "seen": 1794504761.686178,
+    "ast_hash": "eb2efa939238e509539b46da12c97764",
+    "semantic_hash": "eb2efa939238e509539b46da12c97764"
+  },
+  "vps/instalar-google.sh": {
+    "mtime": 1794527290.922724,
+    "seen": 1794527501.179478,
+    "ast_hash": "c4a774bc056ecc6b01291be3258fb82c",
+    "semantic_hash": ""
+  },
+  "vps/instalar.sh": {
+    "mtime": 1794527290.9174159,
+    "seen": 1794527501.1794858,
+    "ast_hash": "0c5c53c7036e14892813f5f5ab91426b",
+    "semantic_hash": ""
+  },
+  "vps/mudar-google.sh": {
+    "mtime": 1794527290.92296,
+    "seen": 1794527501.1794927,
+    "ast_hash": "1f75c89df525d6b03902ee7f077e0c83",
+    "semantic_hash": ""
+  },
+  "vps/package.json": {
+    "mtime": 1794009661.0,
+    "seen": 1794504761.6861982,
+    "ast_hash": "5009abfe30c8d8ffe5acf888999b674b",
+    "semantic_hash": "5009abfe30c8d8ffe5acf888999b674b"
+  },
+  "vps/principal.js": {
+    "mtime": 1794527790.1211314,
+    "seen": 1794527851.1357963,
+    "ast_hash": "d26b4b7ac42dac0bb5bf01b7e06f2c26",
+    "semantic_hash": ""
+  },
+  "vps/textos.js": {
+    "mtime": 1794524499.889114,
+    "seen": 1794524571.9970038,
+    "ast_hash": "3199696b83afd1acffe2c328ef2668fd",
+    "semantic_hash": ""
+  },
+  ".claude/settings.json": {
+    "mtime": 1794504772.3029683,
+    "seen": 1794504838.742115,
+    "ast_hash": "0a0ef578e59e2bb38c69f1dcb49a0e1a",
+    "semantic_hash": ""
+  },
+  ".claude/CLAUDE.md": {
+    "mtime": 1794504772.3022337,
+    "seen": 1794504838.742269,
+    "ast_hash": "9b31786b637be3c13978bec4c2330752",
+    "semantic_hash": ""
+  },
+  "404.html": {
+    "mtime": 1794094458.6075797,
+    "seen": 1794504838.7422745,
+    "ast_hash": "8fb11b5ac0ed46da71ab5f0cacfc779f",
+    "semantic_hash": ""
+  },
+  "BITACORA.md": {
+    "mtime": 1794527790.1350324,
+    "seen": 1794527851.1358151,
+    "ast_hash": "4b9f0fd24f4b7d8e4100a77cec379aee",
+    "semantic_hash": ""
+  },
+  "CLAUDE.md": {
+    "mtime": 1794527431.6907175,
+    "seen": 1794527501.1795554,
+    "ast_hash": "acec54f56250e456fcb5a1d2e3025a73",
+    "semantic_hash": ""
+  },
+  "admin.html": {
+    "mtime": 1794525588.0347795,
+    "seen": 1794525671.4789412,
+    "ast_hash": "5be7c64ead0695b6ef6ae84cb3e4fc7d",
+    "semantic_hash": ""
+  },
+  "index.html": {
+    "mtime": 1794525588.0366757,
+    "seen": 1794525671.4789472,
+    "ast_hash": "bd5729790d654342d9200275bda90a92",
+    "semantic_hash": ""
+  },
+  "privacidad.html": {
+    "mtime": 1794094458.6085045,
+    "seen": 1794504838.7422965,
+    "ast_hash": "609f96007dc616352f48d0251f9a5f9f",
+    "semantic_hash": ""
+  },
+  "super.html": {
+    "mtime": 1794525588.0341265,
+    "seen": 1794525671.4789598,
+    "ast_hash": "68473907fa792f063f1f53f898d8826d",
+    "semantic_hash": ""
+  },
+  "vps/LEEME.txt": {
+    "mtime": 1794527790.1355906,
+    "seen": 1794527851.1358519,
+    "ast_hash": "a2ecb6d742ec967be221ece53705205d",
+    "semantic_hash": ""
+  },
+  "vps/banco/reglas.js": {
+    "mtime": 1794527326.3456306,
+    "seen": 1794527501.1793754,
+    "ast_hash": "7f2a2a93217458aedc59369be65d9095",
+    "semantic_hash": ""
+  },
+  "LEEME-REGLA-UNIVERSAL.txt": {
+    "mtime": 1794527431.6925466,
+    "seen": 1794527501.1795628,
+    "ast_hash": "e6fe882a96145233fb1e250544cab4ad",
+    "semantic_hash": ""
+  },
+  "vps/LEEME-REGLA-UNIVERSAL.txt": {
+    "mtime": 1794527431.6928046,
+    "seen": 1794527501.1796012,
+    "ast_hash": "e6fe882a96145233fb1e250544cab4ad",
+    "semantic_hash": ""
+  },
+  "vps/asistente.js": {
+    "mtime": 1794527790.1195197,
+    "seen": 1794527851.1356866,
+    "ast_hash": "d109f85a6d678b8338a0122ae2607c75",
+    "semantic_hash": ""
+  },
+  "vps/oido/oido.py": {
+    "mtime": 1794516311.92864,
+    "seen": 1794516399.0289774,
+    "ast_hash": "9d9fb64695d932ae9276cce3ffe9a70b",
+    "semantic_hash": ""
+  },
+  "vps/cuposLocal.js": {
+    "mtime": 1794523802.8223042,
+    "seen": 1794524385.230239,
+    "ast_hash": "6f776c5eb3d99e92be12789a30e920b6",
+    "semantic_hash": ""
+  },
+  "vps/package-lock.json": {
+    "mtime": 1794009661.0,
+    "seen": 1794504838.7423108,
+    "ast_hash": "daa7ca27f66f609aae91d6e67fb9ed5a",
+    "semantic_hash": ""
+  }
+}

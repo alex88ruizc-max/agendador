@@ -1,0 +1,21 @@
+{
+  "3": "admin.js",
+  "4": "common.js",
+  "9": "cartero.py",
+  "10": "mary.gs",
+  "17": "environment",
+  "19": "agendador-ia",
+  "20": "postgres-agendador",
+  "21": "services",
+  "22": "evolution-agendador",
+  "26": "options",
+  "27": "waha-agendador",
+  "30": "actualizar-google.sh script",
+  "31": "correo.gs",
+  "32": "instalar.sh script",
+  "34": "configurar-waha.sh",
+  "35": "mudar-google.sh",
+  "36": "conectar.sh",
+  "37": "sw.js",
+  "38": "theme.js"
+}

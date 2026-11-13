@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-12** · Mary **agendador-ia-3.36** · Página **2026-11-12q** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.37** · Página **2026-11-13a** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -132,6 +132,22 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-13 · agendador-ia-3.37 · página 2026-11-13a · 📊 reporte del bot, del link y de los ingresos
+- Pedido de Alex: en el WhatsApp Bot, un reporte por día, mes, año y fechas libres, con:
+  - interacciones con clientes, inicios de conversación (cuando eligen de la lista) y citas confirmadas;
+  - lo mismo para el link;
+  - ingresos = citas confirmadas − citas canceladas.
+- **Panel › WhatsApp Bot › 📊 Reporte** (Hoy / Este mes / Este año / 📅 Fechas):
+  - 💬 Bot: personas que escribieron (sin repetir), interacciones, iniciaron (eligieron de la lista), citas por WhatsApp (y canceladas), recordatorio de servicio (enviados / volvieron a agendar), «¿Seguimos?» (enviados / terminaron agendando).
+  - 🔗 Link y panel: visitas al link (la «Actividad»), citas por el link, citas hechas en el panel.
+  - 💰 Ingresos: citas confirmadas (confirmada, atendida, no asistió y las que luego se cancelaron) − canceladas = ingresos. Por fecha de la cita. Vencidas y sin pago no cuentan.
+- **Cómo se cuenta:**
+  - El VPS cuenta por día y lo guarda en Google UNA vez por hora (op `estadisticas` → businesses/<bid>/stats/<fecha>).
+  - De las personas solo se guarda una huella corta (sha256), nunca el número.
+  - El panel lee con `maryReporte` (solo el dueño). Citas y visitas salen de lo que ya existe.
+  - Lo del bot cuenta desde que se instala la 3.37. Las citas y los ingresos también hacia atrás.
+- Banco: 152 pruebas, 0 fallas (VPS cuenta y manda una vez, sin números; servidor guarda y suma un rango sin repetir personas; solo el dueño). Cálculo de ingresos revisado con datos de prueba.
 
 ### 2026-11-12 · agendador-ia-3.36 · si ya va a cerrar, el «¿Seguimos?» ofrece OTRO día
 - Pedido de Alex (súper importante): si ya es hora de cerrar, el recordatorio debe ponerle una fecha nueva; ese día ya no hay horas.

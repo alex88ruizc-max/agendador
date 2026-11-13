@@ -354,3 +354,18 @@ test('3.32 · 🔁 Recordatorio de servicio (servidor): solo clientes cuya ÚLTI
   bot = { activo: true, volver: { activo: true, dias: 0 } }; assert.deepEqual(correr().clientes, [], 'sin días elegidos por el dueño: no sale');
   bot = { activo: true, volver: { activo: false, dias: 21 } }; assert.deepEqual(correr().clientes, [], 'apagado: no sale');
 });
+
+test('3.37 · 📊 Servidor: guarda el resumen del día y el reporte suma un rango (personas sin repetir)', { skip: !require('fs').existsSync(GS_MARY) && 'dentro de la imagen no está gs/' }, () => {
+  const src = require('fs').readFileSync(GS_MARY, 'utf8');
+  const DB = {}; let rol = 'owner';
+  const G = { ACTIONS: {}, PUBLIC_ACTIONS: {}, console, fail: (m) => { throw new Error(m); }, bp: (x) => x, wSet: (p, d) => ({ p, d }), commit: (w) => w.forEach((x) => { DB[x.p] = x.d; }),
+    fsBatchGet: (L) => Object.fromEntries(L.filter((p) => DB[p]).map((p) => [p, DB[p]])), getAdmin: () => ({ role: rol }), toDateStr: (d) => d.toISOString().slice(0, 10) };
+  const F = new Function(...Object.keys(G), src + '\nreturn { maryEstadisticas_, ACTIONS };')(...Object.values(G));
+  F.maryEstadisticas_({ fecha: '2030-01-01', n: { mensajes: 10, listas: 3, malo$: 5 }, personas: ['aaaaaaaaaa', 'bbbbbbbbbb', '573001234567'], listas: ['aaaaaaaaaa'] });
+  F.maryEstadisticas_({ fecha: '2030-01-03', n: { mensajes: 4, volverOk: 1 }, personas: ['aaaaaaaaaa', 'cccccccccc'], listas: ['cccccccccc'] });
+  assert.deepEqual(DB['stats/2030-01-01'].personas, ['aaaaaaaaaa', 'bbbbbbbbbb'], 'un número de teléfono no se guarda'); assert.equal(DB['stats/2030-01-01'].wa.malo$, undefined);
+  const r = F.ACTIONS.maryReporte({ desde: '2030-01-01', hasta: '2030-01-31' }, {});
+  assert.equal(r.tot.mensajes, 14); assert.equal(r.tot.volverOk, 1); assert.equal(r.personas, 3, 'aaaa contada una sola vez'); assert.equal(r.listas, 2);
+  assert.equal(F.ACTIONS.maryReporte({ desde: '2030-01-02', hasta: '2030-01-02' }, {}).tot.mensajes, undefined);
+  rol = 'staff'; assert.throws(() => F.ACTIONS.maryReporte({ desde: '2030-01-01', hasta: '2030-01-02' }, {}), /Solo el dueño/);
+});

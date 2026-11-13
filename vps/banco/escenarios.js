@@ -54,6 +54,7 @@ global.fetch = async (url, o) => {
     if (W.gasFalla && b.op === 'chat') return resp({ ok: false, error: 'Servicio invocado demasiadas veces' });
     if (b.op === 'chat' && b.conNombre && W.nombreBase) { W.pidioNombre = (W.pidioNombre || 0) + 1; }
     if (W.falla === b.op) return resp({ ok: false, error: 'Tiempo de espera agotado' });   // 3.28: Google falla en un paso
+    if (b.op === 'estadisticas') { W.stats = (W.stats || []).concat([b]); return ok({ ok: true }); }
     if (b.op === 'volver') return ok({ clientes: W.volver || [], negocio: 'Lina Spa', link: NEGOCIO.link });
     if (b.op === 'volverAvisado') { W.volverAvisados = (W.volverAvisados || []).concat(b.codes); return ok({ ok: true }); }
     if (b.op === 'chat') return ok(Object.assign({}, NEGOCIO, { activo: W.activo, citas: W.citas[b.phone] || [] }, b.conNombre && W.nombreBase ? { cliente: W.nombreBase } : {}));
@@ -1154,4 +1155,27 @@ test('3.36 · ⏰ Si TODAVÍA hay horas hoy, el «¿Seguimos?» sigue en el mism
   envejecer(31); await B.tickRetomar(true);
   assert.match(ultimo().texto, /Te quedaste en \*elegir la hora/);
   await llega(toca('ret:si')); assert.equal(ultimo().lista.button, 'Elegir hora');
+});
+
+// =====================================================================
+//  3.37 · 📊 reporte del bot
+// =====================================================================
+test('3.37 · 📊 El bot cuenta personas, interacciones, quién eligió de la lista y lo guarda en Google UNA vez (sin números de teléfono)', async () => {
+  const cl = B.ASIS.cliente('lina-spa:' + CLIENTE); cl.nombre = 'Camila'; cl.correo = '';
+  await llega(wahaMsg(CLIENTE, 'hola')); await llega(wahaMsg('573009998877', 'hola'));
+  await llega(wahaMsg(CLIENTE, 'quiero agendar')); await llega(toca('cat:2')); await llega(toca('svc:e1'));
+  const g = W.gas.filter((x) => x === 'estadisticas').length;
+  assert.equal(g, 0, 'no se manda por cada mensaje');
+  await B.tickEstadisticas();
+  assert.equal(W.stats.length, 1); const e = W.stats[0];
+  assert.equal(e.n.mensajes, 5); assert.equal(e.n.listas, 2); assert.equal(e.personas.length, 2, '2 personas distintas'); assert.equal(e.listas.length, 1, '1 persona eligió de la lista');
+  assert.ok(e.personas.every((x) => /^[0-9a-f]{10}$/.test(x)), 'solo huellas'); assert.ok(!JSON.stringify(e).includes(CLIENTE.slice(-10)), 'sin el número');
+  await B.tickEstadisticas(); assert.equal(W.stats.length, 1, 'sin cambios no se vuelve a mandar');
+});
+test('3.37 · 📊 Recordatorio de servicio y «¿Seguimos?»: enviados y cuántos terminaron agendando', async () => {
+  B.BOT.set('lina-spa', { cfg: P.botNormal({ volver: { activo: true, dias: 21 } }), t: Date.now() });
+  await B.ASIS.ofrecerVolver({ bid: 'lina-spa', instancia: 'lina-spa', motor: 'waha', sesion: 'default' }, CLIENTE, { code: 'R-V', whatsapp: CLIENTE, nombre: 'Nicolas', servicio: 'Degradado', con: 'Lina', ids: ['c2'], staffId: 's1', diasDesde: 21 }, 'Lina Spa');
+  await llega(toca('vol:si')); await llega(toca('dia:' + HOY)); await llega(toca('hora:15:00'));
+  await B.tickEstadisticas();
+  assert.equal(W.stats.pop().n.volverOk, 1);
 });

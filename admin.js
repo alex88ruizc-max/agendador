@@ -9,9 +9,9 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-11-12q";
-import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-12q";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-12q";
+} from "./common.js?v=2026-11-13a";
+import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-13a";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-13a";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -4033,6 +4033,7 @@ function renderWaBot() {
   el.innerHTML = `
     <div class="sp-h"><h2>💬 WhatsApp Bot</h2><span>tu asistente 24/7</span></div>
     ${maryWaCard()}
+    ${reporteHtml()}
     <div class="sp-h mt-5"><h2>⚙️ Cómo atiende</h2><span>se aplica al instante</span></div>
     <div class="sp-card !p-0 divide-y divide-line">
       ${BOT_OPTS.map(([k, ic, t, d]) => fila(k, ic, t, d, !!c[k])).join("")}
@@ -4058,7 +4059,83 @@ function renderWaBot() {
     </div>
     <p class="soft mt-3 text-xs">Solo a clientes que ya vinieron y no tienen otra cita. Una sola vez por visita: si no responde o dice «no, gracias», no se insiste.</p>`;
   if (MW.res && $("mwBox") && ["pidiendo", "codigo", "desconectando"].includes(MW.res.estado) && Date.now() < MW.hasta) mwPintar(MW.res);
+  pintarReporte();
 }
+// ---------- 📊 3.37 · REPORTE: el bot de WhatsApp, el link y los ingresos, por día, mes, año o fechas libres ----------
+const REP = { modo: "hoy", desde: "", hasta: "", datos: null, clave: "", cargando: false, error: "" };
+function rangoRep() {
+  const hoy = bogNow().date;
+  if (REP.modo === "hoy") return [hoy, hoy];
+  if (REP.modo === "mes") return [hoy.slice(0, 8) + "01", hoy];
+  if (REP.modo === "anio") return [hoy.slice(0, 5) + "01-01", hoy];
+  const d = REP.desde || hoy, h = REP.hasta || hoy;
+  return d <= h ? [d, h] : [h, d];
+}
+function reporteHtml() {
+  const [d, h] = rangoRep(), chip = (m, t) => `<button type="button" class="chip" data-rep="${m}" aria-pressed="${REP.modo === m}">${t}</button>`;
+  return `<div class="sp-h mt-5"><h2>📊 Reporte</h2><span>WhatsApp, link e ingresos</span></div>
+    <div class="sp-card">
+      <div class="flex flex-wrap gap-1.5">${chip("hoy", "Hoy")}${chip("mes", "Este mes")}${chip("anio", "Este año")}${chip("libre", "📅 Fechas")}</div>
+      ${REP.modo === "libre" ? `<div class="mt-2 flex flex-wrap items-center gap-2 text-sm"><label>Desde <input id="repDesde" type="date" value="${d}" class="rounded-lg border border-line px-2 py-1"></label><label>Hasta <input id="repHasta" type="date" value="${h}" max="${bogNow().date}" class="rounded-lg border border-line px-2 py-1"></label></div>` : ""}
+      <div id="repBox" class="mt-3"><p class="soft text-sm">Cargando…</p></div>
+    </div>`;
+}
+const pesos = (n) => cop(Math.round(n || 0));
+async function cargarReporte() {
+  const [d, h] = rangoRep(), clave = d + "|" + h;
+  if (REP.cargando || (REP.clave === clave && REP.datos && Date.now() - REP.datos.t < 60000)) return pintarReporte();
+  REP.cargando = true; REP.error = ""; pintarReporte();
+  try {
+    const desdeMs = Date.parse(d + "T00:00:00-05:00"), hastaMs = Date.parse(h + "T23:59:59-05:00");
+    const [wa, citas, visitas] = await Promise.all([
+      api("maryReporte", { desde: d, hasta: h }).catch((e) => ({ error: e.message })),
+      getDocs(query(collection(db, bpath("appointments")), where("date", ">=", d), where("date", "<=", h))).then((q) => q.docs.map((x) => x.data())),
+      getDocs(query(collection(db, bpath("presence")), where("first", ">=", Timestamp.fromMillis(desdeMs)), where("first", "<=", Timestamp.fromMillis(hastaMs)))).then((q) => q.size).catch(() => null)
+    ]);
+    REP.datos = { wa, citas, visitas, t: Date.now() }; REP.clave = clave;
+  } catch (e) { REP.error = e.message; }
+  REP.cargando = false; pintarReporte();
+}
+function pintarReporte() {
+  const box = $("repBox"); if (!box) return;
+  const [d, h] = rangoRep();
+  if (REP.clave !== d + "|" + h && !REP.cargando) { cargarReporte(); return; }
+  if (REP.error) { box.innerHTML = `<p class="text-sm" style="color:var(--sred)">No pude cargar el reporte: ${esc(REP.error)}</p>`; return; }
+  if (!REP.datos) { box.innerHTML = `<p class="soft text-sm">Cargando…</p>`; return; }
+  const { wa, citas, visitas } = REP.datos, t = (wa && wa.tot) || {};
+  const VIGENTE = ["confirmed", "attended", "no_show"], canal = (a) => a.source === "whatsapp" ? "wa" : a.source === "manual" ? "panel" : "link";
+  const de = (c) => citas.filter((a) => canal(a) === c), cuenta = (L, st) => L.filter((a) => st.includes(a.status)).length, suma = (L, st) => L.filter((a) => st.includes(a.status)).reduce((x, a) => x + Number(a.totalCOP || 0), 0);
+  const agendado = suma(citas, [...VIGENTE, "cancelled"]), canceladas = suma(citas, ["cancelled"]);
+  const caja = (ic, n, txt, sub) => `<div class="rounded-xl p-3" style="background:var(--canvas)"><p class="text-[11.5px] font-bold text-ink/60">${ic} ${txt}</p><p class="text-[22px] font-extrabold leading-tight">${n}</p>${sub ? `<p class="text-[11px] text-ink/55">${sub}</p>` : ""}</div>`;
+  const canalHtml = (c, ic, txt) => { const L = de(c); return caja(ic, cuenta(L, VIGENTE), txt, `${cuenta(L, ["cancelled"])} canceladas · ${pesos(suma(L, VIGENTE))}`); };
+  box.innerHTML = `${REP.cargando ? `<p class="soft mb-2 text-xs">Actualizando…</p>` : ""}
+    <p class="mb-2 text-xs font-bold text-ink/60">${d === h ? fechaLarga(d) : fechaCorta(d) + " → " + fechaCorta(h)}</p>
+    <p class="mb-1.5 text-[13px] font-extrabold">💬 Bot de WhatsApp</p>
+    ${wa && wa.error ? `<p class="mb-2 text-xs" style="color:var(--sred)">${esc(wa.error)}</p>` : ""}
+    <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      ${caja("👥", (wa && wa.personas) || 0, "Personas que escribieron")}
+      ${caja("💬", t.mensajes || 0, "Interacciones")}
+      ${caja("📋", (wa && wa.listas) || 0, "Iniciaron (eligieron de la lista)", (t.listas || 0) + " opciones tocadas")}
+      ${canalHtml("wa", "✅", "Citas por WhatsApp")}
+      ${caja("🔁", t.volverEnv || 0, "Recordatorio de servicio", (t.volverOk || 0) + " volvieron a agendar")}
+      ${caja("⏰", t.retomarEnv || 0, "«¿Seguimos?» enviados", (t.retomarOk || 0) + " terminaron agendando")}
+    </div>
+    <p class="mb-1.5 mt-4 text-[13px] font-extrabold">🔗 Link (tu página) y panel</p>
+    <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      ${caja("👀", visitas === null ? "—" : visitas, "Visitas al link")}
+      ${canalHtml("link", "✅", "Citas por el link")}
+      ${canalHtml("panel", "🗓️", "Citas hechas en el panel")}
+    </div>
+    <p class="mb-1.5 mt-4 text-[13px] font-extrabold">💰 Ingresos</p>
+    <div class="rounded-xl p-3 text-sm" style="background:var(--canvas)">
+      <div class="flex justify-between"><span>Citas confirmadas</span><b>${pesos(agendado)}</b></div>
+      <div class="flex justify-between" style="color:var(--sred)"><span>− Citas canceladas (${cuenta(citas, ["cancelled"])})</span><b>− ${pesos(canceladas)}</b></div>
+      <div class="mt-1 flex justify-between border-t border-line pt-1 text-[16px]"><span class="font-extrabold">= Ingresos</span><b class="font-extrabold">${pesos(agendado - canceladas)}</b></div>
+    </div>
+    <p class="soft mt-2 text-[11px]">Por la fecha de la cita. Lo del bot (personas, interacciones, listas) cuenta desde que se instaló el reporte y se actualiza cada hora.</p>`;
+}
+document.addEventListener("click", (e) => { const b = e.target.closest("#tab-wabot [data-rep]"); if (!b) return; REP.modo = b.dataset.rep; REP.clave = ""; renderWaBot(); });
+document.addEventListener("change", (e) => { if (e.target.id === "repDesde" || e.target.id === "repHasta") { REP.desde = $("repDesde").value; REP.hasta = $("repHasta").value; REP.clave = ""; pintarReporte(); } });
 async function botGuardar(patch) {
   const c = botCfg(), n = { ...c, ...patch, estados: { ...c.estados, ...(patch.estados || {}) }, volver: { ...c.volver, ...(patch.volver || {}) } };
   A.settings.maryBot = n; renderWaBot();

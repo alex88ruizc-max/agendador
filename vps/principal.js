@@ -6,7 +6,7 @@
 const http = require('http'), fs = require('fs'), path = require('path');
 const T = require('./textos'), C = require('./correo'), E = require('./estado'), A = require('./asistente');
 
-const VERSION = 'agendador-ia-3.36';
+const VERSION = 'agendador-ia-3.37';
 const env = (k, d) => (process.env[k] === undefined || process.env[k] === '' ? d : process.env[k]);
 const CFG = {
   puerto: parseInt(env('PUERTO', '3060'), 10),
@@ -256,6 +256,32 @@ function frenoRobot({ texto, rowId, interactivo, enFlujo, ultimoEnvio, ahora, hi
 }
 
 // ---------- 🤖 3.0 · el asistente (agendar por listas, cupos, saludo una vez al día, nombre y gustos) ----------
+// 📊 3.37 · REPORTE DEL BOT: cuántas personas escribieron, cuántas interacciones, cuántas eligieron de la lista,
+//    recordatorios de servicio y «¿Seguimos?» enviados y cuántos terminaron agendando. Se cuenta por día en el VPS y se guarda
+//    en Google una vez por hora (no por mensaje). De las personas solo se guarda una huella corta (no el número).
+const huella = (tel) => require('crypto').createHash('sha256').update('agendador:' + String(tel || '').replace(/\D/g, '').slice(-10)).digest('hex').slice(0, 10);
+function contar(bid, campo, tel) {
+  MEM.stats = MEM.stats || {};
+  const f = ahoraLocal().fecha, k = bid + '|' + f;
+  const d = MEM.stats[k] = MEM.stats[k] || { bid, fecha: f, n: {}, personas: {}, listas: {}, cambio: true };
+  d.n[campo] = (d.n[campo] || 0) + 1; d.cambio = true;
+  if (tel && campo === 'mensajes') d.personas[huella(tel)] = 1;
+  if (tel && campo === 'listas') d.listas[huella(tel)] = 1;
+  memGuardar();
+}
+async function tickEstadisticas() {
+  const S = MEM.stats || {}, hoy = ahoraLocal().fecha;
+  for (const [k, d] of Object.entries(S)) {
+    if (d.cambio) {
+      const neg = negocios().find((x) => x.bid === d.bid);
+      if (neg) {
+        try { await gas(neg, 'estadisticas', { fecha: d.fecha, n: d.n, personas: Object.keys(d.personas), listas: Object.keys(d.listas) }); d.cambio = false; memGuardar(); }
+        catch (e) { log('estadísticas', k, e.message); continue; }
+      } else d.cambio = false;
+    }
+    if (!d.cambio && d.fecha < hoy && Date.parse(hoy) - Date.parse(d.fecha) > 2 * 86400000) { delete S[k]; memGuardar(); }   // ya guardado: se olvida
+  }
+}
 // 💰 3.30 · ahorro de Google: días, horas y cupos se calculan en el VPS leyendo la base directo (como la página). Si falla → Google.
 let CL = null;
 const DIRECTO = new Set(['horas', 'dias', 'cupos']);
@@ -274,7 +300,7 @@ async function leer(neg, op, d) {
     return gas(neg, op, d);
   }
 }
-const ASIS = A.crear({ gas: (neg, op, d) => leer(neg, op, d), texto: (neg, tel, t) => escribir(neg, tel, t), lista: (neg, tel, L) => escribirLista(neg, tel, L),
+const ASIS = A.crear({ contar: (bid, campo) => contar(bid, campo), gas: (neg, op, d) => leer(neg, op, d), texto: (neg, tel, t) => escribir(neg, tel, t), lista: (neg, tel, L) => escribirLista(neg, tel, L),
   get mem() { return MEM; }, guardar: () => memGuardar(), anotar: (x) => anotar(x), tz: CFG.tz, bot: (neg) => botDe(neg) });
 
 // ---------- ¿quién escribe? ----------
@@ -372,6 +398,7 @@ async function atenderMensaje(c, neg) {
     await botAlDia(neg);
     if (!botDe(neg).activo || !c.tel) return;
     if (MEM.humano) delete MEM.humano[k];
+    contar(neg.bid, 'listas', c.tel);
     anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: '👆 el negocio tocó «' + (c.texto || c.rowId).split('\n')[0] + '»: lo hago para el cliente' });
     try { await ASIS.manejar(neg, { k, tel: c.tel, texto: '', rowId: c.rowId, nombre: '' }); }
     catch (e) { est.errores++; log('❌ asistente (opción del negocio)', e.message); }
@@ -391,6 +418,7 @@ async function atenderMensaje(c, neg) {
   const pausadoPorDueno = !!(MEM.humano[k] && Date.now() - MEM.humano[k] < botDe(neg).pausaMin * 60000);
   if (pausadoPorDueno) { anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: 'callada: el dueño escribió hace poco' }); return; }
   const prev = MEM.chats[k] || {};
+  contar(neg.bid, 'mensajes', c.tel); if (c.rowId) contar(neg.bid, 'listas', c.tel);   // 📊 3.37: reporte del bot
   // 📸 foto del pago
   if (c.media) {
     est.fotos++;
@@ -573,7 +601,7 @@ async function tickVolver(aCualquierHora) {
       if (!L.length) continue;
       await gas(neg, 'volverAvisado', { codes: L.map((x) => x.code) });   // marcado antes de mandar: nunca se le escribe dos veces por la misma visita
       L.forEach((x, i) => setTimeout(() => {
-        ASIS.ofrecerVolver(neg, numeroWa(x.whatsapp), x, r.negocio).then(() => anotar({ bid: neg.bid, chat: numeroWa(x.whatsapp).slice(-4), que: '🔁 recordatorio de servicio (' + x.diasDesde + ' días)' }))
+        ASIS.ofrecerVolver(neg, numeroWa(x.whatsapp), x, r.negocio).then(() => { contar(neg.bid, 'volverEnv'); }).then(() => anotar({ bid: neg.bid, chat: numeroWa(x.whatsapp).slice(-4), que: '🔁 recordatorio de servicio (' + x.diasDesde + ' días)' }))
           .catch((e) => log('volver', x.code, e.message));
       }, i * CFG.volverEspacioMs));
       anotar({ bid: neg.bid, que: '🔁 recordatorio de servicio: ' + L.length + ' cliente(s) hoy' });
@@ -592,7 +620,7 @@ async function tickRetomar(aCualquierHora) {
     if (!neg || !atiende({ tel }) || mudo(k) || (MEM.humano && MEM.humano[k] && ahora - MEM.humano[k] < botDe(neg).pausaMin * 60000)) continue;
     if (!(await botAlDia(neg)).activo) continue;
     conv.retomado = true; memGuardar();   // una sola vez aunque falle
-    try { await ASIS.retomar(neg, tel, conv); anotar({ bid, chat: tel.slice(-4), que: '⏰ lo retomé: «¿Seguimos con tu cita?» (llevaba 30 min sin elegir)' }); }
+    try { await ASIS.retomar(neg, tel, conv); contar(bid, 'retomarEnv'); anotar({ bid, chat: tel.slice(-4), que: '⏰ lo retomé: «¿Seguimos con tu cita?» (llevaba 30 min sin elegir)' }); }
     catch (e) { log('retomar', k, e.message); }
   }
 }
@@ -815,7 +843,8 @@ function arrancarRelojes() {
   cada(30000, 'estados', tickEstados);
   cada(15 * 60000, 'record', tickRecordatorios);
   cada(5 * 60000, 'volver', tickVolver);
-  cada(60000, 'retomar', tickRetomar);   // 3.33: «¿Seguimos con tu cita?» a los 30 min sin elegir nada   // 3.32: recordatorio de servicio (una vez al día, desde las 10:00)   // 2.5: cada 15 min (antes 5): el recordatorio sale igual con tiempo de sobra
+  cada(60000, 'retomar', tickRetomar);
+  cada(60 * 60000, 'estadisticas', tickEstadisticas);   // 📊 3.37: el reporte se guarda en Google una vez por hora   // 3.33: «¿Seguimos con tu cita?» a los 30 min sin elegir nada   // 3.32: recordatorio de servicio (una vez al día, desde las 10:00)   // 2.5: cada 15 min (antes 5): el recordatorio sale igual con tiempo de sobra
   cada(60000, 'revis', tickRevisadas);
   cada(5000, 'wa', tickPedidosWa);
 }
@@ -852,5 +881,5 @@ if (require.main === module) {
   servidor.listen(CFG.puerto, () => { log('👩‍💼 ' + VERSION + ' escuchando en ' + CFG.puerto + ' · modo ' + CFG.modo); negocios(); arrancarRelojes(); });
 }
 // 🧪 solo para el banco de escenarios (banco/escenarios.js): deja a Mary como recién encendida
-const _banco = { ASIS, BOT, yaLoDije, memDicho: () => (MEM.dicho = MEM.dicho || {}), memHumano: () => MEM.humano, memRobot: () => (MEM.robot = MEM.robot || {}), memConv: () => (MEM.conv = MEM.conv || {}), tickRecordatorios, tickVolver, tickRetomar, publicarEstado, alMensaje, alEventoConexion, ultimos, reiniciar() { CL = null; MEM.volver = {}; leer.avisado = false; BOT_LEIDO.clear(); MEM.sinbot = {}; MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; MEM.conv = {}; MEM.clientes = {}; MEM.conectados = {}; MEM.pendientesWa = {}; MEM.codigos = {}; MEM.robot = {}; MEM.dicho = {}; AGRUPA.clear(); ASIS._cat.clear(); BOT.clear(); CONTACTOS.clear(); vinculando.clear(); delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
+const _banco = { ASIS, BOT, yaLoDije, memDicho: () => (MEM.dicho = MEM.dicho || {}), memHumano: () => MEM.humano, memRobot: () => (MEM.robot = MEM.robot || {}), memConv: () => (MEM.conv = MEM.conv || {}), tickRecordatorios, tickVolver, tickRetomar, tickEstadisticas, memStats: () => (MEM.stats = MEM.stats || {}), publicarEstado, alMensaje, alEventoConexion, ultimos, reiniciar() { CL = null; MEM.volver = {}; MEM.stats = {}; leer.avisado = false; BOT_LEIDO.clear(); MEM.sinbot = {}; MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; MEM.conv = {}; MEM.clientes = {}; MEM.conectados = {}; MEM.pendientesWa = {}; MEM.codigos = {}; MEM.robot = {}; MEM.dicho = {}; AGRUPA.clear(); ASIS._cat.clear(); BOT.clear(); CONTACTOS.clear(); vinculando.clear(); delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
 module.exports = { _banco, botNormal, frenoRobot, estadosQueTocan, atenderPedidoWa, sincronizarConectados, renovarQr, telEnAviso, deWaha, esWaha, debeResponder, alEventoConexion, tickPedidosWa, limpiarSinVincular, leerMensaje, atiende, PREGUNTA, numeroWa, ahoraLocal, enFila, yaVisto, quienVeEstados, CFG };
