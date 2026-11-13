@@ -9,9 +9,9 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, ventanaReserva, OFERTA_TXT, nombreCompleto, planEjemplos, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-11-13y";
-import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-13y";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-13y";
+} from "./common.js?v=2026-11-13z";
+import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-13z";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-13z";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -130,7 +130,7 @@ function start() {
     // recién creada desde "Probar gratis": abre la guía de primeros pasos
     // asistente de inicio: la primera vez (o al llegar desde "Probar gratis")
     if (!A.wizAuto && isOwner() && !A.me?.isSuper && !document.body.classList.contains("plan-gate") && !A.bill?.planWanted && (!A.settings.setupDone || !A.settings.tutorial2 || new URLSearchParams(location.search).get("guia") === "1")) {
-      // 2026-11-13y · los primeros pasos (nuevos, 4 pasos) se muestran UNA vez más a todas las tiendas, también a las que ya los habían hecho (tutorial2)
+      // 2026-11-13z · los primeros pasos (nuevos, 4 pasos) se muestran UNA vez más a todas las tiendas, también a las que ya los habían hecho (tutorial2)
       const otraVez = !!A.settings.setupDone && !A.settings.tutorial2;
       A.wizAuto = true; A.geoAsked = true;
       if (!A.settings.tutorial2) updateDoc(doc(db, bpath("settings", "general")), { tutorial2: true }).catch(() => {});
@@ -2290,7 +2290,7 @@ function freeTimes(date, locks, minutes) {
 }
 const firstName = (a) => (a.customer?.firstName || "Cliente").split(/\s+/)[0];
 
-// ================= 🏠 INICIO (2026-11-13y): accesos directos que cada quien elige · agenda de hoy ordenada · configuración en un botón flotante =================
+// ================= 🏠 INICIO (2026-11-13z): accesos directos que cada quien elige · agenda de hoy ordenada · configuración en un botón flotante =================
 const ACC_DEF = ["agenda", "wabot", "clients", "linkcli"];
 const ACC_CORTO = { agenda: "Agenda", wabot: "Bot", clients: "Clientes", linkcli: "Mi enlace", staff: "Equipo", services: "Servicios", marketing: "Marketing", settings: "Ajustes", plan: "Mi plan", cupos: "Cupos", activity: "Actividad", referrals: "Referidos", appearance: "Apariencia", images: "Imágenes" };
 const accPermitidos = () => ["agenda", "cupos", "staff"].concat(isOwner() ? ["wabot", "clients", "linkcli", "services", "marketing", "settings", "plan", "activity", "referrals", "appearance", "images"] : []);
@@ -2474,7 +2474,7 @@ function renderHome() {
       <span class="min-w-0 flex-1 text-[13.5px] leading-snug"><b>Invita y paga menos</b><br><span class="opacity-80">Gana ${refLevels()[0]}% de descuento cada mes que paguen tus invitados.</span></span>
       <span class="rounded-full px-2 py-0.5 text-[10px] font-extrabold" style="background:var(--sred)">Nuevo</span></button>` : "";
   const bookUrl = $("linkUrl").textContent || "";
-  // 2026-11-13y · el enlace queda en una sola fila (antes era una tarjeta grande que ocupaba medio Inicio)
+  // 2026-11-13z · el enlace queda en una sola fila (antes era una tarjeta grande que ocupaba medio Inicio)
   const linkHtml = bookUrl ? `<div class="sp-card mb-3 flex items-center gap-2 !py-2.5" style="background:linear-gradient(135deg,#14213D,#2B59C3);color:#fff">
       <span class="min-w-0 flex-1"><span class="block text-[11px] font-bold opacity-80">🔗 Tu enlace de citas</span><span class="block truncate font-mono text-[12px]">${esc(bookUrl.replace(/^https?:\/\//, ""))}</span></span>
       <button class="shrink-0 rounded-xl px-3 py-2 text-[13px] font-extrabold" style="background:#25D366;color:#0b3d1f" data-bl="wa" aria-label="Enviar por WhatsApp"><i class="fa-brands fa-whatsapp"></i> Enviar</button>
@@ -2488,9 +2488,9 @@ function renderHome() {
         <button class="rounded-2xl py-2.5 text-[16px]" style="background:rgba(255,255,255,.18)" data-bl="qr" aria-label="Ver QR del enlace"><i class="fa-solid fa-qrcode"></i></button>
       </div></div>` : "";
   void linkViejo;
-  // 2026-11-13y · INICIO REORGANIZADO (todo se queda): accesos directos → agenda de hoy ordenada → pendientes → equipo → en vivo → lo demás.
+  // 2026-11-13z · INICIO REORGANIZADO (todo se queda): accesos directos → agenda de hoy ordenada → pendientes → equipo → en vivo → lo demás.
   //   La configuración pendiente ya no ocupa el Inicio: va en el botón flotante (guiaFab).
-  // 2026-11-13y (Alex): el equipo ARRIBA, para marcar un descanso o un almuerzo de una (antes quedaba debajo de la agenda)
+  // 2026-11-13z (Alex): el equipo ARRIBA, para marcar un descanso o un almuerzo de una (antes quedaba debajo de la agenda)
   el.innerHTML = `${teamHtml}${accesosHtml()}${linkHtml}${pushCard("home")}<div class="home-grid"><div class="home-col">
     <div class="sp-card" id="chairCard"><div class="flex items-center justify-between gap-2"><h2 class="disp text-[18px] font-bold">Hoy en tu agenda</h2>
       ${freeLater.length ? `<button class="rounded-full px-3 py-1.5 text-xs font-bold ${H.showFree ? "" : "t-late"}" style="${H.showFree ? "background:var(--sink);color:#fff" : ""}" data-hfree="1" aria-expanded="${!!H.showFree}">${freeLater.length} hueco${freeLater.length === 1 ? "" : "s"} libre${freeLater.length === 1 ? "" : "s"} ${H.showFree ? "▴" : "▾"}</button>` : `<span class="soft text-xs">Sin huecos libres</span>`}</div>${hoyListaHtml(visible, nowMin, staffList.length > 1)}
@@ -3119,7 +3119,7 @@ async function loadLost() {
 const guideDone = () => A.settings?.guideDone || [];
 // lo que ya se hizo en el asistente de inicio cuenta como hecho en la guía
 const WIZ_ORDER = ["hi", "biz", "social", "team", "hours", "services", "deposit", "geo", "telegram", "done"];
-// 2026-11-13y · el asistente de inicio ahora son 4 pasos (negocio, horario, servicios y listo). Lo demás queda en la guía.
+// 2026-11-13z · el asistente de inicio ahora son 4 pasos (negocio, horario, servicios y listo). Lo demás queda en la guía.
 //   Quien terminó el asistente viejo (10 pasos) ya pasó por todo; quien termina el nuevo (setupVer 2) solo pasó por esos 4.
 const WIZ_NUEVO = ["biz", "hours", "services", "done"];
 const wizPassed = (id) => {
@@ -3177,7 +3177,7 @@ const pushClave = () => "pushOn:" + (bpath().split("/")[1] || "");
 const pushOn = () => { try { return localStorage.getItem(pushClave()) === "1" && Notification.permission === "granted"; } catch { return false; } };
 const pushVisto = () => { try { return localStorage.getItem(pushClave() + ":no") === "1"; } catch { return false; } };
 function pushCard(donde) {
-  if (!A.me) return "";   // 2026-11-13y: también le sale al superusuario (antes no, y Alex no la encontraba al revisar una tienda)
+  if (!A.me) return "";   // 2026-11-13z: también le sale al superusuario (antes no, y Alex no la encontraba al revisar una tienda)
   const on = pushOn();
   if (donde === "home" && (on || pushVisto())) return "";   // en Inicio solo invita; el control completo está en WhatsApp Bot y Configuración
   if (!pushSoporta()) return donde === "home" ? "" : `<div class="sp-card mt-3 text-[13.5px]"><p class="font-extrabold">🔔 Notificaciones en este celular</p>
@@ -3238,7 +3238,7 @@ function guideCard() {
 }
 function openGuide() {
   const todos = guideSteps(), g = guideProgress();
-  // 2026-11-13y: primero lo que FALTA, numerado (1, 2, 3…); abajo lo que ya está hecho
+  // 2026-11-13z: primero lo que FALTA, numerado (1, 2, 3…); abajo lo que ya está hecho
   const faltan = todos.filter((x) => !x.ok && !x.optional), steps = faltan.concat(todos.filter((x) => !faltan.includes(x)));
   openM(faltan.length ? `⚙️ Te falta${faltan.length === 1 ? "" : "n"} ${faltan.length} paso${faltan.length === 1 ? "" : "s"}` : "Guía de configuración", `
     <p class="soft -mt-2 mb-4 text-sm">${g.next ? `Vas ${g.done} de ${g.total}. Cada paso te lleva al lugar exacto y te dice qué hacer.` : "¡Tu agenda está lista! Puedes volver a cualquier paso cuando quieras."}</p>
@@ -3763,7 +3763,7 @@ const STEPS_TODOS = [
           <div class="mt-2 flex items-center gap-2">
             <label class="flex flex-1 items-center gap-1 rounded-xl border-2 px-3 py-1.5" style="border-color:${x.price ? "var(--hair)" : "#f3c27a"}"><span class="soft text-sm font-bold">$</span>
               <input data-sprice="${i}" inputmode="numeric" value="${x.price ? Number(x.price).toLocaleString("es-CO") : ""}" placeholder="Pon tu precio" class="w-full border-0 p-0 text-[16px] font-extrabold outline-none" aria-label="Precio de ${esc(x.name || "este servicio")}"></label>
-            <select data-smin="${i}" class="rounded-xl border border-line bg-white px-2 py-2 text-sm font-semibold" aria-label="Duración">${mins.map((m) => `<option value="${m}" ${x.minutes === m ? "selected" : ""}>${m < 60 ? m + " min" : m / 60 === 1 ? "1 hora" : m === 90 ? "1 h 30" : "2 horas"}</option>`).join("")}</select>
+            <select data-smin="${i}" class="rounded-xl border border-line bg-white px-2 py-2 text-sm font-semibold" aria-label="Duración">${(mins.includes(x.minutes) ? mins : mins.concat([x.minutes]).sort((p, q) => p - q)).map((m) => `<option value="${m}" ${x.minutes === m ? "selected" : ""}>${durServicio(m)}</option>`).join("")}<option value="mas">➕ Más tiempo…</option></select>
           </div>
           ${x.type === "addon" ? `<p class="soft mt-1 text-[11px]">Se suma a otro servicio (ej. con un corte)</p>` : ""}
         </div>`).join("")}</div>
@@ -3861,10 +3861,21 @@ const STEPS_TODOS = [
     } }
 ];
 const STEPS = STEPS_TODOS.filter((x) => WIZ_NUEVO.includes(x.id));
+// duración escrita a mano → minutos. «2:30», «2h30», «2 h 30», «2.5» → 150 · «3» → 180 (hasta 12 se toma como horas) · «150» → 150
+function leerDuracion(txt) {
+  const t = String(txt || "").toLowerCase().replace(",", ".").trim(); let m = 0;
+  const hm = t.match(/^(\d{1,2})\s*(?::|h|horas?)\s*(\d{1,2})?\s*(?:m|min|minutos)?$/);
+  if (hm) m = Number(hm[1]) * 60 + Number(hm[2] || 0);
+  else if (/^\d+(\.\d+)?\s*(m|min|minutos)$/.test(t)) m = Math.round(parseFloat(t));
+  else if (/^\d+(\.\d+)?$/.test(t)) { const n = parseFloat(t); m = n <= 12 ? Math.round(n * 60) : Math.round(n); }
+  m = Math.round(m / 5) * 5;
+  return m >= 5 && m <= 12 * 60 ? m : 0;
+}
+const durServicio = (m) => (m < 60 ? m + " min" : m % 60 === 0 ? (m === 60 ? "1 hora" : m / 60 + " horas") : Math.floor(m / 60) + " h " + (m % 60));
 function wizReadSvcs() {
   document.querySelectorAll("[data-sname]").forEach((i) => { const r = W.d.svcList[Number(i.dataset.sname)]; if (r) r.name = i.value; });
   document.querySelectorAll("[data-sprice]").forEach((i) => { const r = W.d.svcList[Number(i.dataset.sprice)]; if (r) r.price = Number(i.value.replace(/\D/g, "") || 0); });
-  document.querySelectorAll("[data-smin]").forEach((i) => { const r = W.d.svcList[Number(i.dataset.smin)]; if (r) r.minutes = Number(i.value); });
+  document.querySelectorAll("[data-smin]").forEach((i) => { const r = W.d.svcList[Number(i.dataset.smin)]; if (r && i.value !== "mas") r.minutes = Number(i.value); });
 }
 function openWizard(start) {
   if (!A.settings) return;
@@ -3975,6 +3986,15 @@ function wizInput(e) {
 }
 async function wizChange(e) {
   W.tocado = true;
+  const sm = e.target.closest("[data-smin]");
+  if (sm && sm.value === "mas") {   // ➕ más tiempo: un servicio que dura más de 2 horas (o un tiempo distinto)
+    wizReadSvcs();
+    const r = W.d.svcList[Number(sm.dataset.smin)];
+    const v = await uiPrompt("¿Cuánto dura este servicio?", "Escríbelo así: 2:30 (2 horas y 30 minutos). También sirve 3 (3 horas) o 150 (minutos).", "", { okText: "Guardar", cancelText: "Cancelar" });
+    const m = v === null ? 0 : leerDuracion(v);
+    if (r && m) r.minutes = m; else if (v !== null) toast("No entendí ese tiempo. Escríbelo como 2:30.", "error");
+    return drawWizard();
+  }
   if (e.target.closest("[data-wsl]")) {   // ✏️ otro tiempo: horas + minutos (de 15 en 15), mínimo 15 min
     const h = Number(document.querySelector('[data-wsl="h"]')?.value || 0), m = Number(document.querySelector('[data-wsl="m"]')?.value || 0);
     W.d.slot = Math.max(15, h * 60 + m); W.d.slotOtro = true; return drawWizard();
@@ -4093,7 +4113,7 @@ function renderBell() {
 }
 function openPlatformNews() {
   const seen = (() => { try { return Number(localStorage.getItem(NEWS.seenKey()) || 0); } catch { return 0; } })();
-  // 2026-11-13y: la campana también es el lugar para prender las notificaciones de este celular
+  // 2026-11-13z: la campana también es el lugar para prender las notificaciones de este celular
   openM("🔔 Notificaciones y novedades", `<div class="-mt-2 mb-4">${pushCard("campana")}</div>` + (NEWS.list.length ? `<p class="mb-2 text-[11px] font-extrabold tracking-wider text-ink/50">NOVEDADES</p><p class="soft mb-3 text-sm">Lo nuevo de la plataforma para tu negocio.</p><div class="space-y-2">${NEWS.list.map((n) => {
     const k = NEWS_KIND[n.kind] || NEWS_KIND.novedad, fresh = toMillis(n.at) > seen;
     return `<article class="rounded-2xl p-3.5" style="background:${fresh ? "#eef4ff" : "var(--canvas)"}">

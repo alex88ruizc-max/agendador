@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.56** · Página **2026-11-13y** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.56** · Página **2026-11-13z** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -136,6 +136,11 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-13 · página 2026-11-13z · ➕ «Más tiempo…» en la duración de cada servicio (asistente de inicio)
+- Alex: en el paso de servicios la lista de duración llegaba hasta 2 horas. Debajo de «2 horas» ahora sale **«➕ Más tiempo…»**: se escribe el tiempo (2:30, 3, 150…) y queda guardado en ese servicio.
+  `leerDuracion()` entiende 2:30 · 2h30 · 2.5 · 3 (horas) · 150 (minutos); redondea a 5 min; máximo 12 horas. (En Servicios › Editar ya era un número libre.)
+- Banco de la página: 0 fallas.
 
 ### 2026-11-13 · página 2026-11-13y · ✏️ «Otro tiempo» en los turnos del asistente de inicio · campos de hora en iPhone
 - Alex: «hay gente que tiene turno cada 2 horas y media». En el paso «¿Cuándo atiendes?» ahora hay 15, 30, 45 min, 1 h, 1 h 30, 2 h y **«✏️ Otro tiempo»** (horas + minutos de 15 en 15, hasta 8 h 45).
