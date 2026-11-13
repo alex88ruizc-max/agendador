@@ -14,7 +14,7 @@
  * Instalación: pega este archivo, ejecuta activarMary() una vez, copia la clave que sale en el registro
  * y ponla en el mary.env del VPS (MARY_KEY). Vuelve a implementar la aplicación web (Implementar > Administrar > editar > Nueva versión).
  */
-const MARY_VERSION = 'agendador-ia-3.43';
+const MARY_VERSION = 'agendador-ia-3.44';
 
 // Se registra como acción pública del servidor (sin sesión: entra con la clave de Mary).
 // ⚠️ Este archivo debe quedar DEBAJO del archivo principal en la lista de archivos de Apps Script (los nuevos quedan al final: así está bien).
@@ -647,7 +647,25 @@ function maryLibres_(st, date, ids, staffId, locks, pre) {
   });
   return Object.keys(out).sort().map(function (k) { return { time: k, staffIds: out[k] }; });
 }
-function maryVentana_(st) { return Math.min(Number(plansCfg()[bizPlan()].daysAhead || 30), Number(st.bookingWindowDays || 30), 21); }
+function maryVentana_(st) { return Math.min(Number(plansCfg()[bizPlan()].daysAhead || 30), Number(st.bookingWindowDays || 30)); }   // 3.44: sin tope escondido de 21 días
+// ---------- 📅 3.44 · DÍAS PARA RESERVAR: MANDA EL SÚPER PANEL ----------
+// Al crear la tienda de prueba, el servidor guardaba en su configuración los días del plan de ESE momento (ej. 5) y después
+// siempre ganaba el número menor: aunque el súper panel diera más días (o la tienda subiera a Gold), seguía en 5.
+// Ahora los días son los del plan (súper panel). El dueño solo puede poner MENOS si él mismo lo eligió (bookingWindowOwner).
+// Se envuelve loadSettings (nuestro archivo carga de último): la misma lectura de siempre + la ventana correcta en memoria.
+try {
+  const _cargarAjustes = loadSettings;
+  loadSettings = function () {
+    const s = _cargarAjustes.apply(this, arguments);
+    try {
+      if (s && typeof BIZ !== 'undefined' && BIZ && typeof plansCfg === 'function') {
+        const plan = Math.max(1, Number(plansCfg()[bizPlan()].daysAhead || 30));
+        s.bookingWindowDays = s.bookingWindowOwner === true ? Math.max(1, Math.min(plan, Number(s.bookingWindowDays || plan))) : plan;
+      }
+    } catch (e) { /* si algo falla, queda lo guardado */ }
+    return s;
+  };
+} catch (e) { console.error('Días para reservar: ' + e); }
 function maryDias_(st, b) {
   // 3.28: los servicios y el equipo se leen UNA vez (antes se leían de nuevo por cada día: con 21 días tardaba tanto que el bot se quedaba mudo)
   const win = maryVentana_(st), dias = [], pre = { sel: maryCompute_(b.ids), staff: maryStaffPara_(b.ids) }, t0 = Date.now();

@@ -7,11 +7,11 @@ import {
   startUpdateWatcher, applyBrandColors, uiConfirm, uiPrompt, setDialogBrand, viewImage, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, hora12, tmin, fechaLarga, fechaCorta, toMillis, cop, esc, normalizePhone,
   waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, DEFAULT_WA_RESCHEDULE, computeSlots, staffHours, mapLinks, headerBgCss, onColor, darken,
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
-  PLAN_KEYS, plansOf, planOfBiz, planPriceOf, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
+  PLAN_KEYS, plansOf, planOfBiz, planPriceOf, ventanaReserva, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText
-} from "./common.js?v=2026-11-13h";
-import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-13h";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-13h";
+} from "./common.js?v=2026-11-13i";
+import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-13i";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-13i";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -199,6 +199,8 @@ const myPlan = () => planOfBiz(A.biz || {});
 const planInfo = () => PLANS()[myPlan()];
 const isTrial = () => myPlan() === "free" && !A.me?.isSuper;
 const trialDays = () => Math.max(1, Number(planInfo().daysAhead || 30));
+// 📅 días que se puede reservar: manda el súper panel (plan); el dueño solo puede poner menos si lo eligió él
+const ventanaAdmin = () => ventanaReserva(A.settings || {}, trialDays());
 const TAB_FEATURE = { wabot: "whatsapp", clients: "clients", marketing: "marketing", appearance: "appearance", images: "images", activity: "activity" };
 // el plan pagado más barato que tiene una función
 const planFor = (f) => ["basic", "gold"].find((k) => (PLANS()[k].features || []).includes(f)) || "gold";
@@ -554,7 +556,7 @@ function renderModalSlots() {
   const byId = Object.fromEntries(A.services.map((s) => [s.id, s]));
   const total = m.mode === "new" ? [m.mainId, ...m.extras].reduce((s, id) => s + Number(byId[id]?.minutes || 0), 0) : 0;
   const slots = computeSlots({
-    settings: A.settings, staffList: A.staff, locks: m.locks, date: m.date,
+    settings: { ...A.settings, ventana: ventanaAdmin() }, staffList: A.staff, locks: m.locks, date: m.date,
     totalMinutes: total, occupied: m.mode === "resched" ? m.apt.occupiedMinutes : undefined,
     mainId: m.mode === "new" ? m.mainId : undefined, staffFilter: m.staffId,
     ignoreAptCode: m.apt?.code, forAdmin: true, ignoreBreaks: m.force
@@ -1186,7 +1188,7 @@ function renderSettings() {
           <input id="stSlotCustom" type="number" min="15" step="15" class="mt-2 ${[15, 30, 45, 60, 90, 120].includes(Number(s.slotDurationMinutes || 30)) ? "hidden" : ""}" value="${Number(s.slotDurationMinutes || 30)}" placeholder="Minutos (múltiplo de 15)"></label>
         ${num("stDeposit", "Abono para apartar (COP)", s.depositAmountCOP, 'min="0" step="1000"')}
         ${num("stHold", "Minutos para subir el comprobante", s.holdMinutes ?? 30, 'min="5"')}
-        ${num("stWindow", `Días hacia adelante que se puede reservar (máx. ${trialDays()} en tu plan)`, Math.min(trialDays(), s.bookingWindowDays ?? 30), `min="1" max="${trialDays()}"`)}
+        ${num("stWindow", `Días hacia adelante que se puede reservar (máx. ${trialDays()} en tu plan)`, ventanaAdmin(), `min="1" max="${trialDays()}"`)}
         ${num("stAdvance", "Anticipación mínima (minutos)", s.minAdvanceMinutes ?? 60, 'min="0"')}
         ${num("stTolerance", "Tolerancia de espera (minutos)", s.toleranceMinutes ?? 10, 'min="0"')}
       </div>
@@ -1351,7 +1353,7 @@ async function saveSettings(e) {
   const data = {
     businessName: $("stName").value.trim(), whatsapp: phone, address: $("stAddress").value.trim(), city: $("stCity").value.trim(),
     slotDurationMinutes: slotVal, businessType: $("stType").value, businessTypeLabel: $("stType").value === "otro" ? $("stTypeLabel").value.trim() : "", staffLabel: $("stStaffLabel").value.trim(), depositAmountCOP: n("stDeposit"), holdMinutes: Math.max(5, n("stHold")),
-    bookingWindowDays: A.me?.isSuper ? Math.max(1, n("stWindow")) : Math.min(trialDays(), Math.max(1, n("stWindow"))), minAdvanceMinutes: n("stAdvance"), toleranceMinutes: n("stTolerance"),
+    bookingWindowDays: Math.min(trialDays(), Math.max(1, n("stWindow"))), bookingWindowOwner: Math.max(1, n("stWindow")) < trialDays(),   // menos que el plan = lo eligió el dueño; igual = sigue al súper panel minAdvanceMinutes: n("stAdvance"), toleranceMinutes: n("stTolerance"),
     autoConfirmProof: $("stAuto").checked, businessHours: hours, closedDates: A.closedDraft,
     paymentMethods: A.pmDraft.filter((m) => m.label && m.account).map((m) => ({ label: m.label, account: m.account, holder: m.holder || "", qr: m.qr || "" })), paymentInstructions: $("stPayInstr").value.trim(),
     rescheduleMinHours: n("stReschedH"), maxReschedules: n("stMaxResched"), noShowThreshold: Math.max(1, n("stNoShow")),
@@ -1632,7 +1634,7 @@ function renderImages() {
 async function freeSlotsFor(date, conLocks) {
   const q = await getDocs(query(collection(db, bpath("slotLocks")), where("date", "==", date)));
   const slot = Number(A.settings.slotDurationMinutes || 30), locks = q.docs.map((d) => d.data());
-  const L = computeSlots({ settings: A.settings, staffList: A.staff.filter((s) => s.active !== false), locks, date, occupied: slot }).map((s) => s.time);
+  const L = computeSlots({ settings: { ...A.settings, ventana: ventanaAdmin() }, staffList: A.staff.filter((s) => s.active !== false), locks, date, occupied: slot }).map((s) => s.time);
   return conLocks ? { L, locks } : L;
 }
 // 3.20 · 🔒 bloquear / liberar cupos (el servidor pone el bloqueo para todo el equipo; las citas que ya existan no se tocan)

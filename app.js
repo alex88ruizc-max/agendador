@@ -1,6 +1,6 @@
 // Página pública: ver cupos, registrarse, apartar, pagar con screenshot, mis cupos
-import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro } from "./common.js?v=2026-11-13h";
-import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-13h";
+import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro, ventanaReserva } from "./common.js?v=2026-11-13i";
+import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-13i";
 import {
   onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, sendPasswordResetEmail,
   GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult
@@ -12,7 +12,7 @@ import {
   startUpdateWatcher, applyBrandColors, warmServer, uiConfirm, setDialogBrand, viewImage, pushOverlay, dropOverlay, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, dow, hora12, fechaLarga, fechaCorta, toMillis, cop, esc,
   normalizePhone, waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, computeSlots, dayCapacityUnits, staffHours, mapLinks, headerBgCss,
   toast, openModal, closeModal, setBusy, copyText, tmin, mstr, UNIT
-} from "./common.js?v=2026-11-13h";
+} from "./common.js?v=2026-11-13i";
 
 const $ = (id) => document.getElementById(id);
 const S = {
@@ -49,7 +49,7 @@ if (!/^[a-z0-9][a-z0-9-]{1,29}$/.test(BIZ_ID)) {
     const b = e.target.closest("[data-lp]"); if (!b) return;
     if (b.dataset.lp === "trial") $("btnTrial").click(); else openAuth("login");
   });
-  // 🚀 2026-11-13h · viene de la invitación de una página de negocio: se abre «Probar gratis» de una vez
+  // 🚀 2026-11-13i · viene de la invitación de una página de negocio: se abre «Probar gratis» de una vez
   if (new URLSearchParams(location.search).has("probar")) setTimeout(() => $("btnTrial").click(), 400);
 } else {
   setBusiness(BIZ_ID);
@@ -301,7 +301,8 @@ $("staffPick").addEventListener("click", (e) => {
 // ---------- Cálculo de cupos ----------
 const slotLen = () => Number(S.settings?.slotDurationMinutes || 30);
 // En prueba gratis la tienda solo recibe reservas hasta 5 días adelante
-const maxDate = () => addDays(bogNow().date, Math.min(Number(plansOf(PLAT || {})[planOfBiz(S.biz || {})].daysAhead || 30), Number(S.settings?.bookingWindowDays || 30)));
+const ventana = () => ventanaReserva(S.settings || {}, plansOf(PLAT || {})[planOfBiz(S.biz || {})].daysAhead);   // manda el súper panel
+const maxDate = () => addDays(bogNow().date, ventana());
 const staffPool = () => S.staff.filter((s) => !S.staffId || s.id === S.staffId);
 const hoursOfStaff = (s, date) => staffHours(S.settings, s, date);
 // Cerrado si ningún profesional (del filtro) atiende ese día
@@ -1124,7 +1125,7 @@ function openResched(apt) {
   S.resched = { apt, time: null, locks: [] };
   const today = bogNow().date;
   const inp = $("reschedDate");
-  inp.min = today; inp.max = addDays(today, Number(S.settings?.bookingWindowDays || 30)); inp.value = "";
+  inp.min = today; inp.max = addDays(today, ventana()); inp.value = "";
   $("reschedInfo").textContent = `Reserva ${apt.code}: actualmente el ${fechaLarga(apt.date)} a las ${hora12(apt.startTime)} con ${apt.staffName}. Tu abono se conserva.`;
   $("reschedSlots").innerHTML = ""; $("btnResched").disabled = true;
   closeModal("mineModal"); openModal("reschedModal");
@@ -1136,7 +1137,7 @@ $("reschedDate").addEventListener("change", async (e) => {
   const q = await getDocs(query(collection(db, bpath("slotLocks")), where("date", "==", date)));
   R.locks = q.docs.map((d) => d.data()); R.date = date;
   const slots = computeSlots({
-    settings: S.settings, staffList: S.staff, locks: R.locks, date,
+    settings: { ...S.settings, ventana: ventana() }, staffList: S.staff, locks: R.locks, date,
     occupied: R.apt.occupiedMinutes, staffFilter: R.apt.staffId, ignoreAptCode: R.apt.code
   }).filter((s) => !(date === R.apt.date && s.time === R.apt.startTime));
   $("reschedSlots").innerHTML = slots.length
@@ -1173,7 +1174,7 @@ getDoc(doc(db, "platform", "public")).then((d) => {
   if (S.settings) renderAll();
   const on = PLAT.trialEnabled !== false;
   $("trialCta").classList.toggle("hidden", !on);
-  // 2026-11-13h · en la página de un negocio NO hay «Probar gratis» mientras el cliente agenda (no se pierde la cita):
+  // 2026-11-13i · en la página de un negocio NO hay «Probar gratis» mientras el cliente agenda (no se pierde la cita):
   //   solo el sello chiquito abajo; la invitación sale DESPUÉS (cita confirmada y «Mis citas"), en otra pestaña.
   $("trialTop").classList.add("hidden"); $("trialTop").classList.remove("inline-flex");
   $("trialCta").classList.add("hidden");

@@ -438,3 +438,16 @@ test('3.42 · 🚀 El correo trae al pie «Crea la tuya gratis» (abre la prueba
   assert.match(pie, /Crea la tuya gratis/);
   assert.match(pie, /tuagenda\.vip\/\?probar=1/, 'abre directo «Probar gratis»');
 });
+
+test('3.44 · 📅 Días para reservar: MANDA EL SÚPER PANEL (el 5 guardado al crear la tienda ya no limita; el dueño solo puede poner menos si lo eligió)', () => {
+  const { ventana } = require('../cuposLocal');
+  const plat = { plans: { free: { daysAhead: 30 }, basic: { daysAhead: 45 }, gold: { daysAhead: 120 } } };
+  assert.equal(ventana({ bookingWindowDays: 5 }, { trial: true }, plat), 30, 'prueba: 30 del súper panel aunque se guardó 5 al crear');
+  assert.equal(ventana({ bookingWindowDays: 5 }, { plan: 'gold' }, plat), 120, 'subió a Gold: los días de Gold');
+  assert.equal(ventana({ bookingWindowDays: 10, bookingWindowOwner: true }, { plan: 'gold' }, plat), 10, 'el dueño eligió menos: se respeta');
+  assert.equal(ventana({ bookingWindowDays: 500, bookingWindowOwner: true }, { plan: 'basic' }, plat), 45, 'nunca más que el plan');
+  assert.equal(ventana({}, { plan: 'gold' }, {}), 90, 'sin súper panel: respaldo de Gold');
+  const gs = require('fs').readFileSync(GS_MARY, 'utf8');
+  assert.match(gs, /loadSettings = function \(\)[\s\S]*bookingWindowOwner === true/, 'el servidor de Google usa la misma regla');
+  assert.doesNotMatch(gs.match(/function maryVentana_[^\n]*/)[0], /, 21\)/, 'sin tope escondido de 21 días');
+});

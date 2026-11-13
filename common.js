@@ -2,7 +2,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js?v=2026-11-13h";
+import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js?v=2026-11-13i";
 
 export const app = initializeApp(firebaseConfig);
 // Caché en el dispositivo: muestra al instante lo último que se vio y luego actualiza en vivo
@@ -21,7 +21,7 @@ export function businessFromUrl() {
 export const bpath = (...parts) => ["businesses", BID, ...parts].join("/");
 
 // Versión de la página: cámbiala en cada actualización para comprobar que se publicó
-export const APP_VERSION = '2026-11-13h';
+export const APP_VERSION = '2026-11-13i';
 // Versiones que esta página espera del servidor y de las reglas de Firebase
 export const SERVER_VERSION = '2026-10-10n';
 export const RULES_VERSION = '2026-10-10l';
@@ -181,7 +181,7 @@ export function computeSlots({ settings, staffList, locks, date, totalMinutes, o
   const now = bogNow();
   if (date < now.date) return [];
   if ((settings.closedDates || []).includes(date)) return [];
-  if (!forAdmin && date > addDays(now.date, Number(settings.bookingWindowDays || 30))) return [];
+  if (!forAdmin && date > addDays(now.date, Number(settings.ventana || settings.bookingWindowDays || 30))) return [];
   const slot = Number(settings.slotDurationMinutes || 30);
   const occ = occupied || Math.max(slot, Math.ceil(totalMinutes / slot) * slot);
   const minStart = date === now.date ? now.min + (forAdmin ? 0 : Number(settings.minAdvanceMinutes || 0)) : -1;
@@ -481,6 +481,12 @@ export const planBenefitsIntro = (plans, k) => {
 };
 // tiendas antiguas sin plan: en prueba = Gratis; las que ya pagaban = Gold
 export const planOfBiz = (biz = {}) => (PLAN_KEYS.includes(biz.plan) ? biz.plan : biz.trial ? "free" : "gold");
+// 📅 Días hacia adelante que se puede reservar. MANDA EL SÚPER PANEL (días del plan). El dueño solo puede ponerle MENOS
+//    si él mismo lo eligió en Configuración (bookingWindowOwner). El número que se guardaba solo al crear la tienda ya no limita.
+export function ventanaReserva(settings = {}, planDays = 30) {
+  const plan = Math.max(1, Number(planDays || 30));
+  return settings?.bookingWindowOwner === true ? Math.max(1, Math.min(plan, Number(settings.bookingWindowDays || plan))) : plan;
+}
 export function planPriceOf(plat, plan, months) {
   const price = Number(plansOf(plat)[plan].priceCOP || 0), base = price * months;
   let off = Number((plat.planDiscounts || {})[months] || 0);

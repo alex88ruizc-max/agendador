@@ -55,7 +55,14 @@ function libres({ st, staff, servicios, locks, date, ids, staffId, ahora }) {
   }
   return [...out.entries()].sort((a, b) => a[0] - b[0]).map(([t, s]) => ({ time: mstr(t), staffIds: s }));
 }
-const ventana = (st) => Math.min(Number(st.bookingWindowDays || 30), 21);
+// 📅 3.44 · días para reservar: manda el súper panel (días del plan); el dueño solo puede poner menos si lo eligió él. Sin tope escondido.
+const PLAN_DIAS = { free: 5, basic: 30, gold: 90 };   // los mismos de respaldo de la página (common.js DEFAULT_PLANS)
+function planDe(biz) { biz = biz || {}; return ['free', 'basic', 'gold'].includes(biz.plan) ? biz.plan : biz.trial ? 'free' : 'gold'; }
+function ventana(st, biz, plat) {
+  const k = planDe(biz), p = ((plat && plat.plans) || {})[k] || {};
+  const plan = Math.max(1, Number(p.daysAhead || PLAN_DIAS[k] || 30));
+  return st.bookingWindowOwner === true ? Math.max(1, Math.min(plan, Number(st.bookingWindowDays || plan))) : plan;
+}
 
 // ---------- lectura directa de la base (pública, como la página) ----------
 function crear({ fetch: f, url, proyecto, llave, ahora, cacheMs = 60000, locksMs = 15000 }) {
@@ -83,6 +90,8 @@ function crear({ fetch: f, url, proyecto, llave, ahora, cacheMs = 60000, locksMs
     const r = await pedir(base(bid) + ':runQuery?key=' + llave, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(q) });
     return (Array.isArray(r) ? r : []).filter((x) => x.document).map((x) => doc(x.document));
   });
+  const negocio = (bid) => guardado('bz:' + bid, cacheMs, async () => doc(await pedir(base(bid) + '?key=' + llave)));
+  const plataforma = () => guardado('plat', 10 * cacheMs, async () => doc(await pedir(url + '/v1/projects/' + proyecto + '/databases/(default)/documents/platform/public?key=' + llave)));
   async function datos(bid) {
     const [st, staff, servicios] = await Promise.all([ajustes(bid), lista(bid, 'staff'), lista(bid, 'services')]);
     return { st, staff: staff.map((x) => Object.assign({}, x, { nombre: x.name || '' })), servicios: servicios.filter((s) => s.active !== false) };
@@ -96,7 +105,8 @@ function crear({ fetch: f, url, proyecto, llave, ahora, cacheMs = 60000, locksMs
   }
   async function dias(bid, b) {
     const a = ahora(), D = await datos(bid), out = [];
-    for (let i = 0; i <= ventana(D.st) && out.length < 10; i++) {
+    const [biz, plat] = await Promise.all([negocio(bid).catch(() => ({})), plataforma().catch(() => ({}))]);
+    for (let i = 0, V = ventana(D.st, biz, plat); i <= V && out.length < 10; i++) {
       const date = sumarDias(a.fecha, i);
       if (!D.staff.some((x) => x.active !== false && horario(D.st, x, date).length)) continue;   // nadie atiende: ni se consulta
       const n = libres(Object.assign({}, D, { locks: await ocupados(bid, date), date, ids: b.ids, staffId: b.staffId, ahora: a })).length;
@@ -114,7 +124,6 @@ function crear({ fetch: f, url, proyecto, llave, ahora, cacheMs = 60000, locksMs
     return { dias: out };
   }
   // 📲 3.43 · lo que necesita el estado «Cómo agendar» (todo de la base, sin Google)
-  const negocio = (bid) => guardado('bz:' + bid, cacheMs, async () => doc(await pedir(base(bid) + '?key=' + llave)));
   async function guia(bid) {
     const [st, staff, servicios, biz, c] = await Promise.all([ajustes(bid), lista(bid, 'staff'), lista(bid, 'services'), negocio(bid), cupos(bid, { dias: 14 })]);
     return { st, staff, servicios, biz, cupos: c, hoy: ahora().fecha };
@@ -122,4 +131,4 @@ function crear({ fetch: f, url, proyecto, llave, ahora, cacheMs = 60000, locksMs
   return { horas, dias, cupos, guia, olvidar: (bid, date) => { C.delete('lk:' + bid + ':' + date); } };
 }
 
-module.exports = { crear, libres, horario, diaTxt, hora12, ocupa };
+module.exports = { crear, libres, horario, diaTxt, hora12, ocupa, ventana };

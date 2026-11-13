@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.43** · Página **2026-11-13h** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.44** · Página **2026-11-13i** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -132,6 +132,19 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-13 · agendador-ia-3.44 · página 2026-11-13i · 📅 los días para reservar los manda el súper panel
+- **Problema (Alex):** en el súper panel puso más días, pero las tiendas de prueba seguían dejando agendar solo 5 días.
+- **Causa:** al crear la tienda de prueba, el servidor principal guarda en su configuración `bookingWindowDays` = los días del plan en ESE momento (5).
+  Después la página, el servidor y el bot tomaban siempre el MENOR entre el plan y ese número guardado, así que se quedaba en 5,
+  aunque el súper panel diera más o la tienda subiera a Gold. Además el bot tenía un tope escondido de 21 días.
+- **Arreglo (regla nueva, orden de Alex: «el súper panel toma la última decisión»):**
+  - Los días son los del plan del súper panel. El dueño solo puede poner MENOS si él mismo lo elige en Configuración (`bookingWindowOwner`). Nunca más que el plan.
+  - Página: `ventanaReserva()` en common.js (calendario, reagendar y cupos). Panel: Configuración muestra los días del plan y guarda si el dueño eligió menos.
+  - Servidor de Google: `loadSettings` envuelto en gs/mary.gs con la misma regla (así también valida bien al crear la cita). Sin el tope de 21 días en `maryVentana_`.
+  - Bot del VPS (cuposLocal): la misma regla leyendo el plan del negocio y el súper panel; sin el tope de 21.
+- No se tocó el código principal del servidor. La línea que guarda el 5 al crear la tienda sigue ahí, pero ya no limita nada.
+- Banco: 163 pasan (prueba nueva de la regla). Página: 0 fallas.
 
 ### 2026-11-13 · página 2026-11-13h · 📝 reseña de los planes y página de venta al día
 - **Reseña de los planes** (`DEFAULT_BENEFITS` en common.js) con lo nuevo que ya está hecho:
