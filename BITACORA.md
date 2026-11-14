@@ -137,6 +137,13 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 
 ## 📜 Historial (lo más nuevo arriba)
 
+### 2026-11-14 · 👀 Epic en vivo FUNCIONANDO · mapa de Epic (sin versión nueva)
+- Alex creó el repositorio privado `agendador-epic-copia` y le dio permiso al token «cartero agendador». `/epicvivo` → «3 archivo(s) actualizado(s)». Claude ya lee la copia (solo lectura).
+- **Mapa de Epic** hecho (qué hay, en qué líneas mirar, 16 lógicas de Mary que se pueden copiar y su estado aquí, avisos). No se guarda aquí porque este repositorio es público: va en `agendador-epic-copia/mapa/MAPA-EPIC.md` cuando Alex dé permiso de escritura a Claude en ese repositorio.
+- **Hallazgos para el agendador:** (1) el número de Alex …0386 (bot de El Barba) sigue en la lista de números de prueba de **Mary de Epic** → lo quita Alex del lado de Epic. (2) el 12-nov el `waha-agendador` tocó la sesión «default» y la tienda de Epic quedó en STARTING unos minutos (ya corregido aquí en la 2.9/3.1).
+- **Cartero (para la próxima entrega, sin zip todavía):** el filtro de claves borraba palabras normales después de «PIN:» (salió «sin PIN: «QUITADO» y clave»). Ahora solo quita lo que tiene un número o es largo.
+- Pendiente de Alex: decidir qué lógicas de Epic se copian primero.
+
 ### 2026-11-14 · agendador-ia-3.61 · 👀 Epic en vivo: copia automática de sus md a un repositorio privado
 - **Pedido de Alex:** «necesito que lo veas en vivo, que no tenga que yo estar descargando nada». Rutas que dio: `/home/ubuntu/epic/estudio/ESTADO.md`, `…/CLAUDE.md`, `…/fichas-mary/FICHAS.md`.
 - **Por qué un repositorio aparte:** Claude no entra al VPS; solo ve GitHub. El repositorio `agendador` es PÚBLICO (es la página), así que ahí no puede ir nada de Epic. Los de Epic no se tocan. Se usa uno nuevo, **privado**, del agendador: `alex88ruizc-max/agendador-epic-copia` (lo crea Alex).

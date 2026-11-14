@@ -166,12 +166,12 @@ def limpiar_secretos(txt):
 # 📖 3.60 · /epicmd — SOLO MIRAR (autorizado por Alex el 2026-11-14: «te autorizo a que solo mires en epic con el comando»).
 #    Busca los archivos .md que hay en el VPS FUERA de ~/agendador (ahí vive el md de Epic) y le manda a Alex una COPIA por Telegram.
 #    Regla N.º 1: aquí solo se LEE. No se escribe, no se borra, no se mueve ni se ejecuta nada de Epic. Antes de mandar, se quitan las claves.
-SECRETOS_MD = [   # en un md las claves van sueltas (sin comillas): se quitan por su forma y por la palabra que las anuncia
+SECRETOS_MD = [   # 3.62: lo que va después de «clave:» solo se quita si tiene un número o es largo (una palabra como «correo» no es clave) · en un md las claves van sueltas (sin comillas): se quitan por su forma y por la palabra que las anuncia
     (re.compile(r'\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}\b|\bgithub_pat_[A-Za-z0-9_]{20,}\b'), '«TOKEN DE GITHUB QUITADO»'),
     (re.compile(r'\bAIza[0-9A-Za-z_-]{30,}\b'), '«LLAVE DE GOOGLE QUITADA»'),
     (re.compile(r'\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{6,}\b'), '«TOKEN QUITADO»'),
     (re.compile(r'\b(?:sk|pk)-[A-Za-z0-9_-]{20,}\b'), '«LLAVE QUITADA»'),
-    (re.compile(r'((?:contrase[ñn]a|password|passwd|clave|secreto|secret|token|api[ _-]?key|apikey|llave|pin|key)\w*[\s*_]*(?:es|is)?[\s*_]*[:=][\s*_`\'"]*)([^\s`*|\'"«]{6,})', re.I), r'\1«QUITADO»'),
+    (re.compile(r'((?:contrase[ñn]a|password|passwd|clave|secreto|secret|token|api[ _-]?key|apikey|llave|pin|key)\w*[\s*_]*(?:es|is)?[\s*_]*[:=][\s*_`\'"]*)((?=[^\s`*|\'"«]*\d)[^\s`*|\'"«]{6,}|[^\s`*|\'"«]{14,})', re.I), r'\1«QUITADO»'),
 ]
 def limpiar_md(txt):
     txt, n = limpiar_secretos(txt)
