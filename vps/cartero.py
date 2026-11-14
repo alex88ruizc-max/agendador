@@ -3,7 +3,7 @@
 #    Le mandas al bot un archivo y él lo instala (solo si viene de TU chat):
 #      agendador-ia-*.zip    → el Agendador IA del VPS (Mary por dentro) + su Apps Script en Google (actualizar.sh: banco de pruebas; si falla NO instala)
 #      agendador-web-*.zip   → la página tuagenda.vip (sube los archivos a GitHub, rama main, con respaldo de lo anterior)
-#    Comandos:  /estado  (cómo está Mary)   /registro  (qué hizo Mary)   /soporte  (línea de soporte)   /epicmd  (copia del md de Epic, solo lectura)   /ayuda
+#    Comandos:  /estado  (cómo está Mary)   /registro  (qué hizo Mary)   /soporte  (línea de soporte)   /epicmd  (copia del md de Epic, solo lectura)   /epicvivo  (revisar ya la copia en vivo)   /ayuda
 #    Solo usa la librería estándar de Python. Corre como servicio de systemd (agendador-cartero), lo instala instalar-cartero.sh.
 import json, os, re, subprocess, sys, time, urllib.request, urllib.parse, zipfile, io, base64
 
@@ -166,6 +166,18 @@ def limpiar_secretos(txt):
 # 📖 3.60 · /epicmd — SOLO MIRAR (autorizado por Alex el 2026-11-14: «te autorizo a que solo mires en epic con el comando»).
 #    Busca los archivos .md que hay en el VPS FUERA de ~/agendador (ahí vive el md de Epic) y le manda a Alex una COPIA por Telegram.
 #    Regla N.º 1: aquí solo se LEE. No se escribe, no se borra, no se mueve ni se ejecuta nada de Epic. Antes de mandar, se quitan las claves.
+SECRETOS_MD = [   # en un md las claves van sueltas (sin comillas): se quitan por su forma y por la palabra que las anuncia
+    (re.compile(r'\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}\b|\bgithub_pat_[A-Za-z0-9_]{20,}\b'), '«TOKEN DE GITHUB QUITADO»'),
+    (re.compile(r'\bAIza[0-9A-Za-z_-]{30,}\b'), '«LLAVE DE GOOGLE QUITADA»'),
+    (re.compile(r'\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{6,}\b'), '«TOKEN QUITADO»'),
+    (re.compile(r'\b(?:sk|pk)-[A-Za-z0-9_-]{20,}\b'), '«LLAVE QUITADA»'),
+    (re.compile(r'((?:contrase[ñn]a|password|passwd|clave|secreto|secret|token|api[ _-]?key|apikey|llave|pin|key)\w*[\s*_]*(?:es|is)?[\s*_]*[:=][\s*_`\'"]*)([^\s`*|\'"«]{6,})', re.I), r'\1«QUITADO»'),
+]
+def limpiar_md(txt):
+    txt, n = limpiar_secretos(txt)
+    for rx, rep in SECRETOS_MD:
+        txt, k = rx.subn(rep, txt); n += k
+    return txt, n
 def epic_mds():
     casa = os.path.dirname(AQUI); L = []
     for raiz, carpetas, archivos in os.walk(casa):
@@ -190,9 +202,57 @@ def cmd_epicmd(texto):
     if tam > 3 * 1024 * 1024: decir('Ese archivo pesa más de 3 MB. No lo mando.'); return
     try:
         with open(ruta, 'rb') as f: txt = f.read().decode('utf-8', 'replace')
-        txt, n = limpiar_secretos(txt)
+        txt, n = limpiar_md(txt)
         tg_doc(os.path.basename(os.path.dirname(ruta)) + '-' + os.path.basename(ruta), txt.encode('utf-8'), '📖 Copia de ' + os.path.basename(ruta) + ' (solo lectura).' + (' Quité ' + str(n) + ' clave(s).' if n else '') + ' Reenvíasela a Claude.')
     except Exception as e: decir('❌ No pude leerlo: ' + str(e)[:200])
+# 👀 3.61 · EPIC EN VIVO (pedido de Alex, 2026-11-14: «necesito que lo veas en vivo, sin yo estar entrando a Telegram»).
+#    Cada 10 minutos el cartero LEE los md de Epic (rutas fijas, las que dio Alex) y, si cambiaron, sube una COPIA sin claves a un
+#    repositorio PRIVADO aparte, del agendador. Claude lee esa copia. A Epic no se le escribe nada: los archivos solo se abren para leer.
+#    Si el repositorio no existe o NO es privado, no se sube nada (los datos de Epic nunca van a un sitio público).
+COPIA_REPO = CFG.get('COPIA_REPO', 'alex88ruizc-max/agendador-epic-copia')
+EPIC_MDS = [x.strip() for x in CFG.get('EPIC_MDS', '/home/ubuntu/epic/estudio/ESTADO.md,/home/ubuntu/epic/estudio/CLAUDE.md,/home/ubuntu/epic/estudio/fichas-mary/FICHAS.md').split(',') if x.strip().lower().endswith('.md')]
+_ESPEJO = {'t': 0, 'h': {}, 'aviso': ''}
+def gh_copia(metodo, ruta, cuerpo=None):
+    req = urllib.request.Request('https://api.github.com/repos/' + COPIA_REPO + ruta, method=metodo, data=json.dumps(cuerpo).encode() if cuerpo else None,
+                                 headers={'Authorization': 'Bearer ' + GH_TOKEN, 'Accept': 'application/vnd.github+json', 'User-Agent': 'agendador-cartero'})
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r: return r.status, json.load(r)
+    except urllib.error.HTTPError as e: return e.code, json.loads(e.read() or b'{}')
+def espejo_epic(forzar=False):
+    import hashlib, base64
+    if not GH_TOKEN: return '⚠️ Falta GH_TOKEN en cartero.env'
+    if not forzar and time.time() - _ESPEJO['t'] < 600: return ''
+    _ESPEJO['t'] = time.time()
+    leidos, faltan = [], []
+    for ruta in EPIC_MDS:
+        try:
+            with open(ruta, 'rb') as f: txt = f.read(3 * 1024 * 1024).decode('utf-8', 'replace')
+        except Exception: faltan.append(ruta); continue
+        txt, _ = limpiar_md(txt)
+        datos = txt.encode('utf-8')
+        leidos.append((ruta, datos, hashlib.sha1(b'blob ' + str(len(datos)).encode() + b'\0' + datos).hexdigest()))
+    nuevos = [x for x in leidos if _ESPEJO['h'].get(x[0]) != x[2]]
+    nota = (' · no pude leer: ' + ', '.join(os.path.basename(x) for x in faltan)) if faltan else ''
+    if not nuevos: return '👀 Epic en vivo: sin cambios (' + str(len(leidos)) + ' archivo(s) al día)' + nota
+    s, r = gh_copia('GET', '')
+    if s != 200: return '⚠️ Epic en vivo: no encuentro el repositorio privado ' + COPIA_REPO + ' (o el token no tiene permiso). No subí nada.'
+    if r.get('private') is not True: return '🚫 Epic en vivo: ' + COPIA_REPO + ' NO es privado. No subí nada.'
+    rama = r.get('default_branch') or 'main'; subidos = 0
+    for ruta, datos, h in nuevos:
+        nombre = ruta.split('/epic/', 1)[-1].lstrip('/') if '/epic/' in ruta else os.path.basename(ruta)
+        s0, r0 = gh_copia('GET', '/contents/' + urllib.parse.quote(nombre) + '?ref=' + rama)
+        if s0 == 200 and r0.get('sha') == h: _ESPEJO['h'][ruta] = h; continue   # ya estaba igual
+        cuerpo = {'message': 'copia de ' + nombre + ' (solo lectura, desde el VPS)', 'content': base64.b64encode(datos).decode(), 'branch': rama}
+        if s0 == 200 and r0.get('sha'): cuerpo['sha'] = r0['sha']
+        s1, _ = gh_copia('PUT', '/contents/' + urllib.parse.quote(nombre), cuerpo)
+        if s1 in (200, 201): _ESPEJO['h'][ruta] = h; subidos += 1
+        else: return '⚠️ Epic en vivo: GitHub no aceptó ' + nombre + ' (respondió ' + str(s1) + ').'
+    return '👀 Epic en vivo: ' + str(subidos) + ' archivo(s) actualizado(s) en la copia' + nota
+def espejo_solo():   # lo llama el ciclo del cartero; solo le escribe a Alex cuando hay un problema NUEVO
+    try: m = espejo_epic()
+    except Exception as e: m = '⚠️ Epic en vivo: ' + str(e)[:150]
+    if m and m[0] in '⚠🚫' and m != _ESPEJO['aviso']: _ESPEJO['aviso'] = m; decir(m)
+    elif m and m[0] == '👀': _ESPEJO['aviso'] = ''
 def servidor():
     carpeta = os.path.join(AQUI, 'google')
     if not os.path.isdir(carpeta): return None, '❌ No encontré ~/agendador/google (Google no está conectado todavía).'
@@ -312,6 +372,7 @@ def atender(m):
         except Exception as e: decir('No se pudo: ' + str(e))
     elif texto.startswith('/auditoria') or texto.startswith('/auditoría'): decir(auditoria())
     elif texto.startswith('/limpiar'): decir(limpiar())
+    elif texto.startswith('/epicvivo'): decir(espejo_epic(True) or 'sin novedad')   # 3.61: revisar YA la copia en vivo
     elif texto.startswith('/epicmd'): cmd_epicmd(texto)   # 3.60: solo mirar
     elif texto.startswith('/servidor'):
         datos, msj = servidor()
@@ -442,6 +503,7 @@ def main():
     if not TOKEN or not DUENO: print('Falta TG_TOKEN o TG_DUENO en cartero.env', flush=True); sys.exit(1)
     pos = 0
     while True:
+        espejo_solo()   # 3.61: copia en vivo de los md de Epic (solo lectura; como mucho cada 10 min)
         try:
             r = tg('getUpdates', {'offset': pos, 'timeout': 50, 'allowed_updates': ['message']}, timeout=70)
             for u in r.get('result', []):

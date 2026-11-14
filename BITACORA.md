@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.60** · Página **2026-11-13zb** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.61** · Página **2026-11-13zb** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -136,6 +136,15 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-14 · agendador-ia-3.61 · 👀 Epic en vivo: copia automática de sus md a un repositorio privado
+- **Pedido de Alex:** «necesito que lo veas en vivo, que no tenga que yo estar descargando nada». Rutas que dio: `/home/ubuntu/epic/estudio/ESTADO.md`, `…/CLAUDE.md`, `…/fichas-mary/FICHAS.md`.
+- **Por qué un repositorio aparte:** Claude no entra al VPS; solo ve GitHub. El repositorio `agendador` es PÚBLICO (es la página), así que ahí no puede ir nada de Epic. Los de Epic no se tocan. Se usa uno nuevo, **privado**, del agendador: `alex88ruizc-max/agendador-epic-copia` (lo crea Alex).
+- **Cartero:** `espejo_epic()` cada 10 min abre esos 3 archivos SOLO para leer, les quita las claves (`limpiar_md`: tokens de GitHub/Google/Telegram/Wompi, y lo que venga después de «clave/token/password…:») y, si cambiaron, sube la copia. Si el repositorio no existe o **no es privado, no sube nada** y avisa una sola vez. `/epicvivo` lo revisa al momento.
+- Ajustes opcionales en `cartero.env`: `COPIA_REPO`, `EPIC_MDS` (rutas separadas por coma).
+- **Regla en el banco:** ese código no escribe, borra ni ejecuta; solo sube a un repositorio privado del agendador.
+- **Falta (lo hace Alex):** crear el repositorio privado y darle permiso al token del cartero y a Claude. Hasta entonces el cartero avisa que no lo encuentra y no pasa nada más.
+- El `CLAUDE.md` de Epic se lee solo para entender a Epic; las reglas de aquí son las del agendador.
 
 ### 2026-11-14 · agendador-ia-3.60 · 📖 /epicmd: copia del md de Epic (solo lectura)
 - **Pedido de Alex:** «necesito que te copies siempre del md de Epic para que tengas todo actualizado sin gastar muchos tokens y luego crees tu mapa… es para que puedas copiar sus funciones, lógicas, etc. y lo podamos aplicar aquí». El md está en el VPS (en el repositorio `epic-channels` no hay ninguno).
