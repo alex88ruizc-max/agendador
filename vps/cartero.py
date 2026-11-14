@@ -3,7 +3,7 @@
 #    Le mandas al bot un archivo y él lo instala (solo si viene de TU chat):
 #      agendador-ia-*.zip    → el Agendador IA del VPS (Mary por dentro) + su Apps Script en Google (actualizar.sh: banco de pruebas; si falla NO instala)
 #      agendador-web-*.zip   → la página tuagenda.vip (sube los archivos a GitHub, rama main, con respaldo de lo anterior)
-#    Comandos:  /estado  (cómo está Mary)   /registro  (qué hizo Mary)   /soporte  (línea de soporte)   /ayuda
+#    Comandos:  /estado  (cómo está Mary)   /registro  (qué hizo Mary)   /soporte  (línea de soporte)   /epicmd  (copia del md de Epic, solo lectura)   /ayuda
 #    Solo usa la librería estándar de Python. Corre como servicio de systemd (agendador-cartero), lo instala instalar-cartero.sh.
 import json, os, re, subprocess, sys, time, urllib.request, urllib.parse, zipfile, io, base64
 
@@ -163,6 +163,36 @@ def limpiar_secretos(txt):
     for rx, rep in SECRETOS:
         txt, k = rx.subn(rep, txt); n += k
     return txt, n
+# 📖 3.60 · /epicmd — SOLO MIRAR (autorizado por Alex el 2026-11-14: «te autorizo a que solo mires en epic con el comando»).
+#    Busca los archivos .md que hay en el VPS FUERA de ~/agendador (ahí vive el md de Epic) y le manda a Alex una COPIA por Telegram.
+#    Regla N.º 1: aquí solo se LEE. No se escribe, no se borra, no se mueve ni se ejecuta nada de Epic. Antes de mandar, se quitan las claves.
+def epic_mds():
+    casa = os.path.dirname(AQUI); L = []
+    for raiz, carpetas, archivos in os.walk(casa):
+        if raiz[len(casa):].count(os.sep) >= 4: carpetas[:] = []
+        carpetas[:] = [c for c in carpetas if not c.startswith('.') and c not in ('node_modules', 'datos', 'respaldo', 'backup', '__pycache__') and os.path.join(raiz, c) != AQUI]
+        for f in archivos:
+            if not f.lower().endswith('.md'): continue
+            ruta = os.path.join(raiz, f)
+            try: L.append((ruta, os.path.getsize(ruta), os.path.getmtime(ruta)))
+            except Exception: pass
+    return sorted(L)[:40]
+def cmd_epicmd(texto):
+    try: L = epic_mds()
+    except Exception as e: decir('⚠️ No pude buscar: ' + str(e)[:200]); return
+    if not L: decir('📖 No encontré archivos .md fuera de ~/agendador (hasta 4 carpetas de profundidad).'); return
+    p = texto.split()
+    if len(p) < 2 or not p[1].isdigit() or not (1 <= int(p[1]) <= len(L)):
+        casa = os.path.dirname(AQUI)
+        decir('📖 Archivos .md en el VPS (solo los miro, no toco nada):\n\n' + '\n'.join(str(i + 1) + '. ' + r[len(casa) + 1:] + '  (' + str(max(1, t // 1024)) + ' KB · ' + time.strftime('%d/%m %H:%M', time.localtime(m)) + ')' for i, (r, t, m) in enumerate(L))
+              + '\n\nEscribe /epicmd y el número para que te mande la copia. Ejemplo: /epicmd 1'); return
+    ruta, tam, _ = L[int(p[1]) - 1]
+    if tam > 3 * 1024 * 1024: decir('Ese archivo pesa más de 3 MB. No lo mando.'); return
+    try:
+        with open(ruta, 'rb') as f: txt = f.read().decode('utf-8', 'replace')
+        txt, n = limpiar_secretos(txt)
+        tg_doc(os.path.basename(os.path.dirname(ruta)) + '-' + os.path.basename(ruta), txt.encode('utf-8'), '📖 Copia de ' + os.path.basename(ruta) + ' (solo lectura).' + (' Quité ' + str(n) + ' clave(s).' if n else '') + ' Reenvíasela a Claude.')
+    except Exception as e: decir('❌ No pude leerlo: ' + str(e)[:200])
 def servidor():
     carpeta = os.path.join(AQUI, 'google')
     if not os.path.isdir(carpeta): return None, '❌ No encontré ~/agendador/google (Google no está conectado todavía).'
@@ -282,6 +312,7 @@ def atender(m):
         except Exception as e: decir('No se pudo: ' + str(e))
     elif texto.startswith('/auditoria') or texto.startswith('/auditoría'): decir(auditoria())
     elif texto.startswith('/limpiar'): decir(limpiar())
+    elif texto.startswith('/epicmd'): cmd_epicmd(texto)   # 3.60: solo mirar
     elif texto.startswith('/servidor'):
         datos, msj = servidor()
         if not datos: decir(msj)

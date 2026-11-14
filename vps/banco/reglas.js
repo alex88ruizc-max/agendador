@@ -82,3 +82,15 @@ test('3.48 · 🧪 Ninguna prueba del banco lee gs/ sin revisar antes que exista
     });
   }
 });
+
+test('3.60 · 📖 /epicmd solo MIRA: en ese código no hay nada que escriba, borre, mueva ni ejecute (regla N.º 1) y las claves se quitan antes de mandar', { skip: !fs.existsSync(path.join(RAIZ, 'cartero.py')) && 'sin cartero aquí' }, () => {
+  const src = fs.readFileSync(path.join(RAIZ, 'cartero.py'), 'utf8');
+  const i = src.indexOf('def epic_mds():'), j = src.indexOf('def servidor():');
+  assert.ok(i > 0 && j > i, 'el cartero trae /epicmd');
+  const bloque = src.slice(i, j);
+  assert.ok(!/subprocess|os\.system|os\.remove|os\.unlink|os\.rename|os\.replace|shutil|\.write\(|chmod|chown|mkdir|rmdir|docker/.test(bloque), 'solo lectura');
+  const abre = bloque.match(/open\([^)]*\)/g) || [];
+  assert.ok(abre.length >= 1 && abre.every((x) => /'rb'/.test(x)), 'los archivos solo se abren para LEER');
+  assert.match(bloque, /limpiar_secretos\(/, 'se quitan las claves antes de mandar');
+  assert.match(bloque, /!= AQUI/, 'no mira dentro de ~/agendador');
+});

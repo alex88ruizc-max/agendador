@@ -8,6 +8,7 @@
 - ❌ **JAMÁS se modifica**: ni sus contenedores, ni sus redes, ni sus webhooks, ni sus sesiones de WhatsApp, ni sus archivos, ni su base de datos, ni sus repositorios. Ni reiniciarlo, ni detenerlo, ni conectarlo o desconectarlo de nada.
 - ❌ **Ni siquiera para «deshacer», «arreglar» o «limpiar»**. (El 2026-11-12 sacar `epic-waha` de una red «para deshacer» le cortó la conexión a la tienda de Epic.)
 - ❌ Ningún script del agendador ejecuta comandos sobre contenedores o archivos que no sean del agendador (`agendador-ia`, `evolution-agendador`, `postgres-agendador`, `waha-agendador`, `oido-agendador`, `~/agendador`).
+- 📖 **Única excepción, y es solo MIRAR** (autorizada por Alex el 2026-11-14): el comando `/epicmd` del cartero lee los `.md` de Epic y le manda una copia a Alex. Con esa copia (carpeta `epic-copia/`) se arma el mapa para copiar la lógica de Epic aquí. No escribe ni ejecuta nada.
 - 🛑 Si algún paso pudiera afectar a Epic, **se para y se le pregunta a Alex**. Solo Alex, con palabras explícitas, puede autorizar algo sobre Epic.
 
 ## 🖥️ REGLAS DEL SERVIDOR (VPS compartido con Epic Streaming) — obligatorias (orden de Alex, 2026-11-12)

@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.59** · Página **2026-11-13zb** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.60** · Página **2026-11-13zb** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -136,6 +136,14 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-14 · agendador-ia-3.60 · 📖 /epicmd: copia del md de Epic (solo lectura)
+- **Pedido de Alex:** «necesito que te copies siempre del md de Epic para que tengas todo actualizado sin gastar muchos tokens y luego crees tu mapa… es para que puedas copiar sus funciones, lógicas, etc. y lo podamos aplicar aquí». El md está en el VPS (en el repositorio `epic-channels` no hay ninguno).
+- **Autorización explícita (2026-11-14):** «te autorizo a que solo mires en epic con el comando». Vale SOLO para mirar con ese comando.
+- **Cartero:** `/epicmd` lista los `.md` que hay en el VPS fuera de `~/agendador` (hasta 4 carpetas de profundidad); `/epicmd <número>` manda la copia por Telegram, sin claves (`limpiar_secretos`). Solo abre archivos para leer: no escribe, no borra, no ejecuta nada.
+- **Regla en el banco** (`reglas.js`): ese código no puede traer nada que escriba, borre, mueva o ejecute. 
+- **Cómo se usa de aquí en adelante:** Alex manda la copia del md → se guarda en `epic-copia/` del agendador → de ahí sale el mapa. Antes de cada trabajo grande se pide la copia nueva.
+- La página no cambia (2026-11-13zb).
 
 ### 2026-11-13 · agendador-ia-3.59 · página 2026-11-13zb · 🆘 soporte reconoce al dueño por su número · 🤐 botón «Sin bot» por cliente
 - **Corrección de Alex al soporte:** «si tiene mi WhatsApp ya no va a buscar el botón… si tiene el número registrado, el bot lo debe saber y registrar como dueño». Ahora el ayudante **reconoce al dueño por su número registrado**, aunque escriba directo. El botón del panel se queda (sirve para empleados, que no tienen número guardado).
