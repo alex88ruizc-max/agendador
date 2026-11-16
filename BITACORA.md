@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.61** · Página **2026-11-13zb** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.62** · Página **2026-11-16a** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -136,6 +136,19 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-16 · agendador-ia-3.62 · página 2026-11-16a · 👥 sin citas dobles en la página · de dónde salió cada cita
+- **Caso (captura de Alex, El Barba):** Samuel David (+57 316 246 8902) quedó con dos citas seguidas con El Barbas: R-EBS7FY (2:15 p. m.) y R-N2TECP (2:45 p. m.). Las dos «No asistió».
+- **Evidencia (slotLocks, lectura pública):** R-EBS7FY se apartó a la 1:13:53 p. m. y R-N2TECP a la 1:15:12 p. m. (79 s de diferencia). Por dónde entraron no se pudo ver desde aquí: las citas están protegidas (bien).
+- **Causa:** el bot SÍ tenía filtro desde la 3.15 (`preguntarOtra`: «Ya tienes una cita… ¿sacar otra, cambiarla o cancelarla?»). La **página no tenía ninguno**: la misma persona podía apartar dos veces sin que nada le preguntara. Además `maryDobles_` solo avisa citas que se CRUZAN; dos seguidas (2:15–2:45 y 2:45–3:15) no se cruzan.
+- **Arreglo (orden de Alex: «sí, hazlo»):**
+  - Página (`app.js`): antes de apartar revisa «Mis citas». Si tiene una activa, pregunta: «Sí, sacar otra» / «Cambiar la que tengo» (abre reagendar) / «Dejarla así». El cuadro de diálogo (`common.js`) ahora admite un tercer botón (`extraText` → devuelve "extra").
+  - Servidor (`mary.gs`, `maryEnvolverHold_`): envuelve `createHold`. Si la persona (su cuenta o su WhatsApp, también citas hechas por el bot) ya tiene una cita activa y no viene `otraOk`, no aparta nada y devuelve `{ yaTiene }`; la página pregunta lo mismo. Así también lo frena el doble toque o abrirla en otro celular.
+  - Panel (`admin.js`): cada cita dice de dónde salió: 🤖 Por el bot · 🌐 Por la página · 🏪 En el local.
+- Reseña (plan de prueba) e `index.html`: «👥 Sin citas dobles». `tailwind.css` rearmado.
+- Pruebas: 2 nuevas (pruebas.js). Bancos: ver abajo.
+- **Va también en este zip** el ajuste del cartero del 14-nov (el filtro de claves ya no borra palabras normales como «correo»).
+- **Sin probar en real:** que `createHold` del servidor principal reciba `auth.uid` como las demás acciones (si no, la página igual pregunta con «Mis citas»).
 
 ### 2026-11-14 · 👀 Epic en vivo FUNCIONANDO · mapa de Epic (sin versión nueva)
 - Alex creó el repositorio privado `agendador-epic-copia` y le dio permiso al token «cartero agendador». `/epicvivo` → «3 archivo(s) actualizado(s)». Claude ya lee la copia (solo lectura).

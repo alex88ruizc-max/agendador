@@ -14,7 +14,7 @@
  * Instalación: pega este archivo, ejecuta activarMary() una vez, copia la clave que sale en el registro
  * y ponla en el mary.env del VPS (MARY_KEY). Vuelve a implementar la aplicación web (Implementar > Administrar > editar > Nueva versión).
  */
-const MARY_VERSION = 'agendador-ia-3.61';
+const MARY_VERSION = 'agendador-ia-3.62';
 
 // Se registra como acción pública del servidor (sin sesión: entra con la clave de Mary).
 // ⚠️ Este archivo debe quedar DEBAJO del archivo principal en la lista de archivos de Apps Script (los nuevos quedan al final: así está bien).
@@ -1127,6 +1127,29 @@ function maryGuardarContacto_(b) {
 }
 
 // ---------- 🚫 3.53 · CANCELAR TARDE DESDE LA PÁGINA, CON MOTIVO ----------
+// 2026-11-16 · 3.62 · ¿YA TIENE UNA CITA? La página dejaba apartar dos seguidas a la misma persona sin preguntar (El Barba: 2:15 y 2:45,
+//   con 79 s de diferencia). Se envuelve «createHold»: si esa persona (su cuenta o su WhatsApp) ya tiene una cita activa y la página no
+//   manda otraOk, NO se aparta nada: se devuelve { yaTiene } y la página le pregunta (sacar otra, cambiar la que tiene o dejarla así).
+function maryYaTiene_(uid) {
+  if (!uid) return [];
+  let L = []; try { L = fsQuery('appointments', [['customerUid', 'EQUAL', uid]]) || []; } catch (e) { L = []; }
+  try { const c = fsGet(bp('customers/' + uid)) || {}; if (c.whatsapp) L = L.concat(maryCitasDe_(c.whatsapp)); } catch (e) { /* sin cliente: solo por cuenta */ }
+  const vistos = {}, desde = Date.now() - 30 * 60000;
+  return L.filter(function (a) {
+    if (!a || !a.code || vistos[a.code] || ACTIVE.indexOf(a.status) < 0 || !a.startAt || a.startAt.getTime() <= desde) return false;
+    vistos[a.code] = true; return true;
+  }).sort(function (x, y) { return x.startAt.getTime() - y.startAt.getTime(); });
+}
+function maryEnvolverHold_(T) {
+  const _hold = T && T.createHold; if (!_hold || _hold._maryOtra) return;
+  T.createHold = function (b, auth) {
+    if (!(b && b.otraOk === true)) { const ya = maryYaTiene_(auth && auth.uid); if (ya.length) return { yaTiene: ya.slice(0, 3).map(maryCitaOut_) }; }
+    return _hold.apply(this, arguments);
+  };
+  T.createHold._maryOtra = true;
+}
+try { maryEnvolverHold_(ACTIONS); } catch (e) { console.error('Otra cita: ' + e); }
+try { maryEnvolverHold_(PUBLIC_ACTIONS); } catch (e) { /* no está ahí */ }
 // La página no dejaba cancelar si faltaba menos de N horas («escríbele al negocio»). Si el cliente no puede ir, es mejor que lo diga:
 // ahora puede cancelar escribiendo el motivo, que le llega al negocio (Telegram / WhatsApp del dueño). El dueño lo puede apagar (lateCancel: false).
 // Se envuelve la acción de siempre: solo se le quita el límite de horas cuando el cliente manda motivo; todo lo demás es igual.

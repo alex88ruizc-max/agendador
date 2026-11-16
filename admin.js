@@ -9,9 +9,9 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, ventanaReserva, OFERTA_TXT, nombreCompleto, planEjemplos, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText, soporteUrl
-} from "./common.js?v=2026-11-13zb";
-import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-13zb";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-13zb";
+} from "./common.js?v=2026-11-16a";
+import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-16a";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-16a";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -130,7 +130,7 @@ function start() {
     // recién creada desde "Probar gratis": abre la guía de primeros pasos
     // asistente de inicio: la primera vez (o al llegar desde "Probar gratis")
     if (!A.wizAuto && isOwner() && !A.me?.isSuper && !document.body.classList.contains("plan-gate") && !A.bill?.planWanted && (!A.settings.setupDone || !A.settings.tutorial2 || new URLSearchParams(location.search).get("guia") === "1")) {
-      // 2026-11-13zb · los primeros pasos (nuevos, 4 pasos) se muestran UNA vez más a todas las tiendas, también a las que ya los habían hecho (tutorial2)
+      // 2026-11-16a · los primeros pasos (nuevos, 4 pasos) se muestran UNA vez más a todas las tiendas, también a las que ya los habían hecho (tutorial2)
       const otraVez = !!A.settings.setupDone && !A.settings.tutorial2;
       A.wizAuto = true; A.geoAsked = true;
       if (!A.settings.tutorial2) updateDoc(doc(db, bpath("settings", "general")), { tutorial2: true }).catch(() => {});
@@ -349,10 +349,10 @@ function aptCard(a) {
       <p class="font-narrow text-2xl font-bold">${hora12(a.startTime)}<span class="ml-2 text-sm font-normal text-ink/60">a ${hora12(a.endTime)}</span></p>
       ${statusBadge(a.status)}
     </div>
-    <p class="font-semibold">${esc(custName(a))} <span class="font-normal text-ink/60">${esc(a.code)}</span></p>
+    <p class="font-semibold">${esc(custName(a))} <span class="font-normal text-ink/60">${esc(a.code)}</span> ${canalCita(a)}</p>
     <p class="text-sm">${(a.items || []).map((i) => esc(i.name)).join(" + ")}, con ${esc(a.staffName)}</p>
     <p class="text-sm text-ink/70">Total ${cop(a.totalCOP)}, abono ${cop(a.depositCOP)}, saldo ${cop(a.balanceDueCOP)}</p>
-    <p class="text-sm text-ink/70">${payLine(a)}${a.source === "manual" ? ". Agendada desde el panel" : ""}${a.rescheduleCount ? `. Reagendada ${a.rescheduleCount} vez/veces` : ""}</p>
+    <p class="text-sm text-ink/70">${payLine(a)}${a.rescheduleCount ? `. Reagendada ${a.rescheduleCount} vez/veces` : ""}</p>
     ${a.customer?.whatsapp ? `<p class="text-sm text-ink/70">WhatsApp ${esc(a.customer.whatsapp)}</p>` : ""}
     <div class="mt-3 flex flex-wrap gap-2">${acts.join("")}</div>
   </article>`;
@@ -1019,7 +1019,7 @@ async function openClient(u) {
       ${list.map((a) => `<div class="flex items-start justify-between gap-2 rounded-lg border border-line p-2">
         <div class="min-w-0"><p class="font-semibold capitalize">${fechaCorta(a.date)} · ${hora12(a.startTime)}</p>
         <p class="truncate text-xs text-ink/70">${(a.items || []).map((i) => esc(i.name)).join(" + ")} · ${esc(a.staffName)} · ${cop(a.totalCOP)}</p>
-        <p class="text-[11px] text-ink/50">${esc(a.code)}${a.source === "manual" ? " · agendada en el local" : ""}</p></div>
+        <p class="text-[11px] text-ink/50">${esc(a.code)} · ${canalTxt(a)}</p></div>
         ${statusBadge(a.status)}</div>`).join("")}`
       : `<p class="text-ink/60">Todavía no tiene citas.</p>`;
   }).catch((err) => { if ($("cHist")) $("cHist").innerHTML = `<p class="text-rose-800">No se pudo cargar el historial: ${esc(err.message)}</p>`; });
@@ -2307,7 +2307,7 @@ function freeTimes(date, locks, minutes) {
 }
 const firstName = (a) => (a.customer?.firstName || "Cliente").split(/\s+/)[0];
 
-// ================= 🏠 INICIO (2026-11-13zb): accesos directos que cada quien elige · agenda de hoy ordenada · configuración en un botón flotante =================
+// ================= 🏠 INICIO (2026-11-16a): accesos directos que cada quien elige · agenda de hoy ordenada · configuración en un botón flotante =================
 const ACC_DEF = ["agenda", "wabot", "clients", "linkcli"];
 const ACC_CORTO = { agenda: "Agenda", wabot: "Bot", clients: "Clientes", linkcli: "Mi enlace", staff: "Equipo", services: "Servicios", marketing: "Marketing", settings: "Ajustes", plan: "Mi plan", cupos: "Cupos", activity: "Actividad", referrals: "Referidos", appearance: "Apariencia", images: "Imágenes" };
 const accPermitidos = () => ["agenda", "cupos", "staff"].concat(isOwner() ? ["wabot", "clients", "linkcli", "services", "marketing", "settings", "plan", "activity", "referrals", "appearance", "images"] : []);
@@ -2387,6 +2387,9 @@ function ayudaHtml() {
     <span class="min-w-0 flex-1"><b class="block text-[15px]">¿Necesitas ayuda?</b><span class="soft block text-[12.5px]">Escríbenos por WhatsApp. Te respondemos con los pasos.</span></span>
     <i class="fa-solid fa-chevron-right soft"></i></a>`;
 }
+// 2026-11-16 · de dónde salió cada cita: 🤖 bot de WhatsApp, 🌐 la página (link) o 🏪 el panel (en el local)
+const canalTxt = (a) => a.source === "whatsapp" ? "🤖 Por el bot" : a.source === "manual" ? "🏪 En el local" : "🌐 Por la página";
+const canalCita = (a) => `<span class="ml-1 whitespace-nowrap rounded-full px-2 py-0.5 align-middle text-[11px] font-bold text-ink/70" style="background:var(--canvas)">${canalTxt(a)}</span>`;
 const fabClave = () => "guiaFab:" + (bpath().split("/")[1] || "") + ":" + (A.me?.uid || "");
 const fabEstado = () => { try { return JSON.parse(localStorage.getItem(fabClave()) || "null") || { n: 0, t: 0 }; } catch { return { n: 0, t: 0 }; } };
 function guiaFab() {
@@ -2501,7 +2504,7 @@ function renderHome() {
       <span class="min-w-0 flex-1 text-[13.5px] leading-snug"><b>Invita y paga menos</b><br><span class="opacity-80">Gana ${refLevels()[0]}% de descuento cada mes que paguen tus invitados.</span></span>
       <span class="rounded-full px-2 py-0.5 text-[10px] font-extrabold" style="background:var(--sred)">Nuevo</span></button>` : "";
   const bookUrl = $("linkUrl").textContent || "";
-  // 2026-11-13zb · el enlace queda en una sola fila (antes era una tarjeta grande que ocupaba medio Inicio)
+  // 2026-11-16a · el enlace queda en una sola fila (antes era una tarjeta grande que ocupaba medio Inicio)
   const linkHtml = bookUrl ? `<div class="sp-card mb-3 flex items-center gap-2 !py-2.5" style="background:linear-gradient(135deg,#14213D,#2B59C3);color:#fff">
       <span class="min-w-0 flex-1"><span class="block text-[11px] font-bold opacity-80">🔗 Tu enlace de citas</span><span class="block truncate font-mono text-[12px]">${esc(bookUrl.replace(/^https?:\/\//, ""))}</span></span>
       <button class="shrink-0 rounded-xl px-3 py-2 text-[13px] font-extrabold" style="background:#25D366;color:#0b3d1f" data-bl="wa" aria-label="Enviar por WhatsApp"><i class="fa-brands fa-whatsapp"></i> Enviar</button>
@@ -2515,9 +2518,9 @@ function renderHome() {
         <button class="rounded-2xl py-2.5 text-[16px]" style="background:rgba(255,255,255,.18)" data-bl="qr" aria-label="Ver QR del enlace"><i class="fa-solid fa-qrcode"></i></button>
       </div></div>` : "";
   void linkViejo;
-  // 2026-11-13zb · INICIO REORGANIZADO (todo se queda): accesos directos → agenda de hoy ordenada → pendientes → equipo → en vivo → lo demás.
+  // 2026-11-16a · INICIO REORGANIZADO (todo se queda): accesos directos → agenda de hoy ordenada → pendientes → equipo → en vivo → lo demás.
   //   La configuración pendiente ya no ocupa el Inicio: va en el botón flotante (guiaFab).
-  // 2026-11-13zb (Alex): el equipo ARRIBA, para marcar un descanso o un almuerzo de una (antes quedaba debajo de la agenda)
+  // 2026-11-16a (Alex): el equipo ARRIBA, para marcar un descanso o un almuerzo de una (antes quedaba debajo de la agenda)
   el.innerHTML = `${teamHtml}${accesosHtml()}${linkHtml}${pushCard("home")}<div class="home-grid"><div class="home-col">
     <div class="sp-card" id="chairCard"><div class="flex items-center justify-between gap-2"><h2 class="disp text-[18px] font-bold">Hoy en tu agenda</h2>
       ${freeLater.length ? `<button class="rounded-full px-3 py-1.5 text-xs font-bold ${H.showFree ? "" : "t-late"}" style="${H.showFree ? "background:var(--sink);color:#fff" : ""}" data-hfree="1" aria-expanded="${!!H.showFree}">${freeLater.length} hueco${freeLater.length === 1 ? "" : "s"} libre${freeLater.length === 1 ? "" : "s"} ${H.showFree ? "▴" : "▾"}</button>` : `<span class="soft text-xs">Sin huecos libres</span>`}</div>${hoyListaHtml(visible, nowMin, staffList.length > 1)}
@@ -3146,7 +3149,7 @@ async function loadLost() {
 const guideDone = () => A.settings?.guideDone || [];
 // lo que ya se hizo en el asistente de inicio cuenta como hecho en la guía
 const WIZ_ORDER = ["hi", "biz", "social", "team", "hours", "services", "deposit", "geo", "telegram", "done"];
-// 2026-11-13zb · el asistente de inicio ahora son 4 pasos (negocio, horario, servicios y listo). Lo demás queda en la guía.
+// 2026-11-16a · el asistente de inicio ahora son 4 pasos (negocio, horario, servicios y listo). Lo demás queda en la guía.
 //   Quien terminó el asistente viejo (10 pasos) ya pasó por todo; quien termina el nuevo (setupVer 2) solo pasó por esos 4.
 const WIZ_NUEVO = ["biz", "hours", "services", "done"];
 const wizPassed = (id) => {
@@ -3204,7 +3207,7 @@ const pushClave = () => "pushOn:" + (bpath().split("/")[1] || "");
 const pushOn = () => { try { return localStorage.getItem(pushClave()) === "1" && Notification.permission === "granted"; } catch { return false; } };
 const pushVisto = () => { try { return localStorage.getItem(pushClave() + ":no") === "1"; } catch { return false; } };
 function pushCard(donde) {
-  if (!A.me) return "";   // 2026-11-13zb: también le sale al superusuario (antes no, y Alex no la encontraba al revisar una tienda)
+  if (!A.me) return "";   // 2026-11-16a: también le sale al superusuario (antes no, y Alex no la encontraba al revisar una tienda)
   const on = pushOn();
   if (donde === "home" && (on || pushVisto())) return "";   // en Inicio solo invita; el control completo está en WhatsApp Bot y Configuración
   if (!pushSoporta()) return donde === "home" ? "" : `<div class="sp-card mt-3 text-[13.5px]"><p class="font-extrabold">🔔 Notificaciones en este celular</p>
@@ -3265,7 +3268,7 @@ function guideCard() {
 }
 function openGuide() {
   const todos = guideSteps(), g = guideProgress();
-  // 2026-11-13zb: primero lo que FALTA, numerado (1, 2, 3…); abajo lo que ya está hecho
+  // 2026-11-16a: primero lo que FALTA, numerado (1, 2, 3…); abajo lo que ya está hecho
   const faltan = todos.filter((x) => !x.ok && !x.optional), steps = faltan.concat(todos.filter((x) => !faltan.includes(x)));
   openM(faltan.length ? `⚙️ Te falta${faltan.length === 1 ? "" : "n"} ${faltan.length} paso${faltan.length === 1 ? "" : "s"}` : "Guía de configuración", `
     <p class="soft -mt-2 mb-4 text-sm">${g.next ? `Vas ${g.done} de ${g.total}. Cada paso te lleva al lugar exacto y te dice qué hacer.` : "¡Tu agenda está lista! Puedes volver a cualquier paso cuando quieras."}</p>
@@ -4140,7 +4143,7 @@ function renderBell() {
 }
 function openPlatformNews() {
   const seen = (() => { try { return Number(localStorage.getItem(NEWS.seenKey()) || 0); } catch { return 0; } })();
-  // 2026-11-13zb: la campana también es el lugar para prender las notificaciones de este celular
+  // 2026-11-16a: la campana también es el lugar para prender las notificaciones de este celular
   openM("🔔 Notificaciones y novedades", `<div class="-mt-2 mb-4">${pushCard("campana")}</div>` + (NEWS.list.length ? `<p class="mb-2 text-[11px] font-extrabold tracking-wider text-ink/50">NOVEDADES</p><p class="soft mb-3 text-sm">Lo nuevo de la plataforma para tu negocio.</p><div class="space-y-2">${NEWS.list.map((n) => {
     const k = NEWS_KIND[n.kind] || NEWS_KIND.novedad, fresh = toMillis(n.at) > seen;
     return `<article class="rounded-2xl p-3.5" style="background:${fresh ? "#eef4ff" : "var(--canvas)"}">

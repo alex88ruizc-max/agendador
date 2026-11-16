@@ -666,3 +666,38 @@ test('3.59 · 🤐 Servidor: «Sin bot» devuelve solo los números de los clien
   const F = new Function(...Object.keys(G), src + '\nreturn { marySinBot_ };')(...Object.values(G));
   assert.deepEqual(F.marySinBot_(), { ok: true, numeros: ['573001110000'] });
 });
+
+test('3.62 · 👥 Página: si la persona ya tiene una cita activa, «createHold» NO aparta otra sin preguntar (devuelve yaTiene); con otraOk sí', { skip: !require('fs').existsSync(GS_MARY) && 'sin gs/ aquí' }, () => {
+  const src = require('fs').readFileSync(GS_MARY, 'utf8');
+  let apartadas = 0;
+  const futura = (min, code, extra) => Object.assign({ code, status: 'confirmed', date: '2030-01-01', startTime: '14:15', staffName: 'El Barbas', items: [{ name: 'Corte' }], customerUid: 'u1', customer: { whatsapp: '+573162468902' }, startAt: new Date(Date.now() + min * 60000) }, extra || {});
+  let CITAS = [futura(60, 'R-EBS7FY')];
+  const G = { ACTIONS: { createHold: () => { apartadas++; return { appointment: { code: 'R-NUEVA', status: 'confirmed' } }; } }, PUBLIC_ACTIONS: {}, console, ACTIVE: ['pending_payment', 'pending_verification', 'confirmed'], bp: (x) => x,
+    fsQuery: (col, f) => (col === 'appointments' ? CITAS.filter((a) => (f[0][0] === 'customerUid' ? a.customerUid === f[0][2] : a.status === f[0][2])) : []),
+    fsGet: (p) => (p === 'customers/u1' ? { whatsapp: '+573162468902' } : null), waDayLabel: () => 'Hoy', hora12: (t) => t, siteUrl: () => 'https://x', BID: 'barba', fail: (m) => { throw new Error(m); } };
+  const F = new Function(...Object.keys(G), src + '\nreturn { ACTIONS };')(...Object.values(G));
+  // ya tiene la de las 2:15 → no se aparta la de las 2:45: se pregunta
+  let r = F.ACTIONS.createHold({ time: '14:45' }, { uid: 'u1' });
+  assert.equal(apartadas, 0, 'no apartó nada'); assert.equal(r.yaTiene.length, 1); assert.equal(r.yaTiene[0].code, 'R-EBS7FY'); assert.equal(r.yaTiene[0].con, 'El Barbas');
+  // dijo «Sí, sacar otra» (por ejemplo, para otra persona)
+  r = F.ACTIONS.createHold({ time: '14:45', otraOk: true }, { uid: 'u1' }); assert.equal(apartadas, 1); assert.equal(r.appointment.code, 'R-NUEVA');
+  // la encuentra también por el WhatsApp (cita hecha por el bot, sin cuenta)
+  CITAS = [futura(90, 'R-BOT123', { customerUid: null })];
+  r = F.ACTIONS.createHold({}, { uid: 'u1' }); assert.equal(r.yaTiene[0].code, 'R-BOT123');
+  // una cita vieja (ya pasó), cancelada o de otra persona NO cuenta
+  CITAS = [futura(-120, 'R-VIEJA'), futura(60, 'R-CANC', { status: 'cancelled' }), futura(60, 'R-OTRO', { customerUid: 'u2', customer: { whatsapp: '+573009990000' } })];
+  r = F.ACTIONS.createHold({}, { uid: 'u1' }); assert.ok(!r.yaTiene); assert.equal(apartadas, 2);
+  // sin sesión: igual que antes (decide el servidor de siempre)
+  r = F.ACTIONS.createHold({}, null); assert.equal(apartadas, 3);
+  assert.equal(F.ACTIONS.createHold._maryOtra, true, 'se envuelve una sola vez');
+});
+
+test('2026-11-16a · 👥 Página: antes de apartar pregunta si ya tiene una cita (sacar otra / cambiar / dejarla) y el panel dice de dónde salió cada cita', { skip: !require('fs').existsSync(require('path').join(__dirname, '..', '..', 'app.js')) && 'sin la página aquí' }, () => {
+  const fs2 = require('fs'), path2 = require('path'), leer = (f) => fs2.readFileSync(path2.join(__dirname, '..', '..', f), 'utf8');
+  const app = leer('app.js'), adm = leer('admin.js'), com = leer('common.js');
+  assert.match(app, /async function doHold\(otraOk = false\) \{\n  if \(!otraOk\) \{ const L = citasVivas\(\); if \(L\.length\)/, 'pregunta ANTES de apartar');
+  assert.match(app, /if \(r && r\.yaTiene\)/, 'si el servidor encuentra otra cita, también pregunta');
+  assert.match(app, /okText: "Sí, sacar otra", cancelText: "Dejarla así", extraText: "Cambiar la que tengo"/);
+  assert.match(com, /extraText \? `<button type="button" class="dlg-extra/, 'el cuadro de diálogo trae el tercer botón');
+  assert.match(adm, /🤖 Por el bot.*🏪 En el local.*🌐 Por la página/);
+});
