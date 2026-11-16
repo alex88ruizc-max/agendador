@@ -1,6 +1,6 @@
 // Página pública: ver cupos, registrarse, apartar, pagar con screenshot, mis cupos
-import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro, ventanaReserva, OFERTA_TXT, nombreCompleto } from "./common.js?v=2026-11-13zb";
-import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-13zb";
+import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro, ventanaReserva, OFERTA_TXT, nombreCompleto } from "./common.js?v=2026-11-16b";
+import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-16b";
 import {
   onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, sendPasswordResetEmail,
   GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult
@@ -12,7 +12,7 @@ import {
   startUpdateWatcher, applyBrandColors, warmServer, uiConfirm, uiPrompt, setDialogBrand, viewImage, pushOverlay, dropOverlay, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, dow, hora12, fechaLarga, fechaCorta, toMillis, cop, esc,
   normalizePhone, waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, computeSlots, dayCapacityUnits, staffHours, mapLinks, headerBgCss,
   toast, openModal, closeModal, setBusy, copyText, tmin, mstr, UNIT
-} from "./common.js?v=2026-11-13zb";
+} from "./common.js?v=2026-11-16b";
 
 const $ = (id) => document.getElementById(id);
 const S = {
@@ -49,7 +49,7 @@ if (!/^[a-z0-9][a-z0-9-]{1,29}$/.test(BIZ_ID)) {
     const b = e.target.closest("[data-lp]"); if (!b) return;
     if (b.dataset.lp === "trial") $("btnTrial").click(); else openAuth("login");
   });
-  // 🚀 2026-11-13zb · viene de la invitación de una página de negocio: se abre «Probar gratis» de una vez
+  // 🚀 2026-11-16b · viene de la invitación de una página de negocio: se abre «Probar gratis» de una vez
   if (new URLSearchParams(location.search).has("probar")) setTimeout(() => $("btnTrial").click(), 400);
 } else {
   setBusiness(BIZ_ID);
@@ -493,7 +493,7 @@ function renderServices() {
   const fitsMain = (s) => staffThatFit(s.id, Number(s.minutes || 0)).length > 0;
   if (S.mainId && !mains.some((s) => s.id === S.mainId && fitsMain(s))) { S.mainId = null; S.extras.clear(); }
   const groups = [];
-  const unaLista = S.settings?.serviceView === "lista";   // 2026-11-13zb: el dueño eligió «una sola lista» en Servicios (sin categorías)
+  const unaLista = S.settings?.serviceView === "lista";   // 2026-11-16b: el dueño eligió «una sola lista» en Servicios (sin categorías)
   mains.forEach((s) => { const c = unaLista ? "Servicios" : (s.category || "").trim() || "Servicios"; let g = groups.find((x) => x.c === c); if (!g) groups.push(g = { c, list: [] }); g.list.push(s); });
   // Categorías como botones (Uñas, Pestañas, Cejas…): se ve una a la vez. La del servicio ya elegido queda marcada.
   if (S.cat && !groups.some((g) => g.c === S.cat)) S.cat = "";
@@ -567,7 +567,28 @@ function openConsent() {
 }
 $("btnConsent").onclick = () => { S.consentOk = true; closeModal("consentModal"); doHold(); };
 
-async function doHold() {
+// 2026-11-16 · ¿YA TIENE UNA CITA? Antes la página dejaba apartar dos seguidas sin preguntar (pasó en El Barba: 2:15 y 2:45, con 79 s
+//   de diferencia). Ahora pregunta lo mismo que el bot: sacar otra (p. ej. para otra persona), cambiar la que tiene o dejarla así.
+//   Se revisa aquí (con «Mis citas») y también en el servidor, por si se tocó dos veces o se abrió en otro celular.
+const VIVAS = ["pending_payment", "pending_verification", "confirmed"];
+const citasVivas = () => (S.mine || []).filter((a) => VIVAS.includes(a.status) && toMillis(a.startAt) > Date.now() - 30 * 60000)
+  .sort((a, b) => toMillis(a.startAt) - toMillis(b.startAt));
+async function decidirOtra(L) {
+  const x = L[0];
+  const r = await uiConfirm("Ya tienes una cita", `${L.length === 1 ? "Tienes una cita" : "Tienes " + L.length + " citas, la próxima"}: ${fechaLarga(x.date)} a las ${hora12(x.startTime)}${x.staffName ? " con " + x.staffName : ""}. ¿Quieres sacar otra (por ejemplo, para otra persona)?`,
+    { okText: "Sí, sacar otra", cancelText: "Dejarla así", extraText: "Cambiar la que tengo" });
+  if (r === true) return "otra";
+  if (r === "extra") {
+    const apt = (S.mine || []).find((a) => a.code === x.code) || null;
+    if (apt && canChange(apt)) openResched(apt);
+    else toast("Tu cita ya se acerca: para cambiarla escríbele al negocio por WhatsApp.");
+    return "cambiar";
+  }
+  toast("👌 Listo, sigues con tu cita de las " + hora12(x.startTime) + ".");
+  return "no";
+}
+async function doHold(otraOk = false) {
+  if (!otraOk) { const L = citasVivas(); if (L.length) { if ((await decidirOtra(L)) !== "otra") return; otraOk = true; } }
   const btn = $("btnBook");
   setBusy(btn, true, "Apartando…");
   const { items, totalCOP } = selection();
@@ -581,7 +602,14 @@ async function doHold() {
   try {
     const staffId = bookingStaff();
     if (!staffId) throw new Error("Ese horario ya no alcanza para este servicio. Elige otra hora.");
-    const r = await api("createHold", { mainId: S.mainId, extraIds: [...S.extras], staffId, date: S.date, time: S.time, consent: S.consentOk || !!S.cust });
+    let r = await api("createHold", { mainId: S.mainId, extraIds: [...S.extras], staffId, date: S.date, time: S.time, consent: S.consentOk || !!S.cust, otraOk });
+    if (r && r.yaTiene) {   // el servidor encontró otra cita de esta persona (otro celular, doble toque…)
+      if (draft) { clearInterval(S.payTimer); closeModal("payModal"); }
+      const L = r.yaTiene.map((x) => ({ code: x.code, date: x.date, startTime: x.time, staffName: x.con || "" }));
+      if ((await decidirOtra(L)) !== "otra") return;
+      if (draft) showPay(draft);   // vuelve a abrir el pago, como antes
+      r = await api("createHold", { mainId: S.mainId, extraIds: [...S.extras], staffId, date: S.date, time: S.time, consent: S.consentOk || !!S.cust, otraOk: true });
+    }
     S.time = null;
     if (r.appointment.status === "confirmed") { clearInterval(S.payTimer); closeModal("payModal"); toast("¡Cupo confirmado!"); showTicket(r.appointment); watchTicket(r.appointment.code); }
     else if (!$("payModal").classList.contains("hidden") || !draft) showPay(r.appointment, true);
@@ -1107,7 +1135,7 @@ $("mineList").addEventListener("click", async (e) => {
   const act = b.dataset.act;
   if (act === "pay") showPay(apt);
   if (act === "ticket") { closeModal("mineModal"); showTicket(apt); watchTicket(apt.code); }
-  // 2026-11-13zb · falta poco y no puede ir: SÍ puede cancelar, diciendo el motivo (le llega al negocio). El dueño lo puede apagar en Configuración.
+  // 2026-11-16b · falta poco y no puede ir: SÍ puede cancelar, diciendo el motivo (le llega al negocio). El dueño lo puede apagar en Configuración.
   if (act === "cancel" && !canChange(apt) && apt.status !== "pending_payment" && S.settings?.lateCancel !== false) {
     const motivo = await uiPrompt("¿No puedes ir?", "Falta poco para tu cita. Sí la puedes cancelar: cuéntanos en una frase por qué no puedes ir. Se lo avisamos al negocio.", "", { okText: "Cancelar mi cita", cancelText: "Volver", danger: true });
     if (motivo === null) return;
@@ -1185,7 +1213,7 @@ getDoc(doc(db, "platform", "public")).then((d) => {
   if (S.settings) renderAll();
   const on = PLAT.trialEnabled !== false;
   $("trialCta").classList.toggle("hidden", !on);
-  // 2026-11-13zb · en la página de un negocio NO hay «Probar gratis» mientras el cliente agenda (no se pierde la cita):
+  // 2026-11-16b · en la página de un negocio NO hay «Probar gratis» mientras el cliente agenda (no se pierde la cita):
   //   solo el sello chiquito abajo; la invitación sale DESPUÉS (cita confirmada y «Mis citas"), en otra pestaña.
   $("trialTop").classList.add("hidden"); $("trialTop").classList.remove("inline-flex");
   $("trialCta").classList.add("hidden");
@@ -1247,7 +1275,7 @@ $("btnTrial").onclick = () => {
   const f = $("trialForm");
   if (S.profile) { f.ownerName.value = `${S.profile.firstName || ""} ${S.profile.lastName || ""}`.trim(); f.whatsapp.value = S.profile.whatsapp || ""; }
   $("trialForm").classList.add("hidden"); $("trialDone").classList.add("hidden");
-  // 🚀 2026-11-13zb · «Probar gratis» entra DIRECTO a la prueba (sin elegir plan): una sola pantalla. Los planes quedan en «Ver planes y precios».
+  // 🚀 2026-11-16b · «Probar gratis» entra DIRECTO a la prueba (sin elegir plan): una sola pantalla. Los planes quedan en «Ver planes y precios».
   if (PLAT.trialEnabled !== false) { T_PLAN = "free"; showTrialForm(true); }
   openModal("trialModal");
 };
