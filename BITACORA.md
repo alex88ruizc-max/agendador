@@ -137,6 +137,10 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 
 ## 📜 Historial (lo más nuevo arriba)
 
+### 2026-11-16 · cartero: Epic en vivo no avisa por un corte de red de un momento (va en la próxima entrega, sin zip todavía)
+- Alex recibió «⚠️ Epic en vivo: Remote end closed connection without response». Fue un corte de GitHub de un momento: la copia siguió al día (última 3:47 p. m.).
+- Ajuste: un error de red solo se avisa si falla 3 veces seguidas (unos 30 min). Los problemas de verdad (no encuentra el repositorio, sin permiso, no es privado) se siguen avisando de una.
+
 ### 2026-11-16 · agendador-ia-3.62 · página 2026-11-16a · 👥 sin citas dobles en la página · de dónde salió cada cita
 - **Caso (captura de Alex, El Barba):** Samuel David (+57 316 246 8902) quedó con dos citas seguidas con El Barbas: R-EBS7FY (2:15 p. m.) y R-N2TECP (2:45 p. m.). Las dos «No asistió».
 - **Evidencia (slotLocks, lectura pública):** R-EBS7FY se apartó a la 1:13:53 p. m. y R-N2TECP a la 1:15:12 p. m. (79 s de diferencia). Por dónde entraron no se pudo ver desde aquí: las citas están protegidas (bien).

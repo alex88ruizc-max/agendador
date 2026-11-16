@@ -249,10 +249,15 @@ def espejo_epic(forzar=False):
         else: return '⚠️ Epic en vivo: GitHub no aceptó ' + nombre + ' (respondió ' + str(s1) + ').'
     return '👀 Epic en vivo: ' + str(subidos) + ' archivo(s) actualizado(s) en la copia' + nota
 def espejo_solo():   # lo llama el ciclo del cartero; solo le escribe a Alex cuando hay un problema NUEVO
-    try: m = espejo_epic()
-    except Exception as e: m = '⚠️ Epic en vivo: ' + str(e)[:150]
-    if m and m[0] in '⚠🚫' and m != _ESPEJO['aviso']: _ESPEJO['aviso'] = m; decir(m)
-    elif m and m[0] == '👀': _ESPEJO['aviso'] = ''
+    # 3.62: un corte de red de un momento («Remote end closed connection…») no se avisa: se reintenta en 10 min.
+    #       Solo se avisa si falla 3 veces seguidas (unos 30 min) o si el problema no es de red (repositorio, permiso, no es privado).
+    try: m = espejo_epic(); red = False
+    except Exception as e: m = '⚠️ Epic en vivo: ' + str(e)[:150]; red = True
+    if m and m[0] in '⚠🚫':
+        _ESPEJO['fallas'] = _ESPEJO.get('fallas', 0) + 1
+        if red and _ESPEJO['fallas'] < 3: return
+        if m != _ESPEJO['aviso']: _ESPEJO['aviso'] = m; decir(m + (' (falló ' + str(_ESPEJO['fallas']) + ' veces seguidas)' if red else ''))
+    elif m and m[0] == '👀': _ESPEJO['aviso'] = ''; _ESPEJO['fallas'] = 0
 def servidor():
     carpeta = os.path.join(AQUI, 'google')
     if not os.path.isdir(carpeta): return None, '❌ No encontré ~/agendador/google (Google no está conectado todavía).'
