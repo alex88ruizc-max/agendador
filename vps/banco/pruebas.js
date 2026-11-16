@@ -701,3 +701,43 @@ test('2026-11-16a · 👥 Página: antes de apartar pregunta si ya tiene una cit
   assert.match(com, /extraText \? `<button type="button" class="dlg-extra/, 'el cuadro de diálogo trae el tercer botón');
   assert.match(adm, /🤖 Por el bot.*🏪 En el local.*🌐 Por la página/);
 });
+
+test('2026-11-16b · 🔔 Panel: cada cita dice cómo va su recordatorio (recordada a tal hora · falló y por qué · por salir · sin recordatorio · confirmó)', { skip: !require('fs').existsSync(require('path').join(__dirname, '..', '..', 'admin.js')) && 'sin la página aquí' }, () => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'admin.js'), 'utf8');
+  const i = src.indexOf('const horaDe = '), j = src.indexOf('function recLinea(');
+  assert.ok(i > 0 && j > i, 'admin.js trae recEstado');
+  let cfg = { activo: true, recordatorioMin: 120 }, plan = false;
+  const A = { settings: { maryWa: { conectado: true } } };
+  const toMillis = (x) => (x instanceof Date ? x.getTime() : typeof x === 'number' ? x : 0);
+  const F = new Function('A', 'botCfg', 'lockedNow', 'toMillis', src.slice(i, j) + '\nreturn { recEstado, horaDe };')(A, () => cfg, () => plan, toMillis);
+  const en = (min) => new Date(Date.now() + min * 60000);
+  const cita = (x) => Object.assign({ status: 'confirmed', customer: { whatsapp: '+573001112233' }, startAt: en(300), createdAt: en(-600) }, x || {});
+  assert.match(F.recEstado(cita({ maryReminded: true, maryRemindedAt: new Date('2026-11-16T17:15:00Z') })).e.t, /^Recordada por WhatsApp a las 12:15 p\. ?m\./);
+  assert.equal(F.recEstado(cita({ maryReminded: true })).e.t, 'Recordada por WhatsApp', 'las viejas: sin hora');
+  const f = F.recEstado(cita({ maryReminded: true, maryReminderEstado: 'fallo', maryReminderMotivo: 'ese número no tiene WhatsApp o está mal escrito' })).e;
+  assert.equal(f.k, 'fallo'); assert.match(f.t, /no tiene WhatsApp/);
+  assert.match(F.recEstado(cita({ maryReminded: true, maryReminderEstado: 'sinbot' })).e.t, /Sin bot/);
+  assert.match(F.recEstado(cita()).e.t, /^Se le recuerda a las /, 'faltan 5 h y se recuerda 2 h antes');
+  assert.match(F.recEstado(cita({ startAt: en(60) })).e.t, /sale en unos minutos/);
+  assert.match(F.recEstado(cita({ startAt: en(-30), createdAt: en(-60) })).e.t, /agendó con muy poco tiempo/);
+  assert.match(F.recEstado(cita({ customer: {} })).e.t, /no dejó WhatsApp/);
+  cfg = { activo: false, recordatorioMin: 120 }; assert.match(F.recEstado(cita()).e.t, /bot está apagado/);
+  cfg = { activo: true, recordatorioMin: 0 }; assert.match(F.recEstado(cita()).e.t, /apagado en WhatsApp Bot/);
+  cfg = { activo: true, recordatorioMin: 120 }; A.settings.maryWa.conectado = false; assert.match(F.recEstado(cita()).e.t, /no está vinculado/); A.settings.maryWa.conectado = true;
+  plan = true; assert.match(F.recEstado(cita()).e.t, /plan no trae/); plan = false;
+  const c = F.recEstado(cita({ maryReminded: true, clientConfirmed: true, clientConfirmedAt: new Date('2026-11-16T17:20:00Z') }));
+  assert.match(c.conf.t, /^Confirmó que viene \(12:20/);
+  assert.equal(F.recEstado(cita({ status: 'cancelled' })), null, 'canceladas: no aplica');
+  assert.match(src, /\$\{recResumen\(live\)\}/, 'la Agenda trae el resumen del día'); assert.match(src, /\$\{recLinea\(a\)\}/, 'cada cita trae su línea');
+});
+
+test('3.63 · 🔔 Servidor: «recordada» guarda cómo terminó y a qué hora (antes un fallo quedaba igual que un envío)', { skip: !require('fs').existsSync(GS_MARY) && 'sin gs/ aquí' }, () => {
+  const src = require('fs').readFileSync(GS_MARY, 'utf8');
+  let escrito = null;
+  const G = { ACTIONS: {}, PUBLIC_ACTIONS: {}, console, bp: (x) => x, getApt: (c) => ({ code: c }), commit: (w) => { escrito = w[0]; }, wPatch: (p, v) => ({ p, v }) };
+  const F = new Function(...Object.keys(G), src + '\nreturn { maryRecordada_ };')(...Object.values(G));
+  F.maryRecordada_({ code: 'R-1', estado: 'fallo', motivo: 'ese número no tiene WhatsApp' });
+  assert.equal(escrito.p, 'appointments/R-1'); assert.equal(escrito.v.maryReminded, true); assert.equal(escrito.v.maryReminderEstado, 'fallo'); assert.match(escrito.v.maryReminderMotivo, /no tiene WhatsApp/); assert.ok(escrito.v.maryRemindedAt instanceof Date);
+  F.maryRecordada_({ code: 'R-2' }); assert.equal(escrito.v.maryReminderEstado, 'enviado', 'sin estado = enviado (versiones viejas del VPS)');
+  F.maryRecordada_({ code: 'R-3', estado: 'cualquiercosa' }); assert.equal(escrito.v.maryReminderEstado, 'enviado');
+});

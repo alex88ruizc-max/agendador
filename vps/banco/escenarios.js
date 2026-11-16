@@ -92,6 +92,7 @@ global.fetch = async (url, o) => {
   if (/^https:\/\/fcm\.googleapis\.com\//.test(u)) { (W.pushes = W.pushes || []).push(u); return new Response('', { status: /muerto/.test(u) ? 410 : 201 }); }   // 3.55: el servicio de notificaciones
   const lidM = u.match(/\/api\/[^/]+\/lids\/([^/?]+)$/);   // 3.49: WAHA dice (o no) el número real de un código …@lid
   if (lidM) { const pn = (W.lids || {})[decodeURIComponent(lidM[1])]; return pn ? resp({ lid: decodeURIComponent(lidM[1]), pn }) : resp({ error: 'no lo sé' }, 404); }
+  if (/\/api\/sendText$/.test(u) && W.sinWa && String(b.chatId).startsWith(W.sinWa)) return resp({ error: 'no tiene WhatsApp' }, 400);   // 3.63
   if (/\/api\/sendText$/.test(u)) { const id = 'W' + W.enviados.length; W.enviados.push({ id, motor: 'waha', a: b.chatId.split('@')[0], chatId: b.chatId, texto: b.text, sesion: b.session }); return resp({ id }); }
   if (/\/api\/sendList$/.test(u)) {
     if (W.listaFalla) return resp({ error: 'no soportado' }, 501);
@@ -137,6 +138,7 @@ global.fetch = async (url, o) => {
   if (/\/api\/files\//.test(u)) return new Response(Buffer.from('AUDIO-OGG'), { status: 200 });   // la nota de voz que baja de WAHA
   if (/oido-agendador:9000\/transcribir$/.test(u)) { W.oidoLlamadas = (W.oidoLlamadas || 0) + 1; return W.oido == null ? resp({ error: 'el oído todavía está cargando' }, 503) : resp({ texto: W.oido, duracion: 3, tardo: 2 }); }
   if (/\/status\/image$/.test(u)) { W.estados.push({ sesion: u.split('/api/')[1].split('/')[0], caption: b.caption, contacts: b.contacts }); return resp({}); }
+  if (/\/message\/sendText\//.test(u) && W.sinWa && String(b.number).startsWith(W.sinWa)) return resp({ error: 'no tiene WhatsApp' }, 400);   // 3.63
   if (/\/message\/sendText\//.test(u)) { const id = 'E' + W.enviados.length; W.enviados.push({ motor: 'evolution', a: String(b.number), texto: b.text }); return resp({ key: { id } }, 201); }
   if (/\/message\/sendList\//.test(u)) { const id = 'EL' + W.enviados.length; W.enviados.push({ motor: 'evolution', a: String(b.number), texto: [b.title, b.description].filter((x) => x && x.trim()).join('\n'), lista: b }); return resp({ key: { id } }, 201); }
   if (/\/chat\/sendPresence\//.test(u)) return resp({}, 201);
@@ -1520,4 +1522,18 @@ test('3.59 · 🤐 «Sin bot» desde el panel: al cliente marcado en rojo el bot
   const antes = W.enviados.length; W.sinBot = []; W.sinBotT = 1700000009999; P._banco.sinBotAlDia.reset && P._banco.sinBotAlDia.reset();
   await new Promise((ok) => setTimeout(ok, 5)); B.olvidarSinBotT();
   await llega(wahaMsg(CLIENTE, 'hola de nuevo')); assert.ok(W.enviados.length > antes, 'sin rojo: el bot vuelve');
+});
+
+test('3.63 · 🔔 Recordatorio: el servidor sabe cómo terminó (enviado · fallo con motivo · sinbot) para mostrarlo en el panel', async () => {
+  mundoNuevo();
+  const cita = (code, tel) => ({ code, status: 'confirmed', dia: 'Hoy', hora: '3:00 p. m.', servicio: 'Degradado', con: 'Lina', link: 'L', whatsapp: tel, nombre: 'Andrés', ids: ['c2'], staffId: 's1', saldo: 0 });
+  W.sinWa = '573009990000'; W.sinBot = ['573005550000']; W.sinBotT = 1700000000001;
+  W.proximas = [cita('R-BIEN01', CLIENTE), cita('R-SINWA1', '573009990000'), cita('R-MUDO01', '573005550000')];
+  await B.tickRecordatorios(true);
+  const R = Object.fromEntries(W.llamadas.filter((x) => x.op === 'recordada').map((x) => [x.code, x]));
+  assert.equal(R['R-BIEN01'].estado, 'enviado');
+  assert.equal(R['R-SINWA1'].estado, 'fallo'); assert.match(R['R-SINWA1'].motivo, /no tiene WhatsApp/);
+  assert.equal(R['R-MUDO01'].estado, 'sinbot', 'se entera de la lista «Sin bot» del panel antes de recordar, aunque el cliente no haya escrito');
+  assert.equal(W.enviados.filter((x) => x.a === '573005550000').length, 0, 'al de «Sin bot» no se le escribe');
+  W.sinWa = null; W.sinBot = []; W.sinBotT = 0;
 });

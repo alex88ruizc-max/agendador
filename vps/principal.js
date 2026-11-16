@@ -883,6 +883,7 @@ async function tickVolver(aCualquierHora) {
   for (const neg of negocios()) {
     if (MEM.volver[neg.bid] === a.fecha) continue;
     const bot = await botAlDia(neg);
+    await sinBotAlDia(neg);   // 3.63: «Sin bot» del panel al día antes de escribirle a nadie
     if (!bot.activo || !bot.volver || !bot.volver.activo || !bot.volver.dias) continue;
     MEM.volver[neg.bid] = a.fecha; memGuardar();   // una sola vez al día aunque falle
     try {
@@ -919,18 +920,26 @@ async function tickRecordatorios(aCualquierHora) {
   for (const neg of negocios()) {
     const min = Number(neg.recordatorioMin == null ? 120 : neg.recordatorioMin); if (!min) continue;
     if (!(await botAlDia(neg)).activo) continue;   // 3.23: asistente apagado en el panel → sin recordatorios
+    await sinBotAlDia(neg);   // 3.63: la lista «Sin bot» del panel al día ANTES de recordar (no solo cuando el cliente escribe)
     try {
       const r = await gas(neg, 'proximas', { minutos: min });
       if (!r.info || !r.info.activo) continue;
       for (const c of r.citas || []) {   // 1.1: cada cita por su lado; una que falla no frena las demás ni se repite cada 5 min
-        if (!atiende({ tel: numeroWa(c.whatsapp) }) || mudo(neg.bid + ':' + numeroWa(c.whatsapp))) continue;   // 3.24: /sinbot
+        if (!atiende({ tel: numeroWa(c.whatsapp) })) continue;
+        // 3.63 · el panel muestra cómo terminó cada recordatorio: enviado · fallo (con motivo) · sinbot
+        if (mudo(neg.bid + ':' + numeroWa(c.whatsapp))) { await gas(neg, 'recordada', { code: c.code, estado: 'sinbot' }).catch((e) => log('recordada', c.code, e.message)); continue; }   // 3.24: /sinbot
+        let estado = 'enviado', motivo = '';
         try {
           const bot = botDe(neg);
           await escribir(neg, c.whatsapp, T.recordatorio(c, r.info, bot)); est.recordatorios++; anotar({ bid: neg.bid, que: 'recordatorio ' + c.code });
           if (bot.recordatorioConfirmar || bot.cambios) ASIS.trasRecordatorio(neg, numeroWa(c.whatsapp), c);
         }
-        catch (e) { if (!e.permanente) { log('recordatorio', c.code, e.message); continue; } anotar({ bid: neg.bid, que: 'recordatorio ' + c.code + ' no se pudo: ' + e.message }); }
-        await gas(neg, 'recordada', { code: c.code }).catch((e) => log('recordada', c.code, e.message));
+        catch (e) {
+          if (!e.permanente) { log('recordatorio', c.code, e.message); continue; }
+          estado = 'fallo'; motivo = /inv[aá]lido/.test(e.message) ? 'el número está incompleto o mal escrito' : 'ese número no tiene WhatsApp o está mal escrito';
+          anotar({ bid: neg.bid, que: 'recordatorio ' + c.code + ' no se pudo: ' + e.message });
+        }
+        await gas(neg, 'recordada', { code: c.code, estado, motivo }).catch((e) => log('recordada', c.code, e.message));
       }
       // 3.14 · el mismo cliente con 2 citas que se cruzan → «Tienes 2 citas… ¿deseas cancelar una de las dos?» (una sola vez)
       for (const d of r.dobles || []) {

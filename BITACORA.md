@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.63** · Página **2026-11-16a** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.63** · Página **2026-11-16b** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -136,6 +136,15 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-16 · agendador-ia-3.63 · página 2026-11-16b · 🔔 ver si se le recordó al cliente (Alex: «dale, hazlo todo junto»)
+- **Pedido de Alex:** «necesito ver una sesión de citas donde se pueda ver si se le recordó al cliente».
+- **Panel (Agenda):** cada cita trae la línea 🔔: ✅ Recordada por WhatsApp a las X · ❌ No se pudo recordar (motivo) · ⏳ Se le recuerda a las X / sale en unos minutos · ➖ Sin recordatorio (por qué: sin WhatsApp, plan, WhatsApp sin vincular, bot apagado, recordatorio apagado, «Sin bot», agendó muy encima) · 👍 Confirmó que viene (hora). Arriba de las citas del día: «🔔 Recordatorios de este día» con el conteo y la lista (se abre sola si alguno falló).
+- **Arreglo de fondo:** antes, si el recordatorio FALLABA (número sin WhatsApp) se marcaba igual que enviado, y no se guardaba la hora. Ahora `recordada` guarda `maryRemindedAt`, `maryReminderEstado` (enviado · fallo · sinbot) y `maryReminderMotivo`. Las citas viejas solo dicen «✅ Recordada» (sin hora).
+- **Arreglo de fondo 2:** los recordatorios y el «vuelve» ahora leen la lista «Sin bot» del panel ANTES de escribir (`sinBotAlDia` en `tickRecordatorios` y `tickVolver`); antes solo se enteraban cuando el cliente escribía.
+- Reseña Gold e `index.html`: «ves a quién se le recordó». `tailwind.css` rearmado.
+- Pruebas: 3 nuevas (escenario del recordatorio con fallo y «Sin bot»; servidor; panel).
+- Trae también el ajuste del cartero (Epic en vivo: corte de red solo se avisa a la 3.ª falla) y todo lo de la 3.62.
 
 ### 2026-11-16 · agendador-ia-3.63 · cartero: Epic en vivo no avisa por un corte de red de un momento (Alex: «dale instala»)
 - Alex recibió «⚠️ Epic en vivo: Remote end closed connection without response». Fue un corte de GitHub de un momento: la copia siguió al día (última 3:47 p. m.).

@@ -646,9 +646,11 @@ function maryDobleAvisado_(b) {
   commit((b.codes || []).slice(0, 10).map(function (c) { return wPatch(bp('appointments/' + String(c).toUpperCase()), { maryDobleAvisado: true }); }));
   return { ok: true };
 }
+// 3.63 · ahora se guarda CÓMO terminó el recordatorio y a qué hora (el panel lo muestra en cada cita):
+//   enviado · fallo (con el motivo, p. ej. el número no tiene WhatsApp) · sinbot (el cliente está en «Sin bot»). Antes, un fallo se marcaba igual que un envío.
 function maryRecordada_(b) {
-  const a = getApt(b.code);
-  commit([wPatch(bp('appointments/' + a.code), { maryReminded: true })]);
+  const a = getApt(b.code), estado = ['enviado', 'fallo', 'sinbot'].indexOf(b.estado) >= 0 ? b.estado : 'enviado';
+  commit([wPatch(bp('appointments/' + a.code), { maryReminded: true, maryRemindedAt: new Date(), maryReminderEstado: estado, maryReminderMotivo: String(b.motivo || '').slice(0, 120) })]);
   return { ok: true };
 }
 
