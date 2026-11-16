@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.62** · Página **2026-11-16a** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.63** · Página **2026-11-16a** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -137,7 +137,7 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 
 ## 📜 Historial (lo más nuevo arriba)
 
-### 2026-11-16 · cartero: Epic en vivo no avisa por un corte de red de un momento (va en la próxima entrega, sin zip todavía)
+### 2026-11-16 · agendador-ia-3.63 · cartero: Epic en vivo no avisa por un corte de red de un momento (Alex: «dale instala»)
 - Alex recibió «⚠️ Epic en vivo: Remote end closed connection without response». Fue un corte de GitHub de un momento: la copia siguió al día (última 3:47 p. m.).
 - Ajuste: un error de red solo se avisa si falla 3 veces seguidas (unos 30 min). Los problemas de verdad (no encuentra el repositorio, sin permiso, no es privado) se siguen avisando de una.
 
