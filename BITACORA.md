@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.63** · Página **2026-11-16b** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.64** · Página **2026-11-23a** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -136,6 +136,14 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-23 · agendador-ia-3.64 · página 2026-11-23a · 🧾 el comprobante se ve dentro del panel (ya no pide acceso a Drive)
+- **Caso (captura de Alex):** a su correo llegó «Margarita Castellar palma solicitó permiso para editar» el archivo `estetica-margarita-caste_R-GAC5PR_…` (un comprobante de abono). Alex: «¿por qué pide editar y qué quiere editar?».
+- **Causa:** la dueña tocó «Ver comprobante». Ese botón abría el archivo en Google Drive, y el archivo es privado (vive en el Drive del servidor). Drive le ofreció «solicitar acceso» y ella lo pidió. No quería editar nada: solo ver el comprobante de su cliente.
+- **Arreglo:** acción nueva del servidor `maryComprobante` (mary.gs): lee el archivo (el servidor sí es su dueño) y lo entrega al panel; solo al dueño del negocio o a quien atiende esa cita. El panel lo muestra ahí mismo (imagen en pantalla; PDF en otra pestaña desde la memoria). Se cambiaron los DOS botones que mandaban a Drive (`admin.js`: tarjeta de la cita y «¿Aprobar el abono?» del Inicio). El archivo sigue privado: nunca se comparte.
+- **Auditoría (otro agente, solo lectura):** no hay más enlaces a Drive en el repositorio; logos, portadas, historias y QR van como imagen dentro de Firestore. Sin verificar: lo que arma el servidor principal (Código.js no está en el repositorio).
+- Pruebas: 2 nuevas. El zip de la página ya no lleva `tailwind.entrada.css` (el cartero lo ignoraba con aviso).
+- **Sin probar en real:** que el servidor tenga permiso de `DriveApp` (si guarda los comprobantes con otra vía, saldrá «No pude abrir el comprobante» y se ajusta).
 
 ### 2026-11-16 · agendador-ia-3.63 · página 2026-11-16b · 🔔 ver si se le recordó al cliente (Alex: «dale, hazlo todo junto»)
 - **Pedido de Alex:** «necesito ver una sesión de citas donde se pueda ver si se le recordó al cliente».

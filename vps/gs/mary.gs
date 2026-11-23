@@ -14,7 +14,7 @@
  * Instalación: pega este archivo, ejecuta activarMary() una vez, copia la clave que sale en el registro
  * y ponla en el mary.env del VPS (MARY_KEY). Vuelve a implementar la aplicación web (Implementar > Administrar > editar > Nueva versión).
  */
-const MARY_VERSION = 'agendador-ia-3.63';
+const MARY_VERSION = 'agendador-ia-3.64';
 
 // Se registra como acción pública del servidor (sin sesión: entra con la clave de Mary).
 // ⚠️ Este archivo debe quedar DEBAJO del archivo principal en la lista de archivos de Apps Script (los nuevos quedan al final: así está bien).
@@ -969,6 +969,25 @@ function maryWaResultado_(b) {
 // ---------- 🔄 3.46 · REACTIVAR UN APARTADO VENCIDO (no subió el comprobante del abono a tiempo) ----------
 // Lo hace el dueño (o el profesional de esa cita) desde la agenda. Solo si la hora no ha pasado y SIGUE LIBRE (reserveLocks falla si alguien la tomó).
 //   modo 'pagada' → la cita queda confirmada (el dueño ya vio el pago) · modo 'tiempo' → vuelve a esperar el comprobante otro rato (holdMinutes).
+// 🧾 3.64 · VER EL COMPROBANTE DENTRO DEL PANEL. Antes «Ver comprobante» abría el archivo en Google Drive, que es PRIVADO (vive en el
+//   Drive del servidor): a la dueña le salía «solicitar acceso» y a Alex le llegaba un correo pidiendo permiso de editor (23-nov, Estética Margarita).
+//   Ahora el servidor (que sí es dueño del archivo) lo lee y se lo entrega al panel. Solo al dueño del negocio o a quien atiende esa cita.
+//   El archivo sigue privado: nunca se comparte ni se hace público.
+function maryProofId_(p) {
+  const id = String((p && p.proofFileId) || ''); if (/^[\w-]{20,}$/.test(id)) return id;
+  const m = /\/d\/([\w-]{20,})|[?&]id=([\w-]{20,})/.exec(String((p && p.proofUrl) || ''));
+  return m ? (m[1] || m[2]) : '';
+}
+ACTIONS.maryComprobante = function (b, auth) {
+  const adm = getAdmin(auth), a = getApt(String((b && b.code) || ''));
+  if (adm.role !== 'owner' && adm.staffId !== a.staffId) fail('Solo el dueño o quien atiende esa cita puede ver el comprobante.');
+  const id = maryProofId_(a.payment); if (!id) fail('Esta cita no tiene comprobante.');
+  let blob; try { blob = DriveApp.getFileById(id).getBlob(); } catch (e) { fail('No pude abrir el comprobante. Avísale a soporte.'); }
+  const bytes = blob.getBytes(); if (bytes.length > 7 * 1024 * 1024) fail('El comprobante pesa demasiado para verlo aquí.');
+  const mime = String(blob.getContentType() || 'image/jpeg');
+  if (!/^(image\/(jpeg|png|webp|gif|heic|heif)|application\/pdf)$/.test(mime)) fail('Ese archivo no es una imagen ni un PDF.');
+  return { mime: mime, data: Utilities.base64Encode(bytes), code: a.code };
+};
 ACTIONS.maryReactivar = function (b, auth) {
   const adm = getAdmin(auth);
   return withLock(function () {

@@ -1,4 +1,4 @@
-🗓️ AGENDADOR IA · agendador-ia-3.63   (por dentro atiende «Mary», la recepcionista)
+🗓️ AGENDADOR IA · agendador-ia-3.64   (por dentro atiende «Mary», la recepcionista)
 =====================================================================================================
 🚫 REGLA UNIVERSAL N.º 1 — EPIC NO SE TOCA (manda sobre todo lo demás, para Alex, para Claude y para cada script de este paquete)
    Epic (Mary de Epic, Luisa, la tienda, epic-waha, epic-tiendas, Epic Channels…) y CUALQUIER otro proyecto:
@@ -63,6 +63,7 @@ AJUSTES POR NEGOCIO (negocios.json)
   "recordatorioMin": 120     ·   "estados": { "activo": true, "hoy": "07:30", "semana": "07:00", "semanaDia": 1 }
   En Firestore (settings/general del negocio) maryAutoCaptura: true → la captura confirma al instante y el dueño revisa después.
 
+NOVEDADES 3.64 · 🧾 «Ver comprobante» se abre dentro del panel (acción maryComprobante): ya no manda a Google Drive ni pide acceso. Trae lo de la 3.63. Después manda agendador-web-2026-11-23a.zip.
 NOVEDADES 3.63 · 🔔 El recordatorio guarda cómo terminó (enviado · falló y por qué · «Sin bot») y a qué hora: el panel lo muestra en cada cita. Cartero: «Epic en vivo» solo avisa un corte de red a la 3.ª falla. Trae lo de la 3.62. Después manda agendador-web-2026-11-16b.zip.
 NOVEDADES 3.62 · 👥 Sin citas dobles: el servidor no deja apartar otra cita desde la página si la persona ya tiene una, hasta que diga «sí, sacar otra». Trae lo de la 3.61. Después manda agendador-web-2026-11-16a.zip.
 NOVEDADES 3.61 · 👀 Epic en vivo: el cartero copia cada 10 min los md de Epic (solo lectura, sin claves) al repositorio PRIVADO agendador-epic-copia. /epicvivo lo revisa ya. Trae lo de la 3.60. La página no cambia.

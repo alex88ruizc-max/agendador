@@ -741,3 +741,30 @@ test('3.63 · 🔔 Servidor: «recordada» guarda cómo terminó y a qué hora (
   F.maryRecordada_({ code: 'R-2' }); assert.equal(escrito.v.maryReminderEstado, 'enviado', 'sin estado = enviado (versiones viejas del VPS)');
   F.maryRecordada_({ code: 'R-3', estado: 'cualquiercosa' }); assert.equal(escrito.v.maryReminderEstado, 'enviado');
 });
+
+test('3.64 · 🧾 Comprobante dentro del panel: el servidor lo lee del Drive privado y lo entrega solo al dueño o a quien atiende la cita (nunca un enlace a Drive)', { skip: !require('fs').existsSync(GS_MARY) && 'sin gs/ aquí' }, () => {
+  const src = require('fs').readFileSync(GS_MARY, 'utf8');
+  let rol = { role: 'owner' }, pedido = null, mime = 'image/jpeg', peso = 10;
+  const APT = { 'R-1': { code: 'R-1', staffId: 's1', payment: { proofFileId: '', proofUrl: 'https://drive.google.com/file/d/1AbCdEfGhIjKlMnOpQrStUvWxYz012345/view?usp=drivesdk' } }, 'R-2': { code: 'R-2', staffId: 's1', payment: {} } };
+  const G = { ACTIONS: {}, PUBLIC_ACTIONS: {}, console, getAdmin: () => rol, getApt: (c) => APT[c] || (() => { throw new Error('no existe'); })(), fail: (m) => { throw new Error(m); },
+    DriveApp: { getFileById: (id) => { pedido = id; if (id === 'x'.repeat(25)) throw new Error('no'); return { getBlob: () => ({ getBytes: () => new Array(peso).fill(1), getContentType: () => mime }) }; } },
+    Utilities: { base64Encode: (b) => 'B64x' + b.length } };
+  const F = new Function(...Object.keys(G), src + '\nreturn { ACTIONS, maryProofId_ };')(...Object.values(G));
+  const r = F.ACTIONS.maryComprobante({ code: 'R-1' }, {});
+  assert.equal(pedido, '1AbCdEfGhIjKlMnOpQrStUvWxYz012345', 'saca el archivo del enlace viejo'); assert.deepEqual(r, { mime: 'image/jpeg', data: 'B64x10', code: 'R-1' });
+  assert.equal(F.maryProofId_({ proofFileId: 'ZzYyXxWwVvUuTtSsRrQqPp123', proofUrl: 'https://drive.google.com/open?id=otro' }), 'ZzYyXxWwVvUuTtSsRrQqPp123', 'si hay id guardado, ese manda');
+  assert.equal(F.maryProofId_({ proofUrl: 'https://drive.google.com/open?id=1AbCdEfGhIjKlMnOpQrStUvWxYz012345' }), '1AbCdEfGhIjKlMnOpQrStUvWxYz012345');
+  rol = { role: 'staff', staffId: 's2' }; assert.throws(() => F.ACTIONS.maryComprobante({ code: 'R-1' }, {}), /Solo el dueño o quien atiende/);
+  rol = { role: 'staff', staffId: 's1' }; assert.equal(F.ACTIONS.maryComprobante({ code: 'R-1' }, {}).code, 'R-1');
+  rol = { role: 'owner' }; assert.throws(() => F.ACTIONS.maryComprobante({ code: 'R-2' }, {}), /no tiene comprobante/);
+  mime = 'text/html'; assert.throws(() => F.ACTIONS.maryComprobante({ code: 'R-1' }, {}), /no es una imagen ni un PDF/); mime = 'application/pdf';
+  assert.equal(F.ACTIONS.maryComprobante({ code: 'R-1' }, {}).mime, 'application/pdf');
+  peso = 8 * 1024 * 1024; assert.throws(() => F.ACTIONS.maryComprobante({ code: 'R-1' }, {}), /pesa demasiado/);
+  assert.ok(!/setSharing|ANYONE/.test(src.slice(src.indexOf('function maryProofId_'), src.indexOf('ACTIONS.maryReactivar ='))), 'el archivo nunca se comparte ni se hace público');
+});
+
+test('2026-11-23a · 🧾 Panel: «Ver comprobante» ya no manda a Google Drive (se abre dentro del panel)', { skip: !require('fs').existsSync(require('path').join(__dirname, '..', '..', 'admin.js')) && 'sin la página aquí' }, () => {
+  const adm = require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'admin.js'), 'utf8');
+  assert.ok(!/href="\$\{esc\(p\.proofUrl\)\}"/.test(adm) && !/window\.open\(a\.payment\.proofUrl/.test(adm), 'ningún enlace directo al archivo de Drive');
+  assert.match(adm, /data-act="proof"/); assert.match(adm, /api\("maryComprobante", \{ code \}\)/);
+});
