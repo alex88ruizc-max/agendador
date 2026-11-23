@@ -9,9 +9,9 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, ventanaReserva, OFERTA_TXT, nombreCompleto, planEjemplos, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText, soporteUrl
-} from "./common.js?v=2026-11-23a";
-import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-23a";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-23a";
+} from "./common.js?v=2026-11-23b";
+import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-23b";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-23b";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -130,7 +130,7 @@ function start() {
     // recién creada desde "Probar gratis": abre la guía de primeros pasos
     // asistente de inicio: la primera vez (o al llegar desde "Probar gratis")
     if (!A.wizAuto && isOwner() && !A.me?.isSuper && !document.body.classList.contains("plan-gate") && !A.bill?.planWanted && (!A.settings.setupDone || !A.settings.tutorial2 || new URLSearchParams(location.search).get("guia") === "1")) {
-      // 2026-11-23a · los primeros pasos (nuevos, 4 pasos) se muestran UNA vez más a todas las tiendas, también a las que ya los habían hecho (tutorial2)
+      // 2026-11-23b · los primeros pasos (nuevos, 4 pasos) se muestran UNA vez más a todas las tiendas, también a las que ya los habían hecho (tutorial2)
       const otraVez = !!A.settings.setupDone && !A.settings.tutorial2;
       A.wizAuto = true; A.geoAsked = true;
       if (!A.settings.tutorial2) updateDoc(doc(db, bpath("settings", "general")), { tutorial2: true }).catch(() => {});
@@ -2310,7 +2310,7 @@ function freeTimes(date, locks, minutes) {
 }
 const firstName = (a) => (a.customer?.firstName || "Cliente").split(/\s+/)[0];
 
-// ================= 🏠 INICIO (2026-11-23a): accesos directos que cada quien elige · agenda de hoy ordenada · configuración en un botón flotante =================
+// ================= 🏠 INICIO (2026-11-23b): accesos directos que cada quien elige · agenda de hoy ordenada · configuración en un botón flotante =================
 const ACC_DEF = ["agenda", "wabot", "clients", "linkcli"];
 const ACC_CORTO = { agenda: "Agenda", wabot: "Bot", clients: "Clientes", linkcli: "Mi enlace", staff: "Equipo", services: "Servicios", marketing: "Marketing", settings: "Ajustes", plan: "Mi plan", cupos: "Cupos", activity: "Actividad", referrals: "Referidos", appearance: "Apariencia", images: "Imágenes" };
 const accPermitidos = () => ["agenda", "cupos", "staff"].concat(isOwner() ? ["wabot", "clients", "linkcli", "services", "marketing", "settings", "plan", "activity", "referrals", "appearance", "images"] : []);
@@ -2395,8 +2395,23 @@ async function verComprobante(code, btn) {
   if (btn) setBusy(btn, true, "Abriendo…");
   try {
     const r = await api("maryComprobante", { code });
-    if (/^image\//.test(r.mime)) viewImage(`data:${r.mime};base64,${r.data}`, "Comprobante de " + code);
-    else {   // PDF: se abre en otra pestaña desde la memoria del celular (no desde Drive)
+    const a = A.index[code] || A.pending.find((x) => x.code === code) || null, revisar = a && a.payment?.status === "submitted";
+    if (/^image\//.test(r.mime)) {
+      // 2026-11-23b · la foto y, ahí mismo, Aprobar o Rechazar (sin salir a buscar el botón)
+      openM("🧾 Comprobante", `
+        ${a ? `<p class="-mt-2 mb-2 text-sm text-ink/75"><b>${esc(custName(a))}</b> · ${cop(a.payment?.amountCOP || a.depositCOP)} · ${fechaCorta(a.date)} a las ${hora12(a.startTime)}</p>` : ""}
+        <img src="data:${r.mime};base64,${r.data}" alt="Comprobante de pago" data-zoomsrc="1" class="max-h-[62vh] w-full rounded-xl border border-line bg-white object-contain">
+        <p class="soft mt-1 text-center text-xs">Toca la foto para verla grande</p>
+        ${revisar ? `<div class="mt-3 grid grid-cols-2 gap-2"><button id="cpNo" class="btn-light py-3 text-sm" style="color:#B91C1C">❌ Rechazar</button><button id="cpOk" class="btn-primary py-3 text-sm">✅ Aprobar pago</button></div>` : ""}`);
+      if (revisar) {
+        $("cpOk").onclick = async () => { setBusy($("cpOk"), true, "Aprobando…"); try { await api("reviewPayment", { code, approve: true }); closeM(); toast("Abono aprobado. La cita quedó confirmada."); } catch (e) { toast(e.message, "error"); setBusy($("cpOk"), false); } };
+        $("cpNo").onclick = async () => {
+          const reason = await uiPrompt("Rechazar pago", `¿Por qué rechazas el pago de ${custName(a)}? Se lo enviamos por correo y Telegram.`, "No encontramos la transferencia", { okText: "Rechazar", danger: true });
+          if (reason === null) return;
+          setBusy($("cpNo"), true, "Rechazando…"); try { await api("reviewPayment", { code, approve: false, reason }); closeM(); toast("Pago rechazado. El cupo quedó libre."); } catch (e) { toast(e.message, "error"); setBusy($("cpNo"), false); }
+        };
+      }
+    } else {   // PDF: se abre en otra pestaña desde la memoria del celular (no desde Drive)
       const bin = atob(r.data), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
       const url = URL.createObjectURL(new Blob([u8], { type: r.mime }));
       if (!window.open(url, "_blank")) location.href = url;
@@ -2408,7 +2423,7 @@ async function verComprobante(code, btn) {
 // 2026-11-16 · de dónde salió cada cita: 🤖 bot de WhatsApp, 🌐 la página (link) o 🏪 el panel (en el local)
 const canalTxt = (a) => a.source === "whatsapp" ? "🤖 Por el bot" : a.source === "manual" ? "🏪 En el local" : "🌐 Por la página";
 const canalCita = (a) => `<span class="ml-1 whitespace-nowrap rounded-full px-2 py-0.5 align-middle text-[11px] font-bold text-ink/70" style="background:var(--canvas)">${canalTxt(a)}</span>`;
-// 2026-11-23a · 🔔 ¿SE LE RECORDÓ AL CLIENTE? Cada cita dice cómo va su recordatorio por WhatsApp, y la Agenda trae el resumen del día.
+// 2026-11-23b · 🔔 ¿SE LE RECORDÓ AL CLIENTE? Cada cita dice cómo va su recordatorio por WhatsApp, y la Agenda trae el resumen del día.
 //   El VPS guarda maryReminded + maryRemindedAt + maryReminderEstado (enviado · fallo · sinbot) + maryReminderMotivo. Las citas viejas solo traen maryReminded.
 const horaDe = (ms) => new Date(ms).toLocaleTimeString("es-CO", { timeZone: "America/Bogota", hour: "numeric", minute: "2-digit", hour12: true }).replace(/\s+/g, " ");
 function recEstado(a) {
@@ -2518,7 +2533,8 @@ function renderHome() {
   const todo = [];
   pendingMine.slice(0, 4).forEach((a) => todo.push(`<div class="todo"><span class="ic t-due"><i class="fa-solid fa-receipt"></i></span>
     <p class="min-w-0 flex-1 text-[13.5px] leading-snug"><b>${esc(custName(a))}</b> subió el abono de ${cop(a.payment?.amountCOP || a.depositCOP)} para el ${fechaCorta(a.date)} a las ${hora12(a.startTime)}.</p>
-    <button class="act" style="background:var(--sink);color:#fff" data-happrove="${a.code}">Aprobar</button></div>`));
+    <span class="flex shrink-0 flex-col gap-1.5"><button class="act" style="background:#eef4ff;color:#1d4ed8" data-hproof="${a.code}">🧾 Ver comprobante</button>
+    <button class="act" style="background:var(--sink);color:#fff" data-happrove="${a.code}">Aprobar</button></span></div>`));
   const next = visible.filter((a) => a.status === "confirmed").map((a) => ({ a, m: (() => { const [h, mm] = a.startTime.split(":").map(Number); return h * 60 + mm; })() }))
     .filter((x) => x.m >= nowMin && x.m - nowMin <= 120).sort((p, q) => p.m - q.m)[0];
   if (next) todo.push(`<div class="todo"><span class="ic t-trial"><i class="fa-regular fa-clock"></i></span>
@@ -2560,7 +2576,7 @@ function renderHome() {
       <span class="min-w-0 flex-1 text-[13.5px] leading-snug"><b>Invita y paga menos</b><br><span class="opacity-80">Gana ${refLevels()[0]}% de descuento cada mes que paguen tus invitados.</span></span>
       <span class="rounded-full px-2 py-0.5 text-[10px] font-extrabold" style="background:var(--sred)">Nuevo</span></button>` : "";
   const bookUrl = $("linkUrl").textContent || "";
-  // 2026-11-23a · el enlace queda en una sola fila (antes era una tarjeta grande que ocupaba medio Inicio)
+  // 2026-11-23b · el enlace queda en una sola fila (antes era una tarjeta grande que ocupaba medio Inicio)
   const linkHtml = bookUrl ? `<div class="sp-card mb-3 flex items-center gap-2 !py-2.5" style="background:linear-gradient(135deg,#14213D,#2B59C3);color:#fff">
       <span class="min-w-0 flex-1"><span class="block text-[11px] font-bold opacity-80">🔗 Tu enlace de citas</span><span class="block truncate font-mono text-[12px]">${esc(bookUrl.replace(/^https?:\/\//, ""))}</span></span>
       <button class="shrink-0 rounded-xl px-3 py-2 text-[13px] font-extrabold" style="background:#25D366;color:#0b3d1f" data-bl="wa" aria-label="Enviar por WhatsApp"><i class="fa-brands fa-whatsapp"></i> Enviar</button>
@@ -2574,9 +2590,9 @@ function renderHome() {
         <button class="rounded-2xl py-2.5 text-[16px]" style="background:rgba(255,255,255,.18)" data-bl="qr" aria-label="Ver QR del enlace"><i class="fa-solid fa-qrcode"></i></button>
       </div></div>` : "";
   void linkViejo;
-  // 2026-11-23a · INICIO REORGANIZADO (todo se queda): accesos directos → agenda de hoy ordenada → pendientes → equipo → en vivo → lo demás.
+  // 2026-11-23b · INICIO REORGANIZADO (todo se queda): accesos directos → agenda de hoy ordenada → pendientes → equipo → en vivo → lo demás.
   //   La configuración pendiente ya no ocupa el Inicio: va en el botón flotante (guiaFab).
-  // 2026-11-23a (Alex): el equipo ARRIBA, para marcar un descanso o un almuerzo de una (antes quedaba debajo de la agenda)
+  // 2026-11-23b (Alex): el equipo ARRIBA, para marcar un descanso o un almuerzo de una (antes quedaba debajo de la agenda)
   el.innerHTML = `${teamHtml}${accesosHtml()}${linkHtml}${pushCard("home")}<div class="home-grid"><div class="home-col">
     <div class="sp-card" id="chairCard"><div class="flex items-center justify-between gap-2"><h2 class="disp text-[18px] font-bold">Hoy en tu agenda</h2>
       ${freeLater.length ? `<button class="rounded-full px-3 py-1.5 text-xs font-bold ${H.showFree ? "" : "t-late"}" style="${H.showFree ? "background:var(--sink);color:#fff" : ""}" data-hfree="1" aria-expanded="${!!H.showFree}">${freeLater.length} hueco${freeLater.length === 1 ? "" : "s"} libre${freeLater.length === 1 ? "" : "s"} ${H.showFree ? "▴" : "▾"}</button>` : `<span class="soft text-xs">Sin huecos libres</span>`}</div>${hoyListaHtml(visible, nowMin, staffList.length > 1)}
@@ -2595,6 +2611,8 @@ function renderHome() {
 }
 function storyBg(x) { return x.img ? `background-image:url('${x.img}')` : `background:${x.bg || "#14213D"}`; }
 $("tab-home").addEventListener("click", async (e) => {
+  const pr = e.target.closest("[data-hproof]");
+  if (pr) { verComprobante(pr.dataset.hproof, pr); return; }
   const ap = e.target.closest("[data-happrove]");
   if (ap) {
     const a = A.pending.find((x) => x.code === ap.dataset.happrove); if (!a) return;
@@ -3205,7 +3223,7 @@ async function loadLost() {
 const guideDone = () => A.settings?.guideDone || [];
 // lo que ya se hizo en el asistente de inicio cuenta como hecho en la guía
 const WIZ_ORDER = ["hi", "biz", "social", "team", "hours", "services", "deposit", "geo", "telegram", "done"];
-// 2026-11-23a · el asistente de inicio ahora son 4 pasos (negocio, horario, servicios y listo). Lo demás queda en la guía.
+// 2026-11-23b · el asistente de inicio ahora son 4 pasos (negocio, horario, servicios y listo). Lo demás queda en la guía.
 //   Quien terminó el asistente viejo (10 pasos) ya pasó por todo; quien termina el nuevo (setupVer 2) solo pasó por esos 4.
 const WIZ_NUEVO = ["biz", "hours", "services", "done"];
 const wizPassed = (id) => {
@@ -3263,7 +3281,7 @@ const pushClave = () => "pushOn:" + (bpath().split("/")[1] || "");
 const pushOn = () => { try { return localStorage.getItem(pushClave()) === "1" && Notification.permission === "granted"; } catch { return false; } };
 const pushVisto = () => { try { return localStorage.getItem(pushClave() + ":no") === "1"; } catch { return false; } };
 function pushCard(donde) {
-  if (!A.me) return "";   // 2026-11-23a: también le sale al superusuario (antes no, y Alex no la encontraba al revisar una tienda)
+  if (!A.me) return "";   // 2026-11-23b: también le sale al superusuario (antes no, y Alex no la encontraba al revisar una tienda)
   const on = pushOn();
   if (donde === "home" && (on || pushVisto())) return "";   // en Inicio solo invita; el control completo está en WhatsApp Bot y Configuración
   if (!pushSoporta()) return donde === "home" ? "" : `<div class="sp-card mt-3 text-[13.5px]"><p class="font-extrabold">🔔 Notificaciones en este celular</p>
@@ -3324,7 +3342,7 @@ function guideCard() {
 }
 function openGuide() {
   const todos = guideSteps(), g = guideProgress();
-  // 2026-11-23a: primero lo que FALTA, numerado (1, 2, 3…); abajo lo que ya está hecho
+  // 2026-11-23b: primero lo que FALTA, numerado (1, 2, 3…); abajo lo que ya está hecho
   const faltan = todos.filter((x) => !x.ok && !x.optional), steps = faltan.concat(todos.filter((x) => !faltan.includes(x)));
   openM(faltan.length ? `⚙️ Te falta${faltan.length === 1 ? "" : "n"} ${faltan.length} paso${faltan.length === 1 ? "" : "s"}` : "Guía de configuración", `
     <p class="soft -mt-2 mb-4 text-sm">${g.next ? `Vas ${g.done} de ${g.total}. Cada paso te lleva al lugar exacto y te dice qué hacer.` : "¡Tu agenda está lista! Puedes volver a cualquier paso cuando quieras."}</p>
@@ -4199,7 +4217,7 @@ function renderBell() {
 }
 function openPlatformNews() {
   const seen = (() => { try { return Number(localStorage.getItem(NEWS.seenKey()) || 0); } catch { return 0; } })();
-  // 2026-11-23a: la campana también es el lugar para prender las notificaciones de este celular
+  // 2026-11-23b: la campana también es el lugar para prender las notificaciones de este celular
   openM("🔔 Notificaciones y novedades", `<div class="-mt-2 mb-4">${pushCard("campana")}</div>` + (NEWS.list.length ? `<p class="mb-2 text-[11px] font-extrabold tracking-wider text-ink/50">NOVEDADES</p><p class="soft mb-3 text-sm">Lo nuevo de la plataforma para tu negocio.</p><div class="space-y-2">${NEWS.list.map((n) => {
     const k = NEWS_KIND[n.kind] || NEWS_KIND.novedad, fresh = toMillis(n.at) > seen;
     return `<article class="rounded-2xl p-3.5" style="background:${fresh ? "#eef4ff" : "var(--canvas)"}">

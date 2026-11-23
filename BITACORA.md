@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.64** · Página **2026-11-23a** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.64** · Página **2026-11-23b** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -136,6 +136,11 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-23 · página 2026-11-23b · 🧾 «Ver comprobante» a la vista en el Inicio, con Aprobar / Rechazar en la misma pantalla
+- **Captura de Alex (Inicio › «Para hoy»):** cada pago por revisar solo traía «Aprobar»; el comprobante no se veía. «Debe salir algo como ver comprobantes, hay que hacerlo fácil».
+- **Arreglo (`admin.js`):** en cada pago por revisar del Inicio, botón **🧾 Ver comprobante** encima de «Aprobar». Al tocarlo (ahí o en la Agenda) se abre la foto dentro del panel con el nombre, el valor y la cita, y debajo **❌ Rechazar** y **✅ Aprobar pago**. Tocar la foto la pone grande.
+- Necesita Mary 3.64 instalada (la acción `maryComprobante`). Mary no cambia. `tailwind.css` rearmado.
 
 ### 2026-11-23 · agendador-ia-3.64 · página 2026-11-23a · 🧾 el comprobante se ve dentro del panel (ya no pide acceso a Drive)
 - **Caso (captura de Alex):** a su correo llegó «Margarita Castellar palma solicitó permiso para editar» el archivo `estetica-margarita-caste_R-GAC5PR_…` (un comprobante de abono). Alex: «¿por qué pide editar y qué quiere editar?».

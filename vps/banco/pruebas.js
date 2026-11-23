@@ -767,4 +767,7 @@ test('2026-11-23a · 🧾 Panel: «Ver comprobante» ya no manda a Google Drive 
   const adm = require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'admin.js'), 'utf8');
   assert.ok(!/href="\$\{esc\(p\.proofUrl\)\}"/.test(adm) && !/window\.open\(a\.payment\.proofUrl/.test(adm), 'ningún enlace directo al archivo de Drive');
   assert.match(adm, /data-act="proof"/); assert.match(adm, /api\("maryComprobante", \{ code \}\)/);
+  // 2026-11-23b · en el Inicio cada pago por revisar trae su botón «Ver comprobante», y la foto se abre con Aprobar / Rechazar ahí mismo
+  assert.match(adm, /data-hproof="\$\{a\.code\}">🧾 Ver comprobante<\/button>/);
+  assert.match(adm, /id="cpNo"[\s\S]{0,200}id="cpOk"/); assert.match(adm, /api\("reviewPayment", \{ code, approve: true \}\)/);
 });
