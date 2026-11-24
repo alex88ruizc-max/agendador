@@ -791,14 +791,15 @@ test('2026-11-24a · 📣 Página de venta: demo en vivo (cliente y dueño), cal
 test('3.65 · 🤖 ia.js: la consulta a Claude usa caché, respaldo si declina, herramienta estricta sin forzarla, y solo acepta acciones conocidas', async () => {
   const IA = require('../ia');
   let pedido = null, respuesta = null;
-  const falso = { beta: { messages: { create: async (p) => { pedido = p; return respuesta; } } } };
+  let via = '';
+  const falso = { messages: { create: async (p) => { pedido = p; via = 'normal'; return respuesta; } }, beta: { messages: { create: async (p) => { pedido = p; via = 'beta'; return respuesta; } } } };
   const I = IA.crear({ cliente: falso });
   const neg = { st: { businessName: 'Lina Spa', paymentMethods: [{ label: 'Nequi', account: '300' }], depositAmountCOP: 10000, businessHours: { 1: [{ open: '09:00', close: '13:00' }, { open: '14:00', close: '19:00' }] }, maryBot: { ia: { saber: 'Hay parqueadero. <script>' } } },
     servicios: [{ name: 'Corte', priceCOP: 20000, minutes: 40 }], staff: [{ name: 'Lina' }], link: 'https://tuagenda.vip/index.html?b=lina' };
   respuesta = { stop_reason: 'tool_use', usage: { input_tokens: 900, cache_read_input_tokens: 700, output_tokens: 40 }, content: [{ type: 'tool_use', name: 'responder', input: { accion: 'responder', texto: 'Sí, hay parqueadero 😊', pregunta_dueno: '' } }] };
   const r = await I.pensar({ negocio: neg, clienteInfo: { nombre: 'Camila', citas: [] }, historial: [{ yo: true, t: 'Hola' }, { yo: false, t: 'hola' }, { yo: true, t: '¿Qué te hacemos?' }], mensaje: '¿hay parqueadero?' });
   assert.deepEqual([r.ok, r.accion, r.texto], [true, 'responder', 'Sí, hay parqueadero 😊']); assert.deepEqual(r.gasto, { entrada: 900, cache: 700, salida: 40 });
-  assert.equal(pedido.model, 'claude-opus-5-5'); assert.deepEqual(pedido.betas, ['server-side-fallback-2026-07-01']); assert.equal(pedido.fallbacks, 'default');
+  assert.equal(pedido.model, 'claude-haiku-5-5', '3.66: el mismo modelo que Alex eligió en Epic'); assert.equal(via, 'normal', 'Haiku no tiene respaldo del servidor: vía normal'); assert.ok(!('fallbacks' in pedido));
   assert.deepEqual(pedido.tool_choice, { type: 'auto' }, 'nada de forzar la herramienta (ese modelo lo rechaza)'); assert.equal(pedido.tools[0].strict, true);
   assert.equal(pedido.output_config.effort, 'low'); assert.ok(!('thinking' in pedido) && !('temperature' in pedido));
   assert.deepEqual(pedido.system[1].cache_control, { type: 'ephemeral' }, 'reglas + negocio en caché (más barato)');
@@ -811,5 +812,10 @@ test('3.65 · 🤖 ia.js: la consulta a Claude usa caché, respaldo si declina, 
   respuesta = { stop_reason: 'end_turn', content: [{ type: 'text', text: 'hola' }], usage: {} }; assert.equal((await I.pensar({ negocio: neg, mensaje: 'x' })).ok, false);
   respuesta = { stop_reason: 'tool_use', content: [{ type: 'tool_use', name: 'responder', input: { accion: 'regalar', texto: 'gratis', pregunta_dueno: '' } }], usage: {} };
   assert.equal((await I.pensar({ negocio: neg, mensaje: 'x' })).ok, false, 'solo acciones conocidas');
+  // con Opus (IA_MODELO), va con respaldo del servidor si declina
+  const O = IA.crear({ cliente: falso, modelo: 'claude-opus-5-5' });
+  respuesta = { stop_reason: 'tool_use', usage: {}, content: [{ type: 'tool_use', name: 'responder', input: { accion: 'nada', texto: '', pregunta_dueno: '' } }] };
+  await O.pensar({ negocio: neg, mensaje: 'gracias por todo' }); assert.equal(via, 'beta'); assert.deepEqual(pedido.betas, ['server-side-fallback-2026-07-01']); assert.equal(pedido.fallbacks, 'default');
+  assert.match(IA.REGLAS, /Nunca vuelvas a pedir un dato que el cliente ya dio/, 'regla dura copiada de Mary (ESTADO 1227)');
   assert.match(IA.REGLAS, /Nunca inventes precios/); assert.match(IA.REGLAS, /Nunca cierres con «¿Te puedo ayudar en algo más\?»/);
 });

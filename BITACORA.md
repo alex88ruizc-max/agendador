@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.65** · Página **2026-11-24b** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.66** · Página **2026-11-24b** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -136,6 +136,15 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-24 · agendador-ia-3.66 · 🤖 la IA con lo aprendido en Epic (usando el mapa)
+- **Reclamo de Alex:** «usa el mapa de Epic». Era cierto: el mapa (14-nov, 532 líneas) estaba viejo (ESTADO ya tiene 1.593) y la 3.65 se armó con búsquedas sueltas. **Mapa actualizado** en `agendador-epic-copia/mapa/MAPA-EPIC.md`: índice nuevo y tabla «La IA de Mary» con la línea de cada lección. La 3.65 no se instaló.
+- **Cambios por lo que dice el mapa** (Alex: «sí»):
+  1. **Modelo `claude-haiku-5-5`**, el mismo que Alex ya usa en Epic (ESTADO 1288). Haiku no tiene respaldo del servidor si declina: va por la vía normal y, si declina, sigue lo de siempre. `IA_MODELO` lo cambia (con Opus/Sonnet sí se manda el respaldo).
+  2. **Sombra sobre TODOS los mensajes** (informe de Mary, ESTADO 1446: 3 de cada 4 respuestas salían de reglas antes de la IA y «no entendió» 54 %): en modo prueba la IA también lee lo que resolvieron las reglas y /registro dice «🧪 sombra · regla: X · IA: Y ✓/≠». `/salud` y `/ia` cuentan: de acuerdo, distintas y «las reglas no entendieron». No corre en modo activo (no se paga dos veces).
+  3. **Regla dura de Mary** (ESTADO 1227): «nunca vuelvas a pedir un dato que el cliente ya dio».
+  4. **Cartero:** también copia el **mapa del código de Mary** (`~/epic/estudio/mapa/codigo/graphify-out/GRAPH_REPORT.md` y `graph.json`) al repositorio privado, solo lectura, sin claves; el JSON debe seguir válido o no se sube; tope 25 MB.
+- Pruebas: 211 pasan.
 
 ### 2026-11-24 · agendador-ia-3.65 · página 2026-11-24b · 🤖 respuestas inteligentes con Claude (en prueba)
 - **Pedido de Alex:** «entrena al bot (como Epic), dale contexto para que pueda responder y programar citas de forma natural y humana». Eligió **Claude (Anthropic)** y **solo Gold** (el bot de WhatsApp ya es de Gold).

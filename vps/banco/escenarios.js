@@ -1552,7 +1552,7 @@ test('3.65 · 🤖 IA en «sombra» (por defecto): piensa y lo anota en el regis
   await llega(wahaMsg(CLIENTE, '¿el corte incluye lavado?'));
   assert.equal(F.pedidos.length, 1, 'la IA sí pensó');
   assert.ok(!W.enviados.some((x) => /incluye lavado/.test(x.texto)), 'pero NO se lo mandó al cliente');
-  assert.ok(B.ultimos.some((x) => /IA \(prueba, no se envió\) → responder: «Sí, el corte incluye lavado/.test(x.que)), 'queda en /registro para que Alex lo revise');
+  assert.ok(B.ultimos.some((x) => /IA \(prueba, no se envió · las reglas no lo entendieron\) → responder: «Sí, el corte incluye lavado/.test(x.que)), 'queda en /registro para que Alex lo revise');
   assert.ok(W.enviados.length >= 1, 'el cliente recibe la respuesta de siempre');
   // lo que la IA recibe: el negocio (del panel) y la pregunta. Nada inventado.
   const x = F.pedidos[0]; assert.equal(x.mensaje, '¿el corte incluye lavado?'); assert.equal(x.negocio.st.businessName, 'Lina Spa'); assert.equal(x.negocio.servicios[0].name, 'Corte clásico'); assert.match(x.negocio.link, /b=lina-spa/);
@@ -1591,5 +1591,20 @@ test('3.65 · 🤖 La IA NO gasta en «gracias», «ok» ni en un «hola» solo;
   F = mundoIA('activo', { accion: 'responder', texto: 'Claro 😊' }); P.CFG.ia.topeDia = 1;
   await llega(wahaMsg(CLIENTE, '¿el corte incluye lavado?')); await llega(wahaMsg('573001112277', '¿aceptan tarjeta de crédito?'));
   assert.equal(F.pedidos.length, 1, 'tope diario por tienda: el gasto no se dispara');
+  P.CFG.ia = { clave: '', modo: 'sombra', modelo: '', topeDia: 150, topeChat: 20 };
+});
+
+test('3.66 · 🧪 Sombra sobre TODOS los mensajes (copiado del informe de Mary, ESTADO 1446): lo que resolvió la regla también lo lee la IA y queda la comparación en /registro', async () => {
+  const F = mundoIA('sombra', { accion: 'agendar', texto: '' });
+  await llega(wahaMsg(CLIENTE, 'quiero agendar una cita'));
+  await new Promise((ok) => setTimeout(ok, 30));
+  assert.ok(ultimo().lista, 'el cliente recibe lo de siempre (la lista)');
+  assert.equal(F.pedidos.length, 1, 'la IA también lo leyó');
+  assert.ok(B.ultimos.some((x) => /🧪 sombra · regla: agendar · IA: agendar ✓/.test(x.que)), 'regla e IA de acuerdo');
+  assert.equal(B.IA_USO.comp.iguales >= 1, true);
+  // en modo activo NO corre la sombra (no se paga dos veces)
+  const G = mundoIA('activo', { accion: 'agendar', texto: '' }); B.IA_USO.comp = null;
+  await llega(wahaMsg(CLIENTE, 'quiero agendar una cita')); await new Promise((ok) => setTimeout(ok, 30));
+  assert.equal(G.pedidos.length, 0);
   P.CFG.ia = { clave: '', modo: 'sombra', modelo: '', topeDia: 150, topeChat: 20 };
 });

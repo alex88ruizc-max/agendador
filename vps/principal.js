@@ -6,7 +6,7 @@
 const http = require('http'), fs = require('fs'), path = require('path');
 const T = require('./textos'), C = require('./correo'), E = require('./estado'), A = require('./asistente');
 
-const VERSION = 'agendador-ia-3.65';
+const VERSION = 'agendador-ia-3.66';
 const env = (k, d) => (process.env[k] === undefined || process.env[k] === '' ? d : process.env[k]);
 const CFG = {
   puerto: parseInt(env('PUERTO', '3060'), 10),
@@ -607,6 +607,27 @@ function iaPuede(neg, k) {
   if ((IA_USO.neg[neg.bid] || 0) >= CFG.ia.topeDia || (IA_USO.chat[k] || 0) >= CFG.ia.topeChat) return false;   // tope diario: el gasto no se dispara
   return true;
 }
+// 🧪 3.66 · copiado del informe de Mary (Epic, ESTADO 1446): en «sombra» la IA lee TODOS los mensajes, también los que resolvieron
+//    las reglas, y el registro dice lo que hizo la regla y lo que habría hecho la IA. Así se mide cuánto no entiende el bot ANTES de prenderla.
+//    No bloquea ni cambia nada: corre aparte, después de responder.
+const REGLA_A = { agendar: 'agendar', flujo: 'agendar', cupos: 'cupos', cancelar: 'cancelar', cambiar: 'cambiar' };
+function sombraTodo(neg, c, k, regla) {
+  const texto = String(c.texto || '').trim();
+  if (CFG.ia.modo !== 'sombra' || !texto || texto.length < 3 || c.rowId || c.audio || QUIETO.test(texto)) return;
+  if (A.SALUDO.test(A.sinTilde(texto).toLowerCase()) && texto.split(/\s+/).length <= 3) return;
+  if (!iaPuede(neg, k)) return;
+  IA_USO.neg[neg.bid] = (IA_USO.neg[neg.bid] || 0) + 1; IA_USO.chat[k] = (IA_USO.chat[k] || 0) + 1; IA_USO.llamadas++;
+  (async () => {
+    CL = CL || crearCL();
+    const ctx = Object.assign({ link: 'https://tuagenda.vip/index.html?b=' + encodeURIComponent(neg.bid) }, await CL.contexto(neg.bid));
+    const r = await iaCli().pensar({ negocio: ctx, clienteInfo: { nombre: ASIS.cliente(k).nombre || '' }, historial: ((MEM.hilo || {})[k] || []).slice(0, -1), mensaje: texto });
+    if (r.gasto) { IA_USO.entrada += r.gasto.entrada; IA_USO.cache += r.gasto.cache; IA_USO.salida += r.gasto.salida; }
+    if (!r.ok) return;
+    const iguales = (REGLA_A[regla] || regla) === r.accion;
+    IA_USO.comp = IA_USO.comp || { iguales: 0, distintas: 0 }; IA_USO.comp[iguales ? 'iguales' : 'distintas']++;
+    anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: '🧪 sombra · regla: ' + regla + ' · IA: ' + r.accion + (iguales ? ' ✓' : ' ≠') + (r.texto ? ' «' + r.texto.slice(0, 160) + '»' : '') });
+  })().catch((e) => log('sombra IA', String(e.message).slice(0, 120)));
+}
 async function respuestaIA(neg, c, k, info) {
   const texto = String(c.texto || '').trim();
   if (!texto || texto.length < 3 || QUIETO.test(texto) || c.media || c.audio) return false;
@@ -622,7 +643,7 @@ async function respuestaIA(neg, c, k, info) {
   } catch (e) { est.errores++; log('❌ IA', neg.bid, String(e.message).slice(0, 160)); anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: '🤖 IA no respondió (' + String(e.status || e.name || 'error') + '): sigo con lo de siempre' }); return false; }
   if (r.gasto) { IA_USO.entrada += r.gasto.entrada; IA_USO.cache += r.gasto.cache; IA_USO.salida += r.gasto.salida; }
   if (!r.ok) { anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: '🤖 IA: ' + r.motivo + ' → lo de siempre' }); return false; }
-  if (CFG.ia.modo !== 'activo') { anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: '🤖 IA (prueba, no se envió) → ' + r.accion + (r.texto ? ': «' + r.texto.slice(0, 220) + '»' : '') + (r.preguntaDueno ? ' · al dueño: «' + r.preguntaDueno.slice(0, 120) + '»' : '') }); return false; }
+  if (CFG.ia.modo !== 'activo') { IA_USO.comp = IA_USO.comp || { iguales: 0, distintas: 0 }; IA_USO.comp.noEntendio = (IA_USO.comp.noEntendio || 0) + 1; anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: '🤖 IA (prueba, no se envió · las reglas no lo entendieron) → ' + r.accion + (r.texto ? ': «' + r.texto.slice(0, 220) + '»' : '') + (r.preguntaDueno ? ' · al dueño: «' + r.preguntaDueno.slice(0, 120) + '»' : '') }); return false; }
   const de = (t) => anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: '🤖 IA ' + t });
   if (r.accion === 'nada') { de('no hacía falta responder'); return true; }
   if (r.accion === 'responder') { await escribir(neg, c.tel, r.texto); de('respondió'); return true; }
@@ -731,7 +752,7 @@ async function atenderMensaje(c, neg) {
     guardarContacto(neg, c, ASIS.cliente(k));   // 3.52: guardado inteligente (si el dueño lo activó)
     const ca = { k, tel: c.tel, texto: c.texto, rowId: c.rowId, audio: c.audio, nombre: c.nombre };
     let r = null;
-    try { r = await ASIS.manejar(neg, ca); }
+    try { r = await ASIS.manejar(neg, ca); if (r && r !== 'suspendida') sombraTodo(neg, c, k, r); }   // 🧪 3.66: en prueba, la IA también lee lo que resolvieron las reglas (para comparar)
     catch (e) {
       est.errores++; log('❌ asistente', neg.bid, e.message); anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: '❌ falló el asistente: ' + String(e.message).slice(0, 120) });
       // 3.28: si estaba agendando, SIEMPRE se le avisa (antes se quedaba mudo porque «ya le había respondido hace poco»)
@@ -1282,7 +1303,7 @@ const servidor = http.createServer(async (req, res) => {
     const mImg = url.pathname.match(/^\/img\/([a-z0-9]+)\.png$/);
     if (req.method === 'GET' && mImg) { const x = IMG.get(mImg[1]); if (!x) { res.writeHead(404); return res.end(); } res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'no-store' }); return res.end(x.png); }
     if (req.method === 'GET' && url.pathname === '/salud') { let oido = 'no instalado'; try { const r = await fetch(CFG.oido + '/salud', { signal: AbortSignal.timeout(2000) }); const j = await r.json(); oido = j.ok ? 'listo (' + j.modelo + ')' : 'cargando' + (j.error ? ': ' + j.error.slice(0, 60) : ''); } catch (e) { /* no está */ }
-      return json(res, 200, { ok: true, version: VERSION, ia: !CFG.ia.clave ? 'sin llave (apagada)' : CFG.ia.modo + ' · hoy ' + IA_USO.llamadas + ' consulta(s) · entrada ' + IA_USO.entrada + ' (caché ' + IA_USO.cache + ') · salida ' + IA_USO.salida + ' tokens', letras: E.letras() ? 'ok (' + E.FUENTES.length + ' propias)' : '⚠️ NO HAY LETRA: los estados no se publican', oido, modo: CFG.modo, prueba: CFG.prueba.length, negocios: negocios().map((n) => n.bid), gas: !!(CFG.gas && CFG.maryKey), evo: !!CFG.evoKey, est }); }
+      return json(res, 200, { ok: true, version: VERSION, ia: !CFG.ia.clave ? 'sin llave (apagada)' : CFG.ia.modo + ' · ' + (CFG.ia.modelo || IA.MODELO) + ' · hoy ' + IA_USO.llamadas + ' consulta(s)' + (IA_USO.comp ? ' · reglas e IA de acuerdo ' + (IA_USO.comp.iguales || 0) + ', distintas ' + (IA_USO.comp.distintas || 0) + ', las reglas no entendieron ' + (IA_USO.comp.noEntendio || 0) : '') + ' · entrada ' + IA_USO.entrada + ' (caché ' + IA_USO.cache + ') · salida ' + IA_USO.salida + ' tokens', letras: E.letras() ? 'ok (' + E.FUENTES.length + ' propias)' : '⚠️ NO HAY LETRA: los estados no se publican', oido, modo: CFG.modo, prueba: CFG.prueba.length, negocios: negocios().map((n) => n.bid), gas: !!(CFG.gas && CFG.maryKey), evo: !!CFG.evoKey, est }); }
     if (req.method === 'GET' && url.pathname === '/registro') return json(res, 200, ultimos.slice(-Math.min(100, parseInt(url.searchParams.get('n') || '20', 10))));
     // 🧪 vista previa del estado (no publica): curl -s "127.0.0.1:3060/vista?bid=mi-negocio&tipo=hoy" -o hoy.png
     if (req.method === 'GET' && url.pathname === '/vista') { const neg = negocios().find((n) => n.bid === url.searchParams.get('bid')); if (!neg) return json(res, 404, { ok: false, error: 'negocio no está en negocios.json' }); const { png } = await armarEstado(neg, url.searchParams.get('tipo') === 'semana' ? 'semana' : 'hoy'); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(png); }

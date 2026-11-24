@@ -7,7 +7,7 @@
 //    La llave (ANTHROPIC_API_KEY) vive en agendador-ia.env del VPS. Nunca en el código ni en el chat.
 'use strict';
 
-const MODELO = 'claude-opus-5-5';
+const MODELO = 'claude-haiku-5-5';   // 3.66: el mismo que Alex eligió en Epic (ESTADO 1288). IA_MODELO lo cambia.
 const ACCIONES = ['responder', 'agendar', 'cupos', 'cancelar', 'cambiar', 'dueno', 'nada'];
 
 // Las reglas de trato: fijas (sin datos del negocio) para que se guarden en caché y cuesten menos.
@@ -18,6 +18,7 @@ Cómo hablas:
 - Como una recepcionista amable y despierta: natural, cálida y directa. Nada de frases de robot.
 - Mensajes cortos: 1 a 3 frases. Máximo un emoji, y solo si suma.
 - Si sabes el nombre del cliente, úsalo de vez en cuando (no en cada mensaje).
+- Nunca vuelvas a pedir un dato que el cliente ya dio en la conversación (nombre, servicio, día, hora): úsalo.
 - Una sola pregunta a la vez. Si hay varias opciones, pregunta una cosa clara.
 - No repitas lo que ya dijiste en la conversación. No saludes otra vez si ya saludaste.
 - Nunca cierres con «¿Te puedo ayudar en algo más?» ni frases parecidas.
@@ -110,7 +111,6 @@ function crear(o) {
     if (msgs.length && msgs[msgs.length - 1].role === 'user') msgs[msgs.length - 1].content += '\n\n' + nuevo; else msgs.push({ role: 'user', content: nuevo });
     const pedido = {
       model: modelo, max_tokens: 2000,
-      betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default',   // si el modelo declina, el servidor intenta con otro
       output_config: { effort: 'low' },                                     // chat corto: esfuerzo bajo (más rápido y barato)
       system: [
         { type: 'text', text: REGLAS },
@@ -119,7 +119,9 @@ function crear(o) {
       tools: [HERRAMIENTA], tool_choice: { type: 'auto' },
       messages: msgs
     };
-    const r = await sdk().beta.messages.create(pedido);
+    // Haiku no tiene respaldo del servidor si declina: va por la vía normal. Opus/Sonnet sí: si declina, el servidor intenta con otro modelo.
+    const r = /haiku/.test(modelo) ? await sdk().messages.create(pedido)
+      : await sdk().beta.messages.create(Object.assign({ betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' }, pedido));
     const uso = r.usage || {};
     const gasto = { entrada: uso.input_tokens || 0, cache: uso.cache_read_input_tokens || 0, salida: uso.output_tokens || 0 };
     if (r.stop_reason === 'refusal') return { ok: false, motivo: 'declinó', gasto };

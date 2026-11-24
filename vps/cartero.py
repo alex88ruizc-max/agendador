@@ -210,7 +210,8 @@ def cmd_epicmd(texto):
 #    repositorio PRIVADO aparte, del agendador. Claude lee esa copia. A Epic no se le escribe nada: los archivos solo se abren para leer.
 #    Si el repositorio no existe o NO es privado, no se sube nada (los datos de Epic nunca van a un sitio público).
 COPIA_REPO = CFG.get('COPIA_REPO', 'alex88ruizc-max/agendador-epic-copia')
-EPIC_MDS = [x.strip() for x in CFG.get('EPIC_MDS', '/home/ubuntu/epic/estudio/ESTADO.md,/home/ubuntu/epic/estudio/CLAUDE.md,/home/ubuntu/epic/estudio/fichas-mary/FICHAS.md').split(',') if x.strip().lower().endswith('.md')]
+# 3.66 (Alex: «sí»): también el MAPA DEL CÓDIGO de Mary (graphify: GRAPH_REPORT.md y graph.json), para consultar cómo lo resolvió Epic. Solo lectura.
+EPIC_MDS = [x.strip() for x in CFG.get('EPIC_MDS', '/home/ubuntu/epic/estudio/ESTADO.md,/home/ubuntu/epic/estudio/CLAUDE.md,/home/ubuntu/epic/estudio/fichas-mary/FICHAS.md,/home/ubuntu/epic/estudio/mapa/codigo/graphify-out/GRAPH_REPORT.md,/home/ubuntu/epic/estudio/mapa/codigo/graphify-out/graph.json').split(',') if x.strip().lower().endswith(('.md', '.json'))]
 _ESPEJO = {'t': 0, 'h': {}, 'aviso': ''}
 def gh_copia(metodo, ruta, cuerpo=None):
     req = urllib.request.Request('https://api.github.com/repos/' + COPIA_REPO + ruta, method=metodo, data=json.dumps(cuerpo).encode() if cuerpo else None,
@@ -226,9 +227,14 @@ def espejo_epic(forzar=False):
     leidos, faltan = [], []
     for ruta in EPIC_MDS:
         try:
-            with open(ruta, 'rb') as f: txt = f.read(3 * 1024 * 1024).decode('utf-8', 'replace')
+            with open(ruta, 'rb') as f: crudo = f.read(25 * 1024 * 1024 + 1)
+            if len(crudo) > 25 * 1024 * 1024: faltan.append(ruta + ' (pesa más de 25 MB)'); continue
+            txt = crudo.decode('utf-8', 'replace')
         except Exception: faltan.append(ruta); continue
         txt, _ = limpiar_md(txt)
+        if ruta.lower().endswith('.json'):   # el mapa del código: después de quitar claves debe seguir siendo un JSON válido; si no, NO se sube
+            try: json.loads(txt)
+            except Exception: faltan.append(ruta + ' (no quedó válido sin claves)'); continue
         datos = txt.encode('utf-8')
         leidos.append((ruta, datos, hashlib.sha1(b'blob ' + str(len(datos)).encode() + b'\0' + datos).hexdigest()))
     nuevos = [x for x in leidos if _ESPEJO['h'].get(x[0]) != x[2]]
