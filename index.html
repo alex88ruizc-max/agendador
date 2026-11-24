@@ -16,12 +16,12 @@
   <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js">
   <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js">
   <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js">
-  <link rel="modulepreload" href="common.js?v=2026-11-23b">
-  <link rel="modulepreload" href="app.js?v=2026-11-23b">
+  <link rel="modulepreload" href="common.js?v=2026-11-24a">
+  <link rel="modulepreload" href="app.js?v=2026-11-24a">
   <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
-  <link rel="stylesheet" href="styles.css?v=2026-11-23b">
-  <link rel="stylesheet" href="premium.css?v=2026-11-23b">
+  <link rel="stylesheet" href="styles.css?v=2026-11-24a">
+  <link rel="stylesheet" href="premium.css?v=2026-11-24a">
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="theme-color" content="#121216">
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
@@ -31,7 +31,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Tu Agenda">
   <!-- estilos ya armados (antes los calculaba el celular con cdn.tailwindcss.com): va de ÚLTIMO, igual que antes -->
-  <link rel="stylesheet" href="tailwind.css?v=2026-11-23b">
+  <link rel="stylesheet" href="tailwind.css?v=2026-11-24a">
 </head>
 <body class="premium bg-paper text-ink font-sans antialiased">
 
@@ -89,11 +89,39 @@
           <button type="button" class="lp-btn lp-btn-ghost" data-lp="login">Ya tengo cuenta · Ingresar</button>
         </div>
         <p class="lp-mini">Sin tarjeta · Lista en 2 minutos · Desde tu celular</p>
+        <div class="lp-conf"><span>🤖 Asistente de WhatsApp 24/7</span><span>⏰ Recordatorios automáticos</span><span>💳 Abono para apartar</span></div>
         <div class="lp-phone" aria-hidden="true">
           <div class="lp-ph-top"><span class="lp-ph-logo">L</span><span><b>Studio Lúa</b><small>Uñas · Pestañas · Spa</small></span></div>
           <div class="lp-ph-card"><small>PASO 1</small><b>Elige día y hora</b>
             <div class="lp-ph-grid"><i>9:00</i><i>9:30</i><i>10:00</i><i>10:30</i><i class="on">11:00</i><i>11:30</i><i>2:00</i><i>3:30</i><i>4:00</i></div></div>
           <div class="lp-ph-btn">Apartar mi cita</div>
+        </div>
+      </section>
+
+      <!-- 2026-11-24 · DEMO EN VIVO: la misma cita vista por el cliente (su WhatsApp) y por el dueño (su celular). Solo cosas que la app ya hace. -->
+      <section class="lp-sec lp-demo" id="lpDemo">
+        <p class="lp-tag">Míralo funcionar</p>
+        <h3 class="lp-h2">Una cita, dos pantallas.</h3>
+        <p class="lp-sub">Tu cliente escribe por WhatsApp. El asistente lo atiende. A ti solo te llega la cita lista.</p>
+        <div class="lp-tabs" role="tablist"><button type="button" class="on" data-demo="cli" role="tab" aria-selected="true">👤 Lo que ve tu cliente</button><button type="button" data-demo="due" role="tab" aria-selected="false">🧑‍💼 Lo que ves tú</button></div>
+        <div class="lp-demo-box">
+          <div class="lp-cel" aria-live="off">
+            <div class="lp-cel-top" id="lpCelTop"></div>
+            <div class="lp-cel-body" id="lpCelBody"></div>
+          </div>
+          <ul class="lp-demo-pts" id="lpDemoPts"></ul>
+        </div>
+        <button type="button" class="lp-rep" id="lpRep">↻ Verlo otra vez</button>
+      </section>
+
+      <section class="lp-sec">
+        <p class="lp-tag">El cambio</p>
+        <h3 class="lp-h2">De apagar incendios a solo atender.</h3>
+        <div class="lp-ba">
+          <div class="lp-ba-c antes"><span class="lp-pill">Antes</span><b>«Mi agenda es un caos»</b>
+            <ul><li>Contestas «¿tienes cupo?» todo el día</li><li>Anotas en un cuaderno y se cruzan las citas</li><li>Te dejan plantado y nadie avisa</li><li>Pierdes al que escribe de noche</li></ul></div>
+          <div class="lp-ba-c ahora"><span class="lp-pill">Ahora</span><b>«Mis clientes agendan solos»</b>
+            <ul><li>El asistente responde y agenda por ti</li><li>Cada hora se aparta una sola vez</li><li>Recordatorio y confirmación antes de la cita</li><li>Tu página recibe citas las 24 horas</li></ul></div>
         </div>
       </section>
 
@@ -105,6 +133,17 @@
           <article class="lp-card"><span class="lp-ico"><svg viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="3"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5"/></svg></span><h4>Cero plantados</h4><p>Cobra un abono para apartar con tu llave Bre-B. Quien paga, llega. Y si cancela, el cupo vuelve a quedar libre.</p></article>
           <article class="lp-card"><span class="lp-ico"><svg viewBox="0 0 24 24"><path d="M12 3l2.2 5.6L20 11l-5.8 2.4L12 19l-2.2-5.6L4 11l5.8-2.4z"/></svg></span><h4>Imagen profesional</h4><p>Tu propio link con tu logo, tus colores y tus servicios por categoría. Tus clientes lo notan.</p></article>
         </div>
+      </section>
+
+      <section class="lp-sec lp-calc" id="lpCalc">
+        <p class="lp-tag">Haz la cuenta</p>
+        <h3 class="lp-h2">¿Cuánto te cuestan las citas que no llegan?</h3>
+        <label class="lp-rng"><span>Citas que te fallan a la semana: <b id="lpN">3</b></span><input id="lpNR" type="range" min="1" max="15" value="3" aria-label="Citas que fallan a la semana"></label>
+        <p class="lp-rng-t">¿Cuánto vale una cita tuya?</p>
+        <div class="lp-chips" id="lpV"><button type="button" data-v="15000">$15.000</button><button type="button" data-v="25000" class="on">$25.000</button><button type="button" data-v="40000">$40.000</button><button type="button" data-v="60000">$60.000</button><button type="button" data-v="100000">$100.000</button></div>
+        <div class="lp-res"><small>Estás dejando de ganar cerca de</small><b id="lpTot">$325.000</b><small>al mes</small></div>
+        <p class="lp-calc-n" id="lpCalcN">Con el abono para apartar y el recordatorio por WhatsApp, quien aparta tiene motivos para llegar.</p>
+        <button type="button" class="lp-btn lp-btn-main" data-lp="trial">Empezar a recuperarlo · <span class="lp-dias">15</span> días gratis</button>
       </section>
 
       <section class="lp-sec lp-dark">
@@ -127,6 +166,22 @@
           <li><span>3</span><div><b>El cliente aparta y paga</b><p>Elige día, hora y servicio, y paga el abono si lo pides.</p></div></li>
           <li><span class="ok">4</span><div><b>Te llega la cita lista</b><p>Confirmada en tu agenda y con aviso a tu Telegram.</p></div></li>
         </ol>
+      </section>
+
+      <!-- 2026-11-24 · WHATSAPP SIN LETRA PEQUEÑA: qué hace y qué no hace el asistente, dicho de frente (dueños y clientes) -->
+      <section class="lp-sec lp-wa" id="lpWa">
+        <p class="lp-tag">WhatsApp, sin letra pequeña</p>
+        <h3 class="lp-h2">Así usa Tu Agenda tu WhatsApp.</h3>
+        <div class="lp-wa-g">
+          <div class="lp-wa-c si"><h4>✅ Lo que hace</h4><ul>
+            <li>Responde a quien le escribe al negocio: cupos, precios y horarios.</li><li>Agenda, cambia y cancela citas con listas fáciles.</li><li>Recuerda la cita y pregunta si viene.</li><li>Publica tus cupos en los estados, a la hora que tú elijas.</li><li>Entiende notas de voz.</li></ul></div>
+          <div class="lp-wa-c no"><h4>🚫 Lo que no hace</h4><ul>
+            <li>No vende ni comparte los números de tus clientes.</li><li>No le escribe a quien tú marques «Sin bot».</li><li>No responde en los grupos.</li><li>No decide por ti: si escribes tú en un chat, se calla.</li></ul></div>
+          <div class="lp-wa-c tu"><h4>🎛️ Tú mandas</h4><ul>
+            <li>Lo prendes y lo apagas desde tu panel, cuando quieras.</li><li>Vinculas tu propio número, como WhatsApp Web. Sigues usando tu WhatsApp normal.</li><li>Lo desvinculas con un toque.</li></ul></div>
+        </div>
+        <p class="lp-wa-n"><b>Si eres cliente de un negocio:</b> te atiende un asistente automático de ese negocio. Tu número solo se usa para tu cita: confirmarla, recordártela y avisarte cambios. Si no quieres recibir mensajes, díselo al negocio y te deja de escribir.</p>
+        <p class="lp-wa-n lp-wa-l">Tu Agenda es un servicio independiente. No es de WhatsApp ni de Meta, ni está patrocinado por ellos. Como con cualquier herramienta que automatiza mensajes, WhatsApp puede limitar un número si recibe quejas: por eso el asistente no manda cadenas ni mensajes masivos.</p>
       </section>
 
       <section class="lp-sec">
@@ -153,6 +208,27 @@
         </div>
       </section>
 
+      <section class="lp-sec hidden" id="lpPlanes">
+        <p class="lp-tag">Planes</p>
+        <h3 class="lp-h2">Empieza gratis. Después eliges tu plan.</h3>
+        <div class="lp-pl" id="lpPlanesBox"></div>
+        <p class="lp-mini lp-pl-n">Sin contratos. Pagas mes a mes y cancelas cuando quieras.</p>
+      </section>
+
+      <section class="lp-sec">
+        <p class="lp-tag">Preguntas de siempre</p>
+        <h3 class="lp-h2">Lo que todos preguntan.</h3>
+        <div class="lp-faq">
+          <details><summary>¿Tengo que instalar algo?</summary><p>No. Funciona desde el navegador de tu celular o computador. Si quieres, la agregas a tu pantalla de inicio como una app.</p></details>
+          <details><summary>¿Mis clientes tienen que descargar una app?</summary><p>No. Abren tu link o te escriben por WhatsApp, como siempre.</p></details>
+          <details><summary>¿Necesito otro número de WhatsApp?</summary><p>No. Vinculas el número de tu negocio, igual que cuando abres WhatsApp Web. Tu WhatsApp sigue funcionando normal en tu celular.</p></details>
+          <details><summary>¿Y si yo quiero responderle a un cliente?</summary><p>Le escribes y listo: el asistente se hace a un lado en ese chat. También puedes dejar a un cliente «Sin bot» para atenderlo siempre tú.</p></details>
+          <details><summary>¿El dinero del abono pasa por Tu Agenda?</summary><p>No. El cliente te paga directo a ti, a tu llave Bre-B o Nequi. Tú apruebas el comprobante con un toque.</p></details>
+          <details><summary>¿Qué pasa cuando se acaba la prueba?</summary><p>Eliges un plan si te sirvió. Si no, no pagas nada: no pedimos tarjeta.</p></details>
+          <details><summary>¿Sirve para mi tipo de negocio?</summary><p>Sirve para cualquier negocio que atienda con cita: uñas, pestañas, barberías, peluquerías, spa, tatuajes, estética, consultorios y más.</p></details>
+        </div>
+      </section>
+
       <section class="lp-final">
         <h3>Empieza hoy.<br>Tu primera cita puede llegar esta noche.</h3>
         <button type="button" class="lp-btn lp-btn-main" data-lp="trial">Probar <span class="lp-dias">15</span> días gratis</button>
@@ -160,6 +236,7 @@
         <a id="lpApk" href="/tu-agenda.apk" download class="lp-apk hidden">Descargar la app para Android</a>
       </section>
       <p class="lp-foot">Tu Agenda · tuagenda.vip · <a href="privacidad.html">Privacidad</a></p>
+      <div class="lp-fija hidden" id="lpFija"><span><b>Tu agenda llena, sin contestar chats</b><small>Sin tarjeta · lista en 2 minutos</small></span><button type="button" class="lp-btn lp-btn-main" data-lp="trial">Probar gratis</button></div>
     </div>
     <section id="unavailable" class="mx-auto mt-10 hidden max-w-md rounded-2xl bg-white p-6 text-center">
       <h2 id="unTitle" class="font-narrow text-2xl font-bold"></h2><p id="unText" class="mt-2 text-ink/70"></p>
@@ -420,6 +497,6 @@
     </div>
   </div>
 
-  <script type="module" src="app.js?v=2026-11-23b"></script>
+  <script type="module" src="app.js?v=2026-11-24a"></script>
 </body>
 </html>
