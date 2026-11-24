@@ -3,7 +3,7 @@
 #    Le mandas al bot un archivo y él lo instala (solo si viene de TU chat):
 #      agendador-ia-*.zip    → el Agendador IA del VPS (Mary por dentro) + su Apps Script en Google (actualizar.sh: banco de pruebas; si falla NO instala)
 #      agendador-web-*.zip   → la página tuagenda.vip (sube los archivos a GitHub, rama main, con respaldo de lo anterior)
-#    Comandos:  /estado  (cómo está Mary)   /registro  (qué hizo Mary)   /soporte  (línea de soporte)   /epicmd  (copia del md de Epic, solo lectura)   /epicvivo  (revisar ya la copia en vivo)   /ayuda
+#    Comandos:  /estado  (cómo está Mary)   /registro  (qué hizo Mary)   /soporte  (línea de soporte)   /epicmd  (copia del md de Epic, solo lectura)   /epicvivo  (revisar ya la copia en vivo)   /ia  (respuestas inteligentes)   /ayuda
 #    Solo usa la librería estándar de Python. Corre como servicio de systemd (agendador-cartero), lo instala instalar-cartero.sh.
 import json, os, re, subprocess, sys, time, urllib.request, urllib.parse, zipfile, io, base64
 
@@ -385,6 +385,7 @@ def atender(m):
         else:
             try: tg_doc('servidor-google-' + time.strftime('%Y%m%d-%H%M') + '.zip', datos, msj)
             except Exception as e: decir('❌ No pude mandarte el archivo: ' + str(e)[:200])
+    elif texto.startswith('/ia'): decir(cmd_ia(m))   # 3.65: respuestas inteligentes (Claude)
     elif texto.startswith('/modo'): decir(cmd_modo(texto))
     elif texto.startswith('/prueba'): decir(cmd_prueba(texto))
     elif texto: decir('Hola 👋 Soy el cartero del Agendador IA.\nMándame:\n• agendador-ia-….zip → actualizo el VPS (Mary) y el Apps Script de Google\n• agendador-web-….zip → subo la página tuagenda.vip\n/apk → genero la app de Android\n/estado · /registro\n/auditoria → reviso que el agendador no toque a Epic ni a nadie (solo lee)\n/limpiar → quito contenedores sueltos del agendador (solo los nuestros)\n/servidor → te mando el código del servidor de Google (sin claves) para Claude\n/modo → ver o cambiar el modo (prueba, todos, apagado)\n/prueba <números> → tus números de prueba')
@@ -411,6 +412,26 @@ def reiniciar_ia():
         if '"ok":true' in s.replace(' ', ''): return s
     return '⚠️ Reinicié, pero aún no responde. Mira /estado en un minuto.'
 MODOS = {'prueba': '🧪 PRUEBA: solo responde a tus números de prueba', 'todos': '✅ TODOS: atiende a todos los clientes', 'apagado': '⏸️ APAGADO: no responde, no lee correos, no publica'}
+# 🤖 3.65 · /ia — respuestas inteligentes con Claude. La llave se guarda en agendador-ia.env y el mensaje con la llave se BORRA del chat.
+IA_MODOS = {'sombra': '🧪 prueba (piensa y lo anota en /registro, pero NO le escribe al cliente)', 'activo': '✅ activa (le responde a los clientes)', 'apagado': '⏸ apagada'}
+def cmd_ia(m):
+    crudo = (m.get('text') or '').strip(); p = crudo.split()
+    if len(p) >= 3 and p[1].lower() == 'clave':
+        try: tg('deleteMessage', {'chat_id': DUENO, 'message_id': m.get('message_id')}, timeout=20)   # la llave no queda en el chat
+        except Exception: pass
+        llave = p[2].strip()
+        if not re.match(r'^sk-ant-[A-Za-z0-9_-]{20,}$', llave): return '❌ Esa no parece una llave de Anthropic (empieza por sk-ant-). Borré tu mensaje. Vuelve a intentarlo.'
+        env_poner('ANTHROPIC_API_KEY', llave)
+        if not env_valor('IA_MODO'): env_poner('IA_MODO', 'sombra')
+        return '🔐 Llave guardada (y borré tu mensaje del chat). Arranca en ' + IA_MODOS[env_valor('IA_MODO') or 'sombra'] + '.\n' + reiniciar_ia()
+    if len(p) >= 2 and p[1].lower() in IA_MODOS:
+        if not env_valor('ANTHROPIC_API_KEY'): return '❌ Primero guarda la llave: /ia clave sk-ant-…'
+        env_poner('IA_MODO', p[1].lower())
+        return '🔄 Respuestas inteligentes: ' + IA_MODOS[p[1].lower()] + '\n' + reiniciar_ia()
+    modo = env_valor('IA_MODO') or 'sombra'
+    return ('🤖 Respuestas inteligentes (Claude)\nLlave: ' + ('✅ guardada' if env_valor('ANTHROPIC_API_KEY') else '❌ falta') + '\nModo: ' + IA_MODOS.get(modo, modo) +
+            '\nHoy: ' + curl('/salud').split('"ia":"')[-1].split('"')[0] +
+            '\n\nComandos:\n/ia clave sk-ant-…  (la guardo y borro tu mensaje)\n/ia sombra  (prueba: solo mira)\n/ia activo  (responde a los clientes)\n/ia apagado')
 def cmd_modo(texto):
     p = texto.split()
     actual = env_valor('MARY_MODO') or 'prueba'

@@ -6,7 +6,7 @@
 const http = require('http'), fs = require('fs'), path = require('path');
 const T = require('./textos'), C = require('./correo'), E = require('./estado'), A = require('./asistente');
 
-const VERSION = 'agendador-ia-3.64';
+const VERSION = 'agendador-ia-3.65';
 const env = (k, d) => (process.env[k] === undefined || process.env[k] === '' ? d : process.env[k]);
 const CFG = {
   puerto: parseInt(env('PUERTO', '3060'), 10),
@@ -26,6 +26,8 @@ const CFG = {
   oido: String(env('OIDO_URL', 'http://oido-agendador:9000')).replace(/\/+$/, ''),   // 3.13: el oído (notas de voz → texto)   // 3.6: espera a que el cliente termine de escribir (varios mensajes = UNA respuesta)
   tz: env('TZ', 'America/Bogota'), esperaMs: parseInt(env('ESPERA_MS', '2000'), 10),
   // 2.2 · motor de WhatsApp: evolution (el de siempre) o waha. Cada negocio puede tener el suyo en negocios.json ("motor", "sesion").
+  // 🤖 3.65 · respuestas inteligentes con Claude: la llave va en agendador-ia.env (nunca en el código). Sin llave, no hay IA y todo sigue igual.
+  ia: { clave: env('ANTHROPIC_API_KEY', ''), modo: String(env('IA_MODO', 'sombra')).toLowerCase(), modelo: env('IA_MODELO', ''), topeDia: parseInt(env('IA_TOPE_DIA', '150'), 10), topeChat: parseInt(env('IA_TOPE_CHAT', '20'), 10) },
   motor: String(env('WA_MOTOR', env('WAHA_KEY', '') ? 'waha' : 'evolution')).toLowerCase(),   // 3.1: con WAHA del agendador, los negocios nuevos van por WAHA
   waha: String(env('WAHA_URL', 'http://waha-agendador:3000')).replace(/\/+$/, ''), wahaKey: env('WAHA_KEY', '')
 };
@@ -135,6 +137,7 @@ async function escribir(neg, numero, texto) {
     catch (e) { if (/Evolution 4\d\d/.test(e.message)) e.permanente = true; throw e; }   // 400: número sin WhatsApp → no se reintenta
   }
   const id = r && r.key && r.key.id; if (id) { MEM.enviados.push(id); if (MEM.enviados.length > 500) MEM.enviados.splice(0, 100); memGuardar(); }
+  hilo(neg.bid + ':' + n, true, texto);   // 3.65: lo último que se habló (para que la IA no repita)
   est.respondidos++;
   return r;
 }
@@ -211,6 +214,7 @@ function apagarGlobal(c, off) {
     else if (k === 'guia') c.guia = Object.assign({}, c.guia, { activo: false });
     else if (k === 'volver') c.volver = Object.assign({}, c.volver || {}, { activo: false });
     else if (k === 'avisosWa') c.avisos = Object.assign({}, c.avisos || {}, { activo: false });
+    else if (k === 'ia') c.ia = { activo: false };   // 3.65
     else if (k in BOT_DEF && typeof BOT_DEF[k] === 'boolean') c[k] = false;
   });
   return c;
@@ -242,6 +246,7 @@ function botNormal(b, recordatorioViejo) {   // mismos valores por defecto que e
   const v = b.volver || {}; c.volver = { activo: v.activo === true, dias: Math.max(0, Math.min(60, Number(v.dias || 0))) };   // 3.32: recordatorio de servicio (lo elige el dueño)
   c.guardado = b.guardado === true;   // 3.52: guardado inteligente de contactos (apagado por defecto: lo activa el dueño)
   const av = b.avisos || {}; let avn = String(av.numero || '').replace(/\D/g, ''); if (avn.length === 10) avn = '57' + avn; c.avisos = { activo: av.activo === true && avn.length >= 11, numero: avn };   // 3.47: avisos al WhatsApp personal del dueño
+  c.ia = { activo: ((b.ia || {}).activo) !== false };   // 3.65: respuestas inteligentes
   const g = b.guia || {}; c.guia = { activo: g.activo !== false, hora: /^\d{2}:\d{2}$/.test(String(g.hora || '')) ? g.hora : '08:00', cadaDias: Math.max(1, Math.min(30, Number(g.cadaDias || 3))) };   // 3.43: estado «Cómo agendar»
   return c;
 }
@@ -360,9 +365,9 @@ const PREGUNTA = /(^|\b)(hola|holi|buenas|buenos|buen d[ií]a|saludos|hey|info|i
 //  · el cliente ya tiene su cita CONFIRMADA (y ninguna esperando pago) → solo si dice algo de la lista (hola, confirmar, cancelar, cambiar…)
 //  · le respondió hace menos de SILENCIO_MIN → solo si dice algo de la lista
 //  · ya le dijo lo mismo 2 veces seguidas → no
-function debeResponder({ texto, pausadoPorDueno, reciente, citas, repetido }) {
+function debeResponder({ texto, pausadoPorDueno, reciente, citas, repetido, abierta }) {
   if (pausadoPorDueno) return false;
-  const patron = PREGUNTA.test(String(texto || ''));
+  const patron = PREGUNTA.test(String(texto || '')) || !!abierta;   // 3.65: con la IA activa, una pregunta abierta («¿hay parqueadero?») también se responde
   const L = citas || [], todasConfirmadas = L.length > 0 && L.every((c) => c.status === 'confirmed');
   if (todasConfirmadas && !patron) return false;
   if (reciente && !patron) return false;
@@ -578,10 +583,66 @@ async function soporteSesion(accion, numero) {
   const e = await ver(), cfg = await soporteCfg();
   return { ok: true, estado: e.estado, numero: e.numero, prendidaEnElSuperPanel: cfg.activo, numeroEnElSuperPanel: cfg.numero, personasDeTiendas: Object.keys(memSoporte().gente).length, numerosDeDuenos: Object.keys(cfg.activo ? await soporteGente() : SOP_GENTE.L).length, tiendasRevisadas: SOP_GENTE.tiendas, listaDeDuenos: SOP_GENTE.nota };
 }
+// 🤖 3.65 · RESPUESTAS INTELIGENTES (Claude, de Anthropic). Idea copiada de Mary de Epic: las reglas van primero; la IA entiende y redacta
+//    lo que las reglas no entienden, y el código decide (agendar, cancelar, cobrar siguen siendo del flujo de siempre).
+//    IA_MODO: «sombra» (por defecto: piensa y lo anota en el registro, pero NO le escribe al cliente) · «activo» · «apagado».
+const IA = require('./ia');
+let IA_CLI = null;
+const iaCli = () => IA_CLI || (IA_CLI = IA.crear({ clave: CFG.ia.clave, modelo: CFG.ia.modelo || undefined }));
+const IA_USO = { fecha: '', neg: {}, chat: {}, llamadas: 0, entrada: 0, cache: 0, salida: 0 };
+// una pregunta abierta: con «?» o que empieza como pregunta (solo cuenta si la IA está activa)
+const ABIERTA = /\?|^(que|qué|como|cómo|cuanto|cuánto|cuanta|cuánta|donde|dónde|cuando|cuándo|hay|tienen|tiene|aceptan|reciben|puedo|se puede|hacen|manejan|incluye|atienden|venden)\b/i;
+const iaAbierta = (t) => !!CFG.ia.clave && CFG.ia.modo === 'activo' && ABIERTA.test(String(t || '').trim());
+const QUIETO = /^(ok|oki|okey|okay|vale|listo|dale|gracias|muchas gracias|mil gracias|bueno|perfecto|de una|si|sí|no|👍|🙏|❤️|🙌|😊)[\s.!]*$/i;
+// lo último que se habló en cada chat (máximo 10 mensajes y 12 horas; sin correos ni números)
+function hilo(k, yo, texto) {
+  const t = String(texto || '').replace(/[^\s@]+@[^\s@]+\.[^\s@]+/g, '[correo]').replace(/\+?\d[\d\s-]{8,}\d/g, '[número]').slice(0, 600); if (!t.trim()) return;
+  MEM.hilo = MEM.hilo || {}; const L = (MEM.hilo[k] = (MEM.hilo[k] || []).filter((x) => Date.now() - x.ts < 12 * 3600000));
+  L.push({ yo: !!yo, t, ts: Date.now() }); if (L.length > 10) L.splice(0, L.length - 10); memGuardar();
+}
+function iaPuede(neg, k) {
+  if (!CFG.ia.clave || CFG.ia.modo === 'apagado') return false;
+  const b = botDe(neg); if (!b.activo || !(b.ia || { activo: true }).activo) return false;
+  const hoy = ahoraLocal().fecha; if (IA_USO.fecha !== hoy) Object.assign(IA_USO, { fecha: hoy, neg: {}, chat: {} });
+  if ((IA_USO.neg[neg.bid] || 0) >= CFG.ia.topeDia || (IA_USO.chat[k] || 0) >= CFG.ia.topeChat) return false;   // tope diario: el gasto no se dispara
+  return true;
+}
+async function respuestaIA(neg, c, k, info) {
+  const texto = String(c.texto || '').trim();
+  if (!texto || texto.length < 3 || QUIETO.test(texto) || c.media || c.audio) return false;
+  if (A.SALUDO.test(A.sinTilde(texto).toLowerCase()) && texto.split(/\s+/).length <= 3) return false;   // un «hola» solo: el saludo de siempre (no gasta)
+  if (!iaPuede(neg, k)) return false;
+  IA_USO.neg[neg.bid] = (IA_USO.neg[neg.bid] || 0) + 1; IA_USO.chat[k] = (IA_USO.chat[k] || 0) + 1; IA_USO.llamadas++;
+  let r;
+  try {
+    CL = CL || crearCL();
+    const ctx = Object.assign({ link: 'https://tuagenda.vip/index.html?b=' + encodeURIComponent(neg.bid) }, await CL.contexto(neg.bid));
+    const historial = ((MEM.hilo || {})[k] || []).slice(0, -1);   // el último es este mismo mensaje
+    r = await iaCli().pensar({ negocio: ctx, clienteInfo: { nombre: ASIS.cliente(k).nombre || info.cliente || '', citas: info.citas || [] }, historial, mensaje: texto });
+  } catch (e) { est.errores++; log('❌ IA', neg.bid, String(e.message).slice(0, 160)); anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: '🤖 IA no respondió (' + String(e.status || e.name || 'error') + '): sigo con lo de siempre' }); return false; }
+  if (r.gasto) { IA_USO.entrada += r.gasto.entrada; IA_USO.cache += r.gasto.cache; IA_USO.salida += r.gasto.salida; }
+  if (!r.ok) { anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: '🤖 IA: ' + r.motivo + ' → lo de siempre' }); return false; }
+  if (CFG.ia.modo !== 'activo') { anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: '🤖 IA (prueba, no se envió) → ' + r.accion + (r.texto ? ': «' + r.texto.slice(0, 220) + '»' : '') + (r.preguntaDueno ? ' · al dueño: «' + r.preguntaDueno.slice(0, 120) + '»' : '') }); return false; }
+  const de = (t) => anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: '🤖 IA ' + t });
+  if (r.accion === 'nada') { de('no hacía falta responder'); return true; }
+  if (r.accion === 'responder') { await escribir(neg, c.tel, r.texto); de('respondió'); return true; }
+  if (r.accion === 'dueno') {
+    await escribir(neg, c.tel, r.texto || 'Déjame confirmarlo con el negocio y te aviso por aquí 🙏');
+    const av = botDe(neg).avisos || {};
+    if (av.activo && av.numero) await escribir(neg, av.numero, '🤔 *Un cliente pregunta algo que tu asistente no sabe*\n' + (ASIS.cliente(k).nombre || info.cliente || 'Cliente') + ' (…' + c.tel.slice(-4) + '): «' + (r.preguntaDueno || texto).slice(0, 300) + '»\n\nRespóndele tú por WhatsApp. Si es algo que se repite, agrégalo en tu panel › WhatsApp Bot › «Lo que tu asistente debe saber».').catch((e) => log('aviso IA', e.message));
+    de('lo pasó al dueño' + (av.activo ? '' : ' (sin número de avisos: queda en el registro)') + ': «' + (r.preguntaDueno || texto).slice(0, 120) + '»'); return true;
+  }
+  // agendar · cupos · cancelar · cambiar → el flujo de siempre, con sus listas y revisiones
+  const frase = { agendar: 'quiero agendar una cita', cupos: 'qué cupos hay hoy', cancelar: 'quiero cancelar mi cita', cambiar: 'quiero cambiar mi cita' }[r.accion];
+  const res = await ASIS.manejar(neg, Object.assign({}, c, { k, texto: frase, rowId: '' }));
+  if (!res) { if (r.texto) { await escribir(neg, c.tel, r.texto); de('respondió (el flujo no aplicaba)'); return true; } return false; }
+  de('lo llevó a ' + r.accion); return true;
+}
 async function atenderMensaje(c, neg) {
   if (!c.tel && !c.deMi && /@lid$/.test(c.jid)) c.tel = await telDeLid(neg, c.jid);
   const k = neg.bid + ':' + (c.tel || c.jid);
   await sinBotAlDia(neg);   // 3.59
+  if (!c.deMi && c.texto) hilo(k, false, c.texto);   // 3.65
   if (await respuestaDelDueno(c, neg)) return;   // 🔔 3.47: el dueño aprobó o rechazó un pago respondiendo 1 o 2
   if (esSinbot(c.texto)) {
     MEM.sinbot = MEM.sinbot || {};
@@ -685,7 +746,7 @@ async function atenderMensaje(c, neg) {
   }
   if (!c.texto) return;
   const reciente = prev.t && Date.now() - prev.t < CFG.silencioMin * 60000;
-  if (reciente && !PREGUNTA.test(c.texto)) { anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: 'callada (ya le respondí hace poco)' }); return; }   // atajo: ni se consulta a Google (no va a responder)
+  if (reciente && !PREGUNTA.test(c.texto) && !iaAbierta(c.texto)) { anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: 'callada (ya le respondí hace poco)' }); return; }   // atajo: ni se consulta a Google (no va a responder)
   let info;
   // 3.52: si no sabemos quién es, se busca en los Clientes del negocio CADA VEZ que escribe (con 10 min de respiro). Antes era una vez al día:
   //       si el dueño corregía el número en el panel, el bot no se enteraba hasta el otro día.
@@ -696,8 +757,11 @@ async function atenderMensaje(c, neg) {
   catch (e) { est.errores++; log('❌ chat', neg.bid, e.message); if (!reciente) { try { const i2 = await gas(neg, 'info'); await escribir(neg, c.tel, T.problema(i2)); } catch (e2) { /* nada */ } } return; }
   if (!info.activo) { anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: 'agenda suspendida: no respondo' }); return; }   // agenda suspendida: el dueño atiende
   const firma = (info.citas || []).map((x) => x.code + x.status).join(',') || 'sin';
-  if (!debeResponder({ texto: c.texto, pausadoPorDueno, reciente, citas: info.citas, repetido: prev.firma === firma && prev.n >= 2 })) { anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: 'callada (' + (info.citas.length ? 'ya tiene su cita' : 'ya le respondí') + ')' }); return; }
+  if (!debeResponder({ texto: c.texto, pausadoPorDueno, reciente, citas: info.citas, repetido: prev.firma === firma && prev.n >= 2, abierta: iaAbierta(c.texto) })) { anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: 'callada (' + (info.citas.length ? 'ya tiene su cita' : 'ya le respondí') + ')' }); return; }
   if (info.cliente && !ASIS.cliente(k).nombre && /^[\p{L}][\p{L} .'-]{1,40}$/u.test(info.cliente)) { ASIS.cliente(k).nombre = info.cliente; memGuardar(); }   // 3.30: el nombre que ya tiene en el negocio
+  // 🤖 3.65 · lo que las reglas no entendieron: Claude lo lee con el contexto del negocio y del cliente
+  const ia = await respuestaIA(neg, c, k, info);
+  if (ia) { MEM.chats[k] = { t: Date.now(), firma: 'ia' }; memGuardar(); return; }
   const sal = ASIS.saludo(k, info.negocio, c.nombre, !botDe(neg).saludoDiario);   // «Hola 👋 Soy el asistente de…» solo la primera vez del día (o siempre, si el dueño lo apaga)
   if (info.citas && info.citas.length) await escribir(neg, c.tel, T.conCita(info, sal));
   else if (botDe(neg).agendar || botDe(neg).cupos) await ASIS.menu(neg, { k, tel: c.tel, texto: c.texto }, T.sinCita(info, sal), info.negocio);
@@ -1218,7 +1282,7 @@ const servidor = http.createServer(async (req, res) => {
     const mImg = url.pathname.match(/^\/img\/([a-z0-9]+)\.png$/);
     if (req.method === 'GET' && mImg) { const x = IMG.get(mImg[1]); if (!x) { res.writeHead(404); return res.end(); } res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'no-store' }); return res.end(x.png); }
     if (req.method === 'GET' && url.pathname === '/salud') { let oido = 'no instalado'; try { const r = await fetch(CFG.oido + '/salud', { signal: AbortSignal.timeout(2000) }); const j = await r.json(); oido = j.ok ? 'listo (' + j.modelo + ')' : 'cargando' + (j.error ? ': ' + j.error.slice(0, 60) : ''); } catch (e) { /* no está */ }
-      return json(res, 200, { ok: true, version: VERSION, letras: E.letras() ? 'ok (' + E.FUENTES.length + ' propias)' : '⚠️ NO HAY LETRA: los estados no se publican', oido, modo: CFG.modo, prueba: CFG.prueba.length, negocios: negocios().map((n) => n.bid), gas: !!(CFG.gas && CFG.maryKey), evo: !!CFG.evoKey, est }); }
+      return json(res, 200, { ok: true, version: VERSION, ia: !CFG.ia.clave ? 'sin llave (apagada)' : CFG.ia.modo + ' · hoy ' + IA_USO.llamadas + ' consulta(s) · entrada ' + IA_USO.entrada + ' (caché ' + IA_USO.cache + ') · salida ' + IA_USO.salida + ' tokens', letras: E.letras() ? 'ok (' + E.FUENTES.length + ' propias)' : '⚠️ NO HAY LETRA: los estados no se publican', oido, modo: CFG.modo, prueba: CFG.prueba.length, negocios: negocios().map((n) => n.bid), gas: !!(CFG.gas && CFG.maryKey), evo: !!CFG.evoKey, est }); }
     if (req.method === 'GET' && url.pathname === '/registro') return json(res, 200, ultimos.slice(-Math.min(100, parseInt(url.searchParams.get('n') || '20', 10))));
     // 🧪 vista previa del estado (no publica): curl -s "127.0.0.1:3060/vista?bid=mi-negocio&tipo=hoy" -o hoy.png
     if (req.method === 'GET' && url.pathname === '/vista') { const neg = negocios().find((n) => n.bid === url.searchParams.get('bid')); if (!neg) return json(res, 404, { ok: false, error: 'negocio no está en negocios.json' }); const { png } = await armarEstado(neg, url.searchParams.get('tipo') === 'semana' ? 'semana' : 'hoy'); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(png); }
@@ -1234,5 +1298,5 @@ if (require.main === module) {
   servidor.listen(CFG.puerto, () => { log('👩‍💼 ' + VERSION + ' escuchando en ' + CFG.puerto + ' · modo ' + CFG.modo); negocios(); arrancarRelojes(); });
 }
 // 🧪 solo para el banco de escenarios (banco/escenarios.js): deja a Mary como recién encendida
-const _banco = { olvidarSinBotT: () => SINBOT_T.clear(), sinBotAlDia, negocios, atenderSoporte, soporteSesion, SOP_CFG, SOP_TIENDAS, memSoporte, ASIS, BOT, yaLoDije, memDicho: () => (MEM.dicho = MEM.dicho || {}), memHumano: () => MEM.humano, memRobot: () => (MEM.robot = MEM.robot || {}), memConv: () => (MEM.conv = MEM.conv || {}), tickRecordatorios, tickVolver, tickRetomar, tickEstadisticas, tickEstados, publicarGuia, publicarLlavePush, llavesPush, audienciaDe, AUDIENCIA, memLids: () => (MEM.lids = MEM.lids || {}), entregarAvisos, tickPedidosWa, memAvisoPago: () => (MEM.avisoPago = MEM.avisoPago || {}), avisados, botOff: BOT_OFF, apagarGlobal, botAlDia, botDe, memGuia: () => (MEM.guia = MEM.guia || {}), memStats: () => (MEM.stats = MEM.stats || {}), publicarEstado, alMensaje, alEventoConexion, ultimos, reiniciar() { CL = null; MEM.soporte = { gente: {}, callado: {} }; SOP_CFG.t = 0; SOP_CFG.activo = false; SOP_TIENDAS.clear(); SOP_GENTE.L = {}; SOP_GENTE.t = 0; MEM.sinbotPanel = {}; SINBOT_T.clear(); MEM.volver = {}; MEM.stats = {}; MEM.piePrueba = {}; delete MEM.pushPublicada; MEM.lids = {}; MEM.lidAviso = {}; LID_NO.clear(); MEM.guia = {}; MEM.avisoPago = {}; avisados.clear(); leer.avisado = false; BOT_LEIDO.clear(); MEM.sinbot = {}; MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; MEM.conv = {}; MEM.clientes = {}; MEM.conectados = {}; MEM.pendientesWa = {}; MEM.codigos = {}; MEM.robot = {}; MEM.dicho = {}; AGRUPA.clear(); ASIS._cat.clear(); BOT.clear(); CONTACTOS.clear(); AUDIENCIA.clear(); vinculando.clear(); delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
+const _banco = { IA_USO, respuestaIA, hilo, ponerIA: (x) => { IA_CLI = x; }, olvidarSinBotT: () => SINBOT_T.clear(), sinBotAlDia, negocios, atenderSoporte, soporteSesion, SOP_CFG, SOP_TIENDAS, memSoporte, ASIS, BOT, yaLoDije, memDicho: () => (MEM.dicho = MEM.dicho || {}), memHumano: () => MEM.humano, memRobot: () => (MEM.robot = MEM.robot || {}), memConv: () => (MEM.conv = MEM.conv || {}), tickRecordatorios, tickVolver, tickRetomar, tickEstadisticas, tickEstados, publicarGuia, publicarLlavePush, llavesPush, audienciaDe, AUDIENCIA, memLids: () => (MEM.lids = MEM.lids || {}), entregarAvisos, tickPedidosWa, memAvisoPago: () => (MEM.avisoPago = MEM.avisoPago || {}), avisados, botOff: BOT_OFF, apagarGlobal, botAlDia, botDe, memGuia: () => (MEM.guia = MEM.guia || {}), memStats: () => (MEM.stats = MEM.stats || {}), publicarEstado, alMensaje, alEventoConexion, ultimos, reiniciar() { CL = null; MEM.soporte = { gente: {}, callado: {} }; SOP_CFG.t = 0; SOP_CFG.activo = false; SOP_TIENDAS.clear(); SOP_GENTE.L = {}; SOP_GENTE.t = 0; MEM.sinbotPanel = {}; SINBOT_T.clear(); MEM.volver = {}; MEM.stats = {}; MEM.piePrueba = {}; delete MEM.pushPublicada; MEM.lids = {}; MEM.lidAviso = {}; LID_NO.clear(); MEM.guia = {}; MEM.avisoPago = {}; avisados.clear(); leer.avisado = false; BOT_LEIDO.clear(); MEM.sinbot = {}; MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; MEM.conv = {}; MEM.clientes = {}; MEM.conectados = {}; MEM.pendientesWa = {}; MEM.codigos = {}; MEM.robot = {}; MEM.dicho = {}; AGRUPA.clear(); ASIS._cat.clear(); BOT.clear(); CONTACTOS.clear(); AUDIENCIA.clear(); vinculando.clear(); delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
 module.exports = { _banco, botNormal, frenoRobot, estadosQueTocan, atenderPedidoWa, sincronizarConectados, renovarQr, telEnAviso, deWaha, esWaha, debeResponder, alEventoConexion, tickPedidosWa, limpiarSinVincular, leerMensaje, atiende, PREGUNTA, numeroWa, ahoraLocal, enFila, yaVisto, quienVeEstados, CFG };

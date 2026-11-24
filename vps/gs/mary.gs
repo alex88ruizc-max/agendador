@@ -14,7 +14,7 @@
  * Instalación: pega este archivo, ejecuta activarMary() una vez, copia la clave que sale en el registro
  * y ponla en el mary.env del VPS (MARY_KEY). Vuelve a implementar la aplicación web (Implementar > Administrar > editar > Nueva versión).
  */
-const MARY_VERSION = 'agendador-ia-3.64';
+const MARY_VERSION = 'agendador-ia-3.65';
 
 // Se registra como acción pública del servidor (sin sesión: entra con la clave de Mary).
 // ⚠️ Este archivo debe quedar DEBAJO del archivo principal en la lista de archivos de Apps Script (los nuevos quedan al final: así está bien).
@@ -164,10 +164,12 @@ function maryBotCfg_(st) {
     guia: { activo: (b.guia || {}).activo !== false, hora: /^\d{2}:\d{2}$/.test(String((b.guia || {}).hora || '')) ? b.guia.hora : '08:00', cadaDias: Math.max(1, Math.min(30, Number((b.guia || {}).cadaDias || 3))) }   // 3.43: estado «Cómo agendar»
   };
   c.avisos = maryAvisosCfg_(st);   // 3.47: avisos al WhatsApp personal del dueño
+  c.ia = { activo: ((b.ia || {}).activo) !== false };   // 3.65: respuestas inteligentes (Claude) — prendidas salvo que el dueño las apague
   // 🤖 3.45 · lo que el superusuario apagó para TODAS las tiendas manda (platform/public.botOff)
   let off = []; try { off = (typeof platformPublic === 'function' ? platformPublic().botOff : null) || []; } catch (e) { off = []; }
   off.forEach(function (k) {
     if (k === 'recordatorio') c.recordatorioMin = 0;
+    else if (k === 'ia') c.ia = { activo: false };
     else if (k === 'estados') c.estados.activo = false;
     else if (k === 'guia') c.guia.activo = false;
     else if (k === 'volver') c.volver.activo = false;

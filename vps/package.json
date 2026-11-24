@@ -4,9 +4,15 @@
   "private": true,
   "description": "Mary del agendador: recepcionista por WhatsApp sin IA (Evolution propio, aparte de Epic)",
   "main": "principal.js",
-  "scripts": { "start": "node principal.js", "test": "node --test banco/pruebas.js" },
-  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node principal.js",
+    "test": "node --test banco/pruebas.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
   "dependencies": {
+    "@anthropic-ai/sdk": "1.8.0",
     "@resvg/resvg-js": "2.6.2",
     "imapflow": "1.0.171",
     "mailparser": "3.7.1"

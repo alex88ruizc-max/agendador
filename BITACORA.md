@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.64** · Página **2026-11-24a** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.65** · Página **2026-11-24b** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -136,6 +136,20 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-24 · agendador-ia-3.65 · página 2026-11-24b · 🤖 respuestas inteligentes con Claude (en prueba)
+- **Pedido de Alex:** «entrena al bot (como Epic), dale contexto para que pueda responder y programar citas de forma natural y humana». Eligió **Claude (Anthropic)** y **solo Gold** (el bot de WhatsApp ya es de Gold).
+- **De Epic (otro agente, solo lectura):** Mary usa IA solo para lo que sus ~54 reglas no entienden; «la IA entiende y redacta, el código decide»; contexto vivo por mensaje; reglas de trato (una pregunta a la vez, no repetir, «ok/gracias» no es pedido, nada de «¿te puedo ayudar en algo más?», si no sabe «déjame confirmarlo» y avisa). En Epic la «voz humana» se pensó pero no se montó: aquí va desde el principio.
+- **`vps/ia.js` (nuevo):** consulta a Claude con el SDK oficial `@anthropic-ai/sdk` 1.8.0 (`claude-opus-5-5` por defecto; `IA_MODELO` lo cambia), esfuerzo bajo, respaldo del servidor si declina (`fallbacks: "default"`), reglas + datos del negocio en caché, y UNA herramienta estricta «responder» (acción + texto + pregunta para el dueño), sin forzarla.
+  - **Acciones:** responder · agendar / cupos / cancelar / cambiar (las hace el FLUJO de siempre, con sus revisiones) · dueno (dice «déjame confirmarlo» y le avisa al WhatsApp de avisos del dueño) · nada.
+  - **Contexto:** del panel (nombre, dirección, horario, días cerrados, servicios con precio y duración, equipo, medios de pago, abono, horas para cambiar) + la casilla nueva **«Lo que tu asistente debe saber»** + el cliente (nombre, citas) + lo último que se habló (máx. 10 mensajes, 12 h, sin correos ni números).
+- **`principal.js`:** la IA entra SOLO cuando las reglas no entendieron (antes del mensaje de siempre). No gasta en «hola», «ok», «gracias», fotos ni audios. Tope por tienda (`IA_TOPE_DIA`, 150) y por chat (`IA_TOPE_CHAT`, 20) al día. Si falla o declina, sigue lo de siempre. Con la IA activa, una pregunta abierta («¿hay parqueadero?») se responde aunque haya respondido hace poco.
+- **Modo:** `IA_MODO=sombra` por defecto: piensa y lo anota en /registro («🤖 IA (prueba, no se envió) → …») pero NO le escribe al cliente. `activo` responde. `apagado`.
+- **Cartero:** `/ia` (estado y gasto de hoy) · `/ia clave sk-ant-…` (la guarda en agendador-ia.env y **borra el mensaje del chat**) · `/ia sombra` · `/ia activo` · `/ia apagado`. `/salud` muestra el gasto en tokens.
+- **Panel (WhatsApp Bot):** «🤖 Respuestas inteligentes · 🧪 en prueba»: interruptor y la casilla «Lo que tu asistente debe saber». **Súper panel:** «Respuestas inteligentes (Claude)» en las opciones del bot para todas las tiendas.
+- Servidor (`mary.gs`): `maryBotCfg_` trae `ia.activo`; el súper panel lo apaga para todas.
+- Pruebas: 6 nuevas (5 escenarios con una IA de mentiras + 1 de la consulta). 210 pasan.
+- **Pendiente:** (1) Alex consigue la llave en console.anthropic.com y la guarda con `/ia clave …`; una semana en sombra y revisar /registro; luego `/ia activo`. (2) Cuando esté activa: agregarla a la reseña de Gold y a la página de venta (hoy está en prueba). (3) **Documentos legales:** nombrar a Anthropic como proveedor que procesa los mensajes.
 
 ### 2026-11-24 · página 2026-11-24a · 📣 página de venta nueva (tuagenda.vip): demo en vivo, calculadora, WhatsApp sin letra pequeña, planes y preguntas
 - **Pedido de Alex:** «hacer publicidad directa en la página tuagenda.vip, sorpréndeme, ojo que tienes todo lo de Epic» y «que los clientes y los que crean los negocios sepan del uso de WhatsApp y lo que hace». Los anuncios de Instagram/Facebook quedan para cuando cree las páginas y pase las llaves.

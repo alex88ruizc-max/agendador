@@ -787,3 +787,29 @@ test('2026-11-24a · 📣 Página de venta: demo en vivo (cliente y dueño), cal
   // la calculadora usa los números del visitante (citas × valor × 4,3 semanas)
   assert.match(app, /n \* valor \* 4\.3/);
 });
+
+test('3.65 · 🤖 ia.js: la consulta a Claude usa caché, respaldo si declina, herramienta estricta sin forzarla, y solo acepta acciones conocidas', async () => {
+  const IA = require('../ia');
+  let pedido = null, respuesta = null;
+  const falso = { beta: { messages: { create: async (p) => { pedido = p; return respuesta; } } } };
+  const I = IA.crear({ cliente: falso });
+  const neg = { st: { businessName: 'Lina Spa', paymentMethods: [{ label: 'Nequi', account: '300' }], depositAmountCOP: 10000, businessHours: { 1: [{ open: '09:00', close: '13:00' }, { open: '14:00', close: '19:00' }] }, maryBot: { ia: { saber: 'Hay parqueadero. <script>' } } },
+    servicios: [{ name: 'Corte', priceCOP: 20000, minutes: 40 }], staff: [{ name: 'Lina' }], link: 'https://tuagenda.vip/index.html?b=lina' };
+  respuesta = { stop_reason: 'tool_use', usage: { input_tokens: 900, cache_read_input_tokens: 700, output_tokens: 40 }, content: [{ type: 'tool_use', name: 'responder', input: { accion: 'responder', texto: 'Sí, hay parqueadero 😊', pregunta_dueno: '' } }] };
+  const r = await I.pensar({ negocio: neg, clienteInfo: { nombre: 'Camila', citas: [] }, historial: [{ yo: true, t: 'Hola' }, { yo: false, t: 'hola' }, { yo: true, t: '¿Qué te hacemos?' }], mensaje: '¿hay parqueadero?' });
+  assert.deepEqual([r.ok, r.accion, r.texto], [true, 'responder', 'Sí, hay parqueadero 😊']); assert.deepEqual(r.gasto, { entrada: 900, cache: 700, salida: 40 });
+  assert.equal(pedido.model, 'claude-opus-5-5'); assert.deepEqual(pedido.betas, ['server-side-fallback-2026-07-01']); assert.equal(pedido.fallbacks, 'default');
+  assert.deepEqual(pedido.tool_choice, { type: 'auto' }, 'nada de forzar la herramienta (ese modelo lo rechaza)'); assert.equal(pedido.tools[0].strict, true);
+  assert.equal(pedido.output_config.effort, 'low'); assert.ok(!('thinking' in pedido) && !('temperature' in pedido));
+  assert.deepEqual(pedido.system[1].cache_control, { type: 'ephemeral' }, 'reglas + negocio en caché (más barato)');
+  const ctx = pedido.system[1].text;
+  assert.match(ctx, /Corte: \$20\.000, 40 min/); assert.match(ctx, /lunes: 09:00–13:00 y 14:00–19:00/); assert.match(ctx, /Nequi/); assert.match(ctx, /Abono para apartar la cita: \$10\.000/);
+  assert.match(ctx, /Hay parqueadero\. script/, 'lo del dueño entra limpio (sin < >)');
+  assert.equal(pedido.messages[0].role, 'user', 'la conversación empieza por el cliente'); assert.match(pedido.messages[pedido.messages.length - 1].content, /Mensaje del cliente: ¿hay parqueadero\?/);
+  // declina, no usa la herramienta, o inventa una acción → no se responde con eso (sigue lo de siempre)
+  respuesta = { stop_reason: 'refusal', content: [], usage: {} }; assert.equal((await I.pensar({ negocio: neg, mensaje: 'x' })).ok, false);
+  respuesta = { stop_reason: 'end_turn', content: [{ type: 'text', text: 'hola' }], usage: {} }; assert.equal((await I.pensar({ negocio: neg, mensaje: 'x' })).ok, false);
+  respuesta = { stop_reason: 'tool_use', content: [{ type: 'tool_use', name: 'responder', input: { accion: 'regalar', texto: 'gratis', pregunta_dueno: '' } }], usage: {} };
+  assert.equal((await I.pensar({ negocio: neg, mensaje: 'x' })).ok, false, 'solo acciones conocidas');
+  assert.match(IA.REGLAS, /Nunca inventes precios/); assert.match(IA.REGLAS, /Nunca cierres con «¿Te puedo ayudar en algo más\?»/);
+});

@@ -9,9 +9,9 @@ import {
   pushOverlay, dropOverlay, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, BIZ_TYPES, staffWord, fastSave,
   PLAN_KEYS, plansOf, planOfBiz, planPriceOf, ventanaReserva, OFERTA_TXT, nombreCompleto, planEjemplos, DEFAULT_PAY_WARNING, TG_EVENTS, planBenefits, planBenefitsIntro, warmServer,
   toast, openModal, closeModal, setBusy, copyText, soporteUrl
-} from "./common.js?v=2026-11-24a";
-import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-24a";
-import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-24a";
+} from "./common.js?v=2026-11-24b";
+import { setupInstall, enAppInterna, salirAlNavegador, categoriaAuto } from "./common.js?v=2026-11-24b";
+import { META_APP_ID, META_CONFIG_ID } from "./config.js?v=2026-11-24b";
 
 const $ = (id) => document.getElementById(id);
 const ACTIVE = ["pending_payment", "pending_verification", "confirmed"];
@@ -130,7 +130,7 @@ function start() {
     // recién creada desde "Probar gratis": abre la guía de primeros pasos
     // asistente de inicio: la primera vez (o al llegar desde "Probar gratis")
     if (!A.wizAuto && isOwner() && !A.me?.isSuper && !document.body.classList.contains("plan-gate") && !A.bill?.planWanted && (!A.settings.setupDone || !A.settings.tutorial2 || new URLSearchParams(location.search).get("guia") === "1")) {
-      // 2026-11-24a · los primeros pasos (nuevos, 4 pasos) se muestran UNA vez más a todas las tiendas, también a las que ya los habían hecho (tutorial2)
+      // 2026-11-24b · los primeros pasos (nuevos, 4 pasos) se muestran UNA vez más a todas las tiendas, también a las que ya los habían hecho (tutorial2)
       const otraVez = !!A.settings.setupDone && !A.settings.tutorial2;
       A.wizAuto = true; A.geoAsked = true;
       if (!A.settings.tutorial2) updateDoc(doc(db, bpath("settings", "general")), { tutorial2: true }).catch(() => {});
@@ -2310,7 +2310,7 @@ function freeTimes(date, locks, minutes) {
 }
 const firstName = (a) => (a.customer?.firstName || "Cliente").split(/\s+/)[0];
 
-// ================= 🏠 INICIO (2026-11-24a): accesos directos que cada quien elige · agenda de hoy ordenada · configuración en un botón flotante =================
+// ================= 🏠 INICIO (2026-11-24b): accesos directos que cada quien elige · agenda de hoy ordenada · configuración en un botón flotante =================
 const ACC_DEF = ["agenda", "wabot", "clients", "linkcli"];
 const ACC_CORTO = { agenda: "Agenda", wabot: "Bot", clients: "Clientes", linkcli: "Mi enlace", staff: "Equipo", services: "Servicios", marketing: "Marketing", settings: "Ajustes", plan: "Mi plan", cupos: "Cupos", activity: "Actividad", referrals: "Referidos", appearance: "Apariencia", images: "Imágenes" };
 const accPermitidos = () => ["agenda", "cupos", "staff"].concat(isOwner() ? ["wabot", "clients", "linkcli", "services", "marketing", "settings", "plan", "activity", "referrals", "appearance", "images"] : []);
@@ -2397,7 +2397,7 @@ async function verComprobante(code, btn) {
     const r = await api("maryComprobante", { code });
     const a = A.index[code] || A.pending.find((x) => x.code === code) || null, revisar = a && a.payment?.status === "submitted";
     if (/^image\//.test(r.mime)) {
-      // 2026-11-24a · la foto y, ahí mismo, Aprobar o Rechazar (sin salir a buscar el botón)
+      // 2026-11-24b · la foto y, ahí mismo, Aprobar o Rechazar (sin salir a buscar el botón)
       openM("🧾 Comprobante", `
         ${a ? `<p class="-mt-2 mb-2 text-sm text-ink/75"><b>${esc(custName(a))}</b> · ${cop(a.payment?.amountCOP || a.depositCOP)} · ${fechaCorta(a.date)} a las ${hora12(a.startTime)}</p>` : ""}
         <img src="data:${r.mime};base64,${r.data}" alt="Comprobante de pago" data-zoomsrc="1" class="max-h-[62vh] w-full rounded-xl border border-line bg-white object-contain">
@@ -2423,7 +2423,7 @@ async function verComprobante(code, btn) {
 // 2026-11-16 · de dónde salió cada cita: 🤖 bot de WhatsApp, 🌐 la página (link) o 🏪 el panel (en el local)
 const canalTxt = (a) => a.source === "whatsapp" ? "🤖 Por el bot" : a.source === "manual" ? "🏪 En el local" : "🌐 Por la página";
 const canalCita = (a) => `<span class="ml-1 whitespace-nowrap rounded-full px-2 py-0.5 align-middle text-[11px] font-bold text-ink/70" style="background:var(--canvas)">${canalTxt(a)}</span>`;
-// 2026-11-24a · 🔔 ¿SE LE RECORDÓ AL CLIENTE? Cada cita dice cómo va su recordatorio por WhatsApp, y la Agenda trae el resumen del día.
+// 2026-11-24b · 🔔 ¿SE LE RECORDÓ AL CLIENTE? Cada cita dice cómo va su recordatorio por WhatsApp, y la Agenda trae el resumen del día.
 //   El VPS guarda maryReminded + maryRemindedAt + maryReminderEstado (enviado · fallo · sinbot) + maryReminderMotivo. Las citas viejas solo traen maryReminded.
 const horaDe = (ms) => new Date(ms).toLocaleTimeString("es-CO", { timeZone: "America/Bogota", hour: "numeric", minute: "2-digit", hour12: true }).replace(/\s+/g, " ");
 function recEstado(a) {
@@ -2576,7 +2576,7 @@ function renderHome() {
       <span class="min-w-0 flex-1 text-[13.5px] leading-snug"><b>Invita y paga menos</b><br><span class="opacity-80">Gana ${refLevels()[0]}% de descuento cada mes que paguen tus invitados.</span></span>
       <span class="rounded-full px-2 py-0.5 text-[10px] font-extrabold" style="background:var(--sred)">Nuevo</span></button>` : "";
   const bookUrl = $("linkUrl").textContent || "";
-  // 2026-11-24a · el enlace queda en una sola fila (antes era una tarjeta grande que ocupaba medio Inicio)
+  // 2026-11-24b · el enlace queda en una sola fila (antes era una tarjeta grande que ocupaba medio Inicio)
   const linkHtml = bookUrl ? `<div class="sp-card mb-3 flex items-center gap-2 !py-2.5" style="background:linear-gradient(135deg,#14213D,#2B59C3);color:#fff">
       <span class="min-w-0 flex-1"><span class="block text-[11px] font-bold opacity-80">🔗 Tu enlace de citas</span><span class="block truncate font-mono text-[12px]">${esc(bookUrl.replace(/^https?:\/\//, ""))}</span></span>
       <button class="shrink-0 rounded-xl px-3 py-2 text-[13px] font-extrabold" style="background:#25D366;color:#0b3d1f" data-bl="wa" aria-label="Enviar por WhatsApp"><i class="fa-brands fa-whatsapp"></i> Enviar</button>
@@ -2590,9 +2590,9 @@ function renderHome() {
         <button class="rounded-2xl py-2.5 text-[16px]" style="background:rgba(255,255,255,.18)" data-bl="qr" aria-label="Ver QR del enlace"><i class="fa-solid fa-qrcode"></i></button>
       </div></div>` : "";
   void linkViejo;
-  // 2026-11-24a · INICIO REORGANIZADO (todo se queda): accesos directos → agenda de hoy ordenada → pendientes → equipo → en vivo → lo demás.
+  // 2026-11-24b · INICIO REORGANIZADO (todo se queda): accesos directos → agenda de hoy ordenada → pendientes → equipo → en vivo → lo demás.
   //   La configuración pendiente ya no ocupa el Inicio: va en el botón flotante (guiaFab).
-  // 2026-11-24a (Alex): el equipo ARRIBA, para marcar un descanso o un almuerzo de una (antes quedaba debajo de la agenda)
+  // 2026-11-24b (Alex): el equipo ARRIBA, para marcar un descanso o un almuerzo de una (antes quedaba debajo de la agenda)
   el.innerHTML = `${teamHtml}${accesosHtml()}${linkHtml}${pushCard("home")}<div class="home-grid"><div class="home-col">
     <div class="sp-card" id="chairCard"><div class="flex items-center justify-between gap-2"><h2 class="disp text-[18px] font-bold">Hoy en tu agenda</h2>
       ${freeLater.length ? `<button class="rounded-full px-3 py-1.5 text-xs font-bold ${H.showFree ? "" : "t-late"}" style="${H.showFree ? "background:var(--sink);color:#fff" : ""}" data-hfree="1" aria-expanded="${!!H.showFree}">${freeLater.length} hueco${freeLater.length === 1 ? "" : "s"} libre${freeLater.length === 1 ? "" : "s"} ${H.showFree ? "▴" : "▾"}</button>` : `<span class="soft text-xs">Sin huecos libres</span>`}</div>${hoyListaHtml(visible, nowMin, staffList.length > 1)}
@@ -3223,7 +3223,7 @@ async function loadLost() {
 const guideDone = () => A.settings?.guideDone || [];
 // lo que ya se hizo en el asistente de inicio cuenta como hecho en la guía
 const WIZ_ORDER = ["hi", "biz", "social", "team", "hours", "services", "deposit", "geo", "telegram", "done"];
-// 2026-11-24a · el asistente de inicio ahora son 4 pasos (negocio, horario, servicios y listo). Lo demás queda en la guía.
+// 2026-11-24b · el asistente de inicio ahora son 4 pasos (negocio, horario, servicios y listo). Lo demás queda en la guía.
 //   Quien terminó el asistente viejo (10 pasos) ya pasó por todo; quien termina el nuevo (setupVer 2) solo pasó por esos 4.
 const WIZ_NUEVO = ["biz", "hours", "services", "done"];
 const wizPassed = (id) => {
@@ -3281,7 +3281,7 @@ const pushClave = () => "pushOn:" + (bpath().split("/")[1] || "");
 const pushOn = () => { try { return localStorage.getItem(pushClave()) === "1" && Notification.permission === "granted"; } catch { return false; } };
 const pushVisto = () => { try { return localStorage.getItem(pushClave() + ":no") === "1"; } catch { return false; } };
 function pushCard(donde) {
-  if (!A.me) return "";   // 2026-11-24a: también le sale al superusuario (antes no, y Alex no la encontraba al revisar una tienda)
+  if (!A.me) return "";   // 2026-11-24b: también le sale al superusuario (antes no, y Alex no la encontraba al revisar una tienda)
   const on = pushOn();
   if (donde === "home" && (on || pushVisto())) return "";   // en Inicio solo invita; el control completo está en WhatsApp Bot y Configuración
   if (!pushSoporta()) return donde === "home" ? "" : `<div class="sp-card mt-3 text-[13.5px]"><p class="font-extrabold">🔔 Notificaciones en este celular</p>
@@ -3342,7 +3342,7 @@ function guideCard() {
 }
 function openGuide() {
   const todos = guideSteps(), g = guideProgress();
-  // 2026-11-24a: primero lo que FALTA, numerado (1, 2, 3…); abajo lo que ya está hecho
+  // 2026-11-24b: primero lo que FALTA, numerado (1, 2, 3…); abajo lo que ya está hecho
   const faltan = todos.filter((x) => !x.ok && !x.optional), steps = faltan.concat(todos.filter((x) => !faltan.includes(x)));
   openM(faltan.length ? `⚙️ Te falta${faltan.length === 1 ? "" : "n"} ${faltan.length} paso${faltan.length === 1 ? "" : "s"}` : "Guía de configuración", `
     <p class="soft -mt-2 mb-4 text-sm">${g.next ? `Vas ${g.done} de ${g.total}. Cada paso te lleva al lugar exacto y te dice qué hacer.` : "¡Tu agenda está lista! Puedes volver a cualquier paso cuando quieras."}</p>
@@ -4217,7 +4217,7 @@ function renderBell() {
 }
 function openPlatformNews() {
   const seen = (() => { try { return Number(localStorage.getItem(NEWS.seenKey()) || 0); } catch { return 0; } })();
-  // 2026-11-24a: la campana también es el lugar para prender las notificaciones de este celular
+  // 2026-11-24b: la campana también es el lugar para prender las notificaciones de este celular
   openM("🔔 Notificaciones y novedades", `<div class="-mt-2 mb-4">${pushCard("campana")}</div>` + (NEWS.list.length ? `<p class="mb-2 text-[11px] font-extrabold tracking-wider text-ink/50">NOVEDADES</p><p class="soft mb-3 text-sm">Lo nuevo de la plataforma para tu negocio.</p><div class="space-y-2">${NEWS.list.map((n) => {
     const k = NEWS_KIND[n.kind] || NEWS_KIND.novedad, fresh = toMillis(n.at) > seen;
     return `<article class="rounded-2xl p-3.5" style="background:${fresh ? "#eef4ff" : "var(--canvas)"}">
@@ -4495,10 +4495,10 @@ document.addEventListener("click", async (e) => {
 });
 
 // Opciones del asistente (settings.maryBot). Los valores por defecto son los mismos del servidor (maryBotCfg_).
-const BOT_DEF = { guardado: false, audios: true, activo: true, agendar: true, cupos: true, saludoDiario: true, pedirNombre: true, pedirCorreo: true, loDeSiempre: true, recordatorioMin: 120, recordatorioConfirmar: true, cambios: true, pausaMin: 30, estados: { activo: true, horas: ["11:00"], manana: true, semanal: false, todos: true, pagina: true }, volver: { activo: false, dias: 0 }, guia: { activo: true, hora: "08:00", cadaDias: 3 }, avisos: { activo: false, numero: "" } };
+const BOT_DEF = { guardado: false, audios: true, activo: true, agendar: true, cupos: true, saludoDiario: true, pedirNombre: true, pedirCorreo: true, loDeSiempre: true, recordatorioMin: 120, recordatorioConfirmar: true, cambios: true, pausaMin: 30, estados: { activo: true, horas: ["11:00"], manana: true, semanal: false, todos: true, pagina: true }, volver: { activo: false, dias: 0 }, guia: { activo: true, hora: "08:00", cadaDias: 3 }, avisos: { activo: false, numero: "" }, ia: { activo: true, saber: "" } };
 function botCfg() {
   const s = A.settings || {}, b = s.maryBot || {};
-  const c = { ...BOT_DEF, ...b, estados: { ...BOT_DEF.estados, ...(b.estados || {}) }, volver: { ...BOT_DEF.volver, ...(b.volver || {}) }, guia: { ...BOT_DEF.guia, ...(b.guia || {}) }, avisos: { ...BOT_DEF.avisos, ...(b.avisos || {}) } };
+  const c = { ...BOT_DEF, ...b, estados: { ...BOT_DEF.estados, ...(b.estados || {}) }, volver: { ...BOT_DEF.volver, ...(b.volver || {}) }, guia: { ...BOT_DEF.guia, ...(b.guia || {}) }, avisos: { ...BOT_DEF.avisos, ...(b.avisos || {}) }, ia: { ...BOT_DEF.ia, ...(b.ia || {}) } };
   if (b.recordatorioMin === undefined && s.maryReminderMinutes !== undefined) c.recordatorioMin = Number(s.maryReminderMinutes);
   c.estados.horas = (c.estados.horas || []).filter((h) => /^\d{2}:\d{2}$/.test(h)).slice(0, 2);
   if (!c.estados.horas.length) c.estados.horas = ["11:00"];
@@ -4547,6 +4547,15 @@ function renderWaBot() {
       <div class="flex items-center gap-3 p-3.5"><span class="text-xl">🙊</span><span class="min-w-0 flex-1"><b class="block text-[14.5px]">Si escribes tú en un chat, se calla</b><span class="block text-xs text-ink/65">El asistente se hace a un lado en ese chat para que hables tú.</span></span>
         ${sel("pausaMin", c.pausaMin, [[15, "15 min"], [30, "30 min"], [60, "1 hora"], [120, "2 horas"]])}</div>
     </div>
+    ${hay("ia") ? `<div class="sp-h mt-5"><h2>🤖 Respuestas inteligentes</h2><span>🧪 en prueba</span></div>
+    <p class="soft -mt-1 mb-2 text-xs">Estamos probándolas con cuidado. Ya puedes escribir lo que tu asistente debe saber: lo usará apenas se activen.</p>
+    <div class="sp-card !p-0 divide-y divide-line">
+      ${fila("ia.activo", "🤖", "Entender preguntas sueltas", "Cuando te pregunten algo fuera de agendar («¿el corte incluye lavado?», «¿aceptan tarjeta?»), tu asistente responde con lo que pusiste en tu panel. Nunca inventa precios. Si no sabe, dice «déjame confirmarlo» y te avisa.", (c.ia || {}).activo !== false)}
+      ${(c.ia || {}).activo !== false ? `<div class="p-3.5"><p class="mb-1 text-[14.5px] font-bold">📝 Lo que tu asistente debe saber</p>
+        <p class="mb-2 text-xs text-ink/65">Escríbelo como se lo dirías a una persona nueva en tu negocio. Ejemplos: «Hay parqueadero gratis», «No atendemos niños menores de 5 años», «El tinte se cotiza en persona», «Aceptamos tarjeta en el local».</p>
+        <textarea id="iaSaber" rows="5" maxlength="2500" class="w-full rounded-xl border border-line px-3 py-2 text-[14px]" placeholder="Escribe aquí lo que tus clientes siempre preguntan…">${esc((c.ia || {}).saber || "")}</textarea>
+        <div class="mt-2 flex items-center justify-between gap-2"><span class="soft text-xs">Precios, servicios y horario los toma solo de tu panel.</span><button type="button" id="iaSave" class="btn-dark text-sm">Guardar</button></div></div>` : ""}
+    </div>` : ""}
     <div class="sp-h mt-5"><h2>🔔 Notificaciones</h2><span>en este celular</span></div>
     ${pushCard("wabot")}
     ${hay("avisosWa") ? `<div class="sp-h mt-5"><h2>🔔 Que te avisen a tu celular</h2><span>por WhatsApp</span></div>
@@ -4670,7 +4679,7 @@ function pintarReporte() {
 document.addEventListener("click", (e) => { const b = e.target.closest("#tab-wabot [data-rep]"); if (!b) return; REP.modo = b.dataset.rep; REP.clave = ""; renderWaBot(); });
 document.addEventListener("change", (e) => { if (e.target.id === "repDesde" || e.target.id === "repHasta") { REP.desde = $("repDesde").value; REP.hasta = $("repHasta").value; REP.clave = ""; pintarReporte(); } });
 async function botGuardar(patch) {
-  const c = botCfg(), n = { ...c, ...patch, estados: { ...c.estados, ...(patch.estados || {}) }, volver: { ...c.volver, ...(patch.volver || {}) }, guia: { ...c.guia, ...(patch.guia || {}) }, avisos: { ...c.avisos, ...(patch.avisos || {}) } };
+  const c = botCfg(), n = { ...c, ...patch, estados: { ...c.estados, ...(patch.estados || {}) }, volver: { ...c.volver, ...(patch.volver || {}) }, guia: { ...c.guia, ...(patch.guia || {}) }, avisos: { ...c.avisos, ...(patch.avisos || {}) }, ia: { ...(c.ia || {}), ...(patch.ia || {}) } };
   A.settings.maryBot = n; renderWaBot();
   try { await setDoc(doc(db, bpath("settings", "general")), { maryBot: n }, { merge: true }); toast("✓ Guardado."); }
   catch (err) { toast("No se pudo guardar: " + err.message, "error"); }
@@ -4682,6 +4691,7 @@ document.addEventListener("click", (e) => {
   else if (k === "volver.activo") botGuardar({ volver: { activo: !c.volver.activo } });
   else if (k === "guia.activo") botGuardar({ guia: { activo: !c.guia.activo } });
   else if (k === "avisos.activo") botGuardar({ avisos: { activo: !c.avisos.activo } });
+  else if (k === "ia.activo") botGuardar({ ia: { activo: (c.ia || {}).activo === false } });   // 3.65: respuestas inteligentes
   else botGuardar({ [k]: !c[k] });
 });
 document.addEventListener("click", (e) => { if (e.target.closest("#avTg")) openTelegramGuide(); });
@@ -4690,6 +4700,10 @@ document.addEventListener("click", async (e) => {   // 🆕 novedad «Guardado i
   A.settings.novGuardadoVista = true;
   try { await setDoc(doc(db, bpath("settings", "general")), { novGuardadoVista: true }, { merge: true }); } catch { /* no es grave */ }
   if (b.dataset.nov === "si") { await botGuardar({ guardado: true }); toast("🧠 Guardado inteligente activado."); } else renderWaBot();
+});
+document.addEventListener("click", (e) => {   // 🤖 3.65 · «Lo que tu asistente debe saber»
+  if (!e.target.closest("#iaSave")) return;
+  botGuardar({ ia: { saber: String($("iaSaber").value || "").trim().slice(0, 2500) } });
 });
 document.addEventListener("click", (e) => {
   if (!e.target.closest("#avSave")) return;

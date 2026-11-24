@@ -128,7 +128,12 @@ function crear({ fetch: f, url, proyecto, llave, ahora, cacheMs = 60000, locksMs
     const [st, staff, servicios, biz, c] = await Promise.all([ajustes(bid), lista(bid, 'staff'), lista(bid, 'services'), negocio(bid), cupos(bid, { dias: 14 })]);
     return { st, staff, servicios, biz, cupos: c, hoy: ahora().fecha };
   }
-  return { horas, dias, cupos, guia, olvidar: (bid, date) => { C.delete('lk:' + bid + ':' + date); } };
+  // 🤖 3.65 · lo que el asistente con IA sabe del negocio (todo de la base, sin Google)
+  async function contexto(bid) {
+    const [d, biz] = await Promise.all([datos(bid), negocio(bid).catch(() => ({}))]);
+    return { st: d.st, staff: d.staff, servicios: d.servicios, biz };
+  }
+  return { horas, dias, cupos, guia, contexto, olvidar: (bid, date) => { C.delete('lk:' + bid + ':' + date); } };
 }
 
 module.exports = { crear, libres, horario, diaTxt, hora12, ocupa, ventana };

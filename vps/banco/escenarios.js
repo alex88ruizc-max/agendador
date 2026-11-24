@@ -1537,3 +1537,59 @@ test('3.63 · 🔔 Recordatorio: el servidor sabe cómo terminó (enviado · fal
   assert.equal(W.enviados.filter((x) => x.a === '573005550000').length, 0, 'al de «Sin bot» no se le escribe');
   W.sinWa = null; W.sinBot = []; W.sinBotT = 0;
 });
+
+// ---------- 🤖 3.65 · RESPUESTAS INTELIGENTES (Claude) · con una IA de mentiras (no gasta nada) ----------
+function iaFalsa(r) { const F = { pedidos: [], pensar: async (x) => { F.pedidos.push(x); if (r instanceof Error) throw r; return Object.assign({ ok: true, preguntaDueno: '', gasto: { entrada: 100, cache: 0, salida: 20 } }, typeof r === 'function' ? r(x) : r); } }; return F; }
+function mundoIA(modo, r) {
+  mundoNuevo();
+  P.CFG.ia = { clave: 'sk-ant-prueba', modo, modelo: '', topeDia: 150, topeChat: 20 };
+  W.fsDirecto = { st: { businessName: 'Lina Spa', address: 'Calle 10 #5-20', slotDurationMinutes: 30, minAdvanceMinutes: 0, bookingWindowDays: 30, businessHours: { 1: [{ open: '09:00', close: '19:00' }] }, maryBot: { ia: { saber: 'Hay parqueadero gratis.' } } },
+    staff: [{ id: 's1', name: 'Lina', active: true }], servicios: [{ id: 'c1', name: 'Corte clásico', minutes: 40, priceCOP: 20000, type: 'base', active: true }], biz: { status: 'active' } };
+  const F = iaFalsa(r); B.ponerIA(F); Object.assign(B.IA_USO, { fecha: '', neg: {}, chat: {} }); return F;
+}
+test('3.65 · 🤖 IA en «sombra» (por defecto): piensa y lo anota en el registro, pero al cliente le llega lo de siempre', async () => {
+  const F = mundoIA('sombra', { accion: 'responder', texto: 'Sí, el corte incluye lavado 😊' });
+  await llega(wahaMsg(CLIENTE, '¿el corte incluye lavado?'));
+  assert.equal(F.pedidos.length, 1, 'la IA sí pensó');
+  assert.ok(!W.enviados.some((x) => /incluye lavado/.test(x.texto)), 'pero NO se lo mandó al cliente');
+  assert.ok(B.ultimos.some((x) => /IA \(prueba, no se envió\) → responder: «Sí, el corte incluye lavado/.test(x.que)), 'queda en /registro para que Alex lo revise');
+  assert.ok(W.enviados.length >= 1, 'el cliente recibe la respuesta de siempre');
+  // lo que la IA recibe: el negocio (del panel) y la pregunta. Nada inventado.
+  const x = F.pedidos[0]; assert.equal(x.mensaje, '¿el corte incluye lavado?'); assert.equal(x.negocio.st.businessName, 'Lina Spa'); assert.equal(x.negocio.servicios[0].name, 'Corte clásico'); assert.match(x.negocio.link, /b=lina-spa/);
+});
+test('3.65 · 🤖 IA activa: responde la pregunta suelta con naturalidad (sin el menú de siempre)', async () => {
+  const F = mundoIA('activo', { accion: 'responder', texto: 'Sí, Camila: el corte clásico ($20.000) incluye lavado. ¿Te aparto una hora?' });
+  await llega(wahaMsg(CLIENTE, '¿el corte incluye lavado?'));
+  assert.equal(W.enviados.length, 1); assert.match(ultimo().texto, /incluye lavado/); assert.ok(!ultimo().lista, 'sin la lista de siempre');
+  // segunda pregunta: la IA recibe lo que ya se habló (para no repetir)
+  await new Promise((ok) => setTimeout(ok, 5));
+  await llega(wahaMsg(CLIENTE, '¿y hay parqueadero?'));
+  const h = F.pedidos[1].historial; assert.ok(h.some((m) => !m.yo && /lavado/.test(m.t)) && h.some((m) => m.yo && /incluye lavado/.test(m.t)), 'conoce la conversación');
+});
+test('3.65 · 🤖 IA activa: si quiere agendar, el FLUJO de siempre lo hace (la IA no aparta nada)', async () => {
+  mundoIA('activo', { accion: 'agendar', texto: '' });
+  await llega(wahaMsg(CLIENTE, 'me gustaría ir donde ustedes un día de estos para arreglarme'));
+  assert.ok(ultimo().lista, 'sale la lista de siempre'); assert.ok(!W.gas.includes('crear'), 'no se creó ninguna cita sin las revisiones');
+});
+test('3.65 · 🤖 IA activa: lo que no sabe se lo pasa al dueño («déjame confirmarlo») y le avisa a su WhatsApp', async () => {
+  mundoIA('activo', { accion: 'dueno', texto: 'Déjame confirmarlo con Lina y te aviso por aquí 🙏', preguntaDueno: '¿Atienden a domicilio?' });
+  W.fsDirecto.st.maryBot.avisos = { activo: true, numero: '573001234000' }; W.bot = { avisos: { activo: true, numero: '573001234000' } };
+  await llega(wahaMsg(CLIENTE, '¿atienden a domicilio?'));
+  assert.ok(W.enviados.some((x) => x.a === CLIENTE && /Déjame confirmarlo/.test(x.texto)));
+  const d = W.enviados.find((x) => x.a === '573001234000'); assert.ok(d, 'al dueño le llega la pregunta'); assert.match(d.texto, /Atienden a domicilio/); assert.match(d.texto, /Lo que tu asistente debe saber/);
+  W.bot = {};
+});
+test('3.65 · 🤖 La IA NO gasta en «gracias», «ok» ni en un «hola» solo; sin llave no existe; si falla, sigue lo de siempre; y tiene tope diario', async () => {
+  let F = mundoIA('activo', { accion: 'responder', texto: 'x' });
+  await llega(wahaMsg(CLIENTE, 'gracias')); await llega(wahaMsg('573001112299', 'hola')); await llega(wahaMsg('573001112288', 'ok'));
+  assert.equal(F.pedidos.length, 0, 'ni gracias, ni hola, ni ok');
+  F = mundoIA('activo', { accion: 'responder', texto: 'x' }); P.CFG.ia.clave = '';
+  await llega(wahaMsg(CLIENTE, '¿el corte incluye lavado?')); assert.equal(F.pedidos.length, 0, 'sin llave: nada');
+  mundoIA('activo', new Error('se cayó la conexión'));
+  await llega(wahaMsg(CLIENTE, '¿el corte incluye lavado?'));
+  assert.ok(W.enviados.length >= 1, 'si la IA falla, el cliente igual recibe la respuesta de siempre');
+  F = mundoIA('activo', { accion: 'responder', texto: 'Claro 😊' }); P.CFG.ia.topeDia = 1;
+  await llega(wahaMsg(CLIENTE, '¿el corte incluye lavado?')); await llega(wahaMsg('573001112277', '¿aceptan tarjeta de crédito?'));
+  assert.equal(F.pedidos.length, 1, 'tope diario por tienda: el gasto no se dispara');
+  P.CFG.ia = { clave: '', modo: 'sombra', modelo: '', topeDia: 150, topeChat: 20 };
+});
