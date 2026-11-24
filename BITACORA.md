@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.64** · Página **2026-11-23b** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.64** · Página **2026-11-24a** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -136,6 +136,19 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-24 · página 2026-11-24a · 📣 página de venta nueva (tuagenda.vip): demo en vivo, calculadora, WhatsApp sin letra pequeña, planes y preguntas
+- **Pedido de Alex:** «hacer publicidad directa en la página tuagenda.vip, sorpréndeme, ojo que tienes todo lo de Epic» y «que los clientes y los que crean los negocios sepan del uso de WhatsApp y lo que hace». Los anuncios de Instagram/Facebook quedan para cuando cree las páginas y pase las llaves.
+- **De Epic se copiaron IDEAS (otro agente las sacó, solo lectura; nada de su código ni su aspecto):** celular con chat y puntitos de «escribiendo», chips de confianza, planes con «Más elegido», preguntas desplegables, barra fija con el botón, y la regla «mostrar, no contar». No se copió la urgencia falsa («últimas unidades») ni cifras que no tenemos.
+- **Secciones nuevas (`index.html`, `premium.css`, `app.js`):**
+  1. **«Una cita, dos pantallas»:** demo animada de la misma cita vista por el cliente (chat de WhatsApp con el asistente) y por el dueño (avisos: reserva, comprobante, estado publicado, confirmó). Arranca al entrar en pantalla, cambia sola de pestaña y respeta «menos movimiento».
+  2. **Antes / Ahora.**
+  3. **Calculadora** «¿Cuánto te cuestan las citas que no llegan?» con los números del visitante.
+  4. **«WhatsApp, sin letra pequeña»:** qué hace, qué no hace, tú mandas; párrafo para el cliente final; y la frase «no es de WhatsApp ni de Meta» + el riesgo de límites, dicho de frente.
+  5. **Planes** con nombres, precios y «Súper oferta de lanzamiento» leídos del súper panel (ningún precio escrito a mano).
+  6. **Preguntas de siempre** (7) y **barra fija** «Probar gratis».
+- Prueba nueva en `pruebas.js`. Revisado en un navegador de prueba a 400 px (sin desbordes, sin errores). Mary no cambia.
+- **Pendiente:** `privacidad.html` todavía dice «plataforma oficial de WhatsApp Business» (se corrige con los documentos legales, esperando los datos de Alex).
 
 ### 2026-11-23 · página 2026-11-23b · 🧾 «Ver comprobante» a la vista en el Inicio, con Aprobar / Rechazar en la misma pantalla
 - **Captura de Alex (Inicio › «Para hoy»):** cada pago por revisar solo traía «Aprobar»; el comprobante no se veía. «Debe salir algo como ver comprobantes, hay que hacerlo fácil».

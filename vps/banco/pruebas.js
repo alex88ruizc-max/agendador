@@ -771,3 +771,19 @@ test('2026-11-23a · 🧾 Panel: «Ver comprobante» ya no manda a Google Drive 
   assert.match(adm, /data-hproof="\$\{a\.code\}">🧾 Ver comprobante<\/button>/);
   assert.match(adm, /id="cpNo"[\s\S]{0,200}id="cpOk"/); assert.match(adm, /api\("reviewPayment", \{ code, approve: true \}\)/);
 });
+
+test('2026-11-24a · 📣 Página de venta: demo en vivo (cliente y dueño), calculadora, WhatsApp sin letra pequeña, planes con precios del súper panel y preguntas', { skip: !require('fs').existsSync(require('path').join(__dirname, '..', '..', 'index.html')) && 'sin la página aquí' }, () => {
+  const fs2 = require('fs'), path2 = require('path'), leer = (f) => fs2.readFileSync(path2.join(__dirname, '..', '..', f), 'utf8');
+  const html = leer('index.html'), app = leer('app.js');
+  for (const id of ['lpDemo', 'lpCelBody', 'lpDemoPts', 'lpCalc', 'lpNR', 'lpTot', 'lpWa', 'lpPlanes', 'lpPlanesBox', 'lpFija']) assert.ok(html.includes('id="' + id + '"'), 'falta #' + id);
+  // lo legal, dicho de frente: no es de WhatsApp ni de Meta, y nunca «oficial»
+  assert.match(html, /No es de WhatsApp ni de Meta/); assert.ok(!/plataforma oficial|WhatsApp oficial|socio oficial/i.test(html));
+  // los precios NO van escritos a mano en la página: salen del súper panel
+  const venta = html.slice(html.indexOf('id="landing"'), html.indexOf('id="unavailable"'));
+  assert.ok(!/\$\s?\d+\.000\s*(\/|al|por)\s*mes/i.test(venta), 'ningún precio de plan escrito a mano en la página de venta');
+  assert.match(app, /function pintarPlanesLanding\(\)[\s\S]{0,200}plansOf\(PLAT\)/);
+  // la demo solo muestra cosas que la app hace, y respeta a quien pidió menos movimiento
+  assert.match(app, /prefers-reduced-motion/); assert.match(app, /Tú no escribiste ni un mensaje/);
+  // la calculadora usa los números del visitante (citas × valor × 4,3 semanas)
+  assert.match(app, /n \* valor \* 4\.3/);
+});

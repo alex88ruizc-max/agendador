@@ -1,6 +1,7 @@
 // Página pública: ver cupos, registrarse, apartar, pagar con screenshot, mis cupos
-import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro, ventanaReserva, OFERTA_TXT, nombreCompleto } from "./common.js?v=2026-11-23b";
-import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-23b";
+import { BIZ_TYPES, PLAN_KEYS, plansOf, planOfBiz, planBenefits, planBenefitsIntro, ventanaReserva, OFERTA_TXT, nombreCompleto, DEFAULT_BENEFITS_INTRO
+} from "./common.js?v=2026-11-24a";
+import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-24a";
 import {
   onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, sendPasswordResetEmail,
   GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult
@@ -12,7 +13,7 @@ import {
   startUpdateWatcher, applyBrandColors, warmServer, uiConfirm, uiPrompt, setDialogBrand, viewImage, pushOverlay, dropOverlay, db, auth, bpath, api, setBusiness, businessFromUrl, bogNow, addDays, dow, hora12, fechaLarga, fechaCorta, toMillis, cop, esc,
   normalizePhone, waLink, statusBadge, fillTemplate, DEFAULT_WA_CONFIRM, computeSlots, dayCapacityUnits, staffHours, mapLinks, headerBgCss,
   toast, openModal, closeModal, setBusy, copyText, tmin, mstr, UNIT
-} from "./common.js?v=2026-11-23b";
+} from "./common.js?v=2026-11-24a";
 
 const $ = (id) => document.getElementById(id);
 const S = {
@@ -49,7 +50,8 @@ if (!/^[a-z0-9][a-z0-9-]{1,29}$/.test(BIZ_ID)) {
     const b = e.target.closest("[data-lp]"); if (!b) return;
     if (b.dataset.lp === "trial") $("btnTrial").click(); else openAuth("login");
   });
-  // 🚀 2026-11-23b · viene de la invitación de una página de negocio: se abre «Probar gratis» de una vez
+  setTimeout(landingExtras, 0);   // 2026-11-24: demo, calculadora y barra fija de la página de venta
+  // 🚀 2026-11-24a · viene de la invitación de una página de negocio: se abre «Probar gratis» de una vez
   if (new URLSearchParams(location.search).has("probar")) setTimeout(() => $("btnTrial").click(), 400);
 } else {
   setBusiness(BIZ_ID);
@@ -493,7 +495,7 @@ function renderServices() {
   const fitsMain = (s) => staffThatFit(s.id, Number(s.minutes || 0)).length > 0;
   if (S.mainId && !mains.some((s) => s.id === S.mainId && fitsMain(s))) { S.mainId = null; S.extras.clear(); }
   const groups = [];
-  const unaLista = S.settings?.serviceView === "lista";   // 2026-11-23b: el dueño eligió «una sola lista» en Servicios (sin categorías)
+  const unaLista = S.settings?.serviceView === "lista";   // 2026-11-24a: el dueño eligió «una sola lista» en Servicios (sin categorías)
   mains.forEach((s) => { const c = unaLista ? "Servicios" : (s.category || "").trim() || "Servicios"; let g = groups.find((x) => x.c === c); if (!g) groups.push(g = { c, list: [] }); g.list.push(s); });
   // Categorías como botones (Uñas, Pestañas, Cejas…): se ve una a la vez. La del servicio ya elegido queda marcada.
   if (S.cat && !groups.some((g) => g.c === S.cat)) S.cat = "";
@@ -567,6 +569,93 @@ function openConsent() {
 }
 $("btnConsent").onclick = () => { S.consentOk = true; closeModal("consentModal"); doHold(); };
 
+// ===== 2026-11-24 · PÁGINA DE VENTA: demo en vivo (la misma cita vista por el cliente y por el dueño), calculadora, planes y barra fija =====
+//   Todo lo que muestra la demo es algo que la app YA hace. Nada de cifras inventadas: la calculadora usa los números que pone el visitante
+//   y los precios salen del súper panel (plansOf).
+const DEMO = {
+  cli: { top: ["L", "Studio Lúa", "asistente · en línea"], pts: ["Escribe a cualquier hora, como siempre", "El asistente le muestra tus horas libres", "Elige servicio y hora con un toque", "Queda apartada y recibe su recordatorio"],
+    pasos: [
+      { yo: 1, t: "Hola, ¿tienes cupo para mañana?", p: 0 },
+      { t: "¡Hola, Camila! Soy el asistente de <b>Studio Lúa</b>Mañana tengo libre:", ch: ["9:00 a. m.", "11:30 a. m.", "3:00 p. m."], p: 1 },
+      { yo: 1, t: "11:30" },
+      { t: "¿Qué te hacemos?", ch: ["Uñas semipermanentes", "Pestañas"], p: 2 },
+      { yo: 1, t: "Uñas semipermanentes" },
+      { ok: 1, t: "<b>✅ Cita apartada</b>Mañana · 11:30 a. m. · Uñas semipermanentes", p: 3 },
+      { t: "⏰ Camila, tu cita es en 2 horas. ¿Vienes? Responde <b style=\"display:inline\">sí</b>." },
+      { yo: 1, t: "Sí 🙌" }, { t: "¡Listo! Te esperamos." }] },
+  due: { top: ["TA", "Tu panel", "Tu Agenda · notificaciones"], pts: ["Te avisa cada reserva al instante", "Apruebas el abono con un toque", "Publica tus cupos en tus estados", "Sabes quién confirmó que viene"],
+    pasos: [
+      { n: ["🔔", "Nueva reserva", "Camila · mañana 11:30 a. m. · Uñas semipermanentes"], p: 0 },
+      { n: ["🧾", "Camila subió el abono de $20.000", "Mira el comprobante y aprueba"], bt: ["Ver comprobante", "Aprobar"], p: 1 },
+      { n: ["✅", "Abono aprobado", "La cita quedó confirmada"] },
+      { n: ["📸", "Estado publicado", "«Cupos de hoy» ya está en tu WhatsApp"], p: 2 },
+      { n: ["👍", "Camila confirmó que viene", "Respondió al recordatorio"], p: 3 },
+      { fin: "Tú no escribiste ni un mensaje." }] }
+};
+function landingExtras() {
+  const body = $("lpCelBody"), top = $("lpCelTop"), pts = $("lpDemoPts"); if (!body) return;
+  const quieto = !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
+  let modo = "cli", turno = 0, tocado = false;
+  const dormir = (ms) => new Promise((ok) => setTimeout(ok, quieto ? 0 : ms));
+  const burbuja = (s) => {
+    if (s.fin) return `<p class="lp-fin">${s.fin}</p>`;
+    if (s.n) return `<div class="lp-nt"><i>${s.n[0]}</i><span><b>${s.n[1]}</b><small>${s.n[2]}</small>${s.bt ? `<span class="bt"><span>${s.bt[0]}</span><span class="go">${s.bt[1]}</span></span>` : ""}</span></div>`;
+    return `<div class="lp-m${s.yo ? " yo" : ""}${s.ok ? " ok" : ""}">${s.t}${s.ch ? `<span class="ch">${s.ch.map((c) => `<span>${c}</span>`).join("")}</span>` : ""}</div>`;
+  };
+  async function correr() {
+    const yo = ++turno, D = DEMO[modo];
+    top.className = "lp-cel-top" + (modo === "due" ? " due" : ""); body.className = "lp-cel-body" + (modo === "due" ? " due" : "");
+    top.innerHTML = `<i>${D.top[0]}</i><span><b>${D.top[1]}</b><small>${D.top[2]}</small></span>`;
+    pts.innerHTML = D.pts.map((t, i) => `<li><i>${i + 1}</i><span>${t}</span></li>`).join(""); body.innerHTML = "";
+    for (const s of D.pasos) {
+      if (modo === "cli" && !s.yo && !quieto) { body.insertAdjacentHTML("beforeend", `<div class="lp-esc"><span></span><span></span><span></span></div>`); await dormir(800); if (yo !== turno) return; body.querySelector(".lp-esc")?.remove(); }
+      else await dormir(s.yo ? 900 : 1100);
+      if (yo !== turno) return;
+      body.insertAdjacentHTML("beforeend", burbuja(s));
+      while (modo === "cli" && body.scrollHeight > body.clientHeight + 2 && body.firstElementChild) body.firstElementChild.remove();   // el chat sube solo, como en WhatsApp
+      if (s.p !== undefined) pts.children[s.p]?.classList.add("on");
+      await dormir(650); if (yo !== turno) return;
+    }
+    await dormir(4200); if (yo !== turno || quieto) return;
+    if (!tocado) { modo = modo === "cli" ? "due" : "cli"; marcar(); }   // si nadie tocó, pasa sola a la otra pantalla
+    correr();
+  }
+  const marcar = () => document.querySelectorAll("[data-demo]").forEach((b) => { const on = b.dataset.demo === modo; b.classList.toggle("on", on); b.setAttribute("aria-selected", on); });
+  document.querySelectorAll("[data-demo]").forEach((b) => b.onclick = () => { modo = b.dataset.demo; tocado = true; marcar(); correr(); });
+  $("lpRep").onclick = () => correr();
+  // arranca cuando la demo entra a la pantalla (no gasta nada antes)
+  let visto = false;
+  const io = "IntersectionObserver" in window ? new IntersectionObserver((E) => { if (E.some((x) => x.isIntersecting) && !visto) { visto = true; correr(); io.disconnect(); } }, { threshold: 0.25 }) : null;
+  if (io) io.observe($("lpDemo")); else correr();
+  // --- calculadora: lo que dejas de ganar por las citas que no llegan (con TUS números)
+  let valor = 25000;
+  const calc = () => { const n = Number($("lpNR").value || 0); $("lpN").textContent = n; $("lpTot").textContent = cop(Math.round(n * valor * 4.3 / 1000) * 1000); };
+  $("lpNR").oninput = calc;
+  $("lpV").onclick = (e) => { const b = e.target.closest("[data-v]"); if (!b) return; valor = Number(b.dataset.v); $("lpV").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b)); calc(); };
+  calc();
+  // --- barra fija «Probar gratis»: aparece al bajar y se esconde al llegar al final (ahí ya está el botón grande)
+  const fija = $("lpFija"), fin = document.querySelector(".lp-final");
+  const ver = () => { const abajo = fin && fin.getBoundingClientRect().top < innerHeight; fija.classList.toggle("hidden", scrollY < 620 || abajo || !$("gate").classList.contains("hidden")); };
+  addEventListener("scroll", ver, { passive: true }); ver();
+}
+// planes de la página de venta: nombres, precios y oferta salen del súper panel (nunca escritos a mano)
+function pintarPlanesLanding() {
+  const box = $("lpPlanesBox"); if (!box || !document.body.classList.contains("is-landing")) return;
+  const P = plansOf(PLAT), rec = PLAT.recommendedPlan || "gold";
+  box.innerHTML = PLAN_KEYS.map((k) => {
+    const p = P[k], gratis = k === "free", ben = planBenefits(P, k).slice(0, 7);
+    return `<article class="lp-pl-c${k === rec ? " rec" : ""}">${k === rec ? `<span class="mas">Más elegido</span>` : ""}
+      <h4>${esc(p.name)}</h4><p class="tg">${esc(p.tagline || "")}</p>
+      <p class="pr">${gratis ? "Gratis" : cop(p.priceCOP)}<small>${gratis ? ` · ${Number(p.days || 15)} días` : " / mes"}</small></p>
+      ${!gratis && p.oferta ? `<span class="of">${esc(OFERTA_TXT)}</span>` : ""}
+      ${DEFAULT_BENEFITS_INTRO[k] ? `<p class="in">${esc(DEFAULT_BENEFITS_INTRO[k])}</p>` : ""}
+      <ul>${ben.map((b) => `<li>${esc(b)}</li>`).join("")}</ul>
+      <button type="button" class="lp-btn ${k === rec ? "lp-btn-main" : "lp-btn-ghost"}" data-lp="trial">${gratis ? "Empezar gratis" : "Probar gratis primero"}</button></article>`;
+  }).join("");
+  $("lpPlanes").classList.remove("hidden");
+  const n = $("lpCalcN"), g = Number(P.gold.priceCOP || 0);   // el recordatorio por WhatsApp va en Gold: se dice el precio de ESE plan
+  if (n && g > 0) n.innerHTML = `Con el abono para apartar y el recordatorio por WhatsApp, quien aparta tiene motivos para llegar. El plan ${esc(P.gold.name)}, que trae el asistente de WhatsApp, cuesta <b>${cop(g)} al mes</b>.`;
+}
 // 2026-11-16 · ¿YA TIENE UNA CITA? Antes la página dejaba apartar dos seguidas sin preguntar (pasó en El Barba: 2:15 y 2:45, con 79 s
 //   de diferencia). Ahora pregunta lo mismo que el bot: sacar otra (p. ej. para otra persona), cambiar la que tiene o dejarla así.
 //   Se revisa aquí (con «Mis citas») y también en el servidor, por si se tocó dos veces o se abrió en otro celular.
@@ -1135,7 +1224,7 @@ $("mineList").addEventListener("click", async (e) => {
   const act = b.dataset.act;
   if (act === "pay") showPay(apt);
   if (act === "ticket") { closeModal("mineModal"); showTicket(apt); watchTicket(apt.code); }
-  // 2026-11-23b · falta poco y no puede ir: SÍ puede cancelar, diciendo el motivo (le llega al negocio). El dueño lo puede apagar en Configuración.
+  // 2026-11-24a · falta poco y no puede ir: SÍ puede cancelar, diciendo el motivo (le llega al negocio). El dueño lo puede apagar en Configuración.
   if (act === "cancel" && !canChange(apt) && apt.status !== "pending_payment" && S.settings?.lateCancel !== false) {
     const motivo = await uiPrompt("¿No puedes ir?", "Falta poco para tu cita. Sí la puedes cancelar: cuéntanos en una frase por qué no puedes ir. Se lo avisamos al negocio.", "", { okText: "Cancelar mi cita", cancelText: "Volver", danger: true });
     if (motivo === null) return;
@@ -1213,13 +1302,14 @@ getDoc(doc(db, "platform", "public")).then((d) => {
   if (S.settings) renderAll();
   const on = PLAT.trialEnabled !== false;
   $("trialCta").classList.toggle("hidden", !on);
-  // 2026-11-23b · en la página de un negocio NO hay «Probar gratis» mientras el cliente agenda (no se pierde la cita):
+  // 2026-11-24a · en la página de un negocio NO hay «Probar gratis» mientras el cliente agenda (no se pierde la cita):
   //   solo el sello chiquito abajo; la invitación sale DESPUÉS (cita confirmada y «Mis citas"), en otra pestaña.
   $("trialTop").classList.add("hidden"); $("trialTop").classList.remove("inline-flex");
   $("trialCta").classList.add("hidden");
   pintarSello();
   $("trialDaysTxt").textContent = `${Number(plansOf(PLAT).free.days || 30)} días gratis`;
   document.querySelectorAll(".lp-dias").forEach((x) => { x.textContent = String(Number(plansOf(PLAT).free.days || 15)); });
+  pintarPlanesLanding();
   if (document.body.classList.contains("is-landing")) { $("trialCta").classList.add("hidden"); $("trialTop").classList.add("hidden"); }
 }).catch(() => {});
 const PSTYLE = { free: ["linear-gradient(140deg,#5B6782,#2b3446)", "#fff", "🎁"], basic: ["linear-gradient(140deg,#2B59C3,#14213D)", "#fff", "⭐"], gold: ["linear-gradient(140deg,#f5c542,#b8860b)", "#1a1200", "👑"] };
@@ -1275,7 +1365,7 @@ $("btnTrial").onclick = () => {
   const f = $("trialForm");
   if (S.profile) { f.ownerName.value = `${S.profile.firstName || ""} ${S.profile.lastName || ""}`.trim(); f.whatsapp.value = S.profile.whatsapp || ""; }
   $("trialForm").classList.add("hidden"); $("trialDone").classList.add("hidden");
-  // 🚀 2026-11-23b · «Probar gratis» entra DIRECTO a la prueba (sin elegir plan): una sola pantalla. Los planes quedan en «Ver planes y precios».
+  // 🚀 2026-11-24a · «Probar gratis» entra DIRECTO a la prueba (sin elegir plan): una sola pantalla. Los planes quedan en «Ver planes y precios».
   if (PLAT.trialEnabled !== false) { T_PLAN = "free"; showTrialForm(true); }
   openModal("trialModal");
 };
