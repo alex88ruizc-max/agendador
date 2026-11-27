@@ -2,7 +2,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js?v=2026-11-24a";
+import { firebaseConfig, API_URL, DEFAULT_BUSINESS_ID } from "./config.js?v=2026-11-27a";
 
 export const app = initializeApp(firebaseConfig);
 // Caché en el dispositivo: muestra al instante lo último que se vio y luego actualiza en vivo
@@ -21,7 +21,7 @@ export function businessFromUrl() {
 export const bpath = (...parts) => ["businesses", BID, ...parts].join("/");
 
 // Versión de la página: cámbiala en cada actualización para comprobar que se publicó
-export const APP_VERSION = '2026-11-24a';
+export const APP_VERSION = '2026-11-27a';
 // Versiones que esta página espera del servidor y de las reglas de Firebase
 export const SERVER_VERSION = '2026-10-10n';
 export const RULES_VERSION = '2026-10-10l';
@@ -510,7 +510,7 @@ export const BOT_GLOBAL = [
   ["audios", "🎤", "Escuchar notas de voz"], ["saludoDiario", "👋", "Saludar una vez al día"], ["pedirNombre", "🙋", "Preguntar el nombre"],
   ["pedirCorreo", "📧", "Pedir el correo para su calendario"], ["loDeSiempre", "⭐", "Ofrecer «¿Lo de siempre?»"], ["recordatorio", "⏰", "Recordatorio antes de la cita"],
   ["recordatorioConfirmar", "✅", "Pedir confirmación en el recordatorio"], ["cambios", "🔄", "Cancelar o modificar por WhatsApp"],
-  ["avisosWa", "🔔", "Avisos al dueño por WhatsApp"], ["guardado", "🧠", "Guardado inteligente de contactos"], ["estados", "📸", "Estados con los cupos"], ["guia", "📲", "Estado «Cómo agendar»"], ["volver", "🔁", "Recordatorio de servicio (que vuelvan)"]
+  ["avisosWa", "🔔", "Avisos al dueño por WhatsApp"], ["guardado", "🧠", "Guardado inteligente de contactos"], ["ia", "🤖", "Respuestas inteligentes (Claude)"], ["estados", "📸", "Estados con los cupos"], ["guia", "📲", "Estado «Cómo agendar»"], ["volver", "🔁", "Recordatorio de servicio (que vuelvan)"]
 ];
 // 🏷️ el nombre del negocio completo: entre más largo, más pequeño (nunca «…»)
 export function nombreCompleto(el, txt) {
