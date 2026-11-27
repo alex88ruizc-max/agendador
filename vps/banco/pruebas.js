@@ -817,5 +817,43 @@ test('3.65 · 🤖 ia.js: la consulta a Claude usa caché, respaldo si declina, 
   respuesta = { stop_reason: 'tool_use', usage: {}, content: [{ type: 'tool_use', name: 'responder', input: { accion: 'nada', texto: '', pregunta_dueno: '' } }] };
   await O.pensar({ negocio: neg, mensaje: 'gracias por todo' }); assert.equal(via, 'beta'); assert.deepEqual(pedido.betas, ['server-side-fallback-2026-07-01']); assert.equal(pedido.fallbacks, 'default');
   assert.match(IA.REGLAS, /Nunca vuelvas a pedir un dato que el cliente ya dio/, 'regla dura copiada de Mary (ESTADO 1227)');
-  assert.match(IA.REGLAS, /Nunca inventes precios/); assert.match(IA.REGLAS, /Nunca cierres con «¿Te puedo ayudar en algo más\?»/);
+  assert.match(IA.REGLAS, /Nunca inventes precios/);
+  assert.match(IA.REGLAS, /responde ESA pregunta primero/, 'regla de Alex en Epic (ESTADO 1602)'); assert.match(IA.REGLAS, /Nunca cierres con «¿Te puedo ayudar en algo más\?»/);
+});
+
+test('3.67 · ⏰ Recordatorio de vencimiento: 2 días antes, una sola vez por fecha, con valor y medios de pago (también la prueba gratis)', { skip: !require('fs').existsSync(GS_MARY) && 'sin gs/ aquí' }, () => {
+  const src = require('fs').readFileSync(GS_MARY, 'utf8');
+  const dia = (n) => new Date(Date.UTC(2026, 10, 27 + n, 12)).toISOString().slice(0, 10);   // hoy = 27-nov-2026
+  const DB = {
+    'platform/public': { plans: { gold: { name: 'Gold', priceCOP: 40000 }, basic: { name: 'Básico', priceCOP: 30000 } }, payMethods: [{ label: 'Nequi', account: '3001234567', holder: 'Alex' }], brebEnabled: true, brebKey: '@tuagenda', nequiLink: 'https://checkout.wompi.co/l/abc' },
+    'businesses/anto/private/billing': { paidUntil: dia(2), ownerEmail: 'anto@correo.com', priceCOP: 40000 },
+    'businesses/barba/private/billing': { paidUntil: dia(2), ownerEmail: 'barba@correo.com', trial: true },
+    'businesses/lejos/private/billing': { paidUntil: dia(9), ownerEmail: 'x@y.co' },
+    'businesses/ya/private/billing': { paidUntil: dia(2), ownerEmail: 'ya@y.co', maryVencAviso: dia(2) } };
+  const NEG = [{ _id: 'anto', name: 'Antoluxury STUDIO', plan: 'gold' }, { _id: 'barba', name: 'El Barba', plan: 'free', trial: true }, { _id: 'lejos', name: 'Lejos', plan: 'gold' }, { _id: 'ya', name: 'Ya avisado', plan: 'gold' }, { _id: 'off', name: 'Suspendida', status: 'suspended' }];
+  const props = {}, tg = [], mails = [], escritos = [];
+  const fmt = (d, tz, p) => {
+    const o = (x) => new Intl.DateTimeFormat('es-CO', Object.assign({ timeZone: 'America/Bogota' }, x)).format(d);
+    if (p === 'yyyy-MM-dd') return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(d);
+    if (p === 'H') return String(Number(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Bogota', hour: 'numeric', hour12: false }).format(d)) % 24);
+    return o({ weekday: 'long' }) + ' ' + o({ day: 'numeric' }) + ' de ' + o({ month: 'long' });
+  };
+  let BIDV = '';
+  const G = { ACTIONS: {}, PUBLIC_ACTIONS: {}, console, Utilities: { formatDate: fmt }, PropertiesService: { getScriptProperties: () => ({ getProperty: (k) => props[k] || null, setProperty: (k, v) => { props[k] = v; } }) },
+    fsGet: (p) => DB[p] || null, fsListAll: () => NEG, setBusiness: (id) => { BIDV = id; }, tgNotify: (ids, t) => tg.push([BIDV, t]), sendMail: (to, sub, html) => mails.push([to, sub, html]),
+    commit: (w) => w.forEach((x) => { escritos.push(x); DB[x.p] = Object.assign({}, DB[x.p], x.v); }), wPatch: (p, v) => ({ p, v }), siteUrl: () => 'https://tuagenda.vip', esc: (x) => String(x), cop: (n) => '$' + Number(n).toLocaleString('es-CO'), superNotify: () => {} };
+  const F = new Function(...Object.keys(G), src + '\nreturn { maryRecordarVencimientos_ };')(...Object.values(G));
+  const r = F.maryRecordarVencimientos_(new Date('2026-11-27T15:00:00Z'));   // 10 a. m. en Colombia
+  assert.deepEqual(r.enviados.sort(), ['anto', 'barba'], 'solo a quienes les faltan 2 días, una vez, y no a las suspendidas');
+  const a = tg.find((x) => x[0] === 'anto')[1];
+  assert.match(a, /Tu plan Gold vence en 2 días/); assert.match(a, /\$40\.000 al mes/); assert.match(a, /¿Quieres seguir con Tu Agenda\?/);
+  assert.match(a, /Nequi: 3001234567 \(Alex\)/); assert.match(a, /Bre-B: @tuagenda/); assert.match(a, /checkout\.wompi\.co/); assert.match(a, /admin\.html\?b=anto&tab=plan/);
+  assert.match(tg.find((x) => x[0] === 'barba')[1], /Tu prueba gratis termina en 2 días[\s\S]*Elige tu plan/, 'la prueba gratis también');
+  assert.equal(mails.length, 2); assert.equal(mails[0][0], 'anto@correo.com'); assert.match(mails[0][2], /Sí, quiero seguir/);
+  assert.equal(DB['businesses/anto/private/billing'].maryVencAviso, dia(2), 'queda marcado: no se repite');
+  // el mismo día no vuelve a correr, y de noche no trabaja
+  assert.equal(F.maryRecordarVencimientos_(new Date('2026-11-27T20:00:00Z')).yaHoy, true);
+  assert.equal(F.maryRecordarVencimientos_(new Date('2026-11-28T04:00:00Z')).fuera, true);
+  // al otro día (falta 1): ya estaba avisado para esa fecha → no repite
+  tg.length = 0; const r2 = F.maryRecordarVencimientos_(new Date('2026-11-28T15:00:00Z')); assert.deepEqual(r2.enviados, []); assert.equal(tg.length, 0);
 });

@@ -1,4 +1,4 @@
-🗓️ AGENDADOR IA · agendador-ia-3.66   (por dentro atiende «Mary», la recepcionista)
+🗓️ AGENDADOR IA · agendador-ia-3.67   (por dentro atiende «Mary», la recepcionista)
 =====================================================================================================
 🚫 REGLA UNIVERSAL N.º 1 — EPIC NO SE TOCA (manda sobre todo lo demás, para Alex, para Claude y para cada script de este paquete)
    Epic (Mary de Epic, Luisa, la tienda, epic-waha, epic-tiendas, Epic Channels…) y CUALQUIER otro proyecto:
@@ -63,6 +63,7 @@ AJUSTES POR NEGOCIO (negocios.json)
   "recordatorioMin": 120     ·   "estados": { "activo": true, "hoy": "07:30", "semana": "07:00", "semanaDia": 1 }
   En Firestore (settings/general del negocio) maryAutoCaptura: true → la captura confirma al instante y el dueño revisa después.
 
+NOVEDADES 3.67 · ⏰ Recordatorio de vencimiento: 2 días antes, a cada negocio (y a la prueba gratis), por Telegram, app, WhatsApp de avisos y correo, con el valor y los medios de pago. La IA responde primero lo que le preguntan. Trae lo de la 3.66. Después manda agendador-web-2026-11-27a.zip.
 NOVEDADES 3.66 · 🤖 La IA con lo aprendido en Epic: Claude Haiku 5.5 (como en Epic), en prueba lee TODOS los mensajes y compara con las reglas (/ia lo resume), y no vuelve a pedir datos ya dados. El cartero también copia el mapa del código de Mary (solo lectura). Trae lo de la 3.65. La página sigue en 2026-11-24b.
 NOVEDADES 3.65 · 🤖 Respuestas inteligentes con Claude (ia.js): entiende lo que las reglas no entienden, con el contexto del panel. Arranca en PRUEBA (sombra). Llave: /ia clave sk-ant-… (se borra del chat). /ia activo para que responda. Después manda agendador-web-2026-11-24b.zip.
 NOVEDADES 3.64 · 🧾 «Ver comprobante» se abre dentro del panel (acción maryComprobante): ya no manda a Google Drive ni pide acceso. Trae lo de la 3.63. Después manda agendador-web-2026-11-23a.zip.

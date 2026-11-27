@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.66** · Página **2026-11-24b** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.67** · Página **2026-11-27a** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -136,6 +136,17 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-27 · agendador-ia-3.67 · página 2026-11-27a · ⏰ recordatorio de vencimiento del plan (y de la prueba gratis)
+- **Pedido de Alex:** «recordarle a los negocios cuando les falten 2 días para vencer si quieren continuar y poner los medios de pago». Dijo «sí» a: por todas las vías y también a la prueba gratis.
+- **Servidor (`mary.gs`, `maryRecordarVencimientos_`):** corre dentro del lector de pagos (cada minuto) pero trabaja UNA vez al día, de 9 a. m. a 7 p. m. Recorre todos los negocios; si a `private/billing.paidUntil` le faltan 2 días (o 1, si ese día no corrió) y no se avisó para esa fecha (`maryVencAviso`), manda:
+  - «⏰ Tu plan Gold vence en 2 días… ¿Quieres seguir con Tu Agenda? Renovar cuesta $40.000 al mes» + **medios de pago del súper panel** (payMethods, Bre-B, link de pago) + link a «Mi plan». En prueba gratis: «Tu prueba gratis termina… elige tu plan».
+  - Por **Telegram + notificación de la app + WhatsApp de avisos** (con `tgNotify`) y **correo** con el botón «✅ Sí, quiero seguir». Al súper le llega cuántos se recordaron. Las suspendidas no.
+- **Panel:** `admin.html?b=…&tab=plan` abre directo «Mi plan».
+- Idea copiada de Epic: el aviso antes del corte de los alquileres. Queda pendiente el «¡Gracias por renovar!» al pagar.
+- **IA (de paso, por el mapa de Epic):** regla de Alex en Epic (ESTADO 1602) «si preguntan algo, responde eso primero» sumada a `ia.js`.
+- **Mapa de Epic** actualizado al 27-nov (1.732 líneas): regla 1602, respuestas aprendidas, regla fija que pisó a la IA (1622), lentitud por esperas de ráfaga.
+- Pruebas: 212 pasan.
 
 ### 2026-11-24 · agendador-ia-3.66 · 🤖 la IA con lo aprendido en Epic (usando el mapa)
 - **Reclamo de Alex:** «usa el mapa de Epic». Era cierto: el mapa (14-nov, 532 líneas) estaba viejo (ESTADO ya tiene 1.593) y la 3.65 se armó con búsquedas sueltas. **Mapa actualizado** en `agendador-epic-copia/mapa/MAPA-EPIC.md`: índice nuevo y tabla «La IA de Mary» con la línea de cada lección. La 3.65 no se instaló.

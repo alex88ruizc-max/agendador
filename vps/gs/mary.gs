@@ -14,7 +14,7 @@
  * Instalación: pega este archivo, ejecuta activarMary() una vez, copia la clave que sale en el registro
  * y ponla en el mary.env del VPS (MARY_KEY). Vuelve a implementar la aplicación web (Implementar > Administrar > editar > Nueva versión).
  */
-const MARY_VERSION = 'agendador-ia-3.66';
+const MARY_VERSION = 'agendador-ia-3.67';
 
 // Se registra como acción pública del servidor (sin sesión: entra con la clave de Mary).
 // ⚠️ Este archivo debe quedar DEBAJO del archivo principal en la lista de archivos de Apps Script (los nuevos quedan al final: así está bien).
@@ -549,7 +549,68 @@ function montosPago_(txt) {
     return Number(m.replace(/[$\s]/g, '').replace(/,\d{2}$/, '').replace(/[.,]/g, ''));
   });
 }
+// ⏰ 3.67 · RECORDATORIO DE VENCIMIENTO (orden de Alex, 27-nov): cuando a un negocio le faltan 2 días para que se le venza el plan
+//    (o la prueba gratis), le llega «¿quieres seguir?» con el valor y los medios de pago del súper panel. Una sola vez por fecha de corte.
+//    Por: correo + Telegram + notificación de la app + WhatsApp de avisos del dueño (tgNotify ya reparte a esos tres). Idea copiada de Epic
+//    (aviso antes del corte de los alquileres). Corre dentro del lector de pagos (cada minuto), pero solo trabaja UNA vez al día (9 a. m. – 7 p. m.).
+function maryDiasEntre_(a, b) { return Math.round((Date.parse(b + 'T12:00:00Z') - Date.parse(a + 'T12:00:00Z')) / 86400000); }
+function maryMediosPago_(pp) {
+  const L = [];
+  (pp.payMethods || []).forEach(function (m) { if (m && m.label && m.account) L.push(String(m.label) + ': ' + String(m.account) + (m.holder ? ' (' + m.holder + ')' : '')); });
+  if (pp.brebEnabled && pp.brebKey) L.push('Bre-B: ' + pp.brebKey + (pp.brebHolder ? ' (' + pp.brebHolder + ')' : ''));
+  if (pp.nequiLink) L.push('Pago en línea: ' + pp.nequiLink);
+  return L;
+}
+function maryVencimientoTexto_(o) {
+  const cuando = o.dias === 1 ? 'mañana' : 'en ' + o.dias + ' días';
+  const titulo = o.prueba ? '⏰ Tu prueba gratis termina ' + cuando : '⏰ Tu plan ' + o.plan + ' vence ' + cuando;
+  const cuerpo = (o.prueba ? 'Tu prueba gratis de ' + o.negocio + ' termina el ' + o.fecha + '. ¿Quieres seguir con Tu Agenda? Elige tu plan y sigues recibiendo citas sin parar.'
+    : 'El plan ' + o.plan + ' de ' + o.negocio + ' vence el ' + o.fecha + '. ¿Quieres seguir con Tu Agenda?' + (o.precio ? ' Renovar cuesta ' + cop(o.precio) + ' al mes.' : ''));
+  const medios = o.medios.length ? '\n\nMedios de pago:\n• ' + o.medios.join('\n• ') : '';
+  return { titulo: titulo, texto: cuerpo + medios + '\n\nCuando pagues, sube el comprobante en «Mi plan» y listo: ' + o.link };
+}
+function maryRecordarVencimientos_(ahora) {
+  ahora = ahora || new Date();
+  const hoy = Utilities.formatDate(ahora, 'America/Bogota', 'yyyy-MM-dd'), hora = Number(Utilities.formatDate(ahora, 'America/Bogota', 'H'));
+  if (hora < 9 || hora >= 19) return { ok: true, fuera: true };
+  const props = PropertiesService.getScriptProperties();
+  if (props.getProperty('mary_venc_dia') === hoy) return { ok: true, yaHoy: true };
+  props.setProperty('mary_venc_dia', hoy);
+  BID = '';
+  const pp = fsGet('platform/public') || {}, planes = pp.plans || {}, medios = maryMediosPago_(pp);
+  const nombrePlan = function (k) { return String((planes[k] || {}).name || { basic: 'Básico', gold: 'Gold', free: 'Prueba gratis' }[k] || 'Gold'); };
+  const L = fsListAll('businesses') || [], enviados = [];
+  L.forEach(function (b) {
+    const id = String((b && (b._id || b.id)) || '').replace(/[^\w-]/g, ''); if (!id || b.status === 'deleted' || b.status === 'suspended') return;
+    let bl = null; try { bl = fsGet('businesses/' + id + '/private/billing'); } catch (e) { bl = null; }
+    const corte = String((bl && bl.paidUntil) || '').slice(0, 10); if (!/^\d{4}-\d{2}-\d{2}$/.test(corte)) return;
+    const dias = maryDiasEntre_(hoy, corte); if (dias < 1 || dias > 2) return;   // 2 días antes (o 1, si ese día no corrió)
+    if (bl.maryVencAviso === corte) return;                                    // ya se le avisó para esta fecha
+    const prueba = b.plan === 'free' || (!b.plan && b.trial === true) || bl.trial === true;
+    const plan = prueba ? 'free' : (['basic', 'gold'].indexOf(b.plan) >= 0 ? b.plan : 'gold');
+    const fecha = Utilities.formatDate(new Date(corte + 'T12:00:00Z'), 'America/Bogota', 'EEEE d \'de\' MMMM').replace(/^\w/, function (x) { return x.toUpperCase(); });
+    const t = maryVencimientoTexto_({ prueba: prueba, dias: dias, fecha: fecha, negocio: String(b.name || id), plan: nombrePlan(plan), precio: Number(bl.priceCOP || (planes[plan] || {}).priceCOP || 0), medios: medios, link: siteUrl() + '/admin.html?b=' + encodeURIComponent(id) + '&tab=plan' });
+    try {
+      setBusiness(id);
+      try { tgNotify([], '<b>' + esc(t.titulo) + '</b>\n' + esc(t.texto)); } catch (e) { console.error('venc tg ' + id + ': ' + e); }   // Telegram + app + WhatsApp de avisos
+      const correo = String(bl.ownerEmail || '').trim();
+      if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(correo)) {
+        const html = '<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;color:#14213D"><h2 style="margin:0 0 10px">' + esc(t.titulo) + '</h2>'
+          + '<p style="font-size:15px;line-height:1.5">' + esc(t.texto).replace(/\n/g, '<br>') + '</p>'
+          + '<p style="margin:22px 0"><a href="' + siteUrl() + '/admin.html?b=' + encodeURIComponent(id) + '&tab=plan" style="background:#5B3FE0;color:#fff;padding:13px 22px;border-radius:12px;text-decoration:none;font-weight:bold">✅ Sí, quiero seguir</a></p>'
+          + '<p style="font-size:13px;color:#5B6782">¿No vas a seguir o tienes dudas? Responde este correo y te ayudamos.</p></div>';
+        try { sendMail(correo, t.titulo + ' · Tu Agenda', html, 'Tu Agenda'); } catch (e) { console.error('venc correo ' + id + ': ' + e); }
+      }
+      commit([wPatch('businesses/' + id + '/private/billing', { maryVencAviso: corte, maryVencAvisoAt: new Date() })]);
+      enviados.push(id);
+    } catch (e) { console.error('Vencimiento ' + id + ': ' + e); }
+  });
+  BID = '';
+  if (enviados.length) try { superNotify('⏰ Recordé el vencimiento a ' + enviados.length + ' negocio(s): ' + enviados.join(', ')); } catch (e) { /* sin aviso al súper */ }
+  return { ok: true, enviados: enviados };
+}
 function revisarPagosBreb() {
+  try { maryRecordarVencimientos_(); } catch (e) { console.error('Vencimientos: ' + e); }   // 3.67: una vez al día, 2 días antes
   const pp = fsGet('platform/public') || {};
   if (!pp.brebEnabled) return;
   BID = '';
