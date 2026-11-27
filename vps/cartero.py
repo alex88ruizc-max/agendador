@@ -3,7 +3,7 @@
 #    Le mandas al bot un archivo y él lo instala (solo si viene de TU chat):
 #      agendador-ia-*.zip    → el Agendador IA del VPS (Mary por dentro) + su Apps Script en Google (actualizar.sh: banco de pruebas; si falla NO instala)
 #      agendador-web-*.zip   → la página tuagenda.vip (sube los archivos a GitHub, rama main, con respaldo de lo anterior)
-#    Comandos:  /estado  (cómo está Mary)   /registro  (qué hizo Mary)   /soporte  (línea de soporte)   /epicmd  (copia del md de Epic, solo lectura)   /epicvivo  (revisar ya la copia en vivo)   /ia  (respuestas inteligentes)   /ayuda
+#    Comandos:  /estado  (cómo está Mary)   /registro  (qué hizo Mary)   /soporte  (línea de soporte)   /epicmd  (copia del md de Epic, solo lectura)   /epicvivo  (revisar ya la copia en vivo)   /ia  (respuestas inteligentes)   /casos  (casos de entrenamiento)   /ayuda
 #    Solo usa la librería estándar de Python. Corre como servicio de systemd (agendador-cartero), lo instala instalar-cartero.sh.
 import json, os, re, subprocess, sys, time, urllib.request, urllib.parse, zipfile, io, base64
 
@@ -166,6 +166,32 @@ def limpiar_secretos(txt):
 # 📖 3.60 · /epicmd — SOLO MIRAR (autorizado por Alex el 2026-11-14: «te autorizo a que solo mires en epic con el comando»).
 #    Busca los archivos .md que hay en el VPS FUERA de ~/agendador (ahí vive el md de Epic) y le manda a Alex una COPIA por Telegram.
 #    Regla N.º 1: aquí solo se LEE. No se escribe, no se borra, no se mueve ni se ejecuta nada de Epic. Antes de mandar, se quitan las claves.
+# 🎓 3.68 · CASOS DE ENTRENAMIENTO del agendador (ya anonimizados por el bot: sin nombres, números, correos ni códigos).
+#    Cada 6 h (o con /casos) se suben los de hoy y ayer al repositorio PRIVADO, carpeta agendador/casos/. Nunca a uno público.
+_CASOS = {'t': 0, 'h': {}}
+def casos_subir(forzar=False):
+    import hashlib, base64
+    if not GH_TOKEN: return '⚠️ Falta GH_TOKEN'
+    if not forzar and time.time() - _CASOS['t'] < 6 * 3600: return ''
+    _CASOS['t'] = time.time()
+    carpeta = os.path.join(AQUI, 'datos', 'casos')
+    try: L = sorted(f for f in os.listdir(carpeta) if re.match(r'^\d{4}-\d{2}-\d{2}\.jsonl$', f))[-2:]
+    except Exception: return '🎓 Casos: todavía no hay (aparecen cuando el bot les responde a los clientes).'
+    s0, r0 = gh_copia('GET', '')
+    if s0 != 200 or r0.get('private') is not True: return '🚫 Casos: el repositorio de copia no existe o NO es privado. No subí nada.'
+    rama = r0.get('default_branch') or 'main'; subidos, total = 0, 0
+    for f in L:
+        datos = open(os.path.join(carpeta, f), 'rb').read(); total += datos.count(b'\n')
+        h = hashlib.sha1(b'blob ' + str(len(datos)).encode() + b'\0' + datos).hexdigest()
+        if _CASOS['h'].get(f) == h: continue
+        nombre = 'agendador/casos/' + f
+        s1, r1 = gh_copia('GET', '/contents/' + nombre + '?ref=' + rama)
+        if s1 == 200 and r1.get('sha') == h: _CASOS['h'][f] = h; continue
+        cuerpo = {'message': 'casos de entrenamiento ' + f + ' (anonimizados)', 'content': base64.b64encode(datos).decode(), 'branch': rama}
+        if s1 == 200 and r1.get('sha'): cuerpo['sha'] = r1['sha']
+        s2, _ = gh_copia('PUT', '/contents/' + nombre, cuerpo)
+        if s2 in (200, 201): _CASOS['h'][f] = h; subidos += 1
+    return '🎓 Casos de entrenamiento: ' + str(total) + ' en ' + ', '.join(L) + ' · ' + str(subidos) + ' archivo(s) subido(s) a la copia privada.'
 SECRETOS_MD = [   # 3.62: lo que va después de «clave:» solo se quita si tiene un número o es largo (una palabra como «correo» no es clave) · en un md las claves van sueltas (sin comillas): se quitan por su forma y por la palabra que las anuncia
     (re.compile(r'\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}\b|\bgithub_pat_[A-Za-z0-9_]{20,}\b'), '«TOKEN DE GITHUB QUITADO»'),
     (re.compile(r'\bAIza[0-9A-Za-z_-]{30,}\b'), '«LLAVE DE GOOGLE QUITADA»'),
@@ -383,6 +409,7 @@ def atender(m):
         except Exception as e: decir('No se pudo: ' + str(e))
     elif texto.startswith('/auditoria') or texto.startswith('/auditoría'): decir(auditoria())
     elif texto.startswith('/limpiar'): decir(limpiar())
+    elif texto.startswith('/casos'): decir(casos_subir(True) or 'sin novedad')   # 3.68
     elif texto.startswith('/epicvivo'): decir(espejo_epic(True) or 'sin novedad')   # 3.61: revisar YA la copia en vivo
     elif texto.startswith('/epicmd'): cmd_epicmd(texto)   # 3.60: solo mirar
     elif texto.startswith('/servidor'):
@@ -536,6 +563,8 @@ def main():
     pos = 0
     while True:
         espejo_solo()   # 3.61: copia en vivo de los md de Epic (solo lectura; como mucho cada 10 min)
+        try: casos_subir()   # 3.68: casos de entrenamiento anonimizados, cada 6 h
+        except Exception as e: print('casos:', e, flush=True)
         try:
             r = tg('getUpdates', {'offset': pos, 'timeout': 50, 'allowed_updates': ['message']}, timeout=70)
             for u in r.get('result', []):

@@ -1608,3 +1608,21 @@ test('3.66 · 🧪 Sombra sobre TODOS los mensajes (copiado del informe de Mary,
   assert.equal(G.pedidos.length, 0);
   P.CFG.ia = { clave: '', modo: 'sombra', modelo: '', topeDia: 150, topeChat: 20 };
 });
+
+test('3.68 · 🎓 Casos de entrenamiento: cada respuesta al cliente queda guardada SIN nombres, números, correos, códigos ni links', async () => {
+  const fs2 = require('fs'), path2 = require('path');
+  mundoNuevo();
+  W.fsDirecto = { st: { businessName: 'Lina Spa', businessType: 'unas', slotDurationMinutes: 30, minAdvanceMinutes: 0, bookingWindowDays: 30, businessHours: { 1: [{ open: '09:00', close: '19:00' }] } },
+    staff: [{ id: 's1', name: 'Andrés Mora', active: true }], servicios: [{ id: 'c1', name: 'Corte', minutes: 40, priceCOP: 20000, type: 'base', active: true }], biz: { status: 'active', name: 'Lina Spa' } };
+  B.CASO_NEG.clear();
+  const dir = path2.join(P.CFG.datos, 'casos'); try { fs2.rmSync(dir, { recursive: true, force: true }); } catch (e) { /* nada */ }
+  B.ASIS.cliente('lina-spa:' + CLIENTE).nombre = 'Camila Rojas';
+  await llega(wahaMsg(CLIENTE, 'hola soy Camila, mi correo es cami@gmail.com y mi cel 3001234567, ¿hay cupo con Andrés?'));
+  await new Promise((ok) => setTimeout(ok, 50));
+  const f = fs2.readdirSync(dir).find((x) => /\.jsonl$/.test(x)); assert.ok(f, 'se guardó el caso');
+  const L = fs2.readFileSync(path2.join(dir, f), 'utf8').trim().split('\n').map((x) => JSON.parse(x));
+  const todo = JSON.stringify(L);
+  for (const malo of ['Camila', 'cami@gmail.com', '3001234567', 'Andrés', 'Lina Spa', CLIENTE, 'tuagenda.vip']) assert.ok(!todo.includes(malo), 'se coló: ' + malo);
+  assert.match(L[0].cliente, /«Nombre».*(«correo»|\[correo\]).*(«número»|\[número\]).*«Nombre»/); assert.equal(L[0].tipo, 'unas'); assert.equal(L[0].via, 'regla'); assert.ok(L[0].bot.length > 0);
+  assert.equal(B.anonimizar('tu reserva R-AB12CD', []), 'tu reserva «código»');
+});

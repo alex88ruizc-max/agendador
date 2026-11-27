@@ -6,7 +6,7 @@
 const http = require('http'), fs = require('fs'), path = require('path');
 const T = require('./textos'), C = require('./correo'), E = require('./estado'), A = require('./asistente');
 
-const VERSION = 'agendador-ia-3.67';
+const VERSION = 'agendador-ia-3.68';
 const env = (k, d) => (process.env[k] === undefined || process.env[k] === '' ? d : process.env[k]);
 const CFG = {
   puerto: parseInt(env('PUERTO', '3060'), 10),
@@ -138,6 +138,7 @@ async function escribir(neg, numero, texto) {
   }
   const id = r && r.key && r.key.id; if (id) { MEM.enviados.push(id); if (MEM.enviados.length > 500) MEM.enviados.splice(0, 100); memGuardar(); }
   hilo(neg.bid + ':' + n, true, texto);   // 3.65: lo último que se habló (para que la IA no repita)
+  casoAnotar(neg, n, texto);              // 3.68: caso de entrenamiento, SIN nombres ni números
   est.respondidos++;
   return r;
 }
@@ -166,6 +167,7 @@ async function escribirLista(neg, numero, L) {
     } else r = await evo('post', '/message/sendList/' + encodeURIComponent(neg.instancia), { number: n, title: titulo, description: cuerpo || ' ', buttonText: String(L.boton || 'Ver opciones').slice(0, 20), footerText: L.pie || ' ', sections: sec });
     const id = r && r.key && r.key.id; if (id) { MEM.enviados.push(id); if (MEM.enviados.length > 500) MEM.enviados.splice(0, 100); memGuardar(); }
     est.respondidos++;
+    { const txt = L.texto + ' [lista: ' + L.secciones.map((x) => x.filas.map((f) => f.titulo).join(' / ')).join(' / ') + ']'; hilo(neg.bid + ':' + n, true, txt); casoAnotar(neg, n, txt); }   // 3.68
     return r;
   } catch (e) {
     if (/número inválido/.test(e.message)) throw e;
@@ -583,6 +585,42 @@ async function soporteSesion(accion, numero) {
   const e = await ver(), cfg = await soporteCfg();
   return { ok: true, estado: e.estado, numero: e.numero, prendidaEnElSuperPanel: cfg.activo, numeroEnElSuperPanel: cfg.numero, personasDeTiendas: Object.keys(memSoporte().gente).length, numerosDeDuenos: Object.keys(cfg.activo ? await soporteGente() : SOP_GENTE.L).length, tiendasRevisadas: SOP_GENTE.tiendas, listaDeDuenos: SOP_GENTE.nota };
 }
+// 🎓 3.68 · CASOS DE ENTRENAMIENTO (orden de Alex: «usa esos datos para entrenar, sin nombres ni números, es solo entrenamiento»).
+//    Cada vez que el bot le contesta a un cliente, se guarda el par «lo que escribió el cliente → lo que respondió el bot» en
+//    datos/casos/AAAA-MM-DD.jsonl, ANONIMIZADO: sin nombres (del cliente, del negocio ni del equipo), sin números de teléfono, sin correos,
+//    sin códigos de reserva ni links. Solo el tipo de negocio. El cartero los sube al repositorio PRIVADO y de ahí salen las pruebas del banco.
+const CASOS_TOPE = parseInt(env('CASOS_TOPE', '3000'), 10), CASOS = { fecha: '', n: 0 };
+function anonimizar(t, nombres) {
+  let x = String(t || '');
+  (nombres || []).filter((n) => n && String(n).trim().length >= 3).sort((a, b) => String(b).length - String(a).length).forEach((n) => {
+    String(n).trim().split(/\s+/).concat([String(n).trim()]).filter((p) => p.length >= 3).forEach((p) => { x = x.replace(new RegExp('(^|[^\\p{L}])' + p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![\\p{L}])', 'giu'), '$1«Nombre»'); });
+  });
+  return x.replace(/https?:\/\/\S+/gi, '«link»').replace(/[^\s@]+@[^\s@]+\.[^\s@]+/g, '«correo»').replace(/\bR-?[A-Z0-9]{6}\b/g, '«código»')
+    .replace(/(\+?\d[\d\s.-]{6,}\d)/g, '«número»').replace(/\b\d{7,}\b/g, '«número»').slice(0, 800);
+}
+const CASO_NEG = new Map();   // bid → { nombres del negocio y del equipo, tipo } (6 h)
+async function casoNegocio(bid) {
+  const ya = CASO_NEG.get(bid); if (ya && Date.now() - ya.t < 6 * 3600000) return ya;
+  CL = CL || crearCL();
+  const d = await CL.contexto(bid);
+  const x = { t: Date.now(), tipo: String((d.st || {}).businessType || ''), nombres: [(d.st || {}).businessName, (d.biz || {}).name].concat((d.staff || []).map((s) => s.name || s.nombre)) };
+  CASO_NEG.set(bid, x); return x;
+}
+function casoAnotar(neg, n, textoBot) {
+  const k = neg.bid + ':' + n, L = ((MEM.hilo || {})[k] || []);
+  const cli = L.length >= 2 ? L[L.length - 2] : null;   // el último es lo que acaba de decir el bot
+  if (!cli || cli.yo || Date.now() - cli.ts > 5 * 60000) return;   // solo si es respuesta a un cliente (no avisos ni estados)
+  const via = CASO_VIA.get(k) || 'regla'; CASO_VIA.delete(k);
+  casoNegocio(neg.bid).catch(() => null).then((ng) => {
+    if (!ng) return;   // sin los nombres del negocio no se guarda (no se arriesga a guardar un nombre)
+    const hoy = ahoraLocal().fecha; if (CASOS.fecha !== hoy) Object.assign(CASOS, { fecha: hoy, n: 0 }); if (CASOS.n >= CASOS_TOPE) return;
+    const cl = ASIS.cliente(k) || {}, nombres = [cl.nombre, cl.nombreWa].concat(ng.nombres);
+    const fila = { t: new Date().toISOString().slice(0, 16), tipo: ng.tipo, cliente: anonimizar(cli.t, nombres), bot: anonimizar(textoBot, nombres), via };
+    const dir = path.join(CFG.datos, 'casos'); fs.mkdirSync(dir, { recursive: true });
+    fs.appendFileSync(path.join(dir, hoy + '.jsonl'), JSON.stringify(fila) + '\n'); CASOS.n++;
+  }).catch((e) => log('caso', e.message));
+}
+const CASO_VIA = new Map();   // chat → 'ia' cuando la respuesta la redactó la IA
 // 🤖 3.65 · RESPUESTAS INTELIGENTES (Claude, de Anthropic). Idea copiada de Mary de Epic: las reglas van primero; la IA entiende y redacta
 //    lo que las reglas no entienden, y el código decide (agendar, cancelar, cobrar siguen siendo del flujo de siempre).
 //    IA_MODO: «sombra» (por defecto: piensa y lo anota en el registro, pero NO le escribe al cliente) · «activo» · «apagado».
@@ -646,7 +684,7 @@ async function respuestaIA(neg, c, k, info) {
   if (CFG.ia.modo !== 'activo') { IA_USO.comp = IA_USO.comp || { iguales: 0, distintas: 0 }; IA_USO.comp.noEntendio = (IA_USO.comp.noEntendio || 0) + 1; anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: '🤖 IA (prueba, no se envió · las reglas no lo entendieron) → ' + r.accion + (r.texto ? ': «' + r.texto.slice(0, 220) + '»' : '') + (r.preguntaDueno ? ' · al dueño: «' + r.preguntaDueno.slice(0, 120) + '»' : '') }); return false; }
   const de = (t) => anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: '🤖 IA ' + t });
   if (r.accion === 'nada') { de('no hacía falta responder'); return true; }
-  if (r.accion === 'responder') { await escribir(neg, c.tel, r.texto); de('respondió'); return true; }
+  if (r.accion === 'responder') { CASO_VIA.set(k, 'ia'); await escribir(neg, c.tel, r.texto); de('respondió'); return true; }
   if (r.accion === 'dueno') {
     await escribir(neg, c.tel, r.texto || 'Déjame confirmarlo con el negocio y te aviso por aquí 🙏');
     const av = botDe(neg).avisos || {};
@@ -1319,5 +1357,5 @@ if (require.main === module) {
   servidor.listen(CFG.puerto, () => { log('👩‍💼 ' + VERSION + ' escuchando en ' + CFG.puerto + ' · modo ' + CFG.modo); negocios(); arrancarRelojes(); });
 }
 // 🧪 solo para el banco de escenarios (banco/escenarios.js): deja a Mary como recién encendida
-const _banco = { IA_USO, respuestaIA, hilo, ponerIA: (x) => { IA_CLI = x; }, olvidarSinBotT: () => SINBOT_T.clear(), sinBotAlDia, negocios, atenderSoporte, soporteSesion, SOP_CFG, SOP_TIENDAS, memSoporte, ASIS, BOT, yaLoDije, memDicho: () => (MEM.dicho = MEM.dicho || {}), memHumano: () => MEM.humano, memRobot: () => (MEM.robot = MEM.robot || {}), memConv: () => (MEM.conv = MEM.conv || {}), tickRecordatorios, tickVolver, tickRetomar, tickEstadisticas, tickEstados, publicarGuia, publicarLlavePush, llavesPush, audienciaDe, AUDIENCIA, memLids: () => (MEM.lids = MEM.lids || {}), entregarAvisos, tickPedidosWa, memAvisoPago: () => (MEM.avisoPago = MEM.avisoPago || {}), avisados, botOff: BOT_OFF, apagarGlobal, botAlDia, botDe, memGuia: () => (MEM.guia = MEM.guia || {}), memStats: () => (MEM.stats = MEM.stats || {}), publicarEstado, alMensaje, alEventoConexion, ultimos, reiniciar() { CL = null; MEM.soporte = { gente: {}, callado: {} }; SOP_CFG.t = 0; SOP_CFG.activo = false; SOP_TIENDAS.clear(); SOP_GENTE.L = {}; SOP_GENTE.t = 0; MEM.sinbotPanel = {}; SINBOT_T.clear(); MEM.volver = {}; MEM.stats = {}; MEM.piePrueba = {}; delete MEM.pushPublicada; MEM.lids = {}; MEM.lidAviso = {}; LID_NO.clear(); MEM.guia = {}; MEM.avisoPago = {}; avisados.clear(); leer.avisado = false; BOT_LEIDO.clear(); MEM.sinbot = {}; MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; MEM.conv = {}; MEM.clientes = {}; MEM.conectados = {}; MEM.pendientesWa = {}; MEM.codigos = {}; MEM.robot = {}; MEM.dicho = {}; AGRUPA.clear(); ASIS._cat.clear(); BOT.clear(); CONTACTOS.clear(); AUDIENCIA.clear(); vinculando.clear(); delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
+const _banco = { anonimizar, casoAnotar, CASO_NEG, CASOS, IA_USO, respuestaIA, hilo, ponerIA: (x) => { IA_CLI = x; }, olvidarSinBotT: () => SINBOT_T.clear(), sinBotAlDia, negocios, atenderSoporte, soporteSesion, SOP_CFG, SOP_TIENDAS, memSoporte, ASIS, BOT, yaLoDije, memDicho: () => (MEM.dicho = MEM.dicho || {}), memHumano: () => MEM.humano, memRobot: () => (MEM.robot = MEM.robot || {}), memConv: () => (MEM.conv = MEM.conv || {}), tickRecordatorios, tickVolver, tickRetomar, tickEstadisticas, tickEstados, publicarGuia, publicarLlavePush, llavesPush, audienciaDe, AUDIENCIA, memLids: () => (MEM.lids = MEM.lids || {}), entregarAvisos, tickPedidosWa, memAvisoPago: () => (MEM.avisoPago = MEM.avisoPago || {}), avisados, botOff: BOT_OFF, apagarGlobal, botAlDia, botDe, memGuia: () => (MEM.guia = MEM.guia || {}), memStats: () => (MEM.stats = MEM.stats || {}), publicarEstado, alMensaje, alEventoConexion, ultimos, reiniciar() { CL = null; MEM.soporte = { gente: {}, callado: {} }; SOP_CFG.t = 0; SOP_CFG.activo = false; SOP_TIENDAS.clear(); SOP_GENTE.L = {}; SOP_GENTE.t = 0; MEM.sinbotPanel = {}; SINBOT_T.clear(); MEM.volver = {}; MEM.stats = {}; MEM.piePrueba = {}; delete MEM.pushPublicada; MEM.lids = {}; MEM.lidAviso = {}; LID_NO.clear(); MEM.guia = {}; MEM.avisoPago = {}; avisados.clear(); leer.avisado = false; BOT_LEIDO.clear(); MEM.sinbot = {}; MEM.chats = {}; MEM.estados = {}; MEM.humano = {}; MEM.enviados = []; MEM.conv = {}; MEM.clientes = {}; MEM.conectados = {}; MEM.pendientesWa = {}; MEM.codigos = {}; MEM.robot = {}; MEM.dicho = {}; AGRUPA.clear(); ASIS._cat.clear(); BOT.clear(); CONTACTOS.clear(); AUDIENCIA.clear(); vinculando.clear(); delete MEM.revPend; ULT_ENVIO.clear(); VISTOS_ID.clear(); FILAS.clear(); ultimos.length = 0; negT = 0; } };
 module.exports = { _banco, botNormal, frenoRobot, estadosQueTocan, atenderPedidoWa, sincronizarConectados, renovarQr, telEnAviso, deWaha, esWaha, debeResponder, alEventoConexion, tickPedidosWa, limpiarSinVincular, leerMensaje, atiende, PREGUNTA, numeroWa, ahoraLocal, enFila, yaVisto, quienVeEstados, CFG };

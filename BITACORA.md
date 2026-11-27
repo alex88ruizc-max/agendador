@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.67** · Página **2026-11-27a** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.68** · Página **2026-11-27a** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -136,6 +136,15 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-27 · agendador-ia-3.68 · 🎓 casos de entrenamiento anonimizados (de los chats reales)
+- **Orden de Alex:** «usa esos datos para entrenar, sin nombres ni números, es solo entrenamiento, y hazlo rápido».
+- **Bot (`principal.js`, `casoAnotar` / `anonimizar`):** cada vez que el bot le contesta a un cliente (texto o lista), guarda «lo que escribió el cliente → lo que respondió el bot» en `datos/casos/AAAA-MM-DD.jsonl`, con el tipo de negocio y si respondió la regla o la IA. **Antes de guardar quita:** nombres del cliente (WhatsApp y el que dio), del negocio y del equipo, teléfonos, correos, códigos de reserva y links. Si no tiene los nombres del negocio, no guarda. Tope 3.000 al día (`CASOS_TOPE`). Solo respuestas a un cliente (no avisos ni estados).
+- **Cartero:** cada 6 h sube los de hoy y ayer al repositorio PRIVADO (`agendador-epic-copia/agendador/casos/`); `/casos` lo hace ya y dice cuántos hay. Nunca a uno público.
+- **Siguiente paso (Claude):** con los primeros días de casos, convertirlos en pruebas del banco (y los casos de Mary que sirven para citas).
+- Prueba nueva: un mensaje con nombre, correo, celular y nombre del profesional → el caso guardado no trae ninguno. 213 pasan.
+- Va con lo de la 3.67 (recordatorio de vencimiento). La página sigue en 2026-11-27a.
+- **Legal:** cuando se hagan los documentos, decir que se guardan conversaciones anonimizadas para mejorar el asistente.
 
 ### 2026-11-27 · agendador-ia-3.67 · página 2026-11-27a · ⏰ recordatorio de vencimiento del plan (y de la prueba gratis)
 - **Pedido de Alex:** «recordarle a los negocios cuando les falten 2 días para vencer si quieren continuar y poner los medios de pago». Dijo «sí» a: por todas las vías y también a la prueba gratis.
