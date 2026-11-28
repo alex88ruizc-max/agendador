@@ -857,3 +857,10 @@ test('3.67 · ⏰ Recordatorio de vencimiento: 2 días antes, una sola vez por f
   // al otro día (falta 1): ya estaba avisado para esa fecha → no repite
   tg.length = 0; const r2 = F.maryRecordarVencimientos_(new Date('2026-11-28T15:00:00Z')); assert.deepEqual(r2.enviados, []); assert.equal(tg.length, 0);
 });
+
+test('2026-11-28a · 💲 «Crea tu agenda» muestra los precios del súper panel aunque se abra antes de que lleguen (no los de fábrica)', { skip: !require('fs').existsSync(require('path').join(__dirname, '..', '..', 'app.js')) && 'sin la página aquí' }, () => {
+  const app = require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'app.js'), 'utf8');
+  assert.match(app, /function renderTrialPlans\(\) \{\n  if \(!PLAT_OK\) \{[^\n]*Cargando los planes[^\n]*PLAT_P\.then/, 'espera los precios');
+  assert.match(app, /PLAT = d\.data\(\) \|\| \{\}; PLAT_OK = true;\n  if \(!\$\("trialPlans"\)\.classList\.contains\("hidden"\)[^\n]*renderTrialPlans\(\)/, 'y si ya estaba abierto, se vuelve a pintar');
+  assert.match(app, /\.catch\(\(\) => \{ PLAT_OK = true; \}\)/, 'nunca se queda en «Cargando»');
+});

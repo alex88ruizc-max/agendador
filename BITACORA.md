@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.68** · Página **2026-11-27a** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.68** · Página **2026-11-28a** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -136,6 +136,12 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-28 · página 2026-11-28a · 💲 «Crea tu agenda» mostraba precios viejos ($40.000 en vez de $45.000)
+- **Captura de Alex:** «Estos precios están mal». En el súper panel Gold está en **$45.000** (leído de `platform/public`), pero «Crea tu agenda» mostraba **$40.000** (el precio de fábrica de `common.js`).
+- **Causa:** la ventana se pintaba antes de que llegaran los precios del súper panel (pasa con el link `?probar=1`, que la abre a los 0,4 s, o con un toque rápido) y no se volvía a pintar.
+- **Arreglo (`app.js`):** si los precios no han llegado, dice «Cargando los planes…» y se pinta apenas llegan; si ya estaba abierta, se vuelve a pintar; si no hay conexión, usa los de fábrica (nunca se queda cargando).
+- **Pendiente relacionado:** Margarita pagó $45.000 por Bre-B y no se activó solo (ver respuesta a Alex): falta saber si generó el pedido y si el correo llegó al Gmail del servidor; propuesta «pago sin identificar» (copiada de Epic) esperando su sí.
 
 ### 2026-11-27 · agendador-ia-3.68 · 🎓 casos de entrenamiento anonimizados (de los chats reales)
 - **Orden de Alex:** «usa esos datos para entrenar, sin nombres ni números, es solo entrenamiento, y hazlo rápido».
