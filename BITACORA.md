@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.70** · Página **2026-11-28b** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.70** · Página **2026-11-28c** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -136,6 +136,11 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-28 · página 2026-11-28c · 👑 el plan a la vista en el panel
+- **Pedido de Alex (captura del Inicio de una tienda):** «debe notarse el plan en el que está, que sea visible, y que al hacer clic te lleve a pagar o cambiar el plan».
+- **Panel (`admin.html`, `admin.js` · `pintarPlanPill`):** debajo del nombre del negocio, una etiqueta: «👑 Plan Gold · hasta el sáb, 13/12 ›» · ámbar «Plan Gold · vence en 2 días · Renovar ›» (7 días o menos) · «🎁 Prueba gratis · quedan 9 días · Elegir plan ›» · roja «⚠️ Tu prueba gratis terminó / Plan Gold vencido · Renovar ›». Un toque abre «Mi plan». Se ve en todas las secciones del panel, solo para el dueño (y el súper viéndolo). Sin precios del súper panel no se muestra.
+- Prueba nueva. `tailwind.css` rearmado.
 
 ### 2026-11-28 · agendador-ia-3.70 · 💸 gasto de la IA súper mínimo
 - **Estado que mandó Alex (/ia):** llave ✅ guardada · modo prueba (sombra) · claude-haiku-5-5 · 0 consultas hoy (nadie había escrito desde el reinicio). Alex: «ojo, el gasto debe ser súper mínimo».

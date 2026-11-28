@@ -877,3 +877,11 @@ test('2026-11-28b · 💲 Los precios salen SOLO del súper panel: ningún preci
   assert.match(leer('super.js'), /Pon el precio de Básico y de Gold/);
   for (const f of ['index.html', 'app.js', 'admin.js', 'common.js']) assert.ok(!/\$\s?(30|40|45)\.000\s*(\/|al)\s*mes/i.test(leer(f)), f + ': precio escrito a mano');
 });
+
+test('2026-11-28c · 👑 El plan se ve debajo del nombre del negocio y un toque lleva a «Mi plan»', { skip: !require('fs').existsSync(require('path').join(__dirname, '..', '..', 'admin.js')) && 'sin la página aquí' }, () => {
+  const fs2 = require('fs'), path2 = require('path'), adm = fs2.readFileSync(path2.join(__dirname, '..', '..', 'admin.js'), 'utf8'), html = fs2.readFileSync(path2.join(__dirname, '..', '..', 'admin.html'), 'utf8');
+  assert.match(html, /id="hdrPlan"/);
+  assert.match(adm, /function pintarPlanPill\(\)[\s\S]{0,2500}b\.onclick = \(\) => switchTab\("plan"\)/);
+  assert.match(adm, /Tu prueba gratis terminó · Elegir plan/); assert.match(adm, /vence en \$\{dias\} día/); assert.match(adm, /Prueba gratis\$\{dias !== null/);
+  assert.match(adm, /!preciosListos\(A\.plat\)\) \{ b\.classList\.add\("hidden"\)/, 'sin precios del súper panel no muestra nada inventado');
+});
