@@ -1626,3 +1626,43 @@ test('3.68 · 🎓 Casos de entrenamiento: cada respuesta al cliente queda guard
   assert.match(L[0].cliente, /«Nombre».*(«correo»|\[correo\]).*(«número»|\[número\]).*«Nombre»/); assert.equal(L[0].tipo, 'unas'); assert.equal(L[0].via, 'regla'); assert.ok(L[0].bot.length > 0);
   assert.equal(B.anonimizar('tu reserva R-AB12CD', []), 'tu reserva «código»');
 });
+
+// ---------- 🎓 3.69 · CASOS REALES (27-nov, una tienda de estética; anonimizados) ----------
+test('3.69 · 🎓 Caso real: «Hola» en medio de las listas ya NO recibe «No te entendí 🙈»', async () => {
+  mundoNuevo();
+  await llega(wahaMsg(CLIENTE, 'quiero agendar')); assert.ok(ultimo().lista, 'está en las listas');
+  await new Promise((ok) => setTimeout(ok, 5));
+  await llega(wahaMsg(CLIENTE, 'Hola'));
+  assert.ok(!/No te entendí/.test(ultimo().texto), 'antes respondía «No te entendí 🙈»');
+});
+test('3.69 · 🎓 Caso real: «a listo ok» después de hablar NO dispara el saludo completo con los cupos', async () => {
+  mundoNuevo();
+  await llega(wahaMsg(CLIENTE, 'hola')); const n = W.enviados.length; assert.ok(n >= 1);
+  await new Promise((ok) => setTimeout(ok, 5));
+  await llega(wahaMsg(CLIENTE, 'a listo ok'));
+  assert.equal(W.enviados.length, n, 'un acuse suelto no es un pedido');
+  assert.ok(B.ultimos.some((x) => /suelto: no hace falta responder/.test(x.que)));
+});
+test('3.69 · 🎓 Caso real: «ok» en medio de las listas no repite la lista ni dice «No te entendí»', async () => {
+  mundoNuevo();
+  await llega(wahaMsg(CLIENTE, 'quiero agendar')); const n = W.enviados.length;
+  await new Promise((ok) => setTimeout(ok, 5));
+  await llega(wahaMsg(CLIENTE, 'ok'));
+  assert.equal(W.enviados.length, n);
+});
+test('3.69 · 🎓 Caso real: «Y q trae ? El paquete ya q por el precio q tienes ??» en medio de las listas → con la IA activa la responde la IA (antes «No te entendí»)', async () => {
+  const F = mundoIA('activo', { accion: 'responder', texto: 'El paquete trae limpieza facial y masaje 😊 ¿Te aparto una hora?' });
+  await llega(wahaMsg(CLIENTE, 'quiero agendar')); assert.ok(ultimo().lista);
+  await new Promise((ok) => setTimeout(ok, 3100));   // una persona tarda más de 3 s en escribir eso (el freno antirrobot pausa lo largo y muy rápido)
+  await llega(wahaMsg(CLIENTE, 'Y q trae ? El paquete ya q por el precio q tienes ??'));
+  assert.equal(F.pedidos.length, 1, 'la IA la leyó'); assert.match(ultimo().texto, /El paquete trae/); assert.ok(!W.enviados.some((x) => /No te entendí/.test(x.texto)));
+  // sin IA, como antes (lo de siempre): no se queda mudo
+  mundoNuevo(); await llega(wahaMsg(CLIENTE, 'quiero agendar')); await new Promise((ok) => setTimeout(ok, 3100));
+  await llega(wahaMsg(CLIENTE, 'Y q trae ? El paquete ya q por el precio q tienes ??')); assert.ok(W.enviados.length >= 2);
+  P.CFG.ia = { clave: '', modo: 'sombra', modelo: '', topeDia: 150, topeChat: 20 };
+});
+test('3.69 · 🎓 Privacidad: los apodos después de un saludo («Hola Margui», «Hola maryi») tampoco quedan en los casos', () => {
+  assert.equal(B.anonimizar('Hola maryi como estás? Todavía tienes cupo para la promo', []), 'Hola «Nombre» como estás? Todavía tienes cupo para la promo');
+  assert.equal(B.anonimizar('Hola Margui cm vas mami necesito unos masajes', []), 'Hola «Nombre» cm vas mami necesito unos masajes');
+  assert.equal(B.anonimizar('hola, buenas tardes, ¿tienes cupo?', []), 'hola, buenas tardes, ¿tienes cupo?', 'no borra palabras comunes');
+});

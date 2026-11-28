@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.68** · Página **2026-11-28b** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.69** · Página **2026-11-28b** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -136,6 +136,16 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-28 · agendador-ia-3.69 · 🎓 primeros casos reales → arreglos y pruebas
+- **Llegaron los primeros 12 casos reales** (27-nov, una tienda de estética), anonimizados. Todos los resolvió la regla (la IA aún no respondió: falta la llave o está en prueba).
+- **Arreglos (con reglas, sin IA):**
+  - «Hola» en medio de las listas recibía «No te entendí 🙈» → ahora el saludo de siempre.
+  - «a listo ok» (o «ok», «listo gracias», 👍) después de hablar disparaba el saludo completo con los cupos → ahora no se responde (`esAcuse`, regla de Mary de Epic: «ok suelto no es pedido»). En medio de las listas tampoco repite la lista.
+  - Pregunta abierta en medio de las listas («Y q trae? El paquete ya q por el precio q tienes??»): con la IA **activa** la responde la IA y la lista sigue abierta; sin IA, como antes.
+- **Privacidad:** se colaban apodos después de un saludo («Hola Margui», «Hola maryi») → `quitarApodos` quita la palabra que sigue a un saludo si no es una palabra común.
+- **Pruebas nuevas con las frases reales** (5). 220 pasan.
+- Pendiente (necesita IA activa): «masajes reductores sin quemadores, ¿tú los tienes?» y la felicitación por el grado del niño.
 
 ### 2026-11-28 · página 2026-11-28b · 💲 los precios salen SOLO del súper panel (sin precios de fábrica)
 - **Orden de Alex:** «el precio debe salir de mi panel administrador solamente y ya, sin códigos ocultos ni nada».

@@ -6,7 +6,7 @@
 const http = require('http'), fs = require('fs'), path = require('path');
 const T = require('./textos'), C = require('./correo'), E = require('./estado'), A = require('./asistente');
 
-const VERSION = 'agendador-ia-3.68';
+const VERSION = 'agendador-ia-3.69';
 const env = (k, d) => (process.env[k] === undefined || process.env[k] === '' ? d : process.env[k]);
 const CFG = {
   puerto: parseInt(env('PUERTO', '3060'), 10),
@@ -334,7 +334,7 @@ async function leer(neg, op, d) {
     return gas(neg, op, d);
   }
 }
-const ASIS = A.crear({ contar: (bid, campo) => contar(bid, campo), gas: (neg, op, d) => leer(neg, op, d), texto: (neg, tel, t) => escribir(neg, tel, t), lista: (neg, tel, L) => escribirLista(neg, tel, L),
+const ASIS = A.crear({ iaActiva: (neg) => !!CFG.ia.clave && CFG.ia.modo === 'activo' && ((botDe(neg).ia || {}).activo !== false), contar: (bid, campo) => contar(bid, campo), gas: (neg, op, d) => leer(neg, op, d), texto: (neg, tel, t) => escribir(neg, tel, t), lista: (neg, tel, L) => escribirLista(neg, tel, L),
   get mem() { return MEM; }, guardar: () => memGuardar(), anotar: (x) => anotar(x), tz: CFG.tz, bot: (neg) => botDe(neg) });
 
 // ---------- ¿quién escribe? ----------
@@ -590,8 +590,13 @@ async function soporteSesion(accion, numero) {
 //    datos/casos/AAAA-MM-DD.jsonl, ANONIMIZADO: sin nombres (del cliente, del negocio ni del equipo), sin números de teléfono, sin correos,
 //    sin códigos de reserva ni links. Solo el tipo de negocio. El cartero los sube al repositorio PRIVADO y de ahí salen las pruebas del banco.
 const CASOS_TOPE = parseInt(env('CASOS_TOPE', '3000'), 10), CASOS = { fecha: '', n: 0 };
+// 3.69 · los apodos se colaban («Hola Margui», «Hola maryi»): la palabra que va después de un saludo se quita si no es una palabra común
+const COMUNES = new Set('a al como cm cómo con de del el ella en es esta está este hay la las lo los me mi muy nada necesito no para pero por puedo que qué quiero se señor señora seño si sí soy su te tengo ti tienen tienes todo todos tu tú un una uno usted vos y ya buen buena buenas bueno buenos dia día dias días tarde tardes noche noches amiga amigo mami mamita linda lindo reina corazon corazón amor cariño gracias otra vez nuevo nueva'.split(' '));
+function quitarApodos(x) {
+  return x.replace(/((?:^|[^\p{L}])(?:hola+|holi|ola|buenas|buenos d[ií]as|buenas tardes|buenas noches|gracias|hey|que m[aá]s|qu[eé] tal)[\s,!.]+)([\p{L}]{3,})/giu, (m, pre, w) => (COMUNES.has(w.toLowerCase()) ? m : pre + '«Nombre»'));
+}
 function anonimizar(t, nombres) {
-  let x = String(t || '');
+  let x = quitarApodos(String(t || ''));
   (nombres || []).filter((n) => n && String(n).trim().length >= 3).sort((a, b) => String(b).length - String(a).length).forEach((n) => {
     String(n).trim().split(/\s+/).concat([String(n).trim()]).filter((p) => p.length >= 3).forEach((p) => { x = x.replace(new RegExp('(^|[^\\p{L}])' + p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![\\p{L}])', 'giu'), '$1«Nombre»'); });
   });
@@ -804,6 +809,8 @@ async function atenderMensaje(c, neg) {
     if (r) { MEM.chats[k] = { t: Date.now(), firma: r, n: 1 }; memGuardar(); anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: { flujo: 'agendando por WhatsApp', cupos: 'le mostré los cupos', agendar: 'empezó a agendar', audio: 'audio: le pedí que escriba' }[r] || r }); return; }
   }
   if (!c.texto) return;
+  // 3.69 · «a listo ok» (caso real 27-nov) recibía el saludo completo con los cupos: un acuse suelto, si ya se habló hoy, no se responde
+  if (A.esAcuse(c.texto) && prev.t && Date.now() - prev.t < 12 * 3600000) { anotar({ bid: neg.bid, chat: (c.tel || '').slice(-4), que: '👍 «' + String(c.texto).slice(0, 20) + '» suelto: no hace falta responder' }); return; }
   const reciente = prev.t && Date.now() - prev.t < CFG.silencioMin * 60000;
   if (reciente && !PREGUNTA.test(c.texto) && !iaAbierta(c.texto)) { anotar({ bid: neg.bid, chat: c.tel.slice(-4), que: 'callada (ya le respondí hace poco)' }); return; }   // atajo: ni se consulta a Google (no va a responder)
   let info;

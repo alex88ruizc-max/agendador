@@ -87,6 +87,13 @@ const QUIERE_AGENDAR = /agend|reserv|apart(ar|o|e)\b|separ(ar|o) (una |un )?(cit
 // 3.29: «presenta problemas tu aplicativo», «el link no me abre», «la página no funciona» → se le agenda por aquí mismo
 const LINK_FALLA = /(problema|no (me )?(funciona|carga|abre|sirve|deja|entra|sale)|falla|fallando|error|dañad|no puedo (entrar|agendar|abrir|reservar))/;
 const LINK_QUE = /(link|enlace|pagina|aplicativo|aplicacion|app\b|web|agendamiento|plataforma|sistema)/;
+// 3.69 · un «ok / listo / gracias» suelto (o varios juntos: «a listo ok») NO es un pedido (regla de Mary de Epic, FICHAS 13-nov)
+const ACUSES = new Set(['a', 'ah', 'ay', 'aja', 'ok', 'oki', 'okey', 'okay', 'vale', 'listo', 'lista', 'dale', 'bueno', 'bien', 'perfecto', 'gracias', 'mil', 'muchas', 'de', 'una', 'si', 'claro', 'entendido', 'super', 'genial', 'ya', 'va']);
+function esAcuse(texto) {
+  const p = sinTilde(texto).replace(/[^\p{L}\p{N} ]/gu, ' ').trim().split(/\s+/).filter(Boolean);
+  if (!p.length) return /^[\s👍🙏🙌😊❤️👌✅🤝💯]+$/u.test(String(texto || '')) && String(texto || '').trim() !== '';
+  return p.length <= 5 && p.every((w) => ACUSES.has(w)) && !(p.length === 1 && ['si', 'de', 'una', 'mil', 'muchas', 'ya', 'va'].includes(p[0]));
+}
 const SALUDO = /^(hola+|holi|ola|buenas|buenos dias|buenas tardes|buenas noches|buen dia|hey|saludos|que tal)\b/;
 const SALIR = /^(cancelar|salir|menu|inicio|empezar de nuevo|volver a empezar|dejalo asi|olvidalo)$/;
 const SI = /^(si+|claro|dale|listo|ok|okey|okay|confirmo|confirmar|confirmado|de una|correcto|perfecto|va|hagale|hagamosle|asi esta bien|esta bien)\b/;
@@ -535,6 +542,11 @@ function crear(dep) {
       const f = (conv.paso === 'dia' || conv.paso === 'diaCupos' || conv.paso === 'horaCupos') && fechaPedida(c.texto, hoy());
       if (f && conv.paso === 'horaCupos') return cupos(neg, c, '', f, conv);
       if (f) { const op = (conv.opciones || []).find((x) => x.id === 'dia:' + f); if (op) return seguir(neg, Object.assign({}, c, { rowId: op.id }), conv); }
+      // 3.69 · casos reales (27-nov, estética): «Hola» en medio de las listas recibía «No te entendí 🙈» → ahora el saludo de siempre;
+      //        «ok / listo» suelto ya no repite la lista; y una pregunta abierta («¿y qué trae el paquete?») la responde la IA si está activa.
+      if (!c.rowId && SALUDO.test(t) && t.split(' ').length <= 4 && !/\?/.test(String(c.texto || ''))) { fin(c.k); return null; }
+      if (!c.rowId && esAcuse(c.texto)) return 'acuse';
+      if (!c.rowId && dep.iaActiva && dep.iaActiva(neg) && t.split(' ').length >= 3) return null;   // la lista sigue abierta: puede tocarla después
       return reenviar(neg, c, conv);
     }
     const [tipo, val] = o.id.split(/:(.*)/s);
@@ -768,4 +780,4 @@ function crear(dep) {
   return { manejar, menu, saludo, ofrecerVolver, retomar, porRetomar, trasRecordatorio, preguntarDobles, cliente, fechaPedida: (t) => fechaPedida(t, hoy()), _cat: catCache };
 }
 
-module.exports = { crear, horaPedida, fechaPedida, sinTilde, QUIERE_CUPOS, QUIERE_AGENDAR, SALUDO };
+module.exports = { crear, horaPedida, fechaPedida, sinTilde, QUIERE_CUPOS, QUIERE_AGENDAR, SALUDO, esAcuse };
