@@ -111,7 +111,7 @@ function crear(o) {
     const nuevo = '<cliente>\n' + contextoCliente(clienteInfo || {}) + '\n</cliente>\n\nMensaje del cliente: ' + limpia(mensaje, 1200);
     if (msgs.length && msgs[msgs.length - 1].role === 'user') msgs[msgs.length - 1].content += '\n\n' + nuevo; else msgs.push({ role: 'user', content: nuevo });
     const pedido = {
-      model: modelo, max_tokens: 2000,
+      model: modelo, max_tokens: 900,   // 3.70: respuestas cortas = gasto mínimo (la herramienta trae 1–3 frases)
       output_config: { effort: 'low' },                                     // chat corto: esfuerzo bajo (más rápido y barato)
       system: [
         { type: 'text', text: REGLAS },

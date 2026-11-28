@@ -1,4 +1,4 @@
-🗓️ AGENDADOR IA · agendador-ia-3.69   (por dentro atiende «Mary», la recepcionista)
+🗓️ AGENDADOR IA · agendador-ia-3.70   (por dentro atiende «Mary», la recepcionista)
 =====================================================================================================
 🚫 REGLA UNIVERSAL N.º 1 — EPIC NO SE TOCA (manda sobre todo lo demás, para Alex, para Claude y para cada script de este paquete)
    Epic (Mary de Epic, Luisa, la tienda, epic-waha, epic-tiendas, Epic Channels…) y CUALQUIER otro proyecto:
@@ -63,6 +63,7 @@ AJUSTES POR NEGOCIO (negocios.json)
   "recordatorioMin": 120     ·   "estados": { "activo": true, "hoy": "07:30", "semana": "07:00", "semanaDia": 1 }
   En Firestore (settings/general del negocio) maryAutoCaptura: true → la captura confirma al instante y el dueño revisa después.
 
+NOVEDADES 3.70 · 💸 IA con gasto mínimo: tope 40 consultas al día por tienda y 8 por chat, respuestas cortas, y /ia muestra el gasto de hoy en dólares. Trae lo de la 3.69. La página sigue en 2026-11-28b.
 NOVEDADES 3.69 · 🎓 Arreglos sacados de los casos reales: «Hola» en medio de las listas ya no recibe «No te entendí», «ok/listo» suelto no se responde, preguntas abiertas en las listas las responde la IA si está activa, y los apodos no quedan en los casos. Trae lo de la 3.68. La página sigue en 2026-11-28b.
 NOVEDADES 3.68 · 🎓 Casos de entrenamiento: cada respuesta al cliente se guarda SIN nombres, números, correos ni códigos (datos/casos/) y el cartero los sube cada 6 h a la copia privada (/casos). Trae lo de la 3.67. La página sigue en 2026-11-27a.
 NOVEDADES 3.67 · ⏰ Recordatorio de vencimiento: 2 días antes, a cada negocio (y a la prueba gratis), por Telegram, app, WhatsApp de avisos y correo, con el valor y los medios de pago. La IA responde primero lo que le preguntan. Trae lo de la 3.66. Después manda agendador-web-2026-11-27a.zip.

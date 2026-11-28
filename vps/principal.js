@@ -6,7 +6,7 @@
 const http = require('http'), fs = require('fs'), path = require('path');
 const T = require('./textos'), C = require('./correo'), E = require('./estado'), A = require('./asistente');
 
-const VERSION = 'agendador-ia-3.69';
+const VERSION = 'agendador-ia-3.70';
 const env = (k, d) => (process.env[k] === undefined || process.env[k] === '' ? d : process.env[k]);
 const CFG = {
   puerto: parseInt(env('PUERTO', '3060'), 10),
@@ -27,7 +27,8 @@ const CFG = {
   tz: env('TZ', 'America/Bogota'), esperaMs: parseInt(env('ESPERA_MS', '2000'), 10),
   // 2.2 · motor de WhatsApp: evolution (el de siempre) o waha. Cada negocio puede tener el suyo en negocios.json ("motor", "sesion").
   // 🤖 3.65 · respuestas inteligentes con Claude: la llave va en agendador-ia.env (nunca en el código). Sin llave, no hay IA y todo sigue igual.
-  ia: { clave: env('ANTHROPIC_API_KEY', ''), modo: String(env('IA_MODO', 'sombra')).toLowerCase(), modelo: env('IA_MODELO', ''), topeDia: parseInt(env('IA_TOPE_DIA', '150'), 10), topeChat: parseInt(env('IA_TOPE_CHAT', '20'), 10) },
+  ia: { clave: env('ANTHROPIC_API_KEY', ''), modo: String(env('IA_MODO', 'sombra')).toLowerCase(), modelo: env('IA_MODELO', ''), topeDia: parseInt(env('IA_TOPE_DIA', '40'), 10), topeChat: parseInt(env('IA_TOPE_CHAT', '8'), 10),   // 3.70 (Alex: «el gasto debe ser súper mínimo»): topes más bajos
+    precioEntrada: Number(env('IA_USD_ENTRADA', '0.10')), precioSalida: Number(env('IA_USD_SALIDA', '0.50')) },   // US$ por millón de tokens (Haiku 5.5)
   motor: String(env('WA_MOTOR', env('WAHA_KEY', '') ? 'waha' : 'evolution')).toLowerCase(),   // 3.1: con WAHA del agendador, los negocios nuevos van por WAHA
   waha: String(env('WAHA_URL', 'http://waha-agendador:3000')).replace(/\/+$/, ''), wahaKey: env('WAHA_KEY', '')
 };
@@ -646,7 +647,7 @@ function hilo(k, yo, texto) {
 function iaPuede(neg, k) {
   if (!CFG.ia.clave || CFG.ia.modo === 'apagado') return false;
   const b = botDe(neg); if (!b.activo || !(b.ia || { activo: true }).activo) return false;
-  const hoy = ahoraLocal().fecha; if (IA_USO.fecha !== hoy) Object.assign(IA_USO, { fecha: hoy, neg: {}, chat: {} });
+  const hoy = ahoraLocal().fecha; if (IA_USO.fecha !== hoy) Object.assign(IA_USO, { fecha: hoy, neg: {}, chat: {}, llamadas: 0, entrada: 0, cache: 0, salida: 0, comp: null });   // 3.70: «hoy» es de verdad hoy
   if ((IA_USO.neg[neg.bid] || 0) >= CFG.ia.topeDia || (IA_USO.chat[k] || 0) >= CFG.ia.topeChat) return false;   // tope diario: el gasto no se dispara
   return true;
 }
@@ -1348,7 +1349,7 @@ const servidor = http.createServer(async (req, res) => {
     const mImg = url.pathname.match(/^\/img\/([a-z0-9]+)\.png$/);
     if (req.method === 'GET' && mImg) { const x = IMG.get(mImg[1]); if (!x) { res.writeHead(404); return res.end(); } res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'no-store' }); return res.end(x.png); }
     if (req.method === 'GET' && url.pathname === '/salud') { let oido = 'no instalado'; try { const r = await fetch(CFG.oido + '/salud', { signal: AbortSignal.timeout(2000) }); const j = await r.json(); oido = j.ok ? 'listo (' + j.modelo + ')' : 'cargando' + (j.error ? ': ' + j.error.slice(0, 60) : ''); } catch (e) { /* no está */ }
-      return json(res, 200, { ok: true, version: VERSION, ia: !CFG.ia.clave ? 'sin llave (apagada)' : CFG.ia.modo + ' · ' + (CFG.ia.modelo || IA.MODELO) + ' · hoy ' + IA_USO.llamadas + ' consulta(s)' + (IA_USO.comp ? ' · reglas e IA de acuerdo ' + (IA_USO.comp.iguales || 0) + ', distintas ' + (IA_USO.comp.distintas || 0) + ', las reglas no entendieron ' + (IA_USO.comp.noEntendio || 0) : '') + ' · entrada ' + IA_USO.entrada + ' (caché ' + IA_USO.cache + ') · salida ' + IA_USO.salida + ' tokens', letras: E.letras() ? 'ok (' + E.FUENTES.length + ' propias)' : '⚠️ NO HAY LETRA: los estados no se publican', oido, modo: CFG.modo, prueba: CFG.prueba.length, negocios: negocios().map((n) => n.bid), gas: !!(CFG.gas && CFG.maryKey), evo: !!CFG.evoKey, est }); }
+      return json(res, 200, { ok: true, version: VERSION, ia: !CFG.ia.clave ? 'sin llave (apagada)' : CFG.ia.modo + ' · ' + (CFG.ia.modelo || IA.MODELO) + ' · hoy ' + IA_USO.llamadas + ' consulta(s)' + (IA_USO.comp ? ' · reglas e IA de acuerdo ' + (IA_USO.comp.iguales || 0) + ', distintas ' + (IA_USO.comp.distintas || 0) + ', las reglas no entendieron ' + (IA_USO.comp.noEntendio || 0) : '') + ' · entrada ' + IA_USO.entrada + ' (caché ' + IA_USO.cache + ') · salida ' + IA_USO.salida + ' tokens · gasto de hoy ≈ US$' + ((IA_USO.entrada * CFG.ia.precioEntrada + IA_USO.salida * CFG.ia.precioSalida) / 1e6).toFixed(4), letras: E.letras() ? 'ok (' + E.FUENTES.length + ' propias)' : '⚠️ NO HAY LETRA: los estados no se publican', oido, modo: CFG.modo, prueba: CFG.prueba.length, negocios: negocios().map((n) => n.bid), gas: !!(CFG.gas && CFG.maryKey), evo: !!CFG.evoKey, est }); }
     if (req.method === 'GET' && url.pathname === '/registro') return json(res, 200, ultimos.slice(-Math.min(100, parseInt(url.searchParams.get('n') || '20', 10))));
     // 🧪 vista previa del estado (no publica): curl -s "127.0.0.1:3060/vista?bid=mi-negocio&tipo=hoy" -o hoy.png
     if (req.method === 'GET' && url.pathname === '/vista') { const neg = negocios().find((n) => n.bid === url.searchParams.get('bid')); if (!neg) return json(res, 404, { ok: false, error: 'negocio no está en negocios.json' }); const { png } = await armarEstado(neg, url.searchParams.get('tipo') === 'semana' ? 'semana' : 'hoy'); res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(png); }

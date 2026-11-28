@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.69** · Página **2026-11-28b** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.70** · Página **2026-11-28b** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -136,6 +136,11 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-28 · agendador-ia-3.70 · 💸 gasto de la IA súper mínimo
+- **Estado que mandó Alex (/ia):** llave ✅ guardada · modo prueba (sombra) · claude-haiku-5-5 · 0 consultas hoy (nadie había escrito desde el reinicio). Alex: «ojo, el gasto debe ser súper mínimo».
+- **Cambios:** topes más bajos por defecto: **40 consultas al día por tienda** (`IA_TOPE_DIA`, antes 150) y **8 por chat** (`IA_TOPE_CHAT`, antes 20); respuesta máxima 900 tokens (antes 2.000); el contador de «hoy» se reinicia de verdad cada día; `/ia` muestra el **gasto de hoy en dólares** (precios de Haiku 5.5: US$0,10 por millón de tokens de entrada y US$0,50 de salida, cambiables con `IA_USD_ENTRADA` / `IA_USD_SALIDA`).
+- **Cuenta:** una consulta ≈ 2.000–3.000 tokens de entrada y ~200 de salida ≈ US$0,0004. Con el tope, el peor caso de una tienda es ≈ US$0,02 al día.
 
 ### 2026-11-28 · agendador-ia-3.69 · 🎓 primeros casos reales → arreglos y pruebas
 - **Llegaron los primeros 12 casos reales** (27-nov, una tienda de estética), anonimizados. Todos los resolvió la regla (la IA aún no respondió: falta la llave o está en prueba).
