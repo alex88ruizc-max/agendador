@@ -3,9 +3,9 @@ import { onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordRe
 import {
   doc, getDoc, setDoc, addDoc, deleteDoc, collection, query, orderBy, limit, onSnapshot, serverTimestamp, where
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { PLAN_KEYS, PLAN_FEATURES, plansOf, planOfBiz, DEFAULT_PAY_WARNING, TG_EVENTS, BIZ_TYPES, planBenefits, planBenefitsIntro, OFERTA_TXT, BOT_GLOBAL } from "./common.js?v=2026-11-28a";
-import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-28a";
-import { APP_VERSION, SERVER_VERSION, RULES_VERSION, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, readPublishedVersion, reloadFresh, startUpdateWatcher, warmServer, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-11-28a";
+import { PLAN_KEYS, PLAN_FEATURES, plansOf, planOfBiz, DEFAULT_PAY_WARNING, TG_EVENTS, BIZ_TYPES, planBenefits, planBenefitsIntro, OFERTA_TXT, BOT_GLOBAL } from "./common.js?v=2026-11-28b";
+import { setupInstall, enAppInterna, salirAlNavegador } from "./common.js?v=2026-11-28b";
+import { APP_VERSION, SERVER_VERSION, RULES_VERSION, setNavHandler, pushNav, replaceNav, payAccountInput, isKeyMethod, readPublishedVersion, reloadFresh, startUpdateWatcher, warmServer, uiConfirm, uiPrompt, setDialogBrand, db, auth, api, bogNow, addDays, fechaLarga, fechaCorta, cop, esc, toMillis, toast, openModal, closeModal, setBusy, copyText } from "./common.js?v=2026-11-28b";
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on) => $(id).classList.toggle("hidden", !on);
@@ -654,11 +654,11 @@ function renderPlMethods() {
 const PSTY = { free: ["#5B6782", "🎁"], basic: ["#2B59C3", "⭐"], gold: ["#b8860b", "👑"] };
 function renderPlanEditor() {
   $("plPlans").innerHTML = PLAN_KEYS.map((k) => { const p = PL.plans[k]; return `<details class="rounded-2xl border border-line" ${k === "free" ? "" : "open"} data-pled="${k}">
-    <summary class="flex cursor-pointer items-center gap-2 rounded-2xl px-3 py-2.5 text-white" style="background:${PSTY[k][0]}"><b class="flex-1">${PSTY[k][1]} ${esc(p.name)}</b><span class="text-sm">${k === "free" ? p.days + " días" : cop(p.priceCOP) + "/mes"}</span></summary>
+    <summary class="flex cursor-pointer items-center gap-2 rounded-2xl px-3 py-2.5 text-white" style="background:${PSTY[k][0]}"><b class="flex-1">${PSTY[k][1]} ${esc(p.name)}</b><span class="text-sm">${k === "free" ? p.days + " días" : (Number(p.priceCOP) > 0 ? cop(p.priceCOP) : "sin precio") + "/mes"}</span></summary>
     <div class="grid gap-2 p-3 sm:grid-cols-2">
       <label class="field"><span>Nombre</span><input data-plk="name" value="${esc(p.name)}" maxlength="20"></label>
       ${k === "free" ? `<label class="field"><span>Días de prueba</span><input data-plk="days" type="number" min="1" max="365" value="${p.days}"></label>`
-        : `<label class="field"><span>Precio al mes (COP)</span><input data-plk="priceCOP" type="number" min="0" step="1000" value="${p.priceCOP}"></label>
+        : `<label class="field"><span>Precio al mes (COP)</span><input data-plk="priceCOP" type="number" min="0" step="1000" value="${p.priceCOP ?? ""}" placeholder="Escribe el precio"></label>
            <label class="flex items-center gap-2 rounded-xl p-2 text-sm sm:col-span-2" style="background:var(--canvas)"><input type="checkbox" class="h-4 w-4" data-plk="oferta" ${p.oferta ? "checked" : ""}> Mostrar <b style="color:#B3202A">${OFERTA_TXT}</b> en la tarjeta del plan</label>`}
       <label class="field sm:col-span-2"><span>Frase corta</span><input data-plk="tagline" value="${esc(p.tagline || "")}" maxlength="50"></label>
       <label class="field sm:col-span-2"><span>Frase antes de los beneficios <span class="soft font-normal">(ej. “Todo lo de Básico, y además:”)</span></span><input data-plk="benefitsIntro" maxlength="60" value="${esc(planBenefitsIntro(PL.plans, k))}"></label>
@@ -692,7 +692,7 @@ function readPlanEditor() {
 function renderDisc() {
   $("plDisc").innerHTML = [3, 6, 12].map((m) => `<label class="rounded-xl p-2.5 text-center" style="background:var(--canvas)"><span class="block text-sm font-bold">${m} meses</span>
     <span class="flex items-center justify-center gap-0.5"><input type="number" min="0" max="60" data-disc="${m}" value="${Number(PL.disc[m] || 0)}" class="w-14 rounded-lg border border-line px-1 py-1 text-center font-bold">%</span>
-    <span class="soft mt-1 block text-[11px]">Gold: ${cop(Math.round(PL.plans.gold.priceCOP * m * (1 - Number(PL.disc[m] || 0) / 100) / 100) * 100)}</span></label>`).join("");
+    <span class="soft mt-1 block text-[11px]">Gold: ${cop(Math.round(Number(PL.plans.gold.priceCOP || 0) * m * (1 - Number(PL.disc[m] || 0) / 100) / 100) * 100)}</span></label>`).join("");
 }
 $("plDisc").addEventListener("change", (e) => { const i = e.target.closest("[data-disc]"); if (!i) return; PL.disc[i.dataset.disc] = Math.min(60, Math.max(0, Number(i.value || 0))); readPlanEditor(); renderDisc(); });
 $("plPlans").addEventListener("change", () => { readPlanEditor(); renderDisc(); });
@@ -721,6 +721,8 @@ $("bbQr").onchange = async (e) => {
 };
 $("plSave").onclick = async () => {
   readPl();
+  readPlanEditor();
+  if (!["basic", "gold"].every((k) => Number(PL.plans[k].priceCOP) > 0)) return toast("Pon el precio de Básico y de Gold: la página los toma solo de aquí.", "error");   // 2026-11-28: sin precios de fábrica
   // 🆘 línea de soporte: sin un número completo no se puede prender (el botón de las tiendas no tendría a dónde ir)
   const sopNum = (() => { let n = ($("sopNum")?.value || "").replace(/\D/g, ""); if (n.length === 10 && n[0] === "3") n = "57" + n; return n; })();
   if ($("sopOn")?.checked && sopNum.length < 11) return toast("Para prender el soporte, escribe tu número con el 57 adelante.", "error");

@@ -2,7 +2,7 @@
 
 > **Regla:** cada cambio al proyecto se anota aquí, en «Historial», el mismo día. Esto se hace antes de entregar el zip.
 > Aquí se guarda todo lo que hay que saber para retomar el proyecto sin perder nada.
-> Última actualización: **2026-11-13** · Mary **agendador-ia-3.68** · Página **2026-11-28a** · Servidor de Google **2026-10-10n** (cuenta nueva)
+> Última actualización: **2026-11-13** · Mary **agendador-ia-3.68** · Página **2026-11-28b** · Servidor de Google **2026-10-10n** (cuenta nueva)
 
 ---
 
@@ -136,6 +136,15 @@ node vps/banco/web.js <carpeta con los archivos de la página>  # página
 ---
 
 ## 📜 Historial (lo más nuevo arriba)
+
+### 2026-11-28 · página 2026-11-28b · 💲 los precios salen SOLO del súper panel (sin precios de fábrica)
+- **Orden de Alex:** «el precio debe salir de mi panel administrador solamente y ya, sin códigos ocultos ni nada».
+- `common.js`: `DEFAULT_PLANS` ya no trae precios (`priceCOP: null`) ni «oferta» de fábrica. Nuevo `preciosListos(plat)`: Básico y Gold con precio > 0 del súper panel.
+- «Crea tu agenda» (`app.js`): espera los precios; si no llegan, dice «No pudimos cargar los planes» con «Intentar de nuevo» (nunca un precio inventado). La sección de planes de la página de venta no sale sin precios.
+- Panel del dueño (`admin.js`): «Mi plan» dice «Cargando tu plan…» hasta tener los precios; el candado de un plan no muestra precio si no hay.
+- Súper panel (`super.js`): el editor muestra «sin precio» y no deja guardar sin precio de Básico y Gold.
+- Prueba nueva: ningún precio de plan escrito en el código.
+- **Sin verificar:** el servidor principal de Google (`Código.js`, fuera del repositorio) calcula el valor del pedido; si él tuviera precios propios no se ven desde aquí.
 
 ### 2026-11-28 · página 2026-11-28a · 💲 «Crea tu agenda» mostraba precios viejos ($40.000 en vez de $45.000)
 - **Captura de Alex:** «Estos precios están mal». En el súper panel Gold está en **$45.000** (leído de `platform/public`), pero «Crea tu agenda» mostraba **$40.000** (el precio de fábrica de `common.js`).

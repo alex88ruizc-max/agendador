@@ -864,3 +864,16 @@ test('2026-11-28a · 💲 «Crea tu agenda» muestra los precios del súper pane
   assert.match(app, /PLAT = d\.data\(\) \|\| \{\}; PLAT_OK = true;\n  if \(!\$\("trialPlans"\)\.classList\.contains\("hidden"\)[^\n]*renderTrialPlans\(\)/, 'y si ya estaba abierto, se vuelve a pintar');
   assert.match(app, /\.catch\(\(\) => \{ PLAT_OK = true; \}\)/, 'nunca se queda en «Cargando»');
 });
+
+test('2026-11-28b · 💲 Los precios salen SOLO del súper panel: ningún precio escondido en el código', { skip: !require('fs').existsSync(require('path').join(__dirname, '..', '..', 'common.js')) && 'sin la página aquí' }, () => {
+  const fs2 = require('fs'), path2 = require('path'), leer = (f) => fs2.readFileSync(path2.join(__dirname, '..', '..', f), 'utf8');
+  const com = leer('common.js');
+  const def = com.slice(com.indexOf('export const DEFAULT_PLANS'), com.indexOf('};', com.indexOf('export const DEFAULT_PLANS')));
+  assert.ok(!/priceCOP:\s*[1-9]/.test(def), 'DEFAULT_PLANS sin precios'); assert.ok(!/oferta:\s*true/.test(def), 'ni oferta de fábrica');
+  const preciosListos = new Function('return ' + com.match(/export const preciosListos = (.+);/)[1])();
+  assert.equal(preciosListos({}), false); assert.equal(preciosListos({ plans: { basic: { priceCOP: 30000 }, gold: { priceCOP: 0 } } }), false); assert.equal(preciosListos({ plans: { basic: { priceCOP: 30000 }, gold: { priceCOP: 45000 } } }), true);
+  assert.match(leer('app.js'), /if \(!preciosListos\(PLAT\)\) \{ \$\("trialPlans"\)/); assert.match(leer('app.js'), /!preciosListos\(PLAT\)\) return;/);
+  assert.match(leer('admin.js'), /if \(!bl \|\| !preciosListos\(A\.plat\)\)/);
+  assert.match(leer('super.js'), /Pon el precio de Básico y de Gold/);
+  for (const f of ['index.html', 'app.js', 'admin.js', 'common.js']) assert.ok(!/\$\s?(30|40|45)\.000\s*(\/|al)\s*mes/i.test(leer(f)), f + ': precio escrito a mano');
+});
